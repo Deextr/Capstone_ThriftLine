@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
@@ -33,10 +34,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Align(
-              alignment: Alignment.topRight,
-              child: TextButton(onPressed: _finish, child: const Text('Skip')),
-            ),
             Expanded(
               child: PageView.builder(
                 controller: _controller,
@@ -48,22 +45,46 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             OnboardingIndicator(count: pages.length, currentIndex: _page),
             Padding(
               padding: const EdgeInsets.all(AppConstants.spacingLg),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    if (_page == pages.length - 1) {
-                      _finish();
-                    } else {
-                      _controller.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 48),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (_page == pages.length - 1) {
+                          _finish();
+                        } else {
+                          _controller.nextPage(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        minimumSize: const Size(double.infinity, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        _page == pages.length - 1 ? 'Get Started' : 'Next',
+                        style: AppTypography.subheading.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
                   ),
-                  child: Text(_page == pages.length - 1 ? 'Get Started' : 'Next', style: AppTypography.subheading.copyWith(color: Colors.white)),
-                ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _finish,
+                    child: Text(
+                      'Skip',
+                      style: AppTypography.body.copyWith(color: Colors.grey),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

@@ -20,12 +20,14 @@ class ProductCard extends StatefulWidget {
     this.variant = ProductCardVariant.grid,
     this.onTap,
     this.showCountdown = false,
+    this.compact = false,
   });
 
   final ProductModel product;
   final ProductCardVariant variant;
   final VoidCallback? onTap;
   final bool showCountdown;
+  final bool compact;
 
   @override
   State<ProductCard> createState() => _ProductCardState();
@@ -60,6 +62,10 @@ class _ProductCardState extends State<ProductCard>
   Widget _buildGrid(BuildContext context) {
     final data = context.watch<DataProvider>();
     final saved = data.isSaved(widget.product.id);
+    final imageHeight = widget.compact ? 116.0 : 150.0;
+    final contentPadding = widget.compact
+        ? const EdgeInsets.all(8)
+        : const EdgeInsets.all(10);
 
     return ThriftCard(
       onTap: widget.onTap,
@@ -70,15 +76,17 @@ class _ProductCardState extends State<ProductCard>
           Stack(
             children: [
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
                 child: CachedNetworkImage(
                   imageUrl: widget.product.imageUrl,
                   width: double.infinity,
-                  height: 150,
+                  height: imageHeight,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(
+                  placeholder: (_, _) => Container(
                     color: AppColors.primaryLight,
-                    height: 150,
+                    height: imageHeight,
                   ),
                 ),
               ),
@@ -87,7 +95,9 @@ class _ProductCardState extends State<ProductCard>
                   top: 8,
                   left: 8,
                   child: ThriftBadge(
-                    label: widget.showCountdown && widget.product.bidEndTime != null
+                    label:
+                        widget.showCountdown &&
+                            widget.product.bidEndTime != null
                         ? 'Bid ${formatCurrency(widget.product.currentBid ?? 0)}'
                         : 'Bid',
                     variant: BadgeVariant.secondary,
@@ -98,14 +108,20 @@ class _ProductCardState extends State<ProductCard>
                   top: 8,
                   right: 40,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.secondary.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: CountdownTimer(
                       endTime: widget.product.bidEndTime!,
-                      style: AppTypography.caption.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+                      style: AppTypography.caption.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
@@ -115,7 +131,7 @@ class _ProductCardState extends State<ProductCard>
                 child: IconButton(
                   icon: AnimatedBuilder(
                     animation: _heartController,
-                    builder: (_, __) => Icon(
+                    builder: (_, _) => Icon(
                       saved ? Icons.favorite : Icons.favorite_border,
                       color: saved ? AppColors.error : Colors.white,
                       size: 22,
@@ -130,13 +146,16 @@ class _ProductCardState extends State<ProductCard>
             ],
           ),
           Padding(
-            padding: const EdgeInsets.all(10),
+            padding: contentPadding,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    ThriftAvatar(imageUrl: widget.product.sellerAvatar, size: 20),
+                    ThriftAvatar(
+                      imageUrl: widget.product.sellerAvatar,
+                      size: widget.compact ? 18 : 20,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -147,20 +166,29 @@ class _ProductCardState extends State<ProductCard>
                       ),
                     ),
                     if (widget.product.sellerVerified)
-                      const Icon(Icons.verified, size: 14, color: AppColors.primary),
+                      const Icon(
+                        Icons.verified,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Text(
                   widget.product.title,
-                  style: AppTypography.body.copyWith(fontWeight: FontWeight.w500),
-                  maxLines: 2,
+                  style: AppTypography.body.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: widget.compact ? 1 : 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: widget.compact ? 2 : 4),
                 Text(
                   formatCurrency(widget.product.displayPrice),
-                  style: AppTypography.subheading.copyWith(color: AppColors.primary),
+                  style: AppTypography.subheading.copyWith(
+                    color: AppColors.primary,
+                    fontSize: widget.compact ? 14 : null,
+                  ),
                 ),
               ],
             ),
@@ -182,7 +210,11 @@ class _ProductCardState extends State<ProductCard>
               width: 60,
               height: 60,
               fit: BoxFit.cover,
-              placeholder: (_, __) => Container(color: AppColors.primaryLight, width: 60, height: 60),
+              placeholder: (_, _) => Container(
+                color: AppColors.primaryLight,
+                width: 60,
+                height: 60,
+              ),
             ),
           ),
           const SizedBox(width: AppConstants.spacingMd),
@@ -190,10 +222,23 @@ class _ProductCardState extends State<ProductCard>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.product.title, style: AppTypography.body, maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text(formatCurrency(widget.product.price), style: AppTypography.subheading.copyWith(color: AppColors.primary, fontSize: 14)),
-                Text('${widget.product.viewCount} views • ${widget.product.likesCount} likes',
-                    style: AppTypography.caption),
+                Text(
+                  widget.product.title,
+                  style: AppTypography.body,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  formatCurrency(widget.product.price),
+                  style: AppTypography.subheading.copyWith(
+                    color: AppColors.primary,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  '${widget.product.viewCount} views • ${widget.product.likesCount} likes',
+                  style: AppTypography.caption,
+                ),
               ],
             ),
           ),

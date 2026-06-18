@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
@@ -60,19 +61,25 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   const SizedBox(height: 48),
                   Center(
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryLight,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.storefront, size: 48, color: AppColors.primary),
+                    child: Image.asset(
+                      'assets/images/thriftline-app-icon.png',
+                      height: 100,
                     ),
                   ),
                   const SizedBox(height: 24),
-                  Text('Thriftline', style: AppTypography.display, textAlign: TextAlign.center),
+                  Text(
+                    'Thriftline',
+                    style: AppTypography.display,
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 8),
-                  Text('AI-powered thrift marketplace', style: AppTypography.body.copyWith(color: AppColors.textSecondary), textAlign: TextAlign.center),
+                  Text(
+                    'AI-powered thrift marketplace',
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 40),
                   ThriftTextField(
                     label: 'Username',
@@ -87,24 +94,51 @@ class _LoginScreenState extends State<LoginScreen> {
                     obscureText: _obscurePassword,
                     icon: Icons.lock_outline,
                     suffix: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
-                  if (_usernameController.text.isNotEmpty || _passwordController.text.isNotEmpty) ...[
+                  if (_usernameController.text.isNotEmpty ||
+                      _passwordController.text.isNotEmpty) ...[
                     if (Validators.username(_usernameController.text) != null)
-                      Padding(padding: const EdgeInsets.only(top: 4), child: Text(Validators.username(_usernameController.text)!, style: AppTypography.caption.copyWith(color: AppColors.error))),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          Validators.username(_usernameController.text)!,
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ),
                   ],
                   const SizedBox(height: 32),
-                  ThriftButton(label: 'Login', onPressed: auth.isLoading ? null : _login, isLoading: auth.isLoading),
+                  ThriftButton(
+                    label: 'Login',
+                    onPressed: auth.isLoading ? null : _login,
+                    isLoading: auth.isLoading,
+                  ),
                   const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text("Don't have an account? ", style: AppTypography.body),
+                      Text(
+                        "Don't have an account? ",
+                        style: AppTypography.body,
+                      ),
                       GestureDetector(
-                        onTap: () => showThriftSnackBar(context, 'Coming Soon'),
-                        child: Text('Sign up', style: AppTypography.body.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                        onTap: () => context.go(RouteNames.signup),
+                        child: Text(
+                          'Sign up',
+                          style: AppTypography.body.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -145,7 +179,10 @@ class _DemoAccounts extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       dense: true,
       title: Text(creds, style: AppTypography.caption),
-      subtitle: Text(role, style: AppTypography.caption.copyWith(color: AppColors.primary)),
+      subtitle: Text(
+        role,
+        style: AppTypography.caption.copyWith(color: AppColors.primary),
+      ),
       trailing: const Icon(Icons.login, size: 16),
       onTap: () {
         final state = context.findAncestorStateOfType<_LoginScreenState>();

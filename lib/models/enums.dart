@@ -3,9 +3,9 @@ enum UserRole {
   seller;
 
   static UserRole fromString(String value) => UserRole.values.firstWhere(
-        (e) => e.name == value,
-        orElse: () => UserRole.buyer,
-      );
+    (e) => e.name == value,
+    orElse: () => UserRole.buyer,
+  );
 }
 
 enum ProductCategory {
@@ -56,10 +56,8 @@ enum ProductStatus {
   sold,
   draft;
 
-  static ProductStatus fromString(String value) => ProductStatus.values.firstWhere(
-        (e) => e.name == value,
-        orElse: () => ProductStatus.active,
-      );
+  static ProductStatus fromString(String value) => ProductStatus.values
+      .firstWhere((e) => e.name == value, orElse: () => ProductStatus.active);
 }
 
 enum SellingType {
@@ -68,9 +66,9 @@ enum SellingType {
   both;
 
   static SellingType fromString(String value) => SellingType.values.firstWhere(
-        (e) => e.name == value,
-        orElse: () => SellingType.fixedPrice,
-      );
+    (e) => e.name == value,
+    orElse: () => SellingType.fixedPrice,
+  );
 }
 
 enum BidStatus {
@@ -82,9 +80,9 @@ enum BidStatus {
   expired;
 
   static BidStatus fromString(String value) => BidStatus.values.firstWhere(
-        (e) => e.name == value,
-        orElse: () => BidStatus.active,
-      );
+    (e) => e.name == value,
+    orElse: () => BidStatus.active,
+  );
 }
 
 enum OrderStatus {
@@ -98,9 +96,15 @@ enum OrderStatus {
   cancelled;
 
   static OrderStatus fromString(String value) => OrderStatus.values.firstWhere(
-        (e) => e.name == value,
-        orElse: () => OrderStatus.placed,
-      );
+    (e) => e.name == value,
+    orElse: () => OrderStatus.placed,
+  );
+}
+
+String orderStatusLabel(Object? status) {
+  if (status is OrderStatus) return status.name;
+  if (status is String) return status;
+  return 'unknown';
 }
 
 enum PaymentMethod {
@@ -129,9 +133,9 @@ enum MessageType {
   offer;
 
   static MessageType fromString(String value) => MessageType.values.firstWhere(
-        (e) => e.name == value,
-        orElse: () => MessageType.text,
-      );
+    (e) => e.name == value,
+    orElse: () => MessageType.text,
+  );
 }
 
 enum NotificationType {

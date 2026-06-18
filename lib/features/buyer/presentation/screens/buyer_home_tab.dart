@@ -37,7 +37,9 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
     final data = context.watch<DataProvider>();
     final user = AuthService().getUserByUsername(auth.username ?? '');
     final name = user?.name ?? 'there';
-    final notifCount = data.unreadNotificationCount(auth.user?.id ?? 'buyer_maya');
+    final notifCount = data.unreadNotificationCount(
+      auth.user?.id ?? 'buyer_maya',
+    );
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -58,27 +60,34 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                       Row(
                         children: [
                           Expanded(
-                            child: Text('${_greeting()}, $name! 👋', style: AppTypography.heading),
+                            child: Text(
+                              '${_greeting()}, $name! 👋',
+                              style: AppTypography.heading,
+                            ),
                           ),
                           Badge(
                             isLabelVisible: notifCount > 0,
                             label: Text('$notifCount'),
                             child: IconButton(
                               icon: const Icon(Icons.notifications_outlined),
-                              onPressed: () => context.push(RouteNames.notifications),
+                              onPressed: () =>
+                                  context.push(RouteNames.notifications),
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.chat_bubble_outline),
-                            onPressed: () => context.push(RouteNames.chat),
                           ),
                         ],
                       ),
                       Row(
                         children: [
-                          const Icon(Icons.location_on, size: 16, color: AppColors.primary),
+                          const Icon(
+                            Icons.location_on,
+                            size: 16,
+                            color: AppColors.primary,
+                          ),
                           const SizedBox(width: 4),
-                          Text(user?.location ?? 'Quezon City', style: AppTypography.caption),
+                          Text(
+                            user?.location ?? 'Quezon City',
+                            style: AppTypography.caption,
+                          ),
                           const Icon(Icons.keyboard_arrow_down, size: 16),
                         ],
                       ),
@@ -86,7 +95,10 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                       GestureDetector(
                         onTap: () => context.push(RouteNames.search),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.surface,
                             borderRadius: BorderRadius.circular(12),
@@ -94,17 +106,28 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.search, color: AppColors.textHint),
+                              const Icon(
+                                Icons.search,
+                                color: AppColors.textHint,
+                              ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
                                   "Try: 'vintage denim jacket size M under ₱500'",
-                                  style: AppTypography.body.copyWith(color: AppColors.textHint),
+                                  style: AppTypography.body.copyWith(
+                                    color: AppColors.textHint,
+                                  ),
                                 ),
                               ),
                               GestureDetector(
-                                onTap: () => showThriftSnackBar(context, 'Voice search coming soon'),
-                                child: const Icon(Icons.mic, color: AppColors.primary),
+                                onTap: () => showThriftSnackBar(
+                                  context,
+                                  'Voice search coming soon',
+                                ),
+                                child: const Icon(
+                                  Icons.mic,
+                                  color: AppColors.primary,
+                                ),
                               ),
                             ],
                           ),
@@ -119,7 +142,8 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                             return ThriftChip(
                               label: c,
                               selected: _selectedCategory == c,
-                              onTap: () => setState(() => _selectedCategory = c),
+                              onTap: () =>
+                                  setState(() => _selectedCategory = c),
                             );
                           }).toList(),
                         ),
@@ -128,26 +152,41 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                       SizedBox(
                         height: 140,
                         child: PageView(
-                          onPageChanged: (i) => setState(() => _bannerIndex = i),
+                          onPageChanged: (i) =>
+                              setState(() => _bannerIndex = i),
                           children: [
-                            _banner('Mega Thrift Sale — Up to 70% off', [AppColors.primary, AppColors.primaryDark]),
-                            _banner('New Arrivals Daily', [AppColors.secondary, const Color(0xFFEA580C)]),
-                            _banner('Verified Sellers Only', [const Color(0xFF1E293B), const Color(0xFF334155)]),
+                            _banner('Mega Thrift Sale — Up to 70% off', [
+                              AppColors.primary,
+                              AppColors.primaryDark,
+                            ]),
+                            _banner('New Arrivals Daily', [
+                              AppColors.secondary,
+                              const Color(0xFFEA580C),
+                            ]),
+                            _banner('Verified Sellers Only', [
+                              const Color(0xFF1E293B),
+                              const Color(0xFF334155),
+                            ]),
                           ],
                         ),
                       ),
                       const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(3, (i) => Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
-                          width: _bannerIndex == i ? 16 : 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: _bannerIndex == i ? AppColors.primary : AppColors.border,
-                            borderRadius: BorderRadius.circular(3),
+                        children: List.generate(
+                          3,
+                          (i) => Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            width: _bannerIndex == i ? 16 : 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: _bannerIndex == i
+                                  ? AppColors.primary
+                                  : AppColors.border,
+                              borderRadius: BorderRadius.circular(3),
+                            ),
                           ),
-                        )),
+                        ),
                       ),
                     ],
                   ),
@@ -175,6 +214,7 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                           child: ProductCard(
                             product: p,
                             showCountdown: true,
+                            compact: true,
                             onTap: () => context.push('/product/${p.id}'),
                           ),
                         ),
@@ -209,12 +249,26 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Text(s.shopName, style: AppTypography.body.copyWith(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                      Text('${s.distanceKm} km • ⭐ ${s.rating}', style: AppTypography.caption),
-                                      Text('${s.itemCount} items', style: AppTypography.caption),
+                                      Text(
+                                        s.shopName,
+                                        style: AppTypography.body.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        '${s.distanceKm} km • ⭐ ${s.rating}',
+                                        style: AppTypography.caption,
+                                      ),
+                                      Text(
+                                        '${s.itemCount} items',
+                                        style: AppTypography.caption,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -246,7 +300,10 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                     (_, i) {
                       final products = _selectedCategory == 'All'
                           ? data.trendingProducts
-                          : data.searchProducts('', category: _selectedCategory);
+                          : data.searchProducts(
+                              '',
+                              category: _selectedCategory,
+                            );
                       if (i >= products.length) return null;
                       final p = products[i];
                       return ProductCard(
@@ -256,7 +313,9 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                     },
                     childCount: _selectedCategory == 'All'
                         ? data.trendingProducts.length
-                        : data.searchProducts('', category: _selectedCategory).length,
+                        : data
+                              .searchProducts('', category: _selectedCategory)
+                              .length,
                   ),
                 ),
               ),
@@ -276,7 +335,11 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Center(
-        child: Text(text, style: AppTypography.subheading.copyWith(color: Colors.white), textAlign: TextAlign.center),
+        child: Text(
+          text,
+          style: AppTypography.subheading.copyWith(color: Colors.white),
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }

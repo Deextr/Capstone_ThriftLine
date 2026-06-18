@@ -20,7 +20,8 @@ class SellerOrdersTab extends StatefulWidget {
   State<SellerOrdersTab> createState() => _SellerOrdersTabState();
 }
 
-class _SellerOrdersTabState extends State<SellerOrdersTab> with SingleTickerProviderStateMixin {
+class _SellerOrdersTabState extends State<SellerOrdersTab>
+    with SingleTickerProviderStateMixin {
   late TabController _tab;
 
   @override
@@ -64,11 +65,37 @@ class _SellerOrdersTabState extends State<SellerOrdersTab> with SingleTickerProv
             child: TabBarView(
               controller: _tab,
               children: [
-                _list(orders.where((o) => o.status == OrderStatus.placed || o.status == OrderStatus.paymentPending).toList()),
-                _list(orders.where((o) => o.status == OrderStatus.paymentConfirmed || o.status == OrderStatus.preparing).toList()),
-                _list(orders.where((o) => o.status == OrderStatus.shipped).toList()),
-                _list(orders.where((o) => o.status == OrderStatus.delivered).toList()),
-                _list(orders.where((o) => o.status == OrderStatus.cancelled).toList()),
+                _list(
+                  orders
+                      .where(
+                        (o) =>
+                            o.status == OrderStatus.placed ||
+                            o.status == OrderStatus.paymentPending,
+                      )
+                      .toList(),
+                ),
+                _list(
+                  orders
+                      .where(
+                        (o) =>
+                            o.status == OrderStatus.paymentConfirmed ||
+                            o.status == OrderStatus.preparing,
+                      )
+                      .toList(),
+                ),
+                _list(
+                  orders.where((o) => o.status == OrderStatus.shipped).toList(),
+                ),
+                _list(
+                  orders
+                      .where((o) => o.status == OrderStatus.delivered)
+                      .toList(),
+                ),
+                _list(
+                  orders
+                      .where((o) => o.status == OrderStatus.cancelled)
+                      .toList(),
+                ),
               ],
             ),
           ),
@@ -79,7 +106,11 @@ class _SellerOrdersTabState extends State<SellerOrdersTab> with SingleTickerProv
 
   Widget _list(List orders) {
     if (orders.isEmpty) {
-      return const EmptyState(icon: Icons.inventory_2, title: 'No orders', message: 'Orders will appear here');
+      return const EmptyState(
+        icon: Icons.inventory_2,
+        title: 'No orders',
+        message: 'Orders will appear here',
+      );
     }
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -97,7 +128,10 @@ class _SellerOrdersTabState extends State<SellerOrdersTab> with SingleTickerProv
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('#${o.orderNumber}', style: AppTypography.caption),
-                    ThriftBadge(label: o.status.name, variant: BadgeVariant.neutral),
+                    ThriftBadge(
+                      label: orderStatusLabel(o.status),
+                      variant: BadgeVariant.neutral,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -113,34 +147,76 @@ class _SellerOrdersTabState extends State<SellerOrdersTab> with SingleTickerProv
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(6),
-                      child: CachedNetworkImage(imageUrl: o.productImage, width: 48, height: 48, fit: BoxFit.cover),
+                      child: CachedNetworkImage(
+                        imageUrl: o.productImage,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                     const SizedBox(width: 12),
-                    Expanded(child: Text(o.productTitle, style: AppTypography.body)),
-                    Text(formatCurrency(o.total), style: AppTypography.subheading.copyWith(color: AppColors.primary, fontSize: 14)),
+                    Expanded(
+                      child: Text(o.productTitle, style: AppTypography.body),
+                    ),
+                    Text(
+                      formatCurrency(o.total),
+                      style: AppTypography.subheading.copyWith(
+                        color: AppColors.primary,
+                        fontSize: 14,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('${o.paymentMethod.label} • ${o.deliveryMethod.label}', style: AppTypography.caption),
+                Text(
+                  '${o.paymentMethod.label} • ${o.deliveryMethod.label}',
+                  style: AppTypography.caption,
+                ),
                 const SizedBox(height: 8),
-                if (o.status == OrderStatus.placed || o.status == OrderStatus.paymentPending)
+                if (o.status == OrderStatus.placed ||
+                    o.status == OrderStatus.paymentPending)
                   Row(
                     children: [
-                      Expanded(child: ThriftButton(label: 'Confirm Order', expand: false, onPressed: () {
-                        context.read<DataProvider>().updateOrderStatus(o.id, OrderStatus.preparing);
-                        showThriftSnackBar(context, 'Order confirmed');
-                      })),
+                      Expanded(
+                        child: ThriftButton(
+                          label: 'Confirm Order',
+                          expand: false,
+                          onPressed: () {
+                            context.read<DataProvider>().updateOrderStatus(
+                              o.id,
+                              OrderStatus.preparing,
+                            );
+                            showThriftSnackBar(context, 'Order confirmed');
+                          },
+                        ),
+                      ),
                       const SizedBox(width: 8),
-                      ThriftButton(label: 'Cancel', variant: ThriftButtonVariant.outline, color: AppColors.error, expand: false, onPressed: () {
-                        context.read<DataProvider>().updateOrderStatus(o.id, OrderStatus.cancelled);
-                      }),
+                      ThriftButton(
+                        label: 'Cancel',
+                        variant: ThriftButtonVariant.outline,
+                        color: AppColors.error,
+                        expand: false,
+                        onPressed: () {
+                          context.read<DataProvider>().updateOrderStatus(
+                            o.id,
+                            OrderStatus.cancelled,
+                          );
+                        },
+                      ),
                     ],
                   ),
                 if (o.status == OrderStatus.preparing)
-                  ThriftButton(label: 'Mark as Shipped', onPressed: () {
-                    context.read<DataProvider>().updateOrderStatus(o.id, OrderStatus.shipped, tracking: 'JNT${DateTime.now().millisecondsSinceEpoch}');
-                    showThriftSnackBar(context, 'Marked as shipped');
-                  }),
+                  ThriftButton(
+                    label: 'Mark as Shipped',
+                    onPressed: () {
+                      context.read<DataProvider>().updateOrderStatus(
+                        o.id,
+                        OrderStatus.shipped,
+                        tracking: 'JNT${DateTime.now().millisecondsSinceEpoch}',
+                      );
+                      showThriftSnackBar(context, 'Marked as shipped');
+                    },
+                  ),
               ],
             ),
           ),

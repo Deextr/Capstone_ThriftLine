@@ -28,7 +28,8 @@ class BidCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isWinning = bid.status == BidStatus.winning;
-    final currentHighest = product.currentBid ?? product.startingBid ?? product.price;
+    final currentHighest =
+        product.currentBid ?? product.startingBid ?? product.price;
 
     return ThriftCard(
       onTap: onTap,
@@ -41,7 +42,11 @@ class BidCard extends StatelessWidget {
               width: 72,
               height: 72,
               fit: BoxFit.cover,
-              placeholder: (_, __) => Container(color: AppColors.primaryLight, width: 72, height: 72),
+              placeholder: (_, _) => Container(
+                color: AppColors.primaryLight,
+                width: 72,
+                height: 72,
+              ),
             ),
           ),
           const SizedBox(width: AppConstants.spacingMd),
@@ -49,10 +54,23 @@ class BidCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(product.title, style: AppTypography.body.copyWith(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  product.title,
+                  style: AppTypography.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 Text(product.sellerName, style: AppTypography.caption),
                 const SizedBox(height: 4),
-                Text('Your bid: ${formatCurrency(bid.amount)}', style: AppTypography.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                Text(
+                  'Your bid: ${formatCurrency(bid.amount)}',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 Text(
                   'Current highest: ${formatCurrency(currentHighest)}',
                   style: AppTypography.caption.copyWith(
@@ -64,7 +82,11 @@ class BidCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.timer, size: 14, color: AppColors.secondary),
+                      const Icon(
+                        Icons.timer,
+                        size: 14,
+                        color: AppColors.secondary,
+                      ),
                       const SizedBox(width: 4),
                       CountdownTimer(endTime: product.bidEndTime!),
                     ],
@@ -122,30 +144,56 @@ class LookingForCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(post.buyerName, style: AppTypography.body.copyWith(fontWeight: FontWeight.w600)),
-                    Text(formatRelativeTime(post.createdAt), style: AppTypography.caption),
+                    Text(
+                      post.buyerName,
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      formatRelativeTime(post.createdAt),
+                      style: AppTypography.caption,
+                    ),
                   ],
                 ),
               ),
               if (post.responseCount > 0)
-                ThriftBadge(label: '${post.responseCount} responses', variant: BadgeVariant.neutral),
+                ThriftBadge(
+                  label: '${post.responseCount} responses',
+                  variant: BadgeVariant.neutral,
+                ),
             ],
           ),
           const SizedBox(height: 12),
           Text(post.title, style: AppTypography.subheading),
           const SizedBox(height: 4),
-          Text(post.description, style: AppTypography.body, maxLines: 2, overflow: TextOverflow.ellipsis),
+          Text(
+            post.description,
+            style: AppTypography.body,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 8),
           Text(
             '${formatCurrency(post.budgetMin)} – ${formatCurrency(post.budgetMax)}',
-            style: AppTypography.subheading.copyWith(color: AppColors.primary, fontSize: 14),
+            style: AppTypography.subheading.copyWith(
+              color: AppColors.primary,
+              fontSize: 14,
+            ),
           ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 6,
             children: [
-              if (post.size != null) ThriftBadge(label: 'Size ${post.size}', variant: BadgeVariant.neutral),
-              ThriftBadge(label: post.category.label, variant: BadgeVariant.primary),
+              if (post.size != null)
+                ThriftBadge(
+                  label: 'Size ${post.size}',
+                  variant: BadgeVariant.neutral,
+                ),
+              ThriftBadge(
+                label: post.category.label,
+                variant: BadgeVariant.primary,
+              ),
               ThriftBadge(label: post.location, variant: BadgeVariant.neutral),
             ],
           ),

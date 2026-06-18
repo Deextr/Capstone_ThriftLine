@@ -80,6 +80,20 @@ class BuyerProfileTab extends StatelessWidget {
             ),
             _menuItem(context, 'Payment Methods', () => showThriftSnackBar(context, 'Coming soon')),
             _menuItem(context, 'Addresses', () => showThriftSnackBar(context, 'Coming soon')),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.storefront, color: AppColors.primary, size: 20),
+              ),
+              title: Text('Become a Seller', style: AppTypography.body.copyWith(fontWeight: FontWeight.w600)),
+              subtitle: Text('Start selling your thrift items', style: AppTypography.caption),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () => context.push(RouteNames.becomeSeller),
+            ),
           ]),
           _section('Help & Support', [
             _menuItem(context, 'Help Center', () => showThriftSnackBar(context, 'Help center coming soon')),

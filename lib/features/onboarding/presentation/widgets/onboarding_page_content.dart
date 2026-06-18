@@ -26,9 +26,17 @@ class OnboardingPageContent extends StatelessWidget {
             child: Icon(page.icon, size: 80, color: page.color),
           ),
           const SizedBox(height: 40),
-          Text(page.title, style: AppTypography.display, textAlign: TextAlign.center),
+          Text(
+            page.title,
+            style: AppTypography.display,
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 16),
-          Text(page.subtitle, style: AppTypography.body.copyWith(color: AppColors.textSecondary), textAlign: TextAlign.center),
+          Text(
+            page.subtitle,
+            style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );

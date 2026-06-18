@@ -2,6 +2,7 @@ abstract final class RouteNames {
   static const String splash = '/';
   static const String onboarding = '/onboarding';
   static const String login = '/login';
+  static const String signup = '/signup';
   static const String buyerHome = '/buyer';
   static const String sellerHome = '/seller';
   static const String search = '/search';
@@ -20,4 +21,5 @@ abstract final class RouteNames {
   static const String settings = '/settings';
   static const String purchaseHistory = '/purchase-history';
   static const String savedItems = '/saved-items';
+  static const String becomeSeller = '/become-seller';
 }
