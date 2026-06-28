@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../core/constants/app_colors.dart';
 import '../core/constants/app_constants.dart';
@@ -249,8 +250,35 @@ class ThriftAvatar extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: size / 2,
-          backgroundImage: NetworkImage(imageUrl),
           backgroundColor: AppColors.primaryLight,
+          child: ClipOval(
+            child: CachedNetworkImage(
+              imageUrl: imageUrl,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              placeholder: (_, _) => Container(
+                width: size,
+                height: size,
+                color: AppColors.primaryLight,
+                child: Icon(
+                  Icons.person,
+                  size: size * 0.5,
+                  color: AppColors.primary,
+                ),
+              ),
+              errorWidget: (_, _, _) => Container(
+                width: size,
+                height: size,
+                color: AppColors.primaryLight,
+                child: Icon(
+                  Icons.person,
+                  size: size * 0.5,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
         ),
         if (showOnline)
           Positioned(

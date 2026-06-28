@@ -33,180 +33,158 @@ class BidCard extends StatelessWidget {
 
     return ThriftCard(
       onTap: onTap,
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: CachedNetworkImage(
-              imageUrl: product.imageUrl,
-              width: 72,
-              height: 72,
-              fit: BoxFit.cover,
-              placeholder: (_, _) => Container(
-                color: AppColors.primaryLight,
-                width: 72,
-                height: 72,
+      padding: EdgeInsets.zero,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Status strip
+            Container(
+              width: 4,
+              decoration: BoxDecoration(
+                color: isWinning ? AppColors.primary : AppColors.textHint,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(AppConstants.radiusLg),
+                  bottomLeft: Radius.circular(AppConstants.radiusLg),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: AppConstants.spacingMd),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.title,
-                  style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(product.sellerName, style: AppTypography.caption),
-                const SizedBox(height: 4),
-                Text(
-                  'Your bid: ${formatCurrency(bid.amount)}',
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  'Current highest: ${formatCurrency(currentHighest)}',
-                  style: AppTypography.caption.copyWith(
-                    color: isWinning ? AppColors.success : AppColors.error,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (product.bidEndTime != null) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.timer,
-                        size: 14,
-                        color: AppColors.secondary,
-                      ),
-                      const SizedBox(width: 4),
-                      CountdownTimer(endTime: product.bidEndTime!),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Column(
-            children: [
-              ThriftBadge(
-                label: isWinning ? 'Winning' : 'Outbid',
-                variant: isWinning ? BadgeVariant.success : BadgeVariant.error,
-              ),
-              if (!isWinning && onRaiseBid != null) ...[
-                const SizedBox(height: 8),
-                ThriftButton(
-                  label: 'Raise Bid',
-                  variant: ThriftButtonVariant.secondary,
-                  expand: false,
-                  onPressed: onRaiseBid,
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class LookingForCard extends StatelessWidget {
-  const LookingForCard({
-    super.key,
-    required this.post,
-    this.showRespondButton = false,
-    this.onRespond,
-  });
-
-  final dynamic post;
-  final bool showRespondButton;
-  final VoidCallback? onRespond;
-
-  @override
-  Widget build(BuildContext context) {
-    return ThriftCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              ThriftAvatar(imageUrl: post.buyerAvatar, size: 36),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(AppConstants.spacingMd),
+                child: Row(
                   children: [
-                    Text(
-                      post.buyerName,
-                      style: AppTypography.body.copyWith(
-                        fontWeight: FontWeight.w600,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: CachedNetworkImage(
+                        imageUrl: product.imageUrl,
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.cover,
+                        placeholder: (_, _) => Container(
+                          color: AppColors.primaryLight,
+                          width: 72,
+                          height: 72,
+                        ),
+                        errorWidget: (_, _, _) => Container(
+                          color: AppColors.primaryLight,
+                          width: 72,
+                          height: 72,
+                          child: const Icon(
+                            Icons.image_outlined,
+                            color: AppColors.textHint,
+                          ),
+                        ),
                       ),
                     ),
-                    Text(
-                      formatRelativeTime(post.createdAt),
-                      style: AppTypography.caption,
+                    const SizedBox(width: AppConstants.spacingMd),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            product.title,
+                            style: AppTypography.body.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(product.sellerName, style: AppTypography.caption),
+                          const SizedBox(height: 8),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text('Your bid: ', style: AppTypography.caption),
+                              Text(
+                                formatCurrency(bid.amount),
+                                style: AppTypography.subheading.copyWith(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text('Highest: ', style: AppTypography.caption),
+                              Text(
+                                formatCurrency(currentHighest),
+                                style: AppTypography.subheading.copyWith(
+                                  color: isWinning ? AppColors.success : AppColors.textSecondary,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            isWinning ? "You're #1" : "Outbid by ${formatCurrency(currentHighest - bid.amount)}",
+                            style: AppTypography.caption.copyWith(
+                              color: isWinning ? AppColors.success : AppColors.textSecondary,
+                            ),
+                          ),
+                          if (product.bidEndTime != null) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceVariant,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.timer,
+                                    size: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  CountdownTimer(
+                                    endTime: product.bidEndTime!,
+                                    style: AppTypography.caption.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        ThriftBadge(
+                          label: isWinning ? 'Winning' : 'Outbid',
+                          variant: isWinning ? BadgeVariant.success : BadgeVariant.warning,
+                        ),
+                        if (!isWinning && onRaiseBid != null) ...[
+                          const SizedBox(height: 12),
+                          ThriftButton(
+                            label: 'Raise Bid',
+                            variant: ThriftButtonVariant.outline,
+                            expand: false,
+                            onPressed: onRaiseBid,
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
               ),
-              if (post.responseCount > 0)
-                ThriftBadge(
-                  label: '${post.responseCount} responses',
-                  variant: BadgeVariant.neutral,
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(post.title, style: AppTypography.subheading),
-          const SizedBox(height: 4),
-          Text(
-            post.description,
-            style: AppTypography.body,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${formatCurrency(post.budgetMin)} – ${formatCurrency(post.budgetMax)}',
-            style: AppTypography.subheading.copyWith(
-              color: AppColors.primary,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            children: [
-              if (post.size != null)
-                ThriftBadge(
-                  label: 'Size ${post.size}',
-                  variant: BadgeVariant.neutral,
-                ),
-              ThriftBadge(
-                label: post.category.label,
-                variant: BadgeVariant.primary,
-              ),
-              ThriftBadge(label: post.location, variant: BadgeVariant.neutral),
-            ],
-          ),
-          if (showRespondButton) ...[
-            const SizedBox(height: 12),
-            ThriftButton(
-              label: 'I Have This!',
-              variant: ThriftButtonVariant.secondary,
-              onPressed: onRespond ?? () {},
             ),
           ],
-        ],
+        ),
       ),
     );
   }
 }
+

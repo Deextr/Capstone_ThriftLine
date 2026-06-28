@@ -381,4 +381,73 @@ class DataProvider extends ChangeNotifier {
     _products.insert(0, product);
     notifyListeners();
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Seller follow system (in-memory mock)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  final Set<String> _followedSellerUsernames = {};
+
+  bool isFollowing(String sellerUsername) =>
+      _followedSellerUsernames.contains(sellerUsername);
+
+  void toggleFollow(String sellerUsername) {
+    if (_followedSellerUsernames.contains(sellerUsername)) {
+      _followedSellerUsernames.remove(sellerUsername);
+    } else {
+      _followedSellerUsernames.add(sellerUsername);
+    }
+    notifyListeners();
+  }
+
+  /// Mock follower count — base value derived from username hash + follow delta.
+  int followersCount(String sellerUsername) {
+    final base = switch (sellerUsername) {
+      'vintagevibes_ph' => 128,
+      'thrift_trendy' => 85,
+      'preloved_gems' => 256,
+      _ => 11,
+    };
+    return base + (_followedSellerUsernames.contains(sellerUsername) ? 1 : 0);
+  }
+
+  /// Mock following count.
+  int followingCount(String sellerUsername) {
+    return switch (sellerUsername) {
+      'vintagevibes_ph' => 45,
+      'thrift_trendy' => 32,
+      'preloved_gems' => 67,
+      _ => 0,
+    };
+  }
+
+  /// Total sold items for a seller.
+  int soldCount(String sellerUsername) {
+    return switch (sellerUsername) {
+      'vintagevibes_ph' => 234,
+      'thrift_trendy' => 156,
+      'preloved_gems' => 412,
+      _ => 0,
+    };
+  }
+
+  /// Mock review count for a seller.
+  int reviewCount(String sellerUsername) {
+    return switch (sellerUsername) {
+      'vintagevibes_ph' => 89,
+      'thrift_trendy' => 42,
+      'preloved_gems' => 178,
+      _ => 0,
+    };
+  }
+
+  /// Seller rating.
+  double sellerRating(String sellerUsername) {
+    return switch (sellerUsername) {
+      'vintagevibes_ph' => 4.8,
+      'thrift_trendy' => 4.5,
+      'preloved_gems' => 4.9,
+      _ => 0.0,
+    };
+  }
 }

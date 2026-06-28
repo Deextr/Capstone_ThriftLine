@@ -153,25 +153,73 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
         body: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppConstants.spacingMd),
+            padding: const EdgeInsets.symmetric(horizontal: AppConstants.spacingMd, vertical: 24),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const CircleAvatar(
-                  radius: 40,
-                  child: Icon(Icons.person, size: 40),
+                Center(
+                  child: Stack(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.primaryLight, width: 3),
+                        ),
+                        child: const CircleAvatar(
+                          radius: 45,
+                          backgroundColor: AppColors.surfaceVariant,
+                          child: Icon(Icons.person_outline, size: 45, color: AppColors.textSecondary),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: GestureDetector(
+                          onTap: () => showThriftSnackBar(context, 'Change photo coming soon'),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 3),
+                            ),
+                            child: const Icon(Icons.camera_alt_outlined, size: 18, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 24),
-                ThriftTextField(label: 'Name', controller: _nameCtrl),
+                const SizedBox(height: 32),
+                Text('Personal Information', style: AppTypography.subheading),
                 const SizedBox(height: 16),
-                ThriftTextField(label: 'Location', controller: _locationCtrl),
-                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 2))
+                    ]
+                  ),
+                  child: Column(
+                    children: [
+                      ThriftTextField(label: 'Full Name', controller: _nameCtrl, icon: Icons.person_outline),
+                      const SizedBox(height: 16),
+                      ThriftTextField(label: 'Location', controller: _locationCtrl, icon: Icons.location_on_outlined),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+                Text('Contact Details', style: AppTypography.subheading),
+                const SizedBox(height: 16),
                 // Email Verification
                 _verificationTile(
                   icon: Icons.email_outlined,
                   title: 'Email',
-                  value: _emailCtrl.text.isEmpty
-                      ? 'Not set'
-                      : _emailCtrl.text,
+                  value: _emailCtrl.text.isEmpty ? 'Not set' : _emailCtrl.text,
                   isVerified: _emailVerified,
                   onVerify: () {
                     if (_emailCtrl.text.isEmpty) {
@@ -184,8 +232,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           _showVerificationDialog(
                             type: 'email',
                             value: _emailCtrl.text,
-                            onVerified: () =>
-                                setState(() => _emailVerified = true),
+                            onVerified: () => setState(() => _emailVerified = true),
                           );
                         },
                       );
@@ -193,8 +240,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       _showVerificationDialog(
                         type: 'email',
                         value: _emailCtrl.text,
-                        onVerified: () =>
-                            setState(() => _emailVerified = true),
+                        onVerified: () => setState(() => _emailVerified = true),
                       );
                     }
                   },
@@ -204,9 +250,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 _verificationTile(
                   icon: Icons.phone_outlined,
                   title: 'Phone Number',
-                  value: _phoneCtrl.text.isEmpty
-                      ? 'Not set'
-                      : _phoneCtrl.text,
+                  value: _phoneCtrl.text.isEmpty ? 'Not set' : _phoneCtrl.text,
                   isVerified: _phoneVerified,
                   onVerify: () {
                     if (_phoneCtrl.text.isEmpty) {
@@ -219,8 +263,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           _showVerificationDialog(
                             type: 'phone',
                             value: _phoneCtrl.text,
-                            onVerified: () =>
-                                setState(() => _phoneVerified = true),
+                            onVerified: () => setState(() => _phoneVerified = true),
                           );
                         },
                       );
@@ -228,20 +271,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       _showVerificationDialog(
                         type: 'phone',
                         value: _phoneCtrl.text,
-                        onVerified: () =>
-                            setState(() => _phoneVerified = true),
+                        onVerified: () => setState(() => _phoneVerified = true),
                       );
                     }
                   },
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 48),
                 ThriftButton(
-                  label: 'Save',
+                  label: 'Save Changes',
                   onPressed: () {
                     showThriftSnackBar(context, 'Profile updated!');
                     context.pop();
                   },
                 ),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -257,15 +300,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     required bool isVerified,
     required VoidCallback onVerify,
   }) {
-    return ThriftCard(
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isVerified ? AppColors.success.withValues(alpha: 0.3) : AppColors.border.withValues(alpha: 0.5),
+        ),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 2))
+        ]
+      ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: isVerified
-                  ? AppColors.success.withValues(alpha: 0.1)
-                  : AppColors.surfaceVariant,
+              color: isVerified ? AppColors.success.withValues(alpha: 0.1) : AppColors.surfaceVariant,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -274,7 +326,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               size: 24,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,7 +335,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 const SizedBox(height: 2),
                 Text(
                   value,
-                  style: AppTypography.caption,
+                  style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -291,7 +343,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
           if (isVerified)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: AppColors.success.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
@@ -314,6 +366,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           else
             TextButton(
               onPressed: onVerify,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                backgroundColor: AppColors.primaryLight,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              ),
               child: Text(
                 'Verify',
                 style: AppTypography.body.copyWith(

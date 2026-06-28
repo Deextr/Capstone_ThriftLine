@@ -64,23 +64,50 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
         body: SafeArea(
           child: Column(
             children: [
-              // Step indicator
-              Padding(
+              // Sleek segmented indicator
+              Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppConstants.spacingMd,
-                  vertical: 8,
+                  vertical: 16,
                 ),
-                child: Row(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    )
+                  ]
+                ),
+                child: Column(
                   children: [
-                    _stepCircle(0, 'Store Info'),
-                    _stepLine(0),
-                    _stepCircle(1, 'ID Upload'),
-                    _stepLine(1),
-                    _stepCircle(2, 'Selfie'),
+                    Row(
+                      children: [
+                        _buildSegment(0, 'Store Info'),
+                        const SizedBox(width: 8),
+                        _buildSegment(1, 'ID Upload'),
+                        const SizedBox(width: 8),
+                        _buildSegment(2, 'Selfie'),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _getStepTitle(),
+                          style: AppTypography.subheading.copyWith(color: AppColors.primary),
+                        ),
+                        Text(
+                          'Step ${_currentStep + 1} of 3',
+                          style: AppTypography.caption,
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
               // Content
               Expanded(
                 child: SingleChildScrollView(
@@ -89,8 +116,18 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                 ),
               ),
               // Bottom button
-              Padding(
+              Container(
                 padding: const EdgeInsets.all(AppConstants.spacingMd),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, -4),
+                    )
+                  ]
+                ),
                 child: _currentStep < 2
                     ? ThriftButton(
                         label: 'Continue',
@@ -116,6 +153,15 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     );
   }
 
+  String _getStepTitle() {
+    switch (_currentStep) {
+      case 0: return 'Store Details';
+      case 1: return 'Government ID Verification';
+      case 2: return 'Selfie Verification';
+      default: return '';
+    }
+  }
+
   Widget _buildStep() {
     switch (_currentStep) {
       case 0:
@@ -134,58 +180,34 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ThriftCard(
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.storefront,
-                      color: AppColors.primary,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Store Details', style: AppTypography.subheading),
-                        Text(
-                          'Tell us about your thrift store',
-                          style: AppTypography.caption,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
               ThriftTextField(
                 label: 'Store Name',
                 hint: 'e.g. Vintage Vibes PH',
                 controller: _storeNameCtrl,
-                icon: Icons.store,
+                icon: Icons.store_outlined,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               Text(
                 'Region / Barangay',
                 style: AppTypography.label.copyWith(
                   color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(height: AppConstants.spacingXs),
+              const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: AppColors.surfaceVariant.withValues(alpha: 0.3),
                   border: Border.all(color: AppColors.border),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -199,14 +221,14 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                     ),
                     items: _davaoBarangays
                         .map(
-                          (b) => DropdownMenuItem(value: b, child: Text(b)),
+                          (b) => DropdownMenuItem(value: b, child: Text(b, style: AppTypography.body)),
                         )
                         .toList(),
                     onChanged: (v) => setState(() => _selectedRegion = v!),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               ThriftTextField(
                 label: 'Store Address',
                 hint: 'Complete street address',
@@ -217,17 +239,29 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        ThriftCard(
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Why sell on Thriftline?', style: AppTypography.subheading),
-              const SizedBox(height: 12),
-              _benefitRow(Icons.trending_up, 'Reach thousands of thrift buyers'),
-              _benefitRow(Icons.flash_on, 'AI-powered pricing suggestions'),
-              _benefitRow(Icons.security, 'Secure payment processing'),
-              _benefitRow(Icons.local_shipping, 'Integrated shipping options'),
+              Row(
+                children: [
+                  const Icon(Icons.stars_outlined, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text('Why sell on Thriftline?', style: AppTypography.subheading.copyWith(color: AppColors.primary)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _benefitRow(Icons.trending_up_outlined, 'Reach thousands of thrift buyers'),
+              _benefitRow(Icons.auto_awesome_outlined, 'AI-powered pricing suggestions'),
+              _benefitRow(Icons.security_outlined, 'Secure payment processing'),
+              _benefitRow(Icons.local_shipping_outlined, 'Integrated shipping options'),
             ],
           ),
         ),
@@ -237,11 +271,11 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
   Widget _benefitRow(IconData icon, String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
           Icon(icon, size: 18, color: AppColors.primary),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(child: Text(text, style: AppTypography.body)),
         ],
       ),
@@ -253,41 +287,19 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ThriftCard(
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.badge_outlined,
-                      color: AppColors.primary,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Government ID',
-                          style: AppTypography.subheading,
-                        ),
-                        Text(
-                          'Upload a clear photo of your valid government ID',
-                          style: AppTypography.caption,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              Text(
+                'Upload a clear photo of your valid government ID. Ensure all details are readable.',
+                style: AppTypography.body.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 24),
               GestureDetector(
@@ -297,42 +309,46 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                 },
                 child: Container(
                   width: double.infinity,
-                  height: 200,
+                  height: 220,
                   decoration: BoxDecoration(
                     color: _govIdUploaded
-                        ? AppColors.primaryLight
-                        : AppColors.surfaceVariant,
+                        ? AppColors.success.withValues(alpha: 0.05)
+                        : AppColors.primaryLight.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(16),
+                    // Simulated dashed border using a light border
                     border: Border.all(
                       color: _govIdUploaded
-                          ? AppColors.primary
-                          : AppColors.border,
-                      width: _govIdUploaded ? 2 : 1,
-                      strokeAlign: BorderSide.strokeAlignInside,
+                          ? AppColors.success
+                          : AppColors.primary.withValues(alpha: 0.5),
+                      width: 2,
                     ),
                   ),
                   child: _govIdUploaded
                       ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
-                              Icons.check_circle,
-                              color: AppColors.primary,
-                              size: 48,
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.success.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.check_circle_outline, color: AppColors.success, size: 40),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 16),
                             Text(
                               'ID Photo Uploaded',
                               style: AppTypography.body.copyWith(
-                                color: AppColors.primary,
+                                color: AppColors.success,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Tap to replace',
-                              style: AppTypography.caption,
-                            ),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: () => setState(() => _govIdUploaded = false),
+                              icon: const Icon(Icons.refresh, size: 16),
+                              label: const Text('Replace Photo'),
+                            )
                           ],
                         )
                       : Column(
@@ -345,27 +361,28 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.05),
+                                    color: AppColors.primary.withValues(alpha: 0.1),
                                     blurRadius: 10,
                                   ),
                                 ],
                               ),
                               child: const Icon(
-                                Icons.camera_alt_outlined,
+                                Icons.add_photo_alternate_outlined,
                                 color: AppColors.primary,
-                                size: 32,
+                                size: 36,
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 16),
                             Text(
-                              'Take Photo or Upload',
+                              'Tap to upload ID',
                               style: AppTypography.body.copyWith(
                                 fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Tap to capture or choose from gallery',
+                              'JPG, PNG (Max 5MB)',
                               style: AppTypography.caption,
                             ),
                           ],
@@ -375,36 +392,31 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        ThriftCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Accepted IDs', style: AppTypography.subheading),
-              const SizedBox(height: 12),
-              _idTypeRow('Philippine National ID'),
-              _idTypeRow('Driver\'s License'),
-              _idTypeRow('Passport'),
-              _idTypeRow('PhilHealth ID'),
-              _idTypeRow('SSS ID'),
-              _idTypeRow('Voter\'s ID'),
-            ],
-          ),
-        ),
+        const SizedBox(height: 24),
+        Text('Accepted IDs', style: AppTypography.subheading),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _idChip('Philippine National ID'),
+            _idChip('Driver\'s License'),
+            _idChip('Passport'),
+            _idChip('PhilHealth ID'),
+            _idChip('SSS ID'),
+            _idChip('Voter\'s ID'),
+          ],
+        )
       ],
     );
   }
 
-  Widget _idTypeRow(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          const Icon(Icons.check, size: 16, color: AppColors.success),
-          const SizedBox(width: 8),
-          Text(text, style: AppTypography.body),
-        ],
-      ),
+  Widget _idChip(String text) {
+    return Chip(
+      label: Text(text, style: AppTypography.caption.copyWith(color: AppColors.textPrimary)),
+      backgroundColor: AppColors.surfaceVariant.withValues(alpha: 0.5),
+      side: const BorderSide(color: AppColors.border),
+      avatar: const Icon(Icons.check, size: 16, color: AppColors.success),
     );
   }
 
@@ -413,41 +425,19 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ThriftCard(
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.face,
-                      color: AppColors.primary,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Verification Selfie',
-                          style: AppTypography.subheading,
-                        ),
-                        Text(
-                          'Take a selfie while holding your ID',
-                          style: AppTypography.caption,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              Text(
+                'Take a selfie while holding your ID next to your face to verify your identity.',
+                style: AppTypography.body.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 24),
               GestureDetector(
@@ -457,76 +447,75 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                 },
                 child: Container(
                   width: double.infinity,
-                  height: 240,
+                  height: 280,
                   decoration: BoxDecoration(
                     color: _selfieUploaded
-                        ? AppColors.primaryLight
-                        : AppColors.surfaceVariant,
+                        ? AppColors.success.withValues(alpha: 0.05)
+                        : AppColors.primaryLight.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: _selfieUploaded
-                          ? AppColors.primary
-                          : AppColors.border,
-                      width: _selfieUploaded ? 2 : 1,
-                      strokeAlign: BorderSide.strokeAlignInside,
+                          ? AppColors.success
+                          : AppColors.primary.withValues(alpha: 0.5),
+                      width: 2,
                     ),
                   ),
                   child: _selfieUploaded
                       ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
-                              Icons.check_circle,
-                              color: AppColors.primary,
-                              size: 48,
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.success.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.check_circle_outline, color: AppColors.success, size: 40),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 16),
                             Text(
                               'Selfie Captured',
                               style: AppTypography.body.copyWith(
-                                color: AppColors.primary,
+                                color: AppColors.success,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Tap to retake',
-                              style: AppTypography.caption,
-                            ),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: () => setState(() => _selfieUploaded = false),
+                              icon: const Icon(Icons.refresh, size: 16),
+                              label: const Text('Retake Selfie'),
+                            )
                           ],
                         )
                       : Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(24),
+                              padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
                                 color: AppColors.surface,
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.05),
+                                    color: AppColors.primary.withValues(alpha: 0.1),
                                     blurRadius: 10,
                                   ),
                                 ],
                               ),
                               child: const Icon(
-                                Icons.person_outline,
+                                Icons.camera_front_outlined,
                                 color: AppColors.primary,
-                                size: 48,
+                                size: 40,
                               ),
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'Take a Selfie',
+                              'Tap to open camera',
                               style: AppTypography.body.copyWith(
                                 fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Hold your ID next to your face',
-                              style: AppTypography.caption,
                             ),
                           ],
                         ),
@@ -535,17 +524,27 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        ThriftCard(
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.secondary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Tips for a good selfie', style: AppTypography.subheading),
+              Row(
+                children: [
+                  const Icon(Icons.lightbulb_outline, color: AppColors.secondary, size: 20),
+                  const SizedBox(width: 8),
+                  Text('Selfie Tips', style: AppTypography.subheading.copyWith(color: AppColors.secondary)),
+                ],
+              ),
               const SizedBox(height: 12),
-              _tipRow(Icons.light_mode, 'Ensure good lighting'),
-              _tipRow(Icons.crop_portrait, 'Hold your ID beside your face'),
-              _tipRow(Icons.visibility, 'Make sure your face and ID are clearly visible'),
-              _tipRow(Icons.no_photography, 'Don\'t use filters or edited photos'),
+              _tipRow(Icons.light_mode_outlined, 'Ensure good lighting'),
+              _tipRow(Icons.crop_portrait_outlined, 'Hold your ID beside your face'),
+              _tipRow(Icons.visibility_outlined, 'Make sure your face and ID are clearly visible'),
             ],
           ),
         ),
@@ -555,7 +554,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
   Widget _tipRow(IconData icon, String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -567,57 +566,44 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     );
   }
 
-  // ─── Step indicator widgets ───
-  Widget _stepCircle(int step, String label) {
-    final isActive = _currentStep >= step;
+  // ─── Segmented Indicator ───
+  Widget _buildSegment(int stepIndex, String label) {
+    final isActive = _currentStep >= stepIndex;
+    final isPast = _currentStep > stepIndex;
+
     return Expanded(
       child: Column(
         children: [
           Container(
-            width: 32,
-            height: 32,
+            height: 6,
             decoration: BoxDecoration(
               color: isActive ? AppColors.primary : AppColors.surfaceVariant,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isActive ? AppColors.primary : AppColors.border,
-                width: 2,
-              ),
-            ),
-            child: Center(
-              child: isActive && _currentStep > step
-                  ? const Icon(Icons.check, size: 16, color: Colors.white)
-                  : Text(
-                      '${step + 1}',
-                      style: AppTypography.caption.copyWith(
-                        color: isActive ? Colors.white : AppColors.textHint,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+              borderRadius: BorderRadius.circular(3),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: AppTypography.caption.copyWith(
-              color: isActive ? AppColors.primary : AppColors.textHint,
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-              fontSize: 11,
-            ),
-            textAlign: TextAlign.center,
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (isPast)
+                const Padding(
+                  padding: EdgeInsets.only(right: 4),
+                  child: Icon(Icons.check_circle, size: 12, color: AppColors.primary),
+                ),
+              Text(
+                label,
+                style: AppTypography.caption.copyWith(
+                  color: isActive ? AppColors.textPrimary : AppColors.textHint,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                  fontSize: 11,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
         ],
       ),
-    );
-  }
-
-  Widget _stepLine(int step) {
-    final isActive = _currentStep > step;
-    return Container(
-      width: 24,
-      height: 2,
-      margin: const EdgeInsets.only(bottom: 18),
-      color: isActive ? AppColors.primary : AppColors.border,
     );
   }
 }

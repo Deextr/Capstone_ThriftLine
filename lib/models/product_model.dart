@@ -87,7 +87,7 @@ class ProductModel {
   String get imageUrl =>
       imageUrls.isNotEmpty
           ? imageUrls.first
-          : 'https://picsum.photos/seed/$id/400/400';
+          : 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600&h=600';
 
   double get displayPrice => hasActiveBid ? (currentBid ?? startingBid ?? price) : price;
 

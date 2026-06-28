@@ -49,7 +49,26 @@ abstract final class AppTheme {
           selectedItemColor: AppColors.primary,
           unselectedItemColor: AppColors.textHint,
           type: BottomNavigationBarType.fixed,
-          elevation: 8,
+          elevation: 0,
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: AppColors.surface,
+          indicatorColor: AppColors.primaryLight,
+          labelTextStyle: WidgetStatePropertyAll(
+            AppTypography.caption.copyWith(fontSize: 11),
+          ),
+          iconTheme: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const IconThemeData(
+                color: AppColors.primary,
+                size: 24,
+              );
+            }
+            return const IconThemeData(
+              color: AppColors.textHint,
+              size: 24,
+            );
+          }),
         ),
       );
 

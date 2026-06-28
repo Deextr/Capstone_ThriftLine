@@ -103,7 +103,7 @@ class _BuyerSearchTabState extends State<BuyerSearchTab> {
                           crossAxisCount: 2,
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 12,
-                          childAspectRatio: 0.62,
+                          childAspectRatio: 0.52,
                         ),
                         itemCount: results.length,
                         itemBuilder: (_, i) => ProductCard(
@@ -112,6 +112,7 @@ class _BuyerSearchTabState extends State<BuyerSearchTab> {
                             data.addRecentSearch(query);
                             context.push('/product/${results[i].id}');
                           },
+                          onSellerTap: () => context.push('/seller-profile/${results[i].sellerUsername}'),
                         ),
                       ),
                     ),

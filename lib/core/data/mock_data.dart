@@ -11,12 +11,42 @@ import '../../models/seller_profile.dart';
 abstract final class MockData {
   static final DateTime _now = DateTime.now();
 
+  /// Stable product image URLs using picsum.photos (never 404).
+  /// Each product uses a unique seed so it always returns the same image.
+  /// All images are 600×600 for a consistent 1:1 aspect ratio.
+  static const Map<String, String> _fashionImages = {
+    'prod_1':  'https://images.unsplash.com/photo-1554568218-0f1715e72254?auto=format&fit=crop&q=80&w=600&h=600', // Crop Top
+    'prod_2':  'https://images.unsplash.com/photo-1516762689617-e1cffcef479d?auto=format&fit=crop&q=80&w=600&h=600', // Levi's 501
+    'prod_3':  'https://images.unsplash.com/photo-1591369822096-ffd140ec948f?auto=format&fit=crop&q=80&w=600&h=600', // Blazer
+    'prod_4':  'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&q=80&w=600&h=600', // Nike AF1
+    'prod_5':  'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&q=80&w=600&h=600', // Floral Dress
+    'prod_6':  'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&q=80&w=600&h=600', // Cargo Pants
+    'prod_7':  'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&q=80&w=600&h=600', // Band Tee
+    'prod_8':  'https://images.unsplash.com/photo-1584916201218-f4242ceb4809?auto=format&fit=crop&q=80&w=600&h=600', // Leather Bag
+    'prod_9':  'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?auto=format&fit=crop&q=80&w=600&h=600', // Windbreaker
+    'prod_10': 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&q=80&w=600&h=600', // Low-rise Jeans
+    'prod_11': 'https://images.unsplash.com/photo-1608256246200-53e635b5b65f?auto=format&fit=crop&q=80&w=600&h=600', // Boots
+    'prod_12': 'https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?auto=format&fit=crop&q=80&w=600&h=600', // Zara Blazer
+    'prod_13': 'https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&q=80&w=600&h=600', // Graphic Tee
+    'prod_14': 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600&h=600', // Streetwear
+    'prod_15': 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=600&h=600', // Skirt
+    'prod_16': 'https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?auto=format&fit=crop&q=80&w=600&h=600', // Scarf
+    'prod_17': 'https://images.unsplash.com/photo-1514989940723-e8e51635b782?auto=format&fit=crop&q=80&w=600&h=600', // Adidas Samba
+    'prod_18': 'https://images.unsplash.com/photo-1504198458649-3128b932f49e?auto=format&fit=crop&q=80&w=600&h=600', // Midi Skirt
+    'prod_19': 'https://images.unsplash.com/photo-1516257984-b1b4d707412e?auto=format&fit=crop&q=80&w=600&h=600', // Denim Overall
+    'prod_20': 'https://images.unsplash.com/photo-1590874103328-eac38a683ce7?auto=format&fit=crop&q=80&w=600&h=600', // Tote Bag
+  };
+
+  static String imageFor(String productId) =>
+      _fashionImages[productId] ??
+      'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600&h=600';
+
   static final sellers = <SellerProfile>[
     const SellerProfile(
       username: 'vintagevibes_ph',
       shopName: 'Vintage Vibes PH',
       ownerName: 'Carla Mendoza',
-      avatarUrl: 'https://i.pravatar.cc/150?u=vintagevibes_ph',
+      avatarUrl: 'https://ui-avatars.com/api/?name=Carla+Mendoza&background=0D9488&color=fff&size=150',
       rating: 4.8,
       sales: 234,
       itemCount: 48,
@@ -28,7 +58,7 @@ abstract final class MockData {
       username: 'thrift_trendy',
       shopName: 'Thrift & Trendy',
       ownerName: 'Rico Torres',
-      avatarUrl: 'https://i.pravatar.cc/150?u=thrift_trendy',
+      avatarUrl: 'https://ui-avatars.com/api/?name=Rico+Torres&background=F97316&color=fff&size=150',
       rating: 4.5,
       sales: 156,
       itemCount: 32,
@@ -40,7 +70,7 @@ abstract final class MockData {
       username: 'preloved_gems',
       shopName: 'Preloved Gems',
       ownerName: 'Anna Cruz',
-      avatarUrl: 'https://i.pravatar.cc/150?u=preloved_gems',
+      avatarUrl: 'https://ui-avatars.com/api/?name=Anna+Cruz&background=6366F1&color=fff&size=150',
       rating: 4.9,
       sales: 412,
       itemCount: 67,
@@ -339,7 +369,7 @@ abstract final class MockData {
       price: price,
       category: category,
       condition: ProductCondition.good,
-      imageUrls: ['https://picsum.photos/seed/$id/400/400'],
+      imageUrls: [imageFor(id)],
       size: size,
       brand: brand,
       color: color,
@@ -386,7 +416,7 @@ abstract final class MockData {
           id: 'lf_1',
           buyerId: 'buyer_maya',
           buyerName: 'Maya Santos',
-          buyerAvatar: 'https://i.pravatar.cc/150?u=maya_buys',
+          buyerAvatar: 'https://ui-avatars.com/api/?name=Maya+Santos&background=0D9488&color=fff&size=150',
           title: 'Looking for: Zara blazer, size XS',
           description: 'Prefer neutral colors like cream, beige, or black. Good condition preferred.',
           category: ProductCategory.formal,
@@ -396,12 +426,16 @@ abstract final class MockData {
           location: 'Quezon City, Metro Manila',
           createdAt: _now.subtract(const Duration(days: 2)),
           responseCount: 4,
+          thumbnailUrl: 'https://images.unsplash.com/photo-1591369822096-ffd140ec948f?auto=format&fit=crop&q=80&w=600&h=600',
+          likesCount: 12,
+          sharesCount: 3,
+          isLiked: true,
         ),
         LookingForModel(
           id: 'lf_2',
           buyerId: 'buyer_james',
           buyerName: 'James Reyes',
-          buyerAvatar: 'https://i.pravatar.cc/150?u=james_thrift',
+          buyerAvatar: 'https://ui-avatars.com/api/?name=James+Reyes&background=1E293B&color=fff&size=150',
           title: 'Looking for: Vintage graphic tees, size L',
           description: 'Any brand welcome. Band tees, anime, retro logos all good.',
           category: ProductCategory.tops,
@@ -411,12 +445,15 @@ abstract final class MockData {
           location: 'Makati City, Metro Manila',
           createdAt: _now.subtract(const Duration(days: 1)),
           responseCount: 7,
+          thumbnailUrl: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&q=80&w=600&h=600',
+          likesCount: 5,
+          sharesCount: 1,
         ),
         LookingForModel(
           id: 'lf_3',
           buyerId: 'buyer_maya',
           buyerName: 'Maya Santos',
-          buyerAvatar: 'https://i.pravatar.cc/150?u=maya_buys',
+          buyerAvatar: 'https://ui-avatars.com/api/?name=Maya+Santos&background=0D9488&color=fff&size=150',
           title: 'Looking for: Platform boots, size 7',
           description: 'Any color works. Y2K or chunky platform style preferred.',
           category: ProductCategory.shoes,
@@ -431,7 +468,7 @@ abstract final class MockData {
           id: 'lf_4',
           buyerId: 'buyer_james',
           buyerName: 'James Reyes',
-          buyerAvatar: 'https://i.pravatar.cc/150?u=james_thrift',
+          buyerAvatar: 'https://ui-avatars.com/api/?name=James+Reyes&background=1E293B&color=fff&size=150',
           title: 'Looking for: 90s windbreaker, size M',
           description: 'Colorful retro windbreaker. Nike, Adidas, or vintage brands.',
           category: ProductCategory.outerwear,
@@ -446,7 +483,7 @@ abstract final class MockData {
           id: 'lf_5',
           buyerId: 'buyer_maya',
           buyerName: 'Maya Santos',
-          buyerAvatar: 'https://i.pravatar.cc/150?u=maya_buys',
+          buyerAvatar: 'https://ui-avatars.com/api/?name=Maya+Santos&background=0D9488&color=fff&size=150',
           title: 'Looking for: Korean streetwear sets, size S',
           description: 'Matching top and bottom sets. Oversized fit preferred.',
           category: ProductCategory.streetwear,
@@ -543,12 +580,12 @@ abstract final class MockData {
           participantIds: ['buyer_maya', 'seller_carla'],
           participantNames: ['Maya Santos', 'Vintage Vibes PH'],
           participantAvatars: [
-            'https://i.pravatar.cc/150?u=maya_buys',
-            'https://i.pravatar.cc/150?u=vintagevibes_ph',
+            'https://ui-avatars.com/api/?name=Maya+Santos&background=0D9488&color=fff&size=150',
+            'https://ui-avatars.com/api/?name=Carla+Mendoza&background=0D9488&color=fff&size=150',
           ],
           productId: 'prod_1',
           productTitle: 'Y2K Butterfly Crop Top',
-          productImage: 'https://picsum.photos/seed/prod_1/400/400',
+          productImage: imageFor('prod_1'),
           lastMessage: 'Hi! Yes the crop top is still available.',
           lastMessageAt: _now.subtract(const Duration(hours: 3)),
           unreadCount: 1,
@@ -558,12 +595,12 @@ abstract final class MockData {
           participantIds: ['buyer_maya', 'seller_rico'],
           participantNames: ['Maya Santos', 'Thrift & Trendy'],
           participantAvatars: [
-            'https://i.pravatar.cc/150?u=maya_buys',
-            'https://i.pravatar.cc/150?u=thrift_trendy',
+            'https://ui-avatars.com/api/?name=Maya+Santos&background=0D9488&color=fff&size=150',
+            'https://ui-avatars.com/api/?name=Rico+Torres&background=F97316&color=fff&size=150',
           ],
           productId: 'prod_2',
           productTitle: "Levi's 501 Vintage Denim",
-          productImage: 'https://picsum.photos/seed/prod_2/400/400',
+          productImage: imageFor('prod_2'),
           lastMessage: 'Can you do meet-up in QC?',
           lastMessageAt: _now.subtract(const Duration(days: 1)),
         ),
@@ -603,10 +640,10 @@ abstract final class MockData {
           buyerId: 'buyer_maya',
           sellerId: 'seller_carla',
           productTitle: 'Vintage Band Tee (Rolling Stones)',
-          productImage: 'https://picsum.photos/seed/prod_7/400/400',
+          productImage: imageFor('prod_7'),
           sellerName: 'Vintage Vibes PH',
           buyerName: 'Maya Santos',
-          buyerAvatar: 'https://i.pravatar.cc/150?u=maya_buys',
+          buyerAvatar: 'https://ui-avatars.com/api/?name=Maya+Santos&background=0D9488&color=fff&size=150',
           amount: 450,
           shippingFee: 80,
           platformFee: 9,
@@ -627,10 +664,10 @@ abstract final class MockData {
           buyerId: 'buyer_james',
           sellerId: 'seller_anna',
           productTitle: 'Korean Oversized Blazer',
-          productImage: 'https://picsum.photos/seed/prod_3/400/400',
+          productImage: imageFor('prod_3'),
           sellerName: 'Preloved Gems',
           buyerName: 'James Reyes',
-          buyerAvatar: 'https://i.pravatar.cc/150?u=james_thrift',
+          buyerAvatar: 'https://ui-avatars.com/api/?name=James+Reyes&background=1E293B&color=fff&size=150',
           amount: 550,
           shippingFee: 80,
           platformFee: 11,
@@ -648,10 +685,10 @@ abstract final class MockData {
           buyerId: 'buyer_maya',
           sellerId: 'seller_rico',
           productTitle: 'Streetwear Cargo Pants',
-          productImage: 'https://picsum.photos/seed/prod_6/400/400',
+          productImage: imageFor('prod_6'),
           sellerName: 'Thrift & Trendy',
           buyerName: 'Maya Santos',
-          buyerAvatar: 'https://i.pravatar.cc/150?u=maya_buys',
+          buyerAvatar: 'https://ui-avatars.com/api/?name=Maya+Santos&background=0D9488&color=fff&size=150',
           amount: 650,
           shippingFee: 80,
           platformFee: 13,
@@ -664,11 +701,6 @@ abstract final class MockData {
           paymentProofSubmitted: true,
         ),
       ];
-
-  static const List<String> categoryChips = [
-    'Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Shoes',
-    'Bags', 'Accessories', 'Vintage', 'Streetwear', 'Formal',
-  ];
 
   static const List<String> popularSearches = [
     'vintage denim', 'y2k tops', 'nike af1', 'korean blazer',

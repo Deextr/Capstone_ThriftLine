@@ -45,7 +45,14 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: CachedNetworkImage(imageUrl: product.imageUrl, width: 72, height: 72, fit: BoxFit.cover),
+                      child: CachedNetworkImage(
+                        imageUrl: product.imageUrl, 
+                        width: 72, 
+                        height: 72, 
+                        fit: BoxFit.cover,
+                        placeholder: (_, _) => Container(color: const Color(0xFFF1F5F9)),
+                        errorWidget: (_, _, _) => Container(color: const Color(0xFFF1F5F9), child: const Icon(Icons.image_outlined)),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(

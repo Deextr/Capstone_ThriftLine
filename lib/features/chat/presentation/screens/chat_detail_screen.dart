@@ -60,7 +60,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(6),
-                        child: CachedNetworkImage(imageUrl: chat!.productImage ?? '', width: 40, height: 40, fit: BoxFit.cover),
+                        child: CachedNetworkImage(
+                          imageUrl: chat!.productImage ?? '', 
+                          width: 40, 
+                          height: 40, 
+                          fit: BoxFit.cover,
+                          placeholder: (_, _) => Container(color: AppColors.surfaceVariant),
+                          errorWidget: (_, _, _) => Container(color: AppColors.surfaceVariant, child: const Icon(Icons.image_outlined, size: 20)),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(child: Text(chat.productTitle!, style: AppTypography.caption)),

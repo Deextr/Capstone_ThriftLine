@@ -152,6 +152,11 @@ class _SellerOrdersTabState extends State<SellerOrdersTab>
                         width: 48,
                         height: 48,
                         fit: BoxFit.cover,
+                        placeholder: (_, _) => Container(color: AppColors.surfaceVariant),
+                        errorWidget: (_, _, _) => Container(
+                          color: AppColors.surfaceVariant,
+                          child: const Icon(Icons.image_outlined, size: 20),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),

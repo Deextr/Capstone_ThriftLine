@@ -22,4 +22,5 @@ abstract final class RouteNames {
   static const String purchaseHistory = '/purchase-history';
   static const String savedItems = '/saved-items';
   static const String becomeSeller = '/become-seller';
+  static const String sellerProfile = '/seller-profile/:username';
 }

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/constants/app_colors.dart';
-import '../core/constants/app_constants.dart';
 import '../core/constants/app_typography.dart';
 import '../core/utils/formatters.dart';
 import '../models/product_model.dart';
@@ -19,6 +18,7 @@ class ProductCard extends StatefulWidget {
     required this.product,
     this.variant = ProductCardVariant.grid,
     this.onTap,
+    this.onSellerTap,
     this.showCountdown = false,
     this.compact = false,
   });
@@ -26,6 +26,7 @@ class ProductCard extends StatefulWidget {
   final ProductModel product;
   final ProductCardVariant variant;
   final VoidCallback? onTap;
+  final VoidCallback? onSellerTap;
   final bool showCountdown;
   final bool compact;
 
@@ -36,6 +37,7 @@ class ProductCard extends StatefulWidget {
 class _ProductCardState extends State<ProductCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _heartController;
+  bool _isPressed = false;
 
   @override
   void initState() {
@@ -59,190 +61,555 @@ class _ProductCardState extends State<ProductCard>
         : _buildList(context);
   }
 
+  // ---------------------------------------------------------------------------
+  // Grid card — redesigned to match reference image
+  // ---------------------------------------------------------------------------
+
   Widget _buildGrid(BuildContext context) {
     final data = context.watch<DataProvider>();
     final saved = data.isSaved(widget.product.id);
-    final imageHeight = widget.compact ? 116.0 : 150.0;
-    final contentPadding = widget.compact
-        ? const EdgeInsets.all(8)
-        : const EdgeInsets.all(10);
+    final hasBid = widget.product.hasActiveBid;
 
-    return ThriftCard(
-      onTap: widget.onTap,
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16),
-                ),
-                child: CachedNetworkImage(
-                  imageUrl: widget.product.imageUrl,
-                  width: double.infinity,
-                  height: imageHeight,
-                  fit: BoxFit.cover,
-                  placeholder: (_, _) => Container(
-                    color: AppColors.primaryLight,
-                    height: imageHeight,
-                  ),
-                ),
+    return AnimatedScale(
+      scale: _isPressed ? 0.965 : 1.0,
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) {
+          setState(() => _isPressed = false);
+          widget.onTap?.call();
+        },
+        onTapCancel: () => setState(() => _isPressed = false),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.07),
+                blurRadius: 14,
+                spreadRadius: 0,
+                offset: const Offset(0, 4),
               ),
-              if (widget.product.hasActiveBid)
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: ThriftBadge(
-                    label:
-                        widget.showCountdown &&
-                            widget.product.bidEndTime != null
-                        ? 'Bid ${formatCurrency(widget.product.currentBid ?? 0)}'
-                        : 'Bid',
-                    variant: BadgeVariant.secondary,
-                  ),
-                ),
-              if (widget.showCountdown && widget.product.bidEndTime != null)
-                Positioned(
-                  top: 8,
-                  right: 40,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.secondary.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: CountdownTimer(
-                      endTime: widget.product.bidEndTime!,
-                      style: AppTypography.caption.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Product image with overlays ───────────────────────────
+                Expanded(
+                  flex: 11,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Product image — with robust error handling
+                      CachedNetworkImage(
+                        imageUrl: widget.product.imageUrl,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        memCacheWidth: 400,
+                        fadeInDuration: const Duration(milliseconds: 200),
+                        placeholder: (_, _) => const _ImagePlaceholder(),
+                        errorWidget: (_, _, _) => const _ImagePlaceholder(),
                       ),
-                    ),
+
+                      // Condition badge — top left
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: _ConditionBadge(
+                          label: widget.product.condition.label,
+                        ),
+                      ),
+
+                      // Countdown timer pill — top right
+                      if (widget.showCountdown &&
+                          widget.product.bidEndTime != null)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: _CountdownPill(
+                            endTime: widget.product.bidEndTime!,
+                          ),
+                        ),
+
+                      // Save / heart — bottom right of image
+                      Positioned(
+                        bottom: 8,
+                        right: 8,
+                        child: _SaveButton(
+                          saved: saved,
+                          controller: _heartController,
+                          onTap: () {
+                            _heartController.forward(from: 0);
+                            data.toggleSave(widget.product.id);
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              Positioned(
-                top: 4,
-                right: 4,
-                child: IconButton(
-                  icon: AnimatedBuilder(
-                    animation: _heartController,
-                    builder: (_, _) => Icon(
-                      saved ? Icons.favorite : Icons.favorite_border,
-                      color: saved ? AppColors.error : Colors.white,
-                      size: 22,
+
+                // ── Content section — fixed proportional height ──────────
+                Expanded(
+                  flex: 9,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      12,
+                      widget.compact ? 6 : 8,
+                      12,
+                      widget.compact ? 8 : 10,
                     ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Brand name
+                      if (widget.product.brand != null &&
+                          widget.product.brand!.isNotEmpty) ...[
+                        Text(
+                          widget.product.brand!,
+                          style: AppTypography.caption.copyWith(
+                            fontSize: widget.compact ? 10 : 11,
+                            color: AppColors.textSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                      ],
+
+                      // Product title
+                      Text(
+                        widget.product.title,
+                        style: AppTypography.body.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: widget.compact ? 12 : 13,
+                          height: 1.25,
+                          color: AppColors.textPrimary,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+
+                      SizedBox(height: widget.compact ? 4 : 6),
+
+                      // Seller row
+                      GestureDetector(
+                        onTap: widget.onSellerTap,
+                        behavior: HitTestBehavior.opaque,
+                        child: Row(
+                          children: [
+                            ThriftAvatar(
+                              imageUrl: widget.product.sellerAvatar,
+                              size: widget.compact ? 16 : 20,
+                            ),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                widget.product.sellerName,
+                                style: AppTypography.caption.copyWith(
+                                  fontSize: widget.compact ? 10 : 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textPrimary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (widget.product.sellerVerified)
+                              Icon(
+                                Icons.verified_rounded,
+                                size: widget.compact ? 12 : 14,
+                                color: AppColors.primary,
+                              ),
+                          ],
+                        ),
+                      ),
+
+                      SizedBox(height: widget.compact ? 4 : 5),
+
+                      // Bid label (conditional)
+                      if (hasBid)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 1),
+                          child: Text(
+                            'Current Bid',
+                            style: AppTypography.caption.copyWith(
+                              fontSize: widget.compact ? 9 : 10,
+                              color: AppColors.textHint,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+
+                      // Price + Location row
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // Price
+                          Text(
+                            formatCurrency(widget.product.displayPrice),
+                            style: AppTypography.subheading.copyWith(
+                              color: AppColors.primary,
+                              fontSize: widget.compact ? 14 : 15,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                              height: 1.2,
+                            ),
+                          ),
+                          // Location
+                          if (widget.product.location != null &&
+                              widget.product.location!.isNotEmpty) ...[
+                            const Spacer(),
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: widget.compact ? 11 : 12,
+                              color: AppColors.textHint,
+                            ),
+                            const SizedBox(width: 2),
+                            Flexible(
+                              child: Text(
+                                widget.product.location!,
+                                style: AppTypography.caption.copyWith(
+                                  fontSize: widget.compact ? 9 : 10,
+                                  color: AppColors.textHint,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
                   ),
-                  onPressed: () {
-                    _heartController.forward(from: 0);
-                    data.toggleSave(widget.product.id);
-                  },
                 ),
               ),
             ],
           ),
-          Padding(
-            padding: contentPadding,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    ThriftAvatar(
-                      imageUrl: widget.product.sellerAvatar,
-                      size: widget.compact ? 18 : 20,
+        ),
+      ),
+    ),
+  );
+}
+
+  // ---------------------------------------------------------------------------
+  // List card (used in search results etc.)
+  // ---------------------------------------------------------------------------
+
+  Widget _buildList(BuildContext context) {
+    final hasBid = widget.product.hasActiveBid;
+
+    return AnimatedScale(
+      scale: _isPressed ? 0.98 : 1.0,
+      duration: const Duration(milliseconds: 120),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) {
+          setState(() => _isPressed = false);
+          widget.onTap?.call();
+        },
+        onTapCancel: () => setState(() => _isPressed = false),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+            border: Border.all(
+              color: AppColors.border.withValues(alpha: 0.5),
+            ),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              // Thumbnail with condition badge
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: CachedNetworkImage(
+                      imageUrl: widget.product.imageUrl,
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                      placeholder: (_, _) => Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      errorWidget: (_, _, _) => Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.image_outlined,
+                          color: AppColors.textHint,
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
+                  ),
+                  // Condition badge on thumbnail
+                  Positioned(
+                    top: 4,
+                    left: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
                       child: Text(
-                        widget.product.sellerName,
-                        style: AppTypography.caption,
+                        widget.product.condition.label,
+                        style: AppTypography.caption.copyWith(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Brand
+                    if (widget.product.brand != null &&
+                        widget.product.brand!.isNotEmpty)
+                      Text(
+                        widget.product.brand!,
+                        style: AppTypography.caption.copyWith(
+                          fontSize: 10,
+                          color: AppColors.textSecondary,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                    // Title
+                    Text(
+                      widget.product.title,
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    if (widget.product.sellerVerified)
-                      const Icon(
-                        Icons.verified,
-                        size: 14,
-                        color: AppColors.primary,
+                    const SizedBox(height: 4),
+                    // Price row
+                    Row(
+                      children: [
+                        if (hasBid)
+                          Text(
+                            'Current Bid ',
+                            style: AppTypography.caption.copyWith(
+                              fontSize: 10,
+                              color: AppColors.textHint,
+                            ),
+                          ),
+                        Text(
+                          formatCurrency(widget.product.displayPrice),
+                          style: AppTypography.subheading.copyWith(
+                            color: AppColors.primary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    // Location
+                    if (widget.product.location != null &&
+                        widget.product.location!.isNotEmpty)
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on_outlined,
+                            size: 12,
+                            color: AppColors.textHint,
+                          ),
+                          const SizedBox(width: 2),
+                          Expanded(
+                            child: Text(
+                              widget.product.location!,
+                              style: AppTypography.caption.copyWith(
+                                fontSize: 10,
+                                color: AppColors.textHint,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  widget.product.title,
-                  style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: widget.compact ? 1 : 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: widget.compact ? 2 : 4),
-                Text(
-                  formatCurrency(widget.product.displayPrice),
-                  style: AppTypography.subheading.copyWith(
-                    color: AppColors.primary,
-                    fontSize: widget.compact ? 14 : null,
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper widgets
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Shimmer-style placeholder shown while the image loads or on error.
+class _ImagePlaceholder extends StatelessWidget {
+  const _ImagePlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: AppColors.primaryLight.withValues(alpha: 0.5),
+      child: Center(
+        child: Icon(
+          Icons.image_outlined,
+          color: AppColors.textHint.withValues(alpha: 0.5),
+          size: 32,
+        ),
+      ),
+    );
+  }
+}
+
+/// Condition badge (e.g. "Good", "Like new") — semi-transparent white pill,
+/// positioned at the top-left of the image.
+class _ConditionBadge extends StatelessWidget {
+  const _ConditionBadge({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Text(
+        label,
+        style: AppTypography.caption.copyWith(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.w600,
+          fontSize: 11,
+        ),
+      ),
+    );
+  }
+}
+
+/// Countdown timer pill — primary-colored rounded pill with clock icon,
+/// positioned at the top-right of the image.
+class _CountdownPill extends StatelessWidget {
+  const _CountdownPill({required this.endTime});
+  final DateTime endTime;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.35),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.schedule_rounded, color: Colors.white, size: 12),
+          const SizedBox(width: 4),
+          CountdownTimer(
+            endTime: endTime,
+            style: AppTypography.caption.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildList(BuildContext context) {
-    return ThriftCard(
-      onTap: widget.onTap,
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: CachedNetworkImage(
-              imageUrl: widget.product.imageUrl,
-              width: 60,
-              height: 60,
-              fit: BoxFit.cover,
-              placeholder: (_, _) => Container(
-                color: AppColors.primaryLight,
-                width: 60,
-                height: 60,
-              ),
+/// Heart / save button — small white circle with shadow.
+class _SaveButton extends StatelessWidget {
+  const _SaveButton({
+    required this.saved,
+    required this.onTap,
+    required this.controller,
+  });
+  final bool saved;
+  final VoidCallback onTap;
+  final AnimationController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.95),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(
+          child: AnimatedBuilder(
+            animation: controller,
+            builder: (_, _) => Icon(
+              saved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+              color: saved ? AppColors.error : AppColors.textSecondary,
+              size: 17,
             ),
           ),
-          const SizedBox(width: AppConstants.spacingMd),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.product.title,
-                  style: AppTypography.body,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  formatCurrency(widget.product.price),
-                  style: AppTypography.subheading.copyWith(
-                    color: AppColors.primary,
-                    fontSize: 14,
-                  ),
-                ),
-                Text(
-                  '${widget.product.viewCount} views • ${widget.product.likesCount} likes',
-                  style: AppTypography.caption,
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

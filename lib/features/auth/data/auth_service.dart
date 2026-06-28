@@ -42,6 +42,8 @@ class AuthService {
         rating: 4.8,
         sales: 234,
         isVerified: true,
+        bio: 'Philippines Based 🇵🇭 | Curated vintage & Y2K fashion finds ✨ | Haggling is OK',
+        lastActive: DateTime.now().subtract(const Duration(hours: 2)),
       ),
     ),
     'thrift_trendy': _Credential(
@@ -57,6 +59,8 @@ class AuthService {
         rating: 4.5,
         sales: 156,
         isVerified: true,
+        bio: 'Streetwear & Korean fashion 🔥 | Fast shipper 📦 | DM for bundles',
+        lastActive: DateTime.now().subtract(const Duration(minutes: 30)),
       ),
     ),
     'preloved_gems': _Credential(
@@ -72,6 +76,8 @@ class AuthService {
         rating: 4.9,
         sales: 412,
         isVerified: true,
+        bio: 'Quality preloved items only 💎 | COD available | Taguig meetup OK',
+        lastActive: DateTime.now().subtract(const Duration(hours: 8)),
       ),
     ),
   };
