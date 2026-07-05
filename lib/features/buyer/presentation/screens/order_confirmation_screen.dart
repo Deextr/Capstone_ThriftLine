@@ -26,68 +26,71 @@ class OrderConfirmationScreen extends StatelessWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppConstants.spacingLg),
-          child: Column(
-            children: [
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(AppConstants.spacingLg),
+            child: Column(
+              children: [
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check_circle, size: 64, color: AppColors.success),
                 ),
-                child: const Icon(Icons.check_circle, size: 64, color: AppColors.success),
-              ),
-              const SizedBox(height: 24),
-              Text('Order Placed!', style: AppTypography.display),
-              Text('Order #${order.orderNumber}', style: AppTypography.body.copyWith(color: AppColors.textSecondary)),
-              const SizedBox(height: 24),
-              ThriftCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(order.productTitle, style: AppTypography.subheading),
-                    Text('Seller: ${order.sellerName}', style: AppTypography.caption),
-                    const Divider(),
-                    _row('Item', formatCurrency(order.amount)),
-                    _row('Shipping', formatCurrency(order.shippingFee)),
-                    _row('Platform fee', formatCurrency(order.platformFee)),
-                    _row('Total', formatCurrency(order.total), bold: true),
-                    _row('Payment', order.paymentMethod.label),
-                    _row('Delivery', order.deliveryMethod.label),
-                    const SizedBox(height: 16),
-                    Container(
-                      height: 80,
-                      width: 80,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.border),
-                        borderRadius: BorderRadius.circular(8),
+                const SizedBox(height: 24),
+                Text('Order Placed!', style: AppTypography.display),
+                Text('Order #${order.orderNumber}', style: AppTypography.body.copyWith(color: AppColors.textSecondary)),
+                const SizedBox(height: 24),
+                ThriftCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(order.productTitle, style: AppTypography.subheading),
+                      Text('Seller: ${order.sellerName}', style: AppTypography.caption),
+                      const Divider(),
+                      _row('Item', formatCurrency(order.amount)),
+                      _row('Shipping', formatCurrency(order.shippingFee)),
+                      _row('Platform fee', formatCurrency(order.platformFee)),
+                      _row('Total', formatCurrency(order.total), bold: true),
+                      _row('Payment', order.paymentMethod.label),
+                      _row('Delivery', order.deliveryMethod.label),
+                      const SizedBox(height: 16),
+                      Container(
+                        height: 80,
+                        width: 80,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.border),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.qr_code, size: 48),
                       ),
-                      child: const Icon(Icons.qr_code, size: 48),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const Spacer(),
-              if (needsProof)
+                const SizedBox(height: 32),
+                if (needsProof) ...[
+                  ThriftButton(
+                    label: 'Upload Payment Proof',
+                    variant: ThriftButtonVariant.secondary,
+                    onPressed: () => context.push('/payment-proof/$orderId'),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 ThriftButton(
-                  label: 'Upload Payment Proof',
-                  variant: ThriftButtonVariant.secondary,
-                  onPressed: () => context.push('/payment-proof/$orderId'),
+                  label: 'Track Order',
+                  onPressed: () => context.push('/track-order/$orderId'),
                 ),
-              const SizedBox(height: 12),
-              ThriftButton(
-                label: 'Track Order',
-                onPressed: () => context.push('/track-order/$orderId'),
-              ),
-              const SizedBox(height: 12),
-              ThriftButton(
-                label: 'Continue Shopping',
-                variant: ThriftButtonVariant.outline,
-                onPressed: () => context.go(RouteNames.buyerHome),
-              ),
-            ],
+                const SizedBox(height: 12),
+                ThriftButton(
+                  label: 'Continue Shopping',
+                  variant: ThriftButtonVariant.outline,
+                  onPressed: () => context.go(RouteNames.buyerHome),
+                ),
+              ],
+            ),
           ),
         ),
       ),

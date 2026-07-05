@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
-import '../../../../core/utils/ai_search_parser.dart';
 import '../../../../providers/data_provider.dart';
 import '../../../../widgets/product_card.dart';
 import '../../../../widgets/thrift_widgets.dart';
@@ -32,7 +31,6 @@ class _BuyerSearchTabState extends State<BuyerSearchTab> {
   Widget build(BuildContext context) {
     final data = context.watch<DataProvider>();
     final query = _controller.text;
-    final ai = query.isNotEmpty ? parseAiSearch(query) : null;
     final results = data.searchProducts(query, category: _category == 'All' ? null : _category, sort: _sort);
 
     return GestureDetector(
@@ -44,7 +42,7 @@ class _BuyerSearchTabState extends State<BuyerSearchTab> {
               padding: const EdgeInsets.all(AppConstants.spacingMd),
               child: ThriftTextField(
                 controller: _controller,
-                hint: 'Search with AI...',
+                hint: 'Search vintage, streetwear...',
                 icon: Icons.search,
                 autofocus: false,
                 onChanged: (_) => setState(() {}),
@@ -53,16 +51,11 @@ class _BuyerSearchTabState extends State<BuyerSearchTab> {
                         _controller.clear();
                         setState(() {});
                       })
-                    : null,
+                    : IconButton(icon: const Icon(Icons.mic), onPressed: () {
+                        showThriftSnackBar(context, 'Voice search coming soon');
+                      }),
               ),
             ),
-            if (ai != null && query.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: ThriftCard(
-                  child: Text(aiUnderstandingText(ai), style: AppTypography.body.copyWith(color: AppColors.primaryDark)),
-                ),
-              ),
             const SizedBox(height: 8),
             SizedBox(
               height: 36,
@@ -168,11 +161,7 @@ class SearchScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        title: const Text('AI Smart Search'),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => showThriftSnackBar(context, 'Voice search coming soon'),
-        child: const Icon(Icons.mic),
+        title: const Text('Search'),
       ),
       body: const BuyerSearchTab(),
     );

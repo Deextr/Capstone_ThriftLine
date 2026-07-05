@@ -8,6 +8,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/data/mock_data.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../providers/auth_provider.dart';
+import '../../../../providers/cart_provider.dart';
 import '../../../../providers/data_provider.dart';
 import '../../../../widgets/product_card.dart';
 import '../../../../widgets/thrift_widgets.dart';
@@ -63,6 +64,7 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
+    final cart = context.watch<CartProvider>();
     final notifCount =
         data.unreadNotificationCount(auth.user?.id ?? 'buyer_maya');
 
@@ -87,11 +89,10 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
               SliverToBoxAdapter(
                 child: _TopHeader(
                   notifCount: notifCount,
+                  cartCount: cart.itemCount,
                   onSearchTap: () => context.push(RouteNames.search),
-                  onFavoriteTap: () => context.push(RouteNames.savedItems),
-                  onBagTap: () {
-                    showThriftSnackBar(context, 'Shopping Bag coming soon!');
-                  },
+                  onNotificationTap: () => context.push(RouteNames.notifications),
+                  onBagTap: () => context.push(RouteNames.checkout),
                 ),
               ),
 
@@ -180,7 +181,7 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                     crossAxisCount: 2,
                     mainAxisSpacing: 14,
                     crossAxisSpacing: 14,
-                    childAspectRatio: 0.52,
+                    childAspectRatio: 0.55,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (_, i) {
@@ -227,14 +228,16 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
 class _TopHeader extends StatelessWidget {
   const _TopHeader({
     required this.notifCount,
+    required this.cartCount,
     required this.onSearchTap,
-    required this.onFavoriteTap,
+    required this.onNotificationTap,
     required this.onBagTap,
   });
 
   final int notifCount;
+  final int cartCount;
   final VoidCallback onSearchTap;
-  final VoidCallback onFavoriteTap;
+  final VoidCallback onNotificationTap;
   final VoidCallback onBagTap;
 
   @override
@@ -278,10 +281,15 @@ class _TopHeader extends StatelessWidget {
           
           const SizedBox(width: 12),
           
-          // Favorite / Saved Icon
+          // Notification Icon
           IconButton(
-            onPressed: onFavoriteTap,
-            icon: const Icon(Icons.favorite_border_rounded),
+            onPressed: onNotificationTap,
+            icon: Badge(
+              isLabelVisible: notifCount > 0,
+              label: Text(notifCount.toString()),
+              backgroundColor: AppColors.primary,
+              child: const Icon(Icons.notifications_none_rounded),
+            ),
             color: AppColors.textPrimary,
             iconSize: 26,
             constraints: const BoxConstraints(),
@@ -293,7 +301,12 @@ class _TopHeader extends StatelessWidget {
           // Bag / Cart Icon
           IconButton(
             onPressed: onBagTap,
-            icon: const Icon(Icons.shopping_bag_outlined),
+            icon: Badge(
+              isLabelVisible: cartCount > 0,
+              label: Text(cartCount.toString()),
+              backgroundColor: AppColors.secondary,
+              child: const Icon(Icons.shopping_bag_outlined),
+            ),
             color: AppColors.textPrimary,
             iconSize: 26,
             constraints: const BoxConstraints(),

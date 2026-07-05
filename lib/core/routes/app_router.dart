@@ -7,6 +7,7 @@ import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/buyer/presentation/screens/become_seller_screen.dart';
 import '../../features/buyer/presentation/screens/buyer_shell_screen.dart';
 import '../../features/buyer/presentation/screens/buy_now_screen.dart';
+import '../../features/buyer/presentation/screens/checkout_screen.dart';
 import '../../features/buyer/presentation/screens/edit_profile_screen.dart';
 import '../../features/buyer/presentation/screens/order_confirmation_screen.dart';
 import '../../features/buyer/presentation/screens/order_tracking_screen.dart';
@@ -154,6 +155,10 @@ GoRouter createAppRouter({
         path: RouteNames.sellerProfile,
         builder: (_, state) =>
             SellerPublicProfileScreen(username: state.pathParameters['username']!),
+      ),
+      GoRoute(
+        path: RouteNames.checkout,
+        builder: (_, _) => const CheckoutScreen(),
       ),
     ],
     errorBuilder: (_, state) =>

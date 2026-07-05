@@ -8,6 +8,7 @@ import '../core/theme/app_theme.dart';
 import '../features/auth/data/auth_service.dart';
 import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/cart_provider.dart';
 import '../providers/data_provider.dart';
 
 class ThriftlineApp extends StatelessWidget {
@@ -35,6 +36,7 @@ class ThriftlineApp extends StatelessWidget {
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
         ChangeNotifierProvider<AppProvider>.value(value: appProvider),
         ChangeNotifierProvider<DataProvider>.value(value: dataProvider),
+        ChangeNotifierProvider<CartProvider>(create: (_) => CartProvider()),
       ],
       child: MaterialApp.router(
         title: AppConstants.appName,

@@ -7,8 +7,10 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../models/enums.dart';
 import '../../../../models/product_model.dart';
 import '../../../../providers/auth_provider.dart';
+import '../../../../providers/cart_provider.dart';
 import '../../../../providers/data_provider.dart';
 import '../../../../widgets/countdown_timer.dart';
 import '../../../../widgets/thrift_widgets.dart';
@@ -492,36 +494,83 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         color: Colors.white,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
-      child: Row(
+      child: _buildActionButtons(context, product, minBid),
+    );
+  }
+
+  Widget _buildActionButtons(BuildContext context, ProductModel product, double minBid) {
+    final cart = context.watch<CartProvider>();
+    final isFixed = product.sellingType == SellingType.fixedPrice;
+    final isAuction = product.sellingType == SellingType.auction;
+    final isBoth = product.sellingType == SellingType.both;
+    final inCart = cart.isInCart(product.id);
+
+    if (isBoth) {
+      // Both: Chat + Add to Cart + Place Bid
+      return Row(
         children: [
-          Expanded(
-            flex: 1,
-            child: OutlinedButton.icon(
+          // Chat button
+          SizedBox(
+            width: 52,
+            child: OutlinedButton(
               onPressed: () => context.push(RouteNames.chat),
-              icon: const Icon(Icons.chat_bubble_outline, color: AppColors.textPrimary, size: 20),
-              label: Text('Chat', style: AppTypography.body.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary, fontSize: 16)),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 side: const BorderSide(color: AppColors.border, width: 1.5),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
+              child: const Icon(Icons.chat_bubble_outline, color: AppColors.textPrimary, size: 20),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
+          // Add to Cart
           Expanded(
-            flex: 1,
             child: ElevatedButton.icon(
               onPressed: () {
-                if (product.hasActiveBid) {
-                  _showBidBottomSheet(context, product, minBid);
+                if (!inCart) {
+                  cart.addToCart(product);
+                  showThriftSnackBar(context, 'Added to cart!');
                 } else {
-                  context.push('/buy-now/${product.id}');
+                  context.push(RouteNames.checkout);
                 }
               },
-              icon: Icon(product.hasActiveBid ? Icons.gavel_rounded : Icons.shopping_bag_outlined, color: Colors.white, size: 20),
-              label: Text(product.hasActiveBid ? 'Place Bid' : 'Buy Now', style: AppTypography.body.copyWith(fontWeight: FontWeight.w600, color: Colors.white, fontSize: 16)),
+              icon: Icon(
+                inCart ? Icons.shopping_bag_rounded : Icons.add_shopping_cart_rounded,
+                color: inCart ? AppColors.primaryDark : Colors.white,
+                size: 18,
+              ),
+              label: Text(
+                inCart ? 'View Cart' : 'Add to Cart',
+                style: AppTypography.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: inCart ? AppColors.primaryDark : Colors.white,
+                  fontSize: 13,
+                ),
+              ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: inCart ? AppColors.primaryLight : AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Place Bid
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () => _showBidBottomSheet(context, product, minBid),
+              icon: const Icon(Icons.gavel_rounded, color: Colors.white, size: 18),
+              label: Text(
+                'Place Bid',
+                style: AppTypography.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  fontSize: 13,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondary,
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -529,7 +578,60 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ),
         ],
-      ),
+      );
+    }
+
+    // Fixed price or Auction only: Chat + primary action
+    return Row(
+      children: [
+        Expanded(
+          flex: 1,
+          child: OutlinedButton.icon(
+            onPressed: () => context.push(RouteNames.chat),
+            icon: const Icon(Icons.chat_bubble_outline, color: AppColors.textPrimary, size: 20),
+            label: Text('Chat', style: AppTypography.body.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary, fontSize: 16)),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              side: const BorderSide(color: AppColors.border, width: 1.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 1,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              if (isAuction && product.hasActiveBid) {
+                _showBidBottomSheet(context, product, minBid);
+              } else if (isFixed) {
+                cart.addToCart(product);
+                showThriftSnackBar(context, 'Added to cart!');
+                context.push(RouteNames.checkout);
+              }
+            },
+            icon: Icon(
+              isAuction ? Icons.gavel_rounded : Icons.shopping_bag_outlined,
+              color: Colors.white,
+              size: 20,
+            ),
+            label: Text(
+              isAuction ? 'Place Bid' : 'Buy Now',
+              style: AppTypography.body.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                fontSize: 16,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isAuction ? AppColors.secondary : AppColors.primary,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

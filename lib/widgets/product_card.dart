@@ -101,7 +101,6 @@ class _ProductCardState extends State<ProductCard>
               children: [
                 // ── Product image with overlays ───────────────────────────
                 Expanded(
-                  flex: 11,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
@@ -153,16 +152,14 @@ class _ProductCardState extends State<ProductCard>
                   ),
                 ),
 
-                // ── Content section — fixed proportional height ──────────
-                Expanded(
-                  flex: 9,
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      12,
-                      widget.compact ? 6 : 8,
-                      12,
-                      widget.compact ? 8 : 10,
-                    ),
+                // ── Content section — auto height, no empty space at bottom
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    12,
+                    widget.compact ? 6 : 8,
+                    12,
+                    widget.compact ? 12 : 16,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -288,8 +285,7 @@ class _ProductCardState extends State<ProductCard>
                     ],
                   ),
                 ),
-              ),
-            ],
+              ],
           ),
         ),
       ),

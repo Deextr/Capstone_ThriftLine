@@ -45,9 +45,12 @@ class _SellerOrdersTabState extends State<SellerOrdersTab>
     return SafeArea(
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(AppConstants.spacingMd),
-            child: Text('Orders', style: AppTypography.heading),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.all(AppConstants.spacingMd),
+              child: Text('Orders', style: AppTypography.heading),
+            ),
           ),
           TabBar(
             controller: _tab,

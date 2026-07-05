@@ -72,9 +72,13 @@ class _SellerListingsTabState extends State<SellerListingsTab> with SingleTicker
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push(RouteNames.addListing),
-        child: const Icon(Icons.add),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 72.0), // Offset to float above curved bottom nav
+        child: FloatingActionButton(
+          onPressed: () => context.push(RouteNames.addListing),
+          backgroundColor: AppColors.primary,
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
       ),
     );
   }
