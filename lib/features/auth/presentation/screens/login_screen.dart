@@ -74,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'AI-powered thrift marketplace',
+                    'Buy and sell pre-loved fashion',
                     style: AppTypography.body.copyWith(
                       color: AppColors.textSecondary,
                     ),

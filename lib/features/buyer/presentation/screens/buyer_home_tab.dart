@@ -181,7 +181,7 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                     crossAxisCount: 2,
                     mainAxisSpacing: 14,
                     crossAxisSpacing: 14,
-                    childAspectRatio: 0.55,
+                    childAspectRatio: 0.52,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (_, i) {

@@ -98,9 +98,11 @@ class _ProductCardState extends State<ProductCard>
             borderRadius: BorderRadius.circular(18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // ── Product image with overlays ───────────────────────────
-                Expanded(
+                // ── Product image — fixed 1:1 aspect ratio ────────────────
+                AspectRatio(
+                  aspectRatio: 1.0,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
@@ -152,13 +154,13 @@ class _ProductCardState extends State<ProductCard>
                   ),
                 ),
 
-                // ── Content section — auto height, no empty space at bottom
+                // ── Content section — auto height, no overflow ────────────
                 Padding(
                   padding: EdgeInsets.fromLTRB(
                     12,
                     widget.compact ? 6 : 8,
                     12,
-                    widget.compact ? 12 : 16,
+                    widget.compact ? 10 : 14,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -192,7 +194,7 @@ class _ProductCardState extends State<ProductCard>
                         overflow: TextOverflow.ellipsis,
                       ),
 
-                      SizedBox(height: widget.compact ? 4 : 6),
+                      SizedBox(height: widget.compact ? 3 : 5),
 
                       // Seller row
                       GestureDetector(
@@ -227,7 +229,7 @@ class _ProductCardState extends State<ProductCard>
                         ),
                       ),
 
-                      SizedBox(height: widget.compact ? 4 : 5),
+                      SizedBox(height: widget.compact ? 3 : 4),
 
                       // Bid label (conditional)
                       if (hasBid)
@@ -243,25 +245,28 @@ class _ProductCardState extends State<ProductCard>
                           ),
                         ),
 
-                      // Price + Location row
+                      // Price + Location row — Flexible prevents overflow
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          // Price
-                          Text(
-                            formatCurrency(widget.product.displayPrice),
-                            style: AppTypography.subheading.copyWith(
-                              color: AppColors.primary,
-                              fontSize: widget.compact ? 14 : 15,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.3,
-                              height: 1.2,
+                          Flexible(
+                            child: Text(
+                              formatCurrency(widget.product.displayPrice),
+                              style: AppTypography.subheading.copyWith(
+                                color: AppColors.primary,
+                                fontSize: widget.compact ? 13 : 14,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.3,
+                                height: 1.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           // Location
                           if (widget.product.location != null &&
                               widget.product.location!.isNotEmpty) ...[
-                            const Spacer(),
+                            const SizedBox(width: 4),
                             Icon(
                               Icons.location_on_outlined,
                               size: widget.compact ? 11 : 12,
@@ -286,12 +291,12 @@ class _ProductCardState extends State<ProductCard>
                   ),
                 ),
               ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   // ---------------------------------------------------------------------------
   // List card (used in search results etc.)
