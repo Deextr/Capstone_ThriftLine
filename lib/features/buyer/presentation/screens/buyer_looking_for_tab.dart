@@ -52,6 +52,7 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab> with SingleTick
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: SafeArea(
+          bottom: false,
           child: DefaultTabController(
             length: 2,
             child: NestedScrollView(
@@ -75,7 +76,7 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab> with SingleTick
                       ),
                     ],
                     bottom: PreferredSize(
-                      preferredSize: const Size.fromHeight(100),
+                      preferredSize: const Size.fromHeight(112),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -139,14 +140,19 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab> with SingleTick
             ),
           ),
         ),
-        floatingActionButton: Padding(
-          padding: const EdgeInsets.only(bottom: 80.0),
-          child: FloatingActionButton.extended(
-            onPressed: () => _showPostSheet(context),
-            icon: const Icon(Icons.edit),
-            label: const Text('Post Request', style: TextStyle(fontWeight: FontWeight.w600)),
-            backgroundColor: AppColors.primary,
-          ),
+        floatingActionButton: Builder(
+          builder: (context) {
+            final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+            return Padding(
+              padding: EdgeInsets.only(bottom: 80.0 + bottomInset),
+              child: FloatingActionButton.extended(
+                onPressed: () => _showPostSheet(context),
+                icon: const Icon(Icons.edit),
+                label: const Text('Post Request', style: TextStyle(fontWeight: FontWeight.w600)),
+                backgroundColor: AppColors.primary,
+              ),
+            );
+          },
         ),
       ),
     );
@@ -163,11 +169,14 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab> with SingleTick
       );
     }
 
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     return RefreshIndicator(
       onRefresh: () async => setState(() {}),
       color: AppColors.primary,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), // extra padding for FAB
+        // 96px base clearance for FAB + nav bar, plus any system bottom inset
+        // (home indicator / gesture bar) so content is never hidden on physical devices.
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 96.0 + bottomInset),
         itemCount: posts.length,
         itemBuilder: (_, i) {
           final post = posts[i];
