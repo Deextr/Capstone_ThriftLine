@@ -570,7 +570,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.secondary,
+                backgroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -624,7 +624,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: isAuction ? AppColors.secondary : AppColors.primary,
+              backgroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(vertical: 18),
               elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
