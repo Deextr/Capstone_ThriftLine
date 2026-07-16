@@ -53,6 +53,7 @@ abstract final class MockData {
       distanceKm: 2.3,
       isVerified: true,
       location: 'Pasig City',
+      trustScore: 95,
     ),
     const SellerProfile(
       username: 'thrift_trendy',
@@ -65,6 +66,7 @@ abstract final class MockData {
       distanceKm: 4.1,
       isVerified: true,
       location: 'Mandaluyong',
+      trustScore: 78,
     ),
     const SellerProfile(
       username: 'preloved_gems',
@@ -77,6 +79,7 @@ abstract final class MockData {
       distanceKm: 6.8,
       isVerified: true,
       location: 'Taguig City',
+      trustScore: 92,
     ),
   ];
 

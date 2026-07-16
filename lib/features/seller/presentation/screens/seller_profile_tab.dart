@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../models/enums.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -47,7 +48,14 @@ class SellerProfileTab extends StatelessWidget {
                   ],
                 ),
                 Text('⭐ ${user?.rating ?? 4.8} • ${user?.sales ?? 0} sales', style: AppTypography.caption),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
+                if (user != null)
+                  SellerTrustBadge(
+                    trustScore: user.trustScore,
+                    isVerified: user.isVerified,
+                    shopName: user.shopName ?? user.name,
+                  ),
+                const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -87,6 +95,27 @@ class SellerProfileTab extends StatelessWidget {
           SwitchListTile(title: const Text('Vacation Mode'), value: false, onChanged: (_) {}),
           _menu(context, 'Seller Guidelines', () {}),
           _menu(context, 'Help Center', () {}),
+          const Divider(height: 32, thickness: 1, color: AppColors.border),
+          ListTile(
+            leading: const Icon(Icons.refresh, color: AppColors.error),
+            title: const Text('Reset Seller Status (Demo)', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w600)),
+            subtitle: const Text('Revert to buyer to test verification flow again', style: TextStyle(fontSize: 12)),
+            onTap: () async {
+              final auth = context.read<AuthProvider>();
+              final updated = auth.user?.copyWith(
+                role: UserRole.buyer,
+                isVerified: false,
+                verificationStatus: 'none',
+                verificationRejectionReason: null,
+              );
+              if (updated != null) {
+                await auth.updateCurrentUser(updated);
+                if (context.mounted) {
+                  showThriftSnackBar(context, 'Reset to buyer profile. You can test the seller application flow again.');
+                }
+              }
+            },
+          ),
           const SizedBox(height: 16),
           ThriftButton(
             label: 'Logout',

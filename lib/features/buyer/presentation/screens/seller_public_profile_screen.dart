@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/routes/route_names.dart';
 import '../../../../features/auth/data/auth_service.dart';
 import '../../../../models/product_model.dart';
 import '../../../../models/enums.dart';
@@ -186,20 +187,11 @@ class SellerPublicProfileScreen extends StatelessWidget {
               ),
               _OptionTile(
                 icon: Icons.flag_outlined,
-                label: 'Report',
+                label: 'Report Seller',
                 isDestructive: true,
                 onTap: () {
                   Navigator.pop(ctx);
-                  _showConfirmationDialog(
-                    context,
-                    title: 'Report User',
-                    message: 'Are you sure you want to report this user for inappropriate behavior?',
-                    confirmLabel: 'Report',
-                    isDestructive: true,
-                    onConfirm: () {
-                      showThriftSnackBar(context, 'Report submitted. We\'ll review it shortly.');
-                    },
-                  );
+                  context.push('${RouteNames.reportSeller}?seller=$username');
                 },
               ),
               const SizedBox(height: 16),
@@ -270,6 +262,43 @@ class SellerPublicProfileScreen extends StatelessWidget {
           // Avatar
           ThriftAvatar(imageUrl: seller.avatarUrl, size: 80),
 
+          const SizedBox(height: 12),
+
+          // Shop Name & Verification Icon
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                seller.shopName ?? seller.name,
+                style: AppTypography.heading.copyWith(fontWeight: FontWeight.w700),
+              ),
+              if (seller.isVerified) ...[
+                const SizedBox(width: 6),
+                const Icon(Icons.verified, color: AppColors.primary, size: 20),
+              ],
+            ],
+          ),
+
+          const SizedBox(height: 2),
+
+          // Username
+          Text(
+            '@${seller.username}',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Seller Trust Badge & Score
+          SellerTrustBadge(
+            trustScore: seller.trustScore,
+            isVerified: seller.isVerified,
+            shopName: seller.shopName ?? seller.name,
+          ),
+
           const SizedBox(height: 16),
 
           // Stats row
@@ -289,7 +318,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 4),
+          const SizedBox(height: 12),
 
           // Bio
           if (seller.bio != null && seller.bio!.isNotEmpty)
@@ -298,7 +327,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
               children: [
                 Flexible(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                     child: Text(
                       seller.bio!,
                       style: AppTypography.body.copyWith(
@@ -311,25 +340,6 @@ class SellerPublicProfileScreen extends StatelessWidget {
                 ),
               ],
             ),
-
-          // Verified badge
-          if (seller.isVerified) ...[
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.verified, color: AppColors.primary, size: 16),
-                const SizedBox(width: 4),
-                Text(
-                  'Verified Seller',
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ],
 
           const SizedBox(height: 20),
 

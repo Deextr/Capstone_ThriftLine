@@ -92,6 +92,59 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateCurrentUser(AuthUser updatedUser) async {
+    _user = updatedUser;
+    _authService.updateUser(updatedUser);
+    await _prefs.setUserRole(updatedUser.role.name);
+    notifyListeners();
+  }
+
+  Future<void> submitSellerApplication({
+    required String storeName,
+    required String address,
+    required String region,
+  }) async {
+    if (_user == null) return;
+    final updated = _user!.copyWith(
+      shopName: storeName,
+      location: '$region, Davao City',
+      verificationStatus: 'pending',
+      verificationRejectionReason: null,
+    );
+    await updateCurrentUser(updated);
+  }
+
+  Future<void> simulateApproveApplication() async {
+    if (_user == null) return;
+    final updated = _user!.copyWith(
+      role: UserRole.seller,
+      isVerified: true,
+      verificationStatus: 'approved',
+      verificationRejectionReason: null,
+    );
+    await updateCurrentUser(updated);
+  }
+
+  Future<void> simulateRejectApplication(String reason) async {
+    if (_user == null) return;
+    final updated = _user!.copyWith(
+      role: UserRole.buyer,
+      isVerified: false,
+      verificationStatus: 'rejected',
+      verificationRejectionReason: reason,
+    );
+    await updateCurrentUser(updated);
+  }
+
+  Future<void> resetVerificationStatus() async {
+    if (_user == null) return;
+    final updated = _user!.copyWith(
+      verificationStatus: 'none',
+      verificationRejectionReason: null,
+    );
+    await updateCurrentUser(updated);
+  }
+
   Future<void> _saveSession(AuthUser user) async {
     await _prefs.setLoggedIn(true);
     await _prefs.setUserRole(user.role.name);

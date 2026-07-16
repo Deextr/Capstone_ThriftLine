@@ -10,6 +10,7 @@ class SellerProfile {
     required this.distanceKm,
     required this.isVerified,
     required this.location,
+    this.trustScore = 80,
   });
 
   final String username;
@@ -22,4 +23,5 @@ class SellerProfile {
   final double distanceKm;
   final bool isVerified;
   final String location;
+  final int trustScore;
 }

@@ -450,4 +450,165 @@ class DataProvider extends ChangeNotifier {
       _ => 0.0,
     };
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Trust & Safety — Reports / Complaints / Appeals
+  // ─────────────────────────────────────────────────────────────────────────
+
+  final List<ReportModel> _reports = [
+    // Seed demo reports so the screen is not empty on first visit
+    ReportModel(
+      id: 'rpt_demo_1',
+      category: 'Item Not as Described',
+      sellerUsername: 'thrift_trendy',
+      details: 'Received a faded shirt instead of the vibrant one in the listing photo.',
+      evidenceCount: 2,
+      orderId: 'TL-82901738',
+      status: 'action_taken',
+      adminResponse: 'We have verified the discrepancy. A refund has been issued and the seller has received a warning.',
+      createdAt: DateTime.now().subtract(const Duration(days: 3)),
+    ),
+    ReportModel(
+      id: 'rpt_demo_2',
+      category: 'Failure to Ship',
+      sellerUsername: 'vintagevibes_ph',
+      details: 'Paid 5 days ago but the seller has not shipped the item and is not responding to messages.',
+      evidenceCount: 3,
+      orderId: 'TL-77204512',
+      status: 'under_review',
+      createdAt: DateTime.now().subtract(const Duration(hours: 18)),
+    ),
+    ReportModel(
+      id: 'rpt_demo_3',
+      category: 'Fake Product',
+      sellerUsername: 'preloved_gems',
+      details: 'The branded bag I received is clearly a replica, not the authentic item listed.',
+      evidenceCount: 4,
+      orderId: '',
+      status: 'dismissed',
+      adminResponse: 'After review, the item listing clearly states "inspired" in the description. No policy violation found.',
+      createdAt: DateTime.now().subtract(const Duration(days: 7)),
+    ),
+  ];
+
+  List<ReportModel> get reports => List.unmodifiable(_reports);
+
+  void addReport({
+    required String category,
+    required String sellerUsername,
+    required String details,
+    required int evidenceCount,
+    String orderId = '',
+  }) {
+    _reports.insert(
+      0,
+      ReportModel(
+        id: 'rpt_${_uuid.v4().substring(0, 8)}',
+        category: category,
+        sellerUsername: sellerUsername,
+        details: details,
+        evidenceCount: evidenceCount,
+        orderId: orderId,
+        status: 'under_review',
+        createdAt: DateTime.now(),
+      ),
+    );
+    notifyListeners();
+  }
+
+  void removeReport(String id) {
+    _reports.removeWhere((r) => r.id == id);
+    notifyListeners();
+  }
+
+  void appealReport(String id, String appealReason) {
+    final index = _reports.indexWhere((r) => r.id == id);
+    if (index == -1) return;
+    _reports[index] = _reports[index].copyWith(
+      hasAppealed: true,
+      appealReason: appealReason,
+      status: 'under_review',
+    );
+    notifyListeners();
+  }
+
+  void simulateResolveReport(String id, String response) {
+    final index = _reports.indexWhere((r) => r.id == id);
+    if (index == -1) return;
+    _reports[index] = _reports[index].copyWith(
+      status: 'action_taken',
+      adminResponse: response,
+    );
+    notifyListeners();
+  }
+
+  void simulateDismissReport(String id, String response) {
+    final index = _reports.indexWhere((r) => r.id == id);
+    if (index == -1) return;
+    _reports[index] = _reports[index].copyWith(
+      status: 'dismissed',
+      adminResponse: response,
+    );
+    notifyListeners();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Report Model
+// ═══════════════════════════════════════════════════════════════════════════
+
+class ReportModel {
+  const ReportModel({
+    required this.id,
+    required this.category,
+    required this.sellerUsername,
+    required this.details,
+    required this.evidenceCount,
+    required this.orderId,
+    required this.status,
+    required this.createdAt,
+    this.adminResponse,
+    this.hasAppealed = false,
+    this.appealReason,
+  });
+
+  final String id;
+  final String category;
+  final String sellerUsername;
+  final String details;
+  final int evidenceCount;
+  final String orderId;
+  final String status; // 'under_review', 'action_taken', 'resolved', 'dismissed'
+  final DateTime createdAt;
+  final String? adminResponse;
+  final bool hasAppealed;
+  final String? appealReason;
+
+  ReportModel copyWith({
+    String? id,
+    String? category,
+    String? sellerUsername,
+    String? details,
+    int? evidenceCount,
+    String? orderId,
+    String? status,
+    DateTime? createdAt,
+    String? adminResponse,
+    bool? hasAppealed,
+    String? appealReason,
+  }) {
+    return ReportModel(
+      id: id ?? this.id,
+      category: category ?? this.category,
+      sellerUsername: sellerUsername ?? this.sellerUsername,
+      details: details ?? this.details,
+      evidenceCount: evidenceCount ?? this.evidenceCount,
+      orderId: orderId ?? this.orderId,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      adminResponse: adminResponse ?? this.adminResponse,
+      hasAppealed: hasAppealed ?? this.hasAppealed,
+      appealReason: appealReason ?? this.appealReason,
+    );
+  }
 }

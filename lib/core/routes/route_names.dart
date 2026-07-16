@@ -24,4 +24,6 @@ abstract final class RouteNames {
   static const String becomeSeller = '/become-seller';
   static const String sellerProfile = '/seller-profile/:username';
   static const String checkout = '/checkout';
+  static const String reportSeller = '/report-seller';
+  static const String myReports = '/my-reports';
 }

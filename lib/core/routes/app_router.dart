@@ -26,6 +26,8 @@ import '../../features/seller/presentation/screens/add_listing_screen.dart';
 import '../../features/seller/presentation/screens/seller_order_detail_screen.dart';
 import '../../features/seller/presentation/screens/seller_shell_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/trust_safety/presentation/screens/report_seller_screen.dart';
+import '../../features/trust_safety/presentation/screens/my_reports_screen.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/auth_provider.dart';
 import 'route_names.dart';
@@ -159,6 +161,16 @@ GoRouter createAppRouter({
       GoRoute(
         path: RouteNames.checkout,
         builder: (_, _) => const CheckoutScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.reportSeller,
+        builder: (_, state) => ReportSellerScreen(
+          sellerUsername: state.uri.queryParameters['seller'],
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.myReports,
+        builder: (_, _) => const MyReportsScreen(),
       ),
     ],
     errorBuilder: (_, state) =>

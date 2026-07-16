@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../features/auth/domain/auth_user.dart';
+import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 
 class BecomeSellerScreen extends StatefulWidget {
@@ -49,6 +52,16 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final user = auth.user;
+    final status = user?.verificationStatus ?? 'none';
+
+    if (status == 'pending') {
+      return _buildPendingScreen(context, user);
+    } else if (status == 'rejected') {
+      return _buildRejectedScreen(context, user);
+    }
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
@@ -132,17 +145,52 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                     ? ThriftButton(
                         label: 'Continue',
                         onPressed: () {
+                          if (_currentStep == 0) {
+                            if (_storeNameCtrl.text.trim().isEmpty) {
+                              showThriftSnackBar(context, 'Please enter a store name.');
+                              return;
+                            }
+                            if (_selectedRegion == 'Select Barangay') {
+                              showThriftSnackBar(context, 'Please select a barangay.');
+                              return;
+                            }
+                            if (_addressCtrl.text.trim().isEmpty) {
+                              showThriftSnackBar(context, 'Please enter a store address.');
+                              return;
+                            }
+                          } else if (_currentStep == 1) {
+                            if (!_govIdUploaded) {
+                              showThriftSnackBar(context, 'Please upload a photo of your valid ID.');
+                              return;
+                            }
+                          }
                           setState(() => _currentStep++);
                         },
                       )
                     : ThriftButton(
                         label: 'Submit Application',
-                        onPressed: () {
-                          showThriftSnackBar(
-                            context,
-                            'Seller application submitted! We\'ll review it shortly.',
+                        onPressed: () async {
+                          if (!_govIdUploaded) {
+                            showThriftSnackBar(context, 'Please upload your government ID first.');
+                            return;
+                          }
+                          if (!_selfieUploaded) {
+                            showThriftSnackBar(context, 'Please upload your selfie first.');
+                            return;
+                          }
+                          
+                          await auth.submitSellerApplication(
+                            storeName: _storeNameCtrl.text.isEmpty ? 'My Thrift Shop' : _storeNameCtrl.text,
+                            address: _addressCtrl.text.isEmpty ? 'Davao City' : _addressCtrl.text,
+                            region: _selectedRegion == 'Select Barangay' ? 'Poblacion District' : _selectedRegion,
                           );
-                          context.pop();
+                          
+                          if (context.mounted) {
+                            showThriftSnackBar(
+                              context,
+                              'Seller application submitted! We\'ll review it shortly.',
+                            );
+                          }
                         },
                       ),
               ),
@@ -605,5 +653,453 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
         ],
       ),
     );
+  }
+
+  // ─── Pending Screen (Under Review) ───
+  Widget _buildPendingScreen(BuildContext context, AuthUser? user) {
+    final auth = context.read<AuthProvider>();
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Verification Status'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+        elevation: 0,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppConstants.spacingMd),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Pending Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppColors.warning.withValues(alpha: 0.1), AppColors.warning.withValues(alpha: 0.05)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.3), width: 1.5),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.hourglass_empty_rounded,
+                        color: AppColors.warning,
+                        size: 48,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Application Under Review',
+                      style: AppTypography.heading.copyWith(fontSize: 20, color: AppColors.warning),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Your seller verification request is currently being reviewed by our trust and safety team. We\'ll notify you once it\'s processed.',
+                      style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Timeline Steps
+              Text('Verification Progress', style: AppTypography.subheading),
+              const SizedBox(height: 16),
+              _buildTimelineStep(
+                title: 'Application Submitted',
+                subtitle: 'Store details and documents uploaded successfully',
+                isDone: true,
+                isPending: false,
+              ),
+              _buildTimelineStep(
+                title: 'Document Review',
+                subtitle: 'Simulated review processing (under 5 mins for demo)',
+                isDone: false,
+                isPending: true,
+              ),
+              _buildTimelineStep(
+                title: 'Shop Activation',
+                subtitle: 'Verified badge assigned and listing tools unlocked',
+                isDone: false,
+                isPending: false,
+                isLast: true,
+              ),
+              const SizedBox(height: 24),
+
+              // Summary Details
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Submitted Details', style: AppTypography.body.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
+                    _detailRow('Shop Name', user?.shopName ?? 'Vintage PH'),
+                    _detailRow('Location', user?.location ?? 'Davao City'),
+                    _detailRow('Government ID', 'Philippine National ID (Verified File)'),
+                    _detailRow('Verification Selfie', 'Face Match Photo (Selfie + ID)'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              // Admin Review Simulation Panel
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 1.5),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.construction_outlined, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Review Control Panel (Simulator)',
+                          style: AppTypography.subheading.copyWith(color: AppColors.primaryDark),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Use these buttons to simulate how the admin review will affect your profile in real-time.',
+                      style: AppTypography.caption,
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.error,
+                              side: const BorderSide(color: AppColors.error),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            label: const Text('Reject ID'),
+                            onPressed: () => _showRejectionDialog(context, auth),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 0,
+                            ),
+                            icon: const Icon(Icons.check_rounded, size: 18),
+                            label: const Text('Approve ID'),
+                            onPressed: () async {
+                              await auth.simulateApproveApplication();
+                              if (context.mounted) {
+                                showThriftSnackBar(context, '🎉 Congratulations! You are now a Verified Seller!');
+                                context.pop();
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Rejected Screen ───
+  Widget _buildRejectedScreen(BuildContext context, AuthUser? user) {
+    final auth = context.read<AuthProvider>();
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Verification Status'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+        elevation: 0,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppConstants.spacingMd),
+          child: Column(
+            children: [
+              // Rejection Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppColors.error.withValues(alpha: 0.1), AppColors.error.withValues(alpha: 0.05)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.error.withValues(alpha: 0.3), width: 1.5),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.cancel_outlined,
+                        color: AppColors.error,
+                        size: 48,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Application Rejected',
+                      style: AppTypography.heading.copyWith(fontSize: 20, color: AppColors.error),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Unfortunately, your seller verification application has been rejected.',
+                      style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Rejection Reason Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline, color: AppColors.error, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Reason for Rejection',
+                          style: AppTypography.body.copyWith(fontWeight: FontWeight.bold, color: AppColors.error),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      user?.verificationRejectionReason ??
+                          'The ID submission details could not be verified. Please make sure the name on your store matches the name on your ID.',
+                      style: AppTypography.body.copyWith(color: AppColors.textPrimary),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              Text(
+                'Want to try again? Please ensure your document and selfie match and are shot in bright lighting.',
+                style: AppTypography.caption,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              
+              ThriftButton(
+                label: 'Reapply & Edit Details',
+                onPressed: () => _handleReapply(auth),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimelineStep({
+    required String title,
+    required String subtitle,
+    required bool isDone,
+    required bool isPending,
+    bool isLast = false,
+  }) {
+    Color lineCol = isDone ? AppColors.success : AppColors.border;
+    
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: isDone 
+                    ? AppColors.success.withValues(alpha: 0.15) 
+                    : (isPending ? AppColors.warning.withValues(alpha: 0.15) : AppColors.surfaceVariant),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isDone 
+                      ? AppColors.success 
+                      : (isPending ? AppColors.warning : AppColors.border),
+                  width: 2,
+                ),
+              ),
+              child: isDone
+                  ? const Icon(Icons.check, size: 14, color: AppColors.success)
+                  : (isPending 
+                      ? const Padding(
+                          padding: EdgeInsets.all(4.0),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.warning),
+                          ),
+                        )
+                      : null),
+            ),
+            if (!isLast)
+              Container(
+                width: 2,
+                height: 36,
+                color: lineCol,
+              ),
+          ],
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: AppTypography.body.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: isDone ? AppColors.textPrimary : (isPending ? AppColors.warning : AppColors.textHint),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: AppTypography.caption,
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: AppTypography.caption),
+          Text(value, style: AppTypography.body.copyWith(fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  void _showRejectionDialog(BuildContext context, AuthProvider auth) {
+    final reasonCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Simulate Application Rejection'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Specify a reason for rejecting this ID verification submission to simulate the feedback loop.',
+              style: AppTypography.body,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'e.g. Selfie photo is too dark. Please retake the selfie under better lighting.',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              final reason = reasonCtrl.text.trim().isEmpty
+                  ? 'The submitted selfie holding your ID is too blurry to match the face on the ID.'
+                  : reasonCtrl.text.trim();
+              await auth.simulateRejectApplication(reason);
+              if (dialogCtx.mounted) {
+                Navigator.pop(dialogCtx);
+                showThriftSnackBar(context, 'Application rejected (simulation)');
+              }
+            },
+            child: const Text('Reject Submission'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleReapply(AuthProvider auth) async {
+    setState(() {
+      _currentStep = 0;
+      _govIdUploaded = false;
+      _selfieUploaded = false;
+      _storeNameCtrl.clear();
+      _addressCtrl.clear();
+      _selectedRegion = 'Select Barangay';
+    });
+    await auth.resetVerificationStatus();
   }
 }

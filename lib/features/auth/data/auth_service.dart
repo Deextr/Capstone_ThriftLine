@@ -44,6 +44,7 @@ class AuthService {
         isVerified: true,
         bio: 'Philippines Based 🇵🇭 | Curated vintage & Y2K fashion finds ✨ | Haggling is OK',
         lastActive: DateTime.now().subtract(const Duration(hours: 2)),
+        trustScore: 95,
       ),
     ),
     'thrift_trendy': _Credential(
@@ -61,6 +62,7 @@ class AuthService {
         isVerified: true,
         bio: 'Streetwear & Korean fashion 🔥 | Fast shipper 📦 | DM for bundles',
         lastActive: DateTime.now().subtract(const Duration(minutes: 30)),
+        trustScore: 78,
       ),
     ),
     'preloved_gems': _Credential(
@@ -78,6 +80,7 @@ class AuthService {
         isVerified: true,
         bio: 'Quality preloved items only 💎 | COD available | Taguig meetup OK',
         lastActive: DateTime.now().subtract(const Duration(hours: 8)),
+        trustScore: 92,
       ),
     ),
   };
@@ -93,6 +96,16 @@ class AuthService {
 
   AuthUser? getUserByUsername(String username) =>
       _credentials[username.trim().toLowerCase()]?.user;
+
+  void updateUser(AuthUser updatedUser) {
+    final key = updatedUser.username.trim().toLowerCase();
+    if (_credentials.containsKey(key)) {
+      _credentials[key] = _Credential(
+        password: _credentials[key]!.password,
+        user: updatedUser,
+      );
+    }
+  }
 
   List<AuthUser> get sellers =>
       _credentials.values.map((c) => c.user).where((u) => u.isSeller).toList();
