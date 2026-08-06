@@ -9,7 +9,6 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/data/mock_data.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
-import '../../../../features/auth/data/auth_service.dart';
 import '../../../../models/enums.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/data_provider.dart';
@@ -22,7 +21,7 @@ class SellerDashboardTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
-    final user = AuthService().getUserByUsername(auth.username ?? '');
+    final user = auth.user;
     final sellerId = auth.user?.id ?? 'seller_carla';
     final listings = data.productsForSeller(auth.username ?? '');
     final pending = data.pendingOrdersForSeller(sellerId);

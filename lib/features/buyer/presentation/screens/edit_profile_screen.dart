@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
-import '../../../../features/auth/data/auth_service.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 
@@ -28,7 +27,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     final auth = context.read<AuthProvider>();
-    final user = AuthService().getUserByUsername(auth.username ?? '');
+    final user = auth.user;
     _nameCtrl = TextEditingController(text: user?.name ?? '');
     _locationCtrl = TextEditingController(text: user?.location ?? '');
     _emailCtrl = TextEditingController();

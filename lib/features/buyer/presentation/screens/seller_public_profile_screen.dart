@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
-import '../../../../features/auth/data/auth_service.dart';
+import '../../../../features/auth/domain/auth_user.dart';
 import '../../../../models/product_model.dart';
 import '../../../../models/enums.dart';
 import '../../../../providers/data_provider.dart';
@@ -19,16 +19,33 @@ class SellerPublicProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final seller = AuthService().getUserByUsername(username);
-    if (seller == null) {
+    // Get seller info from product data as a fallback.
+    // In a future module, this will fetch from the Supabase profiles table.
+    final data = context.watch<DataProvider>();
+    final sellerProducts = data.productsForSeller(username);
+    final firstProduct = sellerProducts.isNotEmpty ? sellerProducts.first : null;
+
+    // Build a temporary AuthUser from product data (mock-compatible).
+    final seller = AuthUser(
+      id: '',
+      username: username,
+      name: firstProduct?.sellerName ?? username,
+      email: '',
+      role: UserRole.seller,
+      avatarUrl: firstProduct?.sellerAvatar ?? '',
+      location: firstProduct?.location ?? '',
+      shopName: firstProduct?.sellerName,
+      isVerified: firstProduct?.sellerVerified ?? false,
+    );
+    if (firstProduct == null) {
       return Scaffold(
         appBar: AppBar(leading: BackButton(onPressed: () => context.pop())),
         body: const Center(child: Text('Seller not found')),
       );
     }
 
-    final data = context.watch<DataProvider>();
-    final products = data.productsForSeller(username);
+
+    final products = sellerProducts;
     final isFollowing = data.isFollowing(username);
     final followers = data.followersCount(username);
     final following = data.followingCount(username);

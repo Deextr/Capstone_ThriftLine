@@ -6,7 +6,6 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
-import '../../../../features/auth/data/auth_service.dart';
 import '../../../../models/enums.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/data_provider.dart';
@@ -19,7 +18,7 @@ class BuyerProfileTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
-    final user = AuthService().getUserByUsername(auth.username ?? '');
+    final user = auth.user;
     final buyerId = auth.user?.id ?? 'buyer_maya';
     final activeBids = data.bidsForBuyer(buyerId, BidTab.active).length;
     final purchases = data.ordersForBuyer(buyerId).length;

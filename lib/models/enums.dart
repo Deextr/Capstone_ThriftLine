@@ -1,6 +1,7 @@
 enum UserRole {
   buyer,
-  seller;
+  seller,
+  admin;
 
   static UserRole fromString(String value) => UserRole.values.firstWhere(
     (e) => e.name == value,

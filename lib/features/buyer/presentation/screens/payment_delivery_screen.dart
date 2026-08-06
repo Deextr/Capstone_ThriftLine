@@ -6,7 +6,6 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
-import '../../../../features/auth/data/auth_service.dart';
 import '../../../../models/enums.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/data_provider.dart';
@@ -103,7 +102,7 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
                   label: 'Place Order',
                   onPressed: () {
                     final auth = context.read<AuthProvider>();
-                    final user = AuthService().getUserByUsername(auth.username ?? '');
+                    final user = auth.user;
                     final order = data.createOrder(
                       product: product,
                       buyerId: auth.user?.id ?? 'buyer_maya',

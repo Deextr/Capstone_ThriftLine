@@ -7,7 +7,6 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
-import '../../../../features/auth/data/auth_service.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/data_provider.dart';
 import '../../../../widgets/product_card.dart';
@@ -20,7 +19,7 @@ class SellerProfileTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
-    final user = AuthService().getUserByUsername(auth.username ?? '');
+    final user = auth.user;
     final products = data.productsForSeller(auth.username ?? '').take(6).toList();
 
     return SafeArea(

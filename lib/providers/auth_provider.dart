@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthState, AuthChangeEvent;
 
 import '../core/routes/route_names.dart';
 import '../core/services/shared_preferences_service.dart';
@@ -7,6 +10,9 @@ import '../features/auth/domain/auth_user.dart';
 import '../models/enums.dart';
 
 /// Manages authentication state, session persistence, and role detection.
+///
+/// Wraps [AuthService] (Supabase) and caches minimal session data
+/// in [SharedPreferencesService] for fast cold-start restoration.
 class AuthProvider extends ChangeNotifier {
   AuthProvider(this._prefs, this._authService);
 
@@ -17,6 +23,8 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _isInitialized = false;
 
+  StreamSubscription? _authSubscription;
+
   AuthUser? get user => _user;
   bool get isLoading => _isLoading;
   bool get isInitialized => _isInitialized;
@@ -24,47 +32,84 @@ class AuthProvider extends ChangeNotifier {
 
   bool get isBuyer => _user?.isBuyer ?? false;
   bool get isSeller => _user?.isSeller ?? false;
+  bool get isAdmin => _user?.isAdmin ?? false;
   UserRole? get role => _user?.role;
 
   String? get username => _user?.username;
   String? get displayName => _user?.displayName;
 
-  String get homeRoute =>
-      isSeller ? RouteNames.sellerHome : RouteNames.buyerHome;
+  String get homeRoute {
+    // Admin route can be added in a future module.
+    // For now, admin users go to the buyer home.
+    if (isSeller) return RouteNames.sellerHome;
+    return RouteNames.buyerHome;
+  }
 
-  /// Restores a persisted session from SharedPreferences (auto login).
+  /// Restores a session from Supabase (auto-login via persisted JWT).
+  ///
+  /// Called once at app startup from `main()`.
   Future<void> init() async {
-    if (_prefs.isLoggedIn) {
-      final storedUsername = _prefs.username;
-      final storedRole = _prefs.userRole;
-
-      if (storedUsername != null && storedRole != null) {
-        final restoredUser = _authService.getUserByUsername(storedUsername);
-        if (restoredUser != null &&
-            restoredUser.role.name == storedRole) {
-          _user = restoredUser;
-        } else {
-          await _clearSession();
-        }
+    try {
+      // Supabase SDK automatically restores the session from secure storage.
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser != null) {
+        _user = currentUser;
+        await _saveSession(currentUser);
       } else {
         await _clearSession();
       }
+    } catch (e) {
+      debugPrint('AuthProvider.init error: $e');
+      await _clearSession();
     }
+
+    // Listen for future auth state changes (token refresh, sign-out, etc.).
+    _authSubscription = _authService.onAuthStateChange.listen(
+      _handleAuthStateChange,
+    );
 
     _isInitialized = true;
     notifyListeners();
   }
 
-  /// Authenticates with username/password and persists the session on success.
-  /// Returns an error message on failure, or null on success.
-  Future<String?> login({
-    required String username,
+  /// Handles real-time auth events from Supabase.
+  Future<void> _handleAuthStateChange(AuthState event) async {
+    final authEvent = event.event;
+
+    if (authEvent == AuthChangeEvent.signedOut) {
+      _user = null;
+      await _clearSession();
+      notifyListeners();
+    } else if (authEvent == AuthChangeEvent.signedIn ||
+        authEvent == AuthChangeEvent.tokenRefreshed ||
+        authEvent == AuthChangeEvent.userUpdated) {
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser != null) {
+        _user = currentUser;
+        await _saveSession(currentUser);
+        notifyListeners();
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Sign In
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Signs in with email and password.
+  ///
+  /// Returns an error message on failure, or `null` on success.
+  Future<String?> loginWithEmail({
+    required String email,
     required String password,
   }) async {
     _isLoading = true;
     notifyListeners();
 
-    final result = _authService.authenticate(username, password);
+    final result = await _authService.signInWithEmail(
+      email: email,
+      password: password,
+    );
 
     if (!result.success) {
       _isLoading = false;
@@ -80,11 +125,76 @@ class AuthProvider extends ChangeNotifier {
     return null;
   }
 
+  /// Signs in with Google.
+  ///
+  /// Returns an error message on failure, or `null` on success.
+  Future<String?> loginWithGoogle() async {
+    _isLoading = true;
+    notifyListeners();
+
+    final result = await _authService.signInWithGoogle();
+
+    if (!result.success) {
+      _isLoading = false;
+      notifyListeners();
+      return result.errorMessage;
+    }
+
+    _user = result.user;
+    await _saveSession(_user!);
+
+    _isLoading = false;
+    notifyListeners();
+    return null;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Sign Up
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Creates a new account with email and password.
+  ///
+  /// Returns an error message on failure, or `null` on success.
+  Future<String?> signUpWithEmail({
+    required String email,
+    required String password,
+    required String name,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final result = await _authService.signUpWithEmail(
+      email: email,
+      password: password,
+      name: name,
+    );
+
+    if (!result.success) {
+      _isLoading = false;
+      notifyListeners();
+      return result.errorMessage;
+    }
+
+    _user = result.user;
+    if (_user != null) {
+      await _saveSession(_user!);
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return null;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Sign Out
+  // ─────────────────────────────────────────────────────────────────────────
+
   /// Clears the session and logs the user out.
   Future<void> logout() async {
     _isLoading = true;
     notifyListeners();
 
+    await _authService.signOut();
     _user = null;
     await _clearSession();
 
@@ -92,9 +202,25 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Profile Updates
+  // ─────────────────────────────────────────────────────────────────────────
+
   Future<void> updateCurrentUser(AuthUser updatedUser) async {
     _user = updatedUser;
-    _authService.updateUser(updatedUser);
+    await _authService.updateProfile(updatedUser.id, {
+      'role': updatedUser.role.name,
+      'name': updatedUser.name,
+      'username': updatedUser.username,
+      'avatar_url': updatedUser.avatarUrl,
+      'location': updatedUser.location,
+      'shop_name': updatedUser.shopName,
+      'bio': updatedUser.bio,
+      'is_verified': updatedUser.isVerified,
+      'verification_status': updatedUser.verificationStatus,
+      'verification_rejection_reason': updatedUser.verificationRejectionReason,
+      'trust_score': updatedUser.trustScore,
+    });
     await _prefs.setUserRole(updatedUser.role.name);
     notifyListeners();
   }
@@ -145,6 +271,10 @@ class AuthProvider extends ChangeNotifier {
     await updateCurrentUser(updated);
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Session Persistence (SharedPreferences cache for fast cold-start)
+  // ─────────────────────────────────────────────────────────────────────────
+
   Future<void> _saveSession(AuthUser user) async {
     await _prefs.setLoggedIn(true);
     await _prefs.setUserRole(user.role.name);
@@ -155,5 +285,11 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _clearSession() async {
     await _prefs.clearAuthSession();
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 }

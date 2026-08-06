@@ -111,6 +111,7 @@ class ThriftTextField extends StatelessWidget {
     this.onTap,
     this.readOnly = false,
     this.autofocus = false,
+    this.validator,
   });
 
   final String? label;
@@ -126,6 +127,7 @@ class ThriftTextField extends StatelessWidget {
   final VoidCallback? onTap;
   final bool readOnly;
   final bool autofocus;
+  final String? Function(String?)? validator;
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +138,7 @@ class ThriftTextField extends StatelessWidget {
           Text(label!, style: AppTypography.label.copyWith(color: AppColors.textPrimary)),
           const SizedBox(height: AppConstants.spacingXs),
         ],
-        TextField(
+        TextFormField(
           controller: controller,
           obscureText: obscureText,
           onChanged: onChanged,
@@ -145,6 +147,10 @@ class ThriftTextField extends StatelessWidget {
           onTap: onTap,
           readOnly: readOnly,
           autofocus: autofocus,
+          validator: validator,
+          autovalidateMode: validator != null
+              ? AutovalidateMode.onUserInteraction
+              : AutovalidateMode.disabled,
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: icon != null ? Icon(icon, color: AppColors.textHint, size: 20) : null,

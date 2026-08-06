@@ -19,24 +19,35 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
+  Future<void> _loginWithEmail() async {
     if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthProvider>();
-    final error = await auth.login(
-      username: _usernameController.text,
+    final error = await auth.loginWithEmail(
+      email: _emailController.text.trim(),
       password: _passwordController.text,
     );
+    if (!mounted) return;
+    if (error != null) {
+      showThriftSnackBar(context, error, isError: true);
+      return;
+    }
+    context.go(auth.homeRoute);
+  }
+
+  Future<void> _loginWithGoogle() async {
+    final auth = context.read<AuthProvider>();
+    final error = await auth.loginWithGoogle();
     if (!mounted) return;
     if (error != null) {
       showThriftSnackBar(context, error, isError: true);
@@ -81,18 +92,25 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 40),
+
+                  // Email field
                   ThriftTextField(
-                    label: 'Username',
-                    hint: 'e.g. maya_buys',
-                    controller: _usernameController,
-                    icon: Icons.person_outline,
+                    label: 'Email',
+                    hint: 'your@email.com',
+                    controller: _emailController,
+                    icon: Icons.email_outlined,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: Validators.email,
                   ),
                   const SizedBox(height: 16),
+
+                  // Password field
                   ThriftTextField(
                     label: 'Password',
                     controller: _passwordController,
                     obscureText: _obscurePassword,
                     icon: Icons.lock_outline,
+                    validator: Validators.password,
                     suffix: IconButton(
                       icon: Icon(
                         _obscurePassword
@@ -103,26 +121,28 @@ class _LoginScreenState extends State<LoginScreen> {
                           setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
-                  if (_usernameController.text.isNotEmpty ||
-                      _passwordController.text.isNotEmpty) ...[
-                    if (Validators.username(_usernameController.text) != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          Validators.username(_usernameController.text)!,
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.error,
-                          ),
-                        ),
-                      ),
-                  ],
                   const SizedBox(height: 32),
+
+                  // Login button
                   ThriftButton(
                     label: 'Login',
-                    onPressed: auth.isLoading ? null : _login,
+                    onPressed: auth.isLoading ? null : _loginWithEmail,
                     isLoading: auth.isLoading,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
+
+                  // Divider
+                  _OrDivider(),
+                  const SizedBox(height: 24),
+
+                  // Google Sign-In button
+                  _GoogleSignInButton(
+                    onPressed: auth.isLoading ? null : _loginWithGoogle,
+                    isLoading: auth.isLoading,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Sign up link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -143,7 +163,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                   const SizedBox(height: 32),
-                  _DemoAccounts(),
                 ],
               ),
             ),
@@ -154,41 +173,89 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class _DemoAccounts extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared auth widgets
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// "or continue with" divider used on both login and signup screens.
+class _OrDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return ThriftCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Demo Accounts', style: AppTypography.subheading),
-          const SizedBox(height: 8),
-          _tile(context, 'maya_buys / buyer123', 'Buyer'),
-          _tile(context, 'james_thrift / buyer456', 'Buyer'),
-          _tile(context, 'vintagevibes_ph / seller123', 'Seller'),
-          _tile(context, 'thrift_trendy / seller456', 'Seller'),
-          _tile(context, 'preloved_gems / seller789', 'Seller'),
-        ],
-      ),
+    return Row(
+      children: [
+        Expanded(child: Divider(color: AppColors.textSecondary.withValues(alpha: 0.3))),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'or continue with',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        Expanded(child: Divider(color: AppColors.textSecondary.withValues(alpha: 0.3))),
+      ],
     );
   }
+}
 
-  Widget _tile(BuildContext context, String creds, String role) {
-    final parts = creds.split(' / ');
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      dense: true,
-      title: Text(creds, style: AppTypography.caption),
-      subtitle: Text(
-        role,
-        style: AppTypography.caption.copyWith(color: AppColors.primary),
+/// Google Sign-In button with the Google logo.
+class _GoogleSignInButton extends StatelessWidget {
+  const _GoogleSignInButton({this.onPressed, this.isLoading = false});
+
+  final VoidCallback? onPressed;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 52,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: AppColors.textSecondary.withValues(alpha: 0.3)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+          ),
+        ),
+        child: isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Google "G" logo
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'G',
+                        style: TextStyle(
+                          color: Colors.blue.shade700,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Continue with Google',
+                    style: AppTypography.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
       ),
-      trailing: const Icon(Icons.login, size: 16),
-      onTap: () {
-        final state = context.findAncestorStateOfType<_LoginScreenState>();
-        state?._usernameController.text = parts[0];
-        state?._passwordController.text = parts[1];
-      },
     );
   }
 }

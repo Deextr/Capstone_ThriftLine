@@ -1,3 +1,5 @@
+import 'package:supabase_flutter/supabase_flutter.dart' show User;
+
 import '../../../models/enums.dart';
 
 class AuthUser {
@@ -5,6 +7,7 @@ class AuthUser {
     required this.id,
     required this.username,
     required this.name,
+    required this.email,
     required this.role,
     required this.avatarUrl,
     required this.location,
@@ -22,6 +25,7 @@ class AuthUser {
   final String id;
   final String username;
   final String name;
+  final String email;
   final UserRole role;
   final String avatarUrl;
   final String location;
@@ -38,6 +42,7 @@ class AuthUser {
   String get displayName => role == UserRole.seller ? (shopName ?? name) : name;
   bool get isBuyer => role == UserRole.buyer;
   bool get isSeller => role == UserRole.seller;
+  bool get isAdmin => role == UserRole.admin;
 
   String get trustClassification {
     if (trustScore >= 90) return 'Highly Trusted Seller';
@@ -56,10 +61,44 @@ class AuthUser {
     return 'Active ${diff.inDays}d ago';
   }
 
+  /// Creates an [AuthUser] from a Supabase [User] and a `profiles` table row.
+  ///
+  /// The [profile] map may be `null` if the profile hasn't been created yet
+  /// (e.g. during a fresh Google sign-in before the trigger fires).
+  factory AuthUser.fromSupabase(User supabaseUser, Map<String, dynamic>? profile) {
+    final meta = supabaseUser.userMetadata ?? {};
+
+    return AuthUser(
+      id: supabaseUser.id,
+      username: profile?['username'] as String? ?? '',
+      name: profile?['name'] as String? ??
+          meta['full_name'] as String? ??
+          meta['name'] as String? ??
+          '',
+      email: supabaseUser.email ?? '',
+      role: UserRole.fromString(profile?['role'] as String? ?? 'buyer'),
+      avatarUrl: profile?['avatar_url'] as String? ??
+          meta['avatar_url'] as String? ??
+          '',
+      location: profile?['location'] as String? ?? '',
+      shopName: profile?['shop_name'] as String?,
+      rating: (profile?['rating'] as num?)?.toDouble(),
+      sales: profile?['sales'] as int?,
+      isVerified: profile?['is_verified'] as bool? ?? false,
+      bio: profile?['bio'] as String?,
+      verificationStatus:
+          profile?['verification_status'] as String? ?? 'none',
+      verificationRejectionReason:
+          profile?['verification_rejection_reason'] as String?,
+      trustScore: profile?['trust_score'] as int? ?? 80,
+    );
+  }
+
   AuthUser copyWith({
     String? id,
     String? username,
     String? name,
+    String? email,
     UserRole? role,
     String? avatarUrl,
     String? location,
@@ -77,6 +116,7 @@ class AuthUser {
       id: id ?? this.id,
       username: username ?? this.username,
       name: name ?? this.name,
+      email: email ?? this.email,
       role: role ?? this.role,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       location: location ?? this.location,
