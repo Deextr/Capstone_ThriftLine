@@ -8,6 +8,7 @@ class AuthUser {
     required this.username,
     required this.name,
     required this.email,
+    this.phone,
     required this.role,
     required this.avatarUrl,
     required this.location,
@@ -26,6 +27,7 @@ class AuthUser {
   final String username;
   final String name;
   final String email;
+  final String? phone;
   final UserRole role;
   final String avatarUrl;
   final String location;
@@ -61,36 +63,45 @@ class AuthUser {
     return 'Active ${diff.inDays}d ago';
   }
 
-  /// Creates an [AuthUser] from a Supabase [User] and a `profiles` table row.
+  /// Creates an [AuthUser] from a Supabase [User] and a `users` table row.
   ///
-  /// The [profile] map may be `null` if the profile hasn't been created yet
-  /// (e.g. during a fresh Google sign-in before the trigger fires).
-  factory AuthUser.fromSupabase(User supabaseUser, Map<String, dynamic>? profile) {
+  /// The [profile] map may be `null` if the app-user row hasn't been created
+  /// yet or if it is temporarily unavailable.
+  factory AuthUser.fromSupabase(
+    User supabaseUser,
+    Map<String, dynamic>? profile,
+  ) {
     final meta = supabaseUser.userMetadata ?? {};
 
     return AuthUser(
       id: supabaseUser.id,
       username: profile?['username'] as String? ?? '',
-      name: profile?['name'] as String? ??
+      name:
+          profile?['full_name'] as String? ??
           meta['full_name'] as String? ??
           meta['name'] as String? ??
           '',
-      email: supabaseUser.email ?? '',
+      email: profile?['email'] as String? ?? supabaseUser.email ?? '',
+      phone: profile?['phone_number'] as String? ?? profile?['phone'] as String?,
       role: UserRole.fromString(profile?['role'] as String? ?? 'buyer'),
-      avatarUrl: profile?['avatar_url'] as String? ??
+      avatarUrl:
+          profile?['avatar_url'] as String? ??
+          profile?['avatar'] as String? ??
+          profile?['avatarUrl'] as String? ??
+          profile?['picture'] as String? ??
           meta['avatar_url'] as String? ??
+          meta['picture'] as String? ??
+          meta['avatar'] as String? ??
           '',
       location: profile?['location'] as String? ?? '',
-      shopName: profile?['shop_name'] as String?,
-      rating: (profile?['rating'] as num?)?.toDouble(),
-      sales: profile?['sales'] as int?,
-      isVerified: profile?['is_verified'] as bool? ?? false,
-      bio: profile?['bio'] as String?,
-      verificationStatus:
-          profile?['verification_status'] as String? ?? 'none',
-      verificationRejectionReason:
-          profile?['verification_rejection_reason'] as String?,
-      trustScore: profile?['trust_score'] as int? ?? 80,
+      shopName: null,
+      rating: (profile?['rating_average'] as num?)?.toDouble(),
+      sales: null,
+      isVerified: false,
+      bio: null,
+      verificationStatus: 'none',
+      verificationRejectionReason: null,
+      trustScore: (profile?['trust_score'] as num?)?.toInt() ?? 80,
     );
   }
 
@@ -99,6 +110,7 @@ class AuthUser {
     String? username,
     String? name,
     String? email,
+    String? phone,
     UserRole? role,
     String? avatarUrl,
     String? location,
@@ -117,6 +129,7 @@ class AuthUser {
       username: username ?? this.username,
       name: name ?? this.name,
       email: email ?? this.email,
+      phone: phone ?? this.phone,
       role: role ?? this.role,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       location: location ?? this.location,
@@ -127,7 +140,8 @@ class AuthUser {
       bio: bio ?? this.bio,
       lastActive: lastActive ?? this.lastActive,
       verificationStatus: verificationStatus ?? this.verificationStatus,
-      verificationRejectionReason: verificationRejectionReason ?? this.verificationRejectionReason,
+      verificationRejectionReason:
+          verificationRejectionReason ?? this.verificationRejectionReason,
       trustScore: trustScore ?? this.trustScore,
     );
   }

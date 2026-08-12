@@ -12,26 +12,24 @@ abstract final class Validators {
 
   static String? email(String? value) {
     final trimmed = value?.trim() ?? '';
-    if (trimmed.isEmpty) return 'Email is required';
+    if (trimmed.isEmpty) return 'Please enter a valid email address.';
     // Basic email pattern check.
     if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(trimmed)) {
-      return 'Please enter a valid email address';
+      return 'Please enter a valid email address.';
     }
     return null;
   }
 
   static String? name(String? value) {
     final trimmed = value?.trim() ?? '';
-    if (trimmed.isEmpty) return 'Name is required';
-    if (trimmed.length < 2) return 'Name must be at least 2 characters';
+    if (trimmed.isEmpty) return 'Please enter your full name.';
     return null;
   }
 
   static String? password(String? value) {
     final trimmed = value ?? '';
-    if (trimmed.isEmpty) return 'Password is required';
-    if (trimmed.length < 6) return 'Password must be at least 6 characters';
+    if (trimmed.isEmpty) return 'Please enter a password.';
+    if (trimmed.length < 6) return 'Password must be at least 6 characters.';
     return null;
   }
 }
-

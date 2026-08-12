@@ -13,7 +13,7 @@ import 'auth_result.dart';
 /// - Email/password sign-up and sign-in
 /// - Google Sign-In (native → Supabase ID token)
 /// - Sign-out
-/// - Profile fetching and updating
+/// - App-user record fetching and updating
 class AuthService {
   AuthService(this._supabaseService);
 
@@ -27,14 +27,15 @@ class AuthService {
 
   /// Creates a new account with email and password.
   ///
-  /// On success, the Supabase trigger auto-creates a `profiles` row.
-  /// We then update the profile with the user's display name.
+  /// On success, the app-user row in `public.users` is created or refreshed
+  /// using the authenticated Supabase user ID.
   Future<AuthResult> signUpWithEmail({
     required String email,
     required String password,
     required String name,
   }) async {
     try {
+      debugPrint('AuthService.signUpWithEmail: starting sign-up for $email');
       final response = await _auth.signUp(
         email: email,
         password: password,
@@ -43,24 +44,42 @@ class AuthService {
 
       final supabaseUser = response.user;
       if (supabaseUser == null) {
+        debugPrint(
+          'AuthService.signUpWithEmail: sign-up returned no user for $email. '
+          'Session present: ${response.session != null}',
+        );
         return AuthResult.failure(
           'Sign-up succeeded but no user was returned. '
           'Please check your email for a confirmation link.',
         );
       }
 
-      // Update the auto-created profile with the display name.
-      await _updateProfileSafe(supabaseUser.id, {'name': name});
+      if (response.session != null) {
+        await _syncExistingUserRecord(
+          userId: supabaseUser.id,
+          fullName: name,
+          avatarUrl: _extractAvatarUrlFromUser(supabaseUser),
+        );
+      }
 
-      final profile = await getProfile(supabaseUser.id);
-      final authUser = AuthUser.fromSupabase(supabaseUser, profile);
+      final userRecord = await getUserRecord(supabaseUser.id);
+      final authUser = AuthUser.fromSupabase(supabaseUser, userRecord);
 
-      return AuthResult.success(authUser);
+      return AuthResult.success(
+        authUser,
+        requiresEmailVerification: response.session == null,
+      );
     } on AuthException catch (e) {
+      debugPrint(
+        'AuthService.signUpWithEmail AuthException for $email: '
+        '${e.message}',
+      );
       return AuthResult.failure(_friendlyAuthError(e));
-    } catch (e) {
-      debugPrint('AuthService.signUpWithEmail error: $e');
-      return AuthResult.failure('An unexpected error occurred. Please try again.');
+    } catch (e, stackTrace) {
+      debugPrint(
+        'AuthService.signUpWithEmail unexpected error for $email: $e\n$stackTrace',
+      );
+      return AuthResult.failure('Something went wrong. Please try again.');
     }
   }
 
@@ -80,15 +99,24 @@ class AuthService {
         return AuthResult.failure('Sign-in failed. Please try again.');
       }
 
-      final profile = await getProfile(supabaseUser.id);
-      final authUser = AuthUser.fromSupabase(supabaseUser, profile);
+      await _syncExistingUserRecord(
+        userId: supabaseUser.id,
+        fullName:
+            supabaseUser.userMetadata?['full_name'] as String? ??
+            supabaseUser.userMetadata?['name'] as String? ??
+            email.split('@').first,
+        avatarUrl: _extractAvatarUrlFromUser(supabaseUser),
+      );
+
+      final userRecord = await getUserRecord(supabaseUser.id);
+      final authUser = AuthUser.fromSupabase(supabaseUser, userRecord);
 
       return AuthResult.success(authUser);
     } on AuthException catch (e) {
       return AuthResult.failure(_friendlyAuthError(e));
     } catch (e) {
       debugPrint('AuthService.signInWithEmail error: $e');
-      return AuthResult.failure('An unexpected error occurred. Please try again.');
+      return AuthResult.failure('Something went wrong. Please try again.');
     }
   }
 
@@ -107,9 +135,7 @@ class AuthService {
     try {
       final webClientId = dotenv.env['GOOGLE_WEB_CLIENT_ID'] ?? '';
 
-      final googleSignIn = GoogleSignIn(
-        serverClientId: webClientId,
-      );
+      final googleSignIn = GoogleSignIn(serverClientId: webClientId);
 
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
@@ -138,24 +164,28 @@ class AuthService {
         return AuthResult.failure('Google sign-in failed. Please try again.');
       }
 
-      // Ensure the profile has the Google user's name and avatar.
+      // Ensure the app-user row has the Google user's name and avatar.
       final meta = supabaseUser.userMetadata ?? {};
-      await _updateProfileSafe(supabaseUser.id, {
-        'name': meta['full_name'] ?? meta['name'] ?? googleUser.displayName ?? '',
-        'avatar_url': meta['avatar_url'] ?? googleUser.photoUrl ?? '',
-      });
+      final extractedAvatar = _extractAvatarUrlFromUser(supabaseUser) ?? googleUser.photoUrl;
+      await _syncExistingUserRecord(
+        userId: supabaseUser.id,
+        fullName:
+            meta['full_name'] as String? ??
+            meta['name'] as String? ??
+            googleUser.displayName ??
+            googleUser.email.split('@').first,
+        avatarUrl: extractedAvatar,
+      );
 
-      final profile = await getProfile(supabaseUser.id);
-      final authUser = AuthUser.fromSupabase(supabaseUser, profile);
+      final userRecord = await getUserRecord(supabaseUser.id);
+      final authUser = AuthUser.fromSupabase(supabaseUser, userRecord);
 
       return AuthResult.success(authUser);
     } on AuthException catch (e) {
       return AuthResult.failure(_friendlyAuthError(e));
     } catch (e) {
       debugPrint('AuthService.signInWithGoogle error: $e');
-      return AuthResult.failure(
-        'Google sign-in failed. Please try again.',
-      );
+      return AuthResult.failure('Something went wrong. Please try again.');
     }
   }
 
@@ -177,30 +207,32 @@ class AuthService {
   // Profile Operations
   // ─────────────────────────────────────────────────────────────────────────
 
-  /// Fetches the `profiles` row for the given user ID.
+  /// Fetches the `users` row for the given user ID.
   ///
-  /// Returns `null` if no profile exists yet.
-  Future<Map<String, dynamic>?> getProfile(String userId) async {
+  /// Returns `null` if no app-user row exists yet.
+  Future<Map<String, dynamic>?> getUserRecord(String userId) async {
     try {
-      final data = await _supabaseService
-          .client
-          .from('profiles')
+      final data = await _supabaseService.client
+          .from('users')
           .select()
-          .eq('id', userId)
+          .eq('user_id', userId)
           .maybeSingle();
       return data;
     } catch (e) {
-      debugPrint('AuthService.getProfile error: $e');
+      debugPrint('AuthService.getUserRecord error: $e');
       return null;
     }
   }
 
-  /// Updates the `profiles` row for the given user ID.
-  Future<void> updateProfile(String userId, Map<String, dynamic> data) async {
+  /// Updates the `users` row for the given user ID.
+  Future<void> updateUserRecord(
+    String userId,
+    Map<String, dynamic> data,
+  ) async {
     await _supabaseService.client
-        .from('profiles')
+        .from('users')
         .update(data)
-        .eq('id', userId);
+        .eq('user_id', userId);
   }
 
   /// Builds an [AuthUser] from the current Supabase session.
@@ -210,13 +242,23 @@ class AuthService {
     final supabaseUser = _supabaseService.currentUser;
     if (supabaseUser == null) return null;
 
-    final profile = await getProfile(supabaseUser.id);
-    return AuthUser.fromSupabase(supabaseUser, profile);
+    final meta = supabaseUser.userMetadata ?? {};
+    await _syncExistingUserRecord(
+      userId: supabaseUser.id,
+      fullName:
+          meta['full_name'] as String? ??
+          meta['name'] as String? ??
+          supabaseUser.email?.split('@').first ??
+          '',
+      avatarUrl: _extractAvatarUrlFromUser(supabaseUser),
+    );
+
+    final userRecord = await getUserRecord(supabaseUser.id);
+    return AuthUser.fromSupabase(supabaseUser, userRecord);
   }
 
   /// Stream of auth state changes for reactive updates.
-  Stream<AuthState> get onAuthStateChange =>
-      _supabaseService.onAuthStateChange;
+  Stream<AuthState> get onAuthStateChange => _supabaseService.onAuthStateChange;
 
   /// The current session (or null).
   Session? get currentSession => _supabaseService.currentSession;
@@ -225,15 +267,65 @@ class AuthService {
   // Helpers
   // ─────────────────────────────────────────────────────────────────────────
 
-  /// Updates a profile row, silently ignoring errors.
+  String? _extractAvatarUrlFromUser(User? user) {
+    if (user == null) return null;
+    final meta = user.userMetadata ?? {};
+    final url = meta['avatar_url'] as String? ??
+        meta['picture'] as String? ??
+        meta['avatar'] as String?;
+    return (url != null && url.trim().isNotEmpty) ? url.trim() : null;
+  }
+
+  /// Ensures an app-user row exists without overwriting user-edited fields.
   ///
-  /// Used during sign-up/sign-in where the trigger may not have fired yet
-  /// or RLS may block the update for a brief moment.
-  Future<void> _updateProfileSafe(String userId, Map<String, dynamic> data) async {
+  /// If the row already exists (user has logged in before), only `email` and
+  /// `avatar` are refreshed — `full_name` and `username` are preserved so
+  /// profile edits are never lost on subsequent logins or hot-reloads.
+  Future<void> _syncExistingUserRecord({
+    required String userId,
+    required String fullName,
+    String? avatarUrl,
+  }) async {
     try {
-      await updateProfile(userId, data);
+      // Check if the user row already exists.
+      final existing = await _supabaseService.client
+          .from('users')
+          .select('user_id, full_name')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (existing != null) {
+        // Row exists — only sync email & avatar, never overwrite full_name.
+        final updatePayload = <String, dynamic>{
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+        if (avatarUrl != null && avatarUrl.trim().isNotEmpty) {
+          // Only update avatar if the user doesn't already have one set,
+          // or if you always want the latest Google/provider avatar:
+          updatePayload['avatar'] = avatarUrl;
+        }
+        await _supabaseService.client
+            .from('users')
+            .update(updatePayload)
+            .eq('user_id', userId);
+      } else {
+        // First time — insert with all fields including full_name.
+        final payload = <String, dynamic>{
+          'user_id': userId,
+          'full_name': fullName,
+          'role': 'buyer',
+          'trust_score': 80,
+          'rating_count': 0,
+          'account_status': 'active',
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+        if (avatarUrl != null && avatarUrl.trim().isNotEmpty) {
+          payload['avatar'] = avatarUrl;
+        }
+        await _supabaseService.client.from('users').insert(payload);
+      }
     } catch (e) {
-      debugPrint('AuthService._updateProfileSafe (non-fatal): $e');
+      debugPrint('AuthService._syncExistingUserRecord error: $e');
     }
   }
 
@@ -250,7 +342,7 @@ class AuthService {
     }
     if (msg.contains('user already registered') ||
         msg.contains('already been registered')) {
-      return 'An account with this email already exists. Try signing in instead.';
+      return 'This email is already registered. Please log in instead.';
     }
     if (msg.contains('rate limit') || msg.contains('too many requests')) {
       return 'Too many attempts. Please wait a moment and try again.';
@@ -259,6 +351,6 @@ class AuthService {
       return 'Password must be at least 6 characters.';
     }
 
-    return e.message;
+    return 'Something went wrong. Please try again.';
   }
 }

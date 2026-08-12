@@ -22,6 +22,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
@@ -29,44 +30,49 @@ class _SignupScreenState extends State<SignupScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
   Future<void> _signUpWithEmail() async {
     if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthProvider>();
-    final error = await auth.signUpWithEmail(
+    final result = await auth.signUpWithEmail(
       email: _emailController.text.trim(),
       password: _passwordController.text,
       name: _nameController.text.trim(),
     );
     if (!mounted) return;
-    if (error != null) {
-      showThriftSnackBar(context, error, isError: true);
-      return;
-    }
-    // If sign-up auto-signs-in, go to home.
-    if (auth.isAuthenticated) {
-      context.go(auth.homeRoute);
-    } else {
-      // Email confirmation may be required.
+    if (!result.success) {
       showThriftSnackBar(
         context,
-        'Account created! Please check your email to verify, then sign in.',
+        result.errorMessage ?? 'Something went wrong. Please try again.',
+        isError: true,
       );
-      context.go(RouteNames.login);
-    }
-  }
-
-  Future<void> _signUpWithGoogle() async {
-    final auth = context.read<AuthProvider>();
-    final error = await auth.loginWithGoogle();
-    if (!mounted) return;
-    if (error != null) {
-      showThriftSnackBar(context, error, isError: true);
       return;
     }
+
+    if (result.requiresEmailVerification) {
+      showThriftSnackBar(
+        context,
+        'Account created! Please check your email to verify your account.',
+      );
+      context.go(RouteNames.login);
+      return;
+    }
+
     context.go(auth.homeRoute);
+  }
+
+  String? _confirmPasswordValidator(String? value) {
+    final confirmPassword = value?.trim() ?? '';
+    if (confirmPassword.isEmpty) {
+      return 'Passwords do not match.';
+    }
+    if (confirmPassword != _passwordController.text) {
+      return 'Passwords do not match.';
+    }
+    return null;
   }
 
   @override
@@ -95,7 +101,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   Center(
                     child: Image.asset(
                       'assets/images/thriftline-app-icon.png',
-                      height: 80,
+                      height: 84,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -106,38 +112,33 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Start your thrift journey today',
+                    'Join ThriftLine and start selling or shopping today.',
                     style: AppTypography.body.copyWith(
                       color: AppColors.textSecondary,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 24),
-
-                  // Full Name
+                  const SizedBox(height: 28),
                   ThriftTextField(
                     label: 'Full Name',
-                    hint: 'John Doe',
+                    hint: 'Enter your full name',
                     controller: _nameController,
                     icon: Icons.person_outline,
                     validator: Validators.name,
                   ),
                   const SizedBox(height: 16),
-
-                  // Email
                   ThriftTextField(
-                    label: 'Email',
-                    hint: 'your@email.com',
+                    label: 'Email Address',
+                    hint: 'Enter your email address',
                     controller: _emailController,
                     icon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
                     validator: Validators.email,
                   ),
                   const SizedBox(height: 16),
-
-                  // Password
                   ThriftTextField(
                     label: 'Password',
+                    hint: 'Create a password',
                     controller: _passwordController,
                     obscureText: _obscurePassword,
                     icon: Icons.lock_outline,
@@ -152,39 +153,33 @@ class _SignupScreenState extends State<SignupScreen> {
                           setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
-                  const SizedBox(height: 32),
-
-                  // Create Account button
+                  const SizedBox(height: 16),
+                  ThriftTextField(
+                    label: 'Confirm Password',
+                    hint: 'Confirm your password',
+                    controller: _confirmPasswordController,
+                    obscureText: _obscurePassword,
+                    icon: Icons.lock_reset_outlined,
+                    validator: _confirmPasswordValidator,
+                  ),
+                  const SizedBox(height: 28),
                   ThriftButton(
-                    label: 'Create Account',
+                    label: 'Sign Up',
                     onPressed: auth.isLoading ? null : _signUpWithEmail,
                     isLoading: auth.isLoading,
                   ),
-                  const SizedBox(height: 24),
-
-                  // Divider
-                  _OrDivider(),
-                  const SizedBox(height: 24),
-
-                  // Google Sign-In button
-                  _GoogleSignInButton(
-                    onPressed: auth.isLoading ? null : _signUpWithGoogle,
-                    isLoading: auth.isLoading,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Sign in link
+                  const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "Already have an account? ",
+                        'Already have an account? ',
                         style: AppTypography.body,
                       ),
                       GestureDetector(
                         onTap: () => context.go(RouteNames.login),
                         child: Text(
-                          'Sign in',
+                          'Log In',
                           style: AppTypography.body.copyWith(
                             color: AppColors.primary,
                             fontWeight: FontWeight.w600,
@@ -193,104 +188,11 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 48),
-                  Text(
-                    'By continuing, you agree to our Terms & Privacy Policy',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
                 ],
               ),
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared auth widgets (duplicated here for self-containment — could be
-// extracted to a shared file in a future refactor)
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _OrDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: Divider(color: AppColors.textSecondary.withValues(alpha: 0.3))),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'or continue with',
-            style: AppTypography.caption.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ),
-        Expanded(child: Divider(color: AppColors.textSecondary.withValues(alpha: 0.3))),
-      ],
-    );
-  }
-}
-
-class _GoogleSignInButton extends StatelessWidget {
-  const _GoogleSignInButton({this.onPressed, this.isLoading = false});
-
-  final VoidCallback? onPressed;
-  final bool isLoading;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 52,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: AppColors.textSecondary.withValues(alpha: 0.3)),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-          ),
-        ),
-        child: isLoading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'G',
-                        style: TextStyle(
-                          color: Colors.blue.shade700,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Continue with Google',
-                    style: AppTypography.body.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
       ),
     );
   }

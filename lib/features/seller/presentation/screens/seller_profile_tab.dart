@@ -37,7 +37,7 @@ class SellerProfileTab extends StatelessWidget {
             offset: const Offset(0, -40),
             child: Column(
               children: [
-                ThriftAvatar(imageUrl: user?.avatarUrl ?? '', size: 80),
+                ThriftAvatar(imageUrl: user?.avatarUrl ?? '', name: user?.shopName ?? user?.name, size: 80),
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,

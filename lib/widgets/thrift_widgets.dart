@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/services.dart';
 
 import '../core/constants/app_colors.dart';
 import '../core/constants/app_constants.dart';
@@ -99,6 +99,7 @@ class ThriftTextField extends StatelessWidget {
   const ThriftTextField({
     super.key,
     this.label,
+    this.labelSuffix,
     this.hint,
     this.error,
     this.controller,
@@ -107,6 +108,7 @@ class ThriftTextField extends StatelessWidget {
     this.suffix,
     this.onChanged,
     this.keyboardType,
+    this.inputFormatters,
     this.maxLines = 1,
     this.onTap,
     this.readOnly = false,
@@ -115,6 +117,7 @@ class ThriftTextField extends StatelessWidget {
   });
 
   final String? label;
+  final Widget? labelSuffix;
   final String? hint;
   final String? error;
   final TextEditingController? controller;
@@ -123,6 +126,7 @@ class ThriftTextField extends StatelessWidget {
   final Widget? suffix;
   final ValueChanged<String>? onChanged;
   final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
   final int maxLines;
   final VoidCallback? onTap;
   final bool readOnly;
@@ -135,7 +139,13 @@ class ThriftTextField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (label != null) ...[
-          Text(label!, style: AppTypography.label.copyWith(color: AppColors.textPrimary)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label!, style: AppTypography.label.copyWith(color: AppColors.textPrimary)),
+              ?labelSuffix,
+            ],
+          ),
           const SizedBox(height: AppConstants.spacingXs),
         ],
         TextFormField(
@@ -143,6 +153,7 @@ class ThriftTextField extends StatelessWidget {
           obscureText: obscureText,
           onChanged: onChanged,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           maxLines: maxLines,
           onTap: onTap,
           readOnly: readOnly,
@@ -242,47 +253,69 @@ class ThriftAvatar extends StatelessWidget {
   const ThriftAvatar({
     super.key,
     required this.imageUrl,
+    this.name,
     this.size = 40,
     this.showOnline = false,
   });
 
   final String imageUrl;
+  final String? name;
   final double size;
   final bool showOnline;
 
+  String get _effectiveImageUrl {
+    final trimmed = imageUrl.trim();
+    if (trimmed.isNotEmpty) {
+      return trimmed;
+    }
+    if (name != null && name!.trim().isNotEmpty) {
+      final encoded = Uri.encodeComponent(name!.trim());
+      return 'https://ui-avatars.com/api/?name=$encoded&background=6C5CE7&color=ffffff&size=150';
+    }
+    return AppConstants.defaultAvatarUrl;
+  }
+
+  Widget _buildFallbackAvatar() {
+    return Container(
+      width: size,
+      height: size,
+      color: AppColors.primaryLight,
+      alignment: Alignment.center,
+      child: name != null && name!.trim().isNotEmpty
+          ? Text(
+              name!.trim().substring(0, 1).toUpperCase(),
+              style: AppTypography.heading.copyWith(
+                fontSize: size * 0.4,
+                color: AppColors.primaryDark,
+              ),
+            )
+          : Icon(
+              Icons.person,
+              size: size * 0.5,
+              color: AppColors.primary,
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final url = _effectiveImageUrl;
     return Stack(
       children: [
         CircleAvatar(
           radius: size / 2,
           backgroundColor: AppColors.primaryLight,
           child: ClipOval(
-            child: CachedNetworkImage(
-              imageUrl: imageUrl,
+            child: Image.network(
+              url,
               width: size,
               height: size,
               fit: BoxFit.cover,
-              placeholder: (_, _) => Container(
-                width: size,
-                height: size,
-                color: AppColors.primaryLight,
-                child: Icon(
-                  Icons.person,
-                  size: size * 0.5,
-                  color: AppColors.primary,
-                ),
-              ),
-              errorWidget: (_, _, _) => Container(
-                width: size,
-                height: size,
-                color: AppColors.primaryLight,
-                child: Icon(
-                  Icons.person,
-                  size: size * 0.5,
-                  color: AppColors.primary,
-                ),
-              ),
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return _buildFallbackAvatar();
+              },
+              errorBuilder: (_, _, _) => _buildFallbackAvatar(),
             ),
           ),
         ),

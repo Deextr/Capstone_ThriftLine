@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show AuthState, AuthChangeEvent;
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show AuthState, AuthChangeEvent;
 
 import '../core/routes/route_names.dart';
 import '../core/services/shared_preferences_service.dart';
 import '../features/auth/data/auth_service.dart';
+import '../features/auth/data/auth_result.dart';
 import '../features/auth/domain/auth_user.dart';
 import '../models/enums.dart';
 
@@ -154,8 +156,8 @@ class AuthProvider extends ChangeNotifier {
 
   /// Creates a new account with email and password.
   ///
-  /// Returns an error message on failure, or `null` on success.
-  Future<String?> signUpWithEmail({
+  /// Returns the auth result, including whether email verification is needed.
+  Future<AuthResult> signUpWithEmail({
     required String email,
     required String password,
     required String name,
@@ -172,17 +174,28 @@ class AuthProvider extends ChangeNotifier {
     if (!result.success) {
       _isLoading = false;
       notifyListeners();
-      return result.errorMessage;
+      return result;
     }
 
-    _user = result.user;
-    if (_user != null) {
-      await _saveSession(_user!);
+    if (!result.requiresEmailVerification && result.user == null) {
+      _isLoading = false;
+      notifyListeners();
+      return AuthResult.failure('Something went wrong. Please try again.');
+    }
+
+    if (result.requiresEmailVerification) {
+      _user = null;
+      await _clearSession();
+    } else {
+      _user = result.user;
+      if (_user != null) {
+        await _saveSession(_user!);
+      }
     }
 
     _isLoading = false;
     notifyListeners();
-    return null;
+    return result;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -208,21 +221,45 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> updateCurrentUser(AuthUser updatedUser) async {
     _user = updatedUser;
-    await _authService.updateProfile(updatedUser.id, {
-      'role': updatedUser.role.name,
-      'name': updatedUser.name,
+    await _authService.updateUserRecord(updatedUser.id, {
+      'full_name': updatedUser.name,
       'username': updatedUser.username,
-      'avatar_url': updatedUser.avatarUrl,
-      'location': updatedUser.location,
-      'shop_name': updatedUser.shopName,
-      'bio': updatedUser.bio,
-      'is_verified': updatedUser.isVerified,
-      'verification_status': updatedUser.verificationStatus,
-      'verification_rejection_reason': updatedUser.verificationRejectionReason,
+      'email': updatedUser.email,
+      'phone_number': updatedUser.phone,
+      'avatar': updatedUser.avatarUrl.isEmpty ? null : updatedUser.avatarUrl,
+      'role': updatedUser.role.name,
       'trust_score': updatedUser.trustScore,
+      'rating_average': updatedUser.rating,
     });
-    await _prefs.setUserRole(updatedUser.role.name);
+    await _saveSession(_user!);
     notifyListeners();
+  }
+
+  Future<void> updateProfileData({
+    required String name,
+    required String username,
+    required String email,
+    required String phone,
+  }) async {
+    if (_user != null) {
+      _user = _user!.copyWith(
+        name: name,
+        username: username,
+        email: email,
+        phone: phone,
+      );
+      await _saveSession(_user!);
+      notifyListeners();
+    }
+  }
+
+  Future<void> reloadUser() async {
+    final currentUser = await _authService.getCurrentUser();
+    if (currentUser != null) {
+      _user = currentUser;
+      await _saveSession(currentUser);
+      notifyListeners();
+    }
   }
 
   Future<void> submitSellerApplication({

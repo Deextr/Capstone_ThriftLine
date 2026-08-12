@@ -8,7 +8,7 @@ import '../../features/buyer/presentation/screens/become_seller_screen.dart';
 import '../../features/buyer/presentation/screens/buyer_shell_screen.dart';
 import '../../features/buyer/presentation/screens/buy_now_screen.dart';
 import '../../features/buyer/presentation/screens/checkout_screen.dart';
-import '../../features/buyer/presentation/screens/edit_profile_screen.dart';
+import '../../features/profile/screens/edit_profile_screen.dart';
 import '../../features/buyer/presentation/screens/order_confirmation_screen.dart';
 import '../../features/buyer/presentation/screens/order_tracking_screen.dart';
 import '../../features/buyer/presentation/screens/payment_delivery_screen.dart';

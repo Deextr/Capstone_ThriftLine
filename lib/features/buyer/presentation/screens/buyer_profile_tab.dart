@@ -200,9 +200,13 @@ class BuyerProfileTab extends StatelessWidget {
   }
 
   Widget _buildProfileHeader(BuildContext context, user) {
+    final username = user?.username ?? '';
+    final email = user?.email ?? '';
+    final phone = user?.phone ?? '';
+
     return Column(
       children: [
-        ThriftAvatar(imageUrl: user?.avatarUrl ?? '', size: 90),
+        ThriftAvatar(imageUrl: user?.avatarUrl ?? '', name: user?.name, size: 90),
         const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -215,7 +219,30 @@ class BuyerProfileTab extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        Text('@${user?.username ?? ''}', style: AppTypography.caption.copyWith(fontSize: 14)),
+        Text(username.isNotEmpty ? '@$username' : '@username', style: AppTypography.caption.copyWith(fontSize: 14)),
+        if (email.isNotEmpty || phone.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (email.isNotEmpty) ...[
+                const Icon(Icons.email_outlined, size: 14, color: AppColors.textSecondary),
+                const SizedBox(width: 4),
+                Text(email, style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
+              ],
+              if (email.isNotEmpty && phone.isNotEmpty) ...[
+                const SizedBox(width: 12),
+                Text('•', style: AppTypography.caption.copyWith(color: AppColors.textHint)),
+                const SizedBox(width: 12),
+              ],
+              if (phone.isNotEmpty) ...[
+                const Icon(Icons.phone_outlined, size: 14, color: AppColors.textSecondary),
+                const SizedBox(width: 4),
+                Text(phone, style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
+              ],
+            ],
+          ),
+        ],
       ],
     );
   }

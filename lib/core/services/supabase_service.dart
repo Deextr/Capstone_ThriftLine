@@ -30,15 +30,48 @@ class SupabaseService {
   /// Stream of auth state changes (sign-in, sign-out, token refresh, etc.).
   Stream<AuthState> get onAuthStateChange => auth.onAuthStateChange;
 
-  /// Simple health check — queries the `profiles` table to verify connectivity.
+  /// Simple health check — queries the `users` table to verify connectivity.
   ///
   /// Returns `true` if the connection is alive, `false` otherwise.
   Future<bool> healthCheck() async {
     try {
-      await client.from('profiles').select('id').limit(1);
+      await client.from('users').select('user_id').limit(1);
       return true;
     } catch (_) {
       return false;
     }
   }
+
+  /// Fetches the `users` row for a given [userId].
+  Future<Map<String, dynamic>?> fetchUserProfile(String userId) async {
+    final response = await client
+        .from('users')
+        .select()
+        .eq('user_id', userId)
+        .maybeSingle();
+    return response;
+  }
+
+  /// Checks if [username] is available (i.e. not used by any user other than [currentUserId]).
+  Future<bool> checkUsernameAvailability(
+    String username,
+    String currentUserId,
+  ) async {
+    final response = await client
+        .from('users')
+        .select('user_id')
+        .eq('username', username)
+        .neq('user_id', currentUserId);
+
+    return (response as List).isEmpty;
+  }
+
+  /// Updates profile fields in the `users` table for [userId].
+  Future<void> updateUserProfile({
+    required String userId,
+    required Map<String, dynamic> data,
+  }) async {
+    await client.from('users').update(data).eq('user_id', userId);
+  }
 }
+

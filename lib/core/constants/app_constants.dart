@@ -30,4 +30,8 @@ abstract final class AppConstants {
   static const double radiusMd = 12;
   static const double radiusLg = 16;
   static const double radiusXl = 24;
+
+  // Default Fallbacks
+  static const String defaultAvatarUrl =
+      'https://ui-avatars.com/api/?name=User&background=6C5CE7&crolor=ffffff&size=150';
 }

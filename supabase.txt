@@ -1,0 +1,2292 @@
+{
+	"enums": [
+		{
+			"enum": "account_status_enum",
+			"values": [
+				"active",
+				"suspended",
+				"banned",
+				"deactivated"
+			]
+		},
+		{
+			"enum": "auction_status_enum",
+			"values": [
+				"scheduled",
+				"active",
+				"ended",
+				"cancelled"
+			]
+		},
+		{
+			"enum": "escrow_status_enum",
+			"values": [
+				"holding",
+				"released",
+				"refunded",
+				"disputed"
+			]
+		},
+		{
+			"enum": "listing_type_enum",
+			"values": [
+				"fixed_price",
+				"auction",
+				"live_session"
+			]
+		},
+		{
+			"enum": "live_session_status_enum",
+			"values": [
+				"scheduled",
+				"live",
+				"ended"
+			]
+		},
+		{
+			"enum": "looking_for_status_enum",
+			"values": [
+				"open",
+				"closed",
+				"fulfilled"
+			]
+		},
+		{
+			"enum": "order_status_enum",
+			"values": [
+				"pending",
+				"paid",
+				"shipped",
+				"delivered",
+				"completed",
+				"cancelled",
+				"disputed"
+			]
+		},
+		{
+			"enum": "order_type_enum",
+			"values": [
+				"fixed_price",
+				"auction"
+			]
+		},
+		{
+			"enum": "payment_method_enum",
+			"values": [
+				"gcash",
+				"cod",
+				"bank_transfer"
+			]
+		},
+		{
+			"enum": "payment_status_enum",
+			"values": [
+				"pending",
+				"paid",
+				"failed",
+				"refunded"
+			]
+		},
+		{
+			"enum": "product_condition_enum",
+			"values": [
+				"new",
+				"like_new",
+				"good",
+				"fair",
+				"poor"
+			]
+		},
+		{
+			"enum": "product_status_enum",
+			"values": [
+				"active",
+				"sold",
+				"removed",
+				"draft"
+			]
+		},
+		{
+			"enum": "review_type_enum",
+			"values": [
+				"buyer_to_seller",
+				"seller_to_buyer"
+			]
+		},
+		{
+			"enum": "shipping_status_enum",
+			"values": [
+				"pending",
+				"shipped",
+				"in_transit",
+				"delivered",
+				"failed"
+			]
+		},
+		{
+			"enum": "user_role_enum",
+			"values": [
+				"buyer",
+				"seller",
+				"admin"
+			]
+		},
+		{
+			"enum": "verification_status_enum",
+			"values": [
+				"pending",
+				"approved",
+				"rejected",
+				"resubmission_required",
+				"expired"
+			]
+		}
+	],
+	"tables": [
+		{
+			"table": "auctions",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "auction_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "product_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "numeric",
+					"name": "starting_price",
+					"type": "numeric",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "numeric",
+					"name": "minimum_increment",
+					"type": "numeric",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "numeric",
+					"name": "current_price",
+					"type": "numeric",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "winner_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "starts_at",
+					"type": "timestamp with time zone",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "ends_at",
+					"type": "timestamp with time zone",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "auction_status_enum",
+					"name": "status",
+					"type": "USER-DEFINED",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "bids",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "bid_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "auction_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "bidder_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "numeric",
+					"name": "bid_amount",
+					"type": "numeric",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "bool",
+					"name": "is_highest_bid",
+					"type": "boolean",
+					"default": "false",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "categories",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "category_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "varchar",
+					"name": "category_name",
+					"type": "character varying",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "bool",
+					"name": "is_active",
+					"type": "boolean",
+					"default": "true",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "escrow",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "escrow_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "payment_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "numeric",
+					"name": "amount",
+					"type": "numeric",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "escrow_status_enum",
+					"name": "escrow_status",
+					"type": "USER-DEFINED",
+					"default": "'holding'::escrow_status_enum",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "released_at",
+					"type": "timestamp with time zone",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "refunded_at",
+					"type": "timestamp with time zone",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "live_sessions",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "live_session_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "seller_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "varchar",
+					"name": "title",
+					"type": "character varying",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "text",
+					"name": "description",
+					"type": "text",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "text",
+					"name": "stream_url",
+					"type": "text",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "live_session_status_enum",
+					"name": "status",
+					"type": "USER-DEFINED",
+					"default": "'scheduled'::live_session_status_enum",
+					"nullable": "NO"
+				},
+				{
+					"udt": "int4",
+					"name": "viewer_count",
+					"type": "integer",
+					"default": "0",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "started_at",
+					"type": "timestamp with time zone",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "looking_for_posts",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "post_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "user_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "varchar",
+					"name": "title",
+					"type": "character varying",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "varchar",
+					"name": "preferred_brand",
+					"type": "character varying",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "varchar",
+					"name": "preferred_size",
+					"type": "character varying",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "numeric",
+					"name": "minimum_price",
+					"type": "numeric",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "numeric",
+					"name": "maximum_price",
+					"type": "numeric",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "looking_for_status_enum",
+					"name": "status",
+					"type": "USER-DEFINED",
+					"default": "'open'::looking_for_status_enum",
+					"nullable": "NO"
+				},
+				{
+					"udt": "int4",
+					"name": "response_count",
+					"type": "integer",
+					"default": "0",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "looking_for_responses",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "response_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "post_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "seller_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "product_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "text",
+					"name": "message",
+					"type": "text",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "order_items",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "order_item_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "order_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "product_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "auction_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "numeric",
+					"name": "unit_price",
+					"type": "numeric",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "orders",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "order_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "buyer_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "seller_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "order_type_enum",
+					"name": "order_type",
+					"type": "USER-DEFINED",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "order_status_enum",
+					"name": "order_status",
+					"type": "USER-DEFINED",
+					"default": "'pending'::order_status_enum",
+					"nullable": "NO"
+				},
+				{
+					"udt": "numeric",
+					"name": "subtotal",
+					"type": "numeric",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "numeric",
+					"name": "platform_fee",
+					"type": "numeric",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "numeric",
+					"name": "total_amount",
+					"type": "numeric",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "expires_at",
+					"type": "timestamp with time zone",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "payments",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "payment_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "order_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "payment_method_enum",
+					"name": "payment_method",
+					"type": "USER-DEFINED",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "numeric",
+					"name": "total_amount",
+					"type": "numeric",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "payment_status_enum",
+					"name": "payment_status",
+					"type": "USER-DEFINED",
+					"default": "'pending'::payment_status_enum",
+					"nullable": "NO"
+				},
+				{
+					"udt": "varchar",
+					"name": "transaction_reference",
+					"type": "character varying",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "product_images",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "image_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "product_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "text",
+					"name": "image_url",
+					"type": "text",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "bool",
+					"name": "is_primary",
+					"type": "boolean",
+					"default": "false",
+					"nullable": "NO"
+				},
+				{
+					"udt": "int4",
+					"name": "display_order",
+					"type": "integer",
+					"default": "0",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "products",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "product_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "category_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "uuid",
+					"name": "seller_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "varchar",
+					"name": "title",
+					"type": "character varying",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "text",
+					"name": "description",
+					"type": "text",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "varchar",
+					"name": "brand",
+					"type": "character varying",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "varchar",
+					"name": "size",
+					"type": "character varying",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "varchar",
+					"name": "color",
+					"type": "character varying",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "varchar",
+					"name": "material",
+					"type": "character varying",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "product_condition_enum",
+					"name": "condition",
+					"type": "USER-DEFINED",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "listing_type_enum",
+					"name": "listing_type",
+					"type": "USER-DEFINED",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "numeric",
+					"name": "price",
+					"type": "numeric",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "varchar",
+					"name": "location",
+					"type": "character varying",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "product_status_enum",
+					"name": "status",
+					"type": "USER-DEFINED",
+					"default": "'active'::product_status_enum",
+					"nullable": "NO"
+				},
+				{
+					"udt": "bool",
+					"name": "boosted",
+					"type": "boolean",
+					"default": "false",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "boost_until",
+					"type": "timestamp with time zone",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "int4",
+					"name": "views",
+					"type": "integer",
+					"default": "0",
+					"nullable": "NO"
+				},
+				{
+					"udt": "int4",
+					"name": "favorite_count",
+					"type": "integer",
+					"default": "0",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "reviews",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "review_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "order_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "reviewer_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "review_type_enum",
+					"name": "review_type",
+					"type": "USER-DEFINED",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "reviewed_user_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "int2",
+					"name": "rating",
+					"type": "smallint",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "text",
+					"name": "review_text",
+					"type": "text",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "saved_items",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "saved_item_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "user_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "product_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "shipping",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "shipping_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "order_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "varchar",
+					"name": "courier",
+					"type": "character varying",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "varchar",
+					"name": "tracking_number",
+					"type": "character varying",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "shipping_status_enum",
+					"name": "shipping_status",
+					"type": "USER-DEFINED",
+					"default": "'pending'::shipping_status_enum",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "shipped_at",
+					"type": "timestamp with time zone",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "delivered_at",
+					"type": "timestamp with time zone",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "user_verifications",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "verification_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "uuid",
+					"name": "user_id",
+					"type": "uuid",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "bool",
+					"name": "email_verified",
+					"type": "boolean",
+					"default": "false",
+					"nullable": "NO"
+				},
+				{
+					"udt": "bool",
+					"name": "phone_verified",
+					"type": "boolean",
+					"default": "false",
+					"nullable": "NO"
+				},
+				{
+					"udt": "varchar",
+					"name": "government_id_type",
+					"type": "character varying",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "varchar",
+					"name": "government_id_number",
+					"type": "character varying",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "text",
+					"name": "government_id_front",
+					"type": "text",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "text",
+					"name": "government_id_back",
+					"type": "text",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "text",
+					"name": "selfie_image",
+					"type": "text",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "verification_status_enum",
+					"name": "verification_status",
+					"type": "USER-DEFINED",
+					"default": "'pending'::verification_status_enum",
+					"nullable": "NO"
+				},
+				{
+					"udt": "text",
+					"name": "rejection_reason",
+					"type": "text",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "submitted_at",
+					"type": "timestamp with time zone",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "verified_at",
+					"type": "timestamp with time zone",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				}
+			]
+		},
+		{
+			"table": "users",
+			"columns": [
+				{
+					"udt": "uuid",
+					"name": "user_id",
+					"type": "uuid",
+					"default": "gen_random_uuid()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "varchar",
+					"name": "full_name",
+					"type": "character varying",
+					"default": null,
+					"nullable": "NO"
+				},
+				{
+					"udt": "varchar",
+					"name": "phone_number",
+					"type": "character varying",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "text",
+					"name": "avatar",
+					"type": "text",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "user_role_enum",
+					"name": "role",
+					"type": "USER-DEFINED",
+					"default": "'buyer'::user_role_enum",
+					"nullable": "NO"
+				},
+				{
+					"udt": "numeric",
+					"name": "trust_score",
+					"type": "numeric",
+					"default": "0",
+					"nullable": "NO"
+				},
+				{
+					"udt": "numeric",
+					"name": "rating_average",
+					"type": "numeric",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "int4",
+					"name": "rating_count",
+					"type": "integer",
+					"default": "0",
+					"nullable": "NO"
+				},
+				{
+					"udt": "account_status_enum",
+					"name": "account_status",
+					"type": "USER-DEFINED",
+					"default": "'active'::account_status_enum",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "timestamptz",
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"default": "now()",
+					"nullable": "NO"
+				},
+				{
+					"udt": "varchar",
+					"name": "username",
+					"type": "character varying",
+					"default": null,
+					"nullable": "YES"
+				},
+				{
+					"udt": "text",
+					"name": "email",
+					"type": "text",
+					"default": null,
+					"nullable": "YES"
+				}
+			]
+		}
+	],
+	"triggers": [
+		{
+			"name": "trg_auctions_updated_at",
+			"event": "UPDATE",
+			"table": "auctions",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		},
+		{
+			"name": "trg_bids_updated_at",
+			"event": "UPDATE",
+			"table": "bids",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		},
+		{
+			"name": "trg_categories_updated_at",
+			"event": "UPDATE",
+			"table": "categories",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		},
+		{
+			"name": "trg_escrow_updated_at",
+			"event": "UPDATE",
+			"table": "escrow",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		},
+		{
+			"name": "trg_live_sessions_updated_at",
+			"event": "UPDATE",
+			"table": "live_sessions",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		},
+		{
+			"name": "trg_looking_for_posts_updated_at",
+			"event": "UPDATE",
+			"table": "looking_for_posts",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		},
+		{
+			"name": "trg_looking_for_responses_updated_at",
+			"event": "UPDATE",
+			"table": "looking_for_responses",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		},
+		{
+			"name": "trg_order_items_updated_at",
+			"event": "UPDATE",
+			"table": "order_items",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		},
+		{
+			"name": "trg_orders_updated_at",
+			"event": "UPDATE",
+			"table": "orders",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		},
+		{
+			"name": "trg_payments_updated_at",
+			"event": "UPDATE",
+			"table": "payments",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		},
+		{
+			"name": "trg_product_images_updated_at",
+			"event": "UPDATE",
+			"table": "product_images",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		},
+		{
+			"name": "trg_products_updated_at",
+			"event": "UPDATE",
+			"table": "products",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		},
+		{
+			"name": "trg_reviews_updated_at",
+			"event": "UPDATE",
+			"table": "reviews",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		},
+		{
+			"name": "trg_saved_items_updated_at",
+			"event": "UPDATE",
+			"table": "saved_items",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		},
+		{
+			"name": "trg_shipping_updated_at",
+			"event": "UPDATE",
+			"table": "shipping",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		},
+		{
+			"name": "trg_user_verifications_updated_at",
+			"event": "UPDATE",
+			"table": "user_verifications",
+			"timing": "BEFORE",
+			"statement": "EXECUTE FUNCTION set_updated_at()"
+		}
+	],
+	"functions": [
+		{
+			"name": "handle_looking_for_response_change",
+			"arguments": "",
+			"definition": "CREATE OR REPLACE FUNCTION public.handle_looking_for_response_change()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nbegin\r\n  if (tg_op = 'INSERT') then\r\n    update looking_for_posts set response_count = response_count + 1, updated_at = now()\r\n      where post_id = new.post_id;\r\n    return new;\r\n  elsif (tg_op = 'DELETE') then\r\n    update looking_for_posts set response_count = greatest(response_count - 1, 0), updated_at = now()\r\n      where post_id = old.post_id;\r\n    return old;\r\n  end if;\r\n  return null;\r\nend;\r\n$function$\n",
+			"return_type": "trigger"
+		},
+		{
+			"name": "handle_new_auth_user",
+			"arguments": "",
+			"definition": "CREATE OR REPLACE FUNCTION public.handle_new_auth_user()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$DECLARE\r\n  new_full_name text;\r\n  new_avatar text;\r\n  new_username text;\r\n  base_username text;\r\nBEGIN\r\n  -- Get full name\r\n  new_full_name := COALESCE(\r\n    NULLIF(TRIM(new.raw_user_meta_data->>'full_name'), ''),\r\n    NULLIF(TRIM(new.raw_user_meta_data->>'name'), ''),\r\n    NULLIF(SPLIT_PART(COALESCE(new.email, ''), '@', 1), ''),\r\n    'New User'\r\n  );\r\n\r\n  -- Get avatar\r\n  new_avatar := NULLIF(new.raw_user_meta_data->>'avatar_url', '');\r\n\r\n  -- Create base username from full name\r\n  base_username := LOWER(\r\n    REGEXP_REPLACE(new_full_name, '[^a-zA-Z0-9]', '', 'g')\r\n  );\r\n\r\n  -- Fallback username\r\n  IF base_username = '' THEN\r\n    base_username := 'user';\r\n  END IF;\r\n\r\n  -- Start with base username\r\n  new_username := base_username;\r\n\r\n  -- Add random 4-digit suffix if username exists\r\n  WHILE EXISTS (\r\n    SELECT 1\r\n    FROM public.users\r\n    WHERE username = new_username\r\n  ) LOOP\r\n    new_username := base_username || FLOOR(1000 + RANDOM() * 9000)::text;\r\n  END LOOP;\r\n\r\n  -- Create user profile\r\n  INSERT INTO public.users (\r\n    user_id,\r\n    username,\r\n    full_name,\r\n    email,\r\n    avatar\r\n  )\r\n  VALUES (\r\n    new.id,\r\n    new_username,\r\n    new_full_name,\r\n    new.email,\r\n    new_avatar\r\n  )\r\n  ON CONFLICT (user_id) DO UPDATE\r\n    SET email = EXCLUDED.email,\r\n        full_name = EXCLUDED.full_name,\r\n        avatar = COALESCE(EXCLUDED.avatar, public.users.avatar),\r\n        updated_at = NOW();\r\n\r\n  RETURN new;\r\nEND;$function$\n",
+			"return_type": "trigger"
+		},
+		{
+			"name": "handle_new_bid",
+			"arguments": "",
+			"definition": "CREATE OR REPLACE FUNCTION public.handle_new_bid()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nbegin\r\n  update bidding\r\n    set is_highest_bid = false\r\n    where auction_id = new.auction_id\r\n      and bid_id <> new.bid_id\r\n      and is_highest_bid = true;\r\n\r\n  update auctions\r\n    set current_price = new.bid_amount,\r\n        updated_at = now()\r\n    where auction_id = new.auction_id;\r\n\r\n  new.is_highest_bid = true;\r\n  return new;\r\nend;\r\n$function$\n",
+			"return_type": "trigger"
+		},
+		{
+			"name": "handle_review_change",
+			"arguments": "",
+			"definition": "CREATE OR REPLACE FUNCTION public.handle_review_change()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nbegin\r\n  update users\r\n    set rating_count   = (select count(*) from reviews where reviewed_user_id = coalesce(new.reviewed_user_id, old.reviewed_user_id)),\r\n        rating_average = (select round(avg(rating)::numeric, 2) from reviews where reviewed_user_id = coalesce(new.reviewed_user_id, old.reviewed_user_id)),\r\n        updated_at     = now()\r\n    where user_id = coalesce(new.reviewed_user_id, old.reviewed_user_id);\r\n  return coalesce(new, old);\r\nend;\r\n$function$\n",
+			"return_type": "trigger"
+		},
+		{
+			"name": "handle_saved_items_change",
+			"arguments": "",
+			"definition": "CREATE OR REPLACE FUNCTION public.handle_saved_items_change()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nbegin\r\n  if (tg_op = 'INSERT') then\r\n    update products set favorite_count = favorite_count + 1, updated_at = now()\r\n      where product_id = new.product_id;\r\n    return new;\r\n  elsif (tg_op = 'DELETE') then\r\n    update products set favorite_count = greatest(favorite_count - 1, 0), updated_at = now()\r\n      where product_id = old.product_id;\r\n    return old;\r\n  end if;\r\n  return null;\r\nend;\r\n$function$\n",
+			"return_type": "trigger"
+		},
+		{
+			"name": "is_admin",
+			"arguments": "",
+			"definition": "CREATE OR REPLACE FUNCTION public.is_admin()\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\n    SELECT EXISTS (\r\n        SELECT 1 FROM users WHERE user_id = auth.uid() AND role = 'admin'\r\n    );\r\n$function$\n",
+			"return_type": "boolean"
+		},
+		{
+			"name": "set_updated_at",
+			"arguments": "",
+			"definition": "CREATE OR REPLACE FUNCTION public.set_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n    NEW.updated_at = NOW();\r\n    RETURN NEW;\r\nEND;\r\n$function$\n",
+			"return_type": "trigger"
+		}
+	],
+	"rls_policies": [
+		{
+			"roles": [
+				"public"
+			],
+			"table": "auctions",
+			"using": "is_admin()",
+			"policy": "auctions_delete_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "auctions",
+			"using": null,
+			"policy": "auctions_insert_own",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(EXISTS ( SELECT 1\n   FROM products p\n  WHERE ((p.product_id = auctions.product_id) AND (p.seller_id = auth.uid()))))"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "auctions",
+			"using": "true",
+			"policy": "auctions_select_all",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "auctions",
+			"using": "(is_admin() OR (EXISTS ( SELECT 1\n   FROM products p\n  WHERE ((p.product_id = auctions.product_id) AND (p.seller_id = auth.uid())))))",
+			"policy": "auctions_update_own_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "bids",
+			"using": "is_admin()",
+			"policy": "bids_delete_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "bids",
+			"using": null,
+			"policy": "bids_insert_own",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(auth.uid() = bidder_id)"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "bids",
+			"using": "true",
+			"policy": "bids_select_all",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "bids",
+			"using": "is_admin()",
+			"policy": "bids_update_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "categories",
+			"using": "is_admin()",
+			"policy": "categories_delete_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "categories",
+			"using": "true",
+			"policy": "categories_select_all",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "categories",
+			"using": "is_admin()",
+			"policy": "categories_update_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "categories",
+			"using": null,
+			"policy": "categories_write_admin",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "is_admin()"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "escrow",
+			"using": "is_admin()",
+			"policy": "escrow_delete_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "escrow",
+			"using": "(is_admin() OR (EXISTS ( SELECT 1\n   FROM (payments pay\n     JOIN orders o ON ((o.order_id = pay.order_id)))\n  WHERE ((pay.payment_id = escrow.payment_id) AND ((o.buyer_id = auth.uid()) OR (o.seller_id = auth.uid()))))))",
+			"policy": "escrow_select_participant_admin",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "escrow",
+			"using": "is_admin()",
+			"policy": "escrow_update_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "live_sessions",
+			"using": "((auth.uid() = seller_id) OR is_admin())",
+			"policy": "live_sessions_delete_own_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "live_sessions",
+			"using": null,
+			"policy": "live_sessions_insert_own",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(auth.uid() = seller_id)"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "live_sessions",
+			"using": "true",
+			"policy": "live_sessions_select_all",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "live_sessions",
+			"using": "((auth.uid() = seller_id) OR is_admin())",
+			"policy": "live_sessions_update_own_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "looking_for_posts",
+			"using": "((auth.uid() = user_id) OR is_admin())",
+			"policy": "looking_for_posts_delete_own_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "looking_for_posts",
+			"using": null,
+			"policy": "looking_for_posts_insert_own",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(auth.uid() = user_id)"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "looking_for_posts",
+			"using": "true",
+			"policy": "looking_for_posts_select_all",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "looking_for_posts",
+			"using": "((auth.uid() = user_id) OR is_admin())",
+			"policy": "looking_for_posts_update_own_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "looking_for_responses",
+			"using": "((auth.uid() = seller_id) OR is_admin())",
+			"policy": "looking_for_responses_delete_own_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "looking_for_responses",
+			"using": null,
+			"policy": "looking_for_responses_insert_own",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(auth.uid() = seller_id)"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "looking_for_responses",
+			"using": "(is_admin() OR (auth.uid() = seller_id) OR (EXISTS ( SELECT 1\n   FROM looking_for_posts lp\n  WHERE ((lp.post_id = looking_for_responses.post_id) AND (lp.user_id = auth.uid())))))",
+			"policy": "looking_for_responses_select_participant_admin",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "looking_for_responses",
+			"using": "((auth.uid() = seller_id) OR is_admin())",
+			"policy": "looking_for_responses_update_own_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "order_items",
+			"using": "is_admin()",
+			"policy": "order_items_delete_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "order_items",
+			"using": null,
+			"policy": "order_items_insert_buyer",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(EXISTS ( SELECT 1\n   FROM orders o\n  WHERE ((o.order_id = order_items.order_id) AND (o.buyer_id = auth.uid()))))"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "order_items",
+			"using": "(is_admin() OR (EXISTS ( SELECT 1\n   FROM orders o\n  WHERE ((o.order_id = order_items.order_id) AND ((o.buyer_id = auth.uid()) OR (o.seller_id = auth.uid()))))))",
+			"policy": "order_items_select_participant_admin",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "order_items",
+			"using": "is_admin()",
+			"policy": "order_items_update_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "orders",
+			"using": "is_admin()",
+			"policy": "orders_delete_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "orders",
+			"using": null,
+			"policy": "orders_insert_buyer",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(auth.uid() = buyer_id)"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "orders",
+			"using": "((auth.uid() = buyer_id) OR (auth.uid() = seller_id) OR is_admin())",
+			"policy": "orders_select_participant_admin",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "orders",
+			"using": "((auth.uid() = buyer_id) OR (auth.uid() = seller_id) OR is_admin())",
+			"policy": "orders_update_participant_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "payments",
+			"using": "is_admin()",
+			"policy": "payments_delete_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "payments",
+			"using": null,
+			"policy": "payments_insert_buyer",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(EXISTS ( SELECT 1\n   FROM orders o\n  WHERE ((o.order_id = payments.order_id) AND (o.buyer_id = auth.uid()))))"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "payments",
+			"using": "(is_admin() OR (EXISTS ( SELECT 1\n   FROM orders o\n  WHERE ((o.order_id = payments.order_id) AND ((o.buyer_id = auth.uid()) OR (o.seller_id = auth.uid()))))))",
+			"policy": "payments_select_participant_admin",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "payments",
+			"using": "is_admin()",
+			"policy": "payments_update_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "product_images",
+			"using": "(is_admin() OR (EXISTS ( SELECT 1\n   FROM products p\n  WHERE ((p.product_id = product_images.product_id) AND (p.seller_id = auth.uid())))))",
+			"policy": "product_images_delete_own_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "product_images",
+			"using": null,
+			"policy": "product_images_insert_own",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(EXISTS ( SELECT 1\n   FROM products p\n  WHERE ((p.product_id = product_images.product_id) AND (p.seller_id = auth.uid()))))"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "product_images",
+			"using": "true",
+			"policy": "product_images_select_all",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "product_images",
+			"using": "(is_admin() OR (EXISTS ( SELECT 1\n   FROM products p\n  WHERE ((p.product_id = product_images.product_id) AND (p.seller_id = auth.uid())))))",
+			"policy": "product_images_update_own_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "products",
+			"using": "((auth.uid() = seller_id) OR is_admin())",
+			"policy": "products_delete_own_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "products",
+			"using": null,
+			"policy": "products_insert_own",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(auth.uid() = seller_id)"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "products",
+			"using": "true",
+			"policy": "products_select_all",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "products",
+			"using": "((auth.uid() = seller_id) OR is_admin())",
+			"policy": "products_update_own_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "reviews",
+			"using": "is_admin()",
+			"policy": "reviews_delete_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "reviews",
+			"using": null,
+			"policy": "reviews_insert_own",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(auth.uid() = reviewer_id)"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "reviews",
+			"using": "true",
+			"policy": "reviews_select_all",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "reviews",
+			"using": "((auth.uid() = reviewer_id) OR is_admin())",
+			"policy": "reviews_update_own_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "saved_items",
+			"using": "((auth.uid() = user_id) OR is_admin())",
+			"policy": "saved_items_delete_own_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "saved_items",
+			"using": null,
+			"policy": "saved_items_insert_own",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(auth.uid() = user_id)"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "saved_items",
+			"using": "((auth.uid() = user_id) OR is_admin())",
+			"policy": "saved_items_select_own_admin",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "shipping",
+			"using": "is_admin()",
+			"policy": "shipping_delete_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "shipping",
+			"using": null,
+			"policy": "shipping_insert_seller",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(EXISTS ( SELECT 1\n   FROM orders o\n  WHERE ((o.order_id = shipping.order_id) AND (o.seller_id = auth.uid()))))"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "shipping",
+			"using": "(is_admin() OR (EXISTS ( SELECT 1\n   FROM orders o\n  WHERE ((o.order_id = shipping.order_id) AND ((o.buyer_id = auth.uid()) OR (o.seller_id = auth.uid()))))))",
+			"policy": "shipping_select_participant_admin",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "shipping",
+			"using": "(is_admin() OR (EXISTS ( SELECT 1\n   FROM orders o\n  WHERE ((o.order_id = shipping.order_id) AND (o.seller_id = auth.uid())))))",
+			"policy": "shipping_update_seller_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "user_verifications",
+			"using": "is_admin()",
+			"policy": "verifications_delete_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "user_verifications",
+			"using": null,
+			"policy": "verifications_insert_own",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(auth.uid() = user_id)"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "user_verifications",
+			"using": "((auth.uid() = user_id) OR is_admin())",
+			"policy": "verifications_select_own_admin",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "user_verifications",
+			"using": "((auth.uid() = user_id) OR is_admin())",
+			"policy": "verifications_update_own_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "users",
+			"using": null,
+			"policy": "Users can insert own profile",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(auth.uid() = user_id)"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "users",
+			"using": "(auth.uid() = user_id)",
+			"policy": "Users can read own profile",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "users",
+			"using": "(auth.uid() = user_id)",
+			"policy": "Users can update own profile",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": "(auth.uid() = user_id)"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "users",
+			"using": "is_admin()",
+			"policy": "users_delete_admin",
+			"command": "DELETE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "users",
+			"using": null,
+			"policy": "users_insert_self",
+			"command": "INSERT",
+			"permissive": "PERMISSIVE",
+			"with_check": "(auth.uid() = user_id)"
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "users",
+			"using": "true",
+			"policy": "users_select_all",
+			"command": "SELECT",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		},
+		{
+			"roles": [
+				"public"
+			],
+			"table": "users",
+			"using": "((auth.uid() = user_id) OR is_admin())",
+			"policy": "users_update_self_admin",
+			"command": "UPDATE",
+			"permissive": "PERMISSIVE",
+			"with_check": null
+		}
+	]
+}
