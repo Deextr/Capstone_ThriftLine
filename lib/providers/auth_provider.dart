@@ -236,17 +236,19 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> updateProfileData({
-    required String name,
-    required String username,
-    required String email,
-    required String phone,
+    String? name,
+    String? username,
+    String? email,
+    String? phone,
+    String? avatarUrl,
   }) async {
     if (_user != null) {
       _user = _user!.copyWith(
-        name: name,
-        username: username,
-        email: email,
-        phone: phone,
+        name: name ?? _user!.name,
+        username: username ?? _user!.username,
+        email: email ?? _user!.email,
+        phone: phone ?? _user!.phone,
+        avatarUrl: avatarUrl ?? _user!.avatarUrl,
       );
       await _saveSession(_user!);
       notifyListeners();

@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_typography.dart';
-import '../../../../core/routes/route_names.dart';
-import '../../../../features/auth/domain/auth_user.dart';
-import '../../../../models/product_model.dart';
-import '../../../../models/enums.dart';
-import '../../../../providers/data_provider.dart';
-import '../../../../widgets/thrift_widgets.dart';
+import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_typography.dart';
+import '../../../core/routes/route_names.dart';
+import '../../../features/auth/domain/auth_user.dart';
+import '../../../models/product_model.dart';
+import '../../../models/enums.dart';
+import '../../../providers/data_provider.dart';
+import '../../../widgets/thrift_widgets.dart';
 
 class SellerPublicProfileScreen extends StatelessWidget {
   const SellerPublicProfileScreen({super.key, required this.username});
@@ -516,20 +516,23 @@ class _OptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isDestructive ? AppColors.error : AppColors.textPrimary,
-        size: 22,
-      ),
-      title: Text(
-        label,
-        style: AppTypography.body.copyWith(
+    return Material(
+      color: AppColors.surface,
+      child: ListTile(
+        leading: Icon(
+          icon,
           color: isDestructive ? AppColors.error : AppColors.textPrimary,
-          fontWeight: FontWeight.w500,
+          size: 22,
         ),
+        title: Text(
+          label,
+          style: AppTypography.body.copyWith(
+            color: isDestructive ? AppColors.error : AppColors.textPrimary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        onTap: onTap,
       ),
-      onTap: onTap,
     );
   }
 }

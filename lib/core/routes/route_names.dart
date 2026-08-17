@@ -13,6 +13,7 @@ abstract final class RouteNames {
   static const String paymentProof = '/payment-proof/:orderId';
   static const String trackOrder = '/track-order/:orderId';
   static const String addListing = '/add-listing';
+  static const String editListing = '/edit-listing/:id';
   static const String sellerOrder = '/seller-order/:id';
   static const String chat = '/chat';
   static const String chatDetail = '/chat/:id';
@@ -26,4 +27,5 @@ abstract final class RouteNames {
   static const String checkout = '/checkout';
   static const String reportSeller = '/report-seller';
   static const String myReports = '/my-reports';
+  static const String myShop = '/my-shop';
 }

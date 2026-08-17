@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/signup_screen.dart';
@@ -9,23 +10,28 @@ import '../../features/buyer/presentation/screens/buyer_shell_screen.dart';
 import '../../features/buyer/presentation/screens/buy_now_screen.dart';
 import '../../features/buyer/presentation/screens/checkout_screen.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
+import '../../features/profile/screens/seller_public_profile_screen.dart';
 import '../../features/buyer/presentation/screens/order_confirmation_screen.dart';
 import '../../features/buyer/presentation/screens/order_tracking_screen.dart';
 import '../../features/buyer/presentation/screens/payment_delivery_screen.dart';
 import '../../features/buyer/presentation/screens/payment_proof_screen.dart';
 import '../../features/buyer/presentation/screens/product_detail_screen.dart';
-import '../../features/buyer/presentation/screens/seller_public_profile_screen.dart';
 import '../../features/buyer/presentation/screens/purchase_history_screen.dart';
 import '../../features/buyer/presentation/screens/saved_items_screen.dart';
-import '../../features/buyer/presentation/screens/search_screen.dart';
+import '../../features/buyer/presentation/screens/buyer_search_tab.dart';
 import '../../features/chat/presentation/screens/chat_detail_screen.dart';
 import '../../features/chat/presentation/screens/chat_list_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
+import '../../features/seller/controllers/add_listing_controller.dart';
+import '../../features/seller/controllers/edit_listing_controller.dart';
 import '../../features/seller/presentation/screens/add_listing_screen.dart';
+import '../../features/seller/presentation/screens/edit_listing_screen.dart';
+import '../services/supabase_service.dart';
 import '../../features/seller/presentation/screens/seller_order_detail_screen.dart';
 import '../../features/seller/presentation/screens/seller_shell_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/seller/presentation/screens/my_shop_screen.dart';
 import '../../features/trust_safety/presentation/screens/report_seller_screen.dart';
 import '../../features/trust_safety/presentation/screens/my_reports_screen.dart';
 import '../../providers/app_provider.dart';
@@ -116,7 +122,24 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: RouteNames.addListing,
-        builder: (_, _) => const AddListingScreen(),
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => AddListingController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+          ),
+          child: const AddListingScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.editListing,
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => EditListingController(
+            productId: state.pathParameters['id']!,
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+          ),
+          child: const EditListingScreen(),
+        ),
       ),
       GoRoute(
         path: RouteNames.sellerOrder,
@@ -171,6 +194,10 @@ GoRouter createAppRouter({
       GoRoute(
         path: RouteNames.myReports,
         builder: (_, _) => const MyReportsScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.myShop,
+        builder: (_, _) => const MyShopScreen(),
       ),
     ],
     errorBuilder: (_, state) =>

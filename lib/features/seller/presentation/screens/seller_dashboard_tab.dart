@@ -28,9 +28,9 @@ class SellerDashboardTab extends StatelessWidget {
     final recentOrders = data.ordersForSeller(sellerId).take(3).toList();
     final lookingForPosts = data.lookingForPosts.take(3).toList();
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
+    return ColoredBox(
+      color: AppColors.background,
+      child: SafeArea(
         child: RefreshIndicator(
           color: AppColors.primary,
           strokeWidth: 2.5,
@@ -124,9 +124,17 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(
         children: [
+          // Drawer Menu Button
+          Builder(
+            builder: (ctx) => _IconBtn(
+              icon: Icons.menu_rounded,
+              onTap: () => Scaffold.of(ctx).openDrawer(),
+            ),
+          ),
+          const SizedBox(width: 10),
           // Avatar
           ThriftAvatar(imageUrl: user?.avatarUrl ?? '', size: 42),
           const SizedBox(width: 12),

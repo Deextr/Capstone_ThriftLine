@@ -4,11 +4,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/routes/route_names.dart';
 import '../../../../widgets/curved_navigation_bar.dart';
+import '../../../../widgets/thrift_drawer.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../profile/screens/buyer_profile_tab.dart';
 import 'buyer_bids_tab.dart';
 import 'buyer_home_tab.dart';
 import 'buyer_looking_for_tab.dart';
-import 'buyer_profile_tab.dart';
 
 class BuyerShellScreen extends StatefulWidget {
   const BuyerShellScreen({super.key});
@@ -65,6 +66,7 @@ class _BuyerShellScreenState extends State<BuyerShellScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: const ThriftDrawer(),
       // Use extendBody so the curved nav bar can overlap the body edge
       extendBody: true,
       body: AnimatedSwitcher(

@@ -84,6 +84,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           children: [
                             Center(
                               child: Stack(
+                                clipBehavior: Clip.none,
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.all(4),
@@ -94,10 +95,67 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                         width: 3,
                                       ),
                                     ),
-                                    child: ThriftAvatar(
-                                      imageUrl: currentUser?.avatarUrl ?? authUser?.avatarUrl ?? '',
-                                      name: initialName,
-                                      size: 90,
+                                    child: controller.isUploadingAvatar
+                                        ? const SizedBox(
+                                            width: 90,
+                                            height: 90,
+                                            child: Center(
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: AppColors.primary,
+                                              ),
+                                            ),
+                                          )
+                                        : ThriftAvatar(
+                                            imageUrl: currentUser?.avatarUrl ??
+                                                authUser?.avatarUrl ??
+                                                '',
+                                            name: initialName,
+                                            size: 90,
+                                          ),
+                                  ),
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: GestureDetector(
+                                      onTap: controller.isUploadingAvatar
+                                          ? null
+                                          : () async {
+                                              await controller
+                                                  .pickAndUploadAvatar();
+                                              if (context.mounted &&
+                                                  controller.errorMessage !=
+                                                      null) {
+                                                showThriftSnackBar(
+                                                  context,
+                                                  controller.errorMessage!,
+                                                  isError: true,
+                                                );
+                                              } else if (context.mounted &&
+                                                  controller.successMessage !=
+                                                      null) {
+                                                showThriftSnackBar(
+                                                  context,
+                                                  controller.successMessage!,
+                                                );
+                                              }
+                                            },
+                                      child: Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                              color: AppColors.surface,
+                                              width: 2),
+                                        ),
+                                        child: const Icon(
+                                          Icons.camera_alt,
+                                          color: Colors.white,
+                                          size: 16,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ],

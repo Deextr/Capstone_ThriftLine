@@ -1,372 +1,734 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
-import '../../../../core/routes/route_names.dart';
 import '../../../../models/enums.dart';
-import '../../../../models/product_model.dart';
-import '../../../../providers/auth_provider.dart';
-import '../../../../providers/data_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../controllers/add_listing_controller.dart';
 
-class AddListingScreen extends StatefulWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+// Screen
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Single-scroll listing creation screen.
+///
+/// Pure UI — all state and logic live in [AddListingController].
+/// Observes the controller via [context.watch] and delegates every action to it.
+///
+/// Requirements: 1.1, 1.2, 1.3, 1.4, 8.1, 8.2, 9.2, 9.3
+class AddListingScreen extends StatelessWidget {
   const AddListingScreen({super.key});
 
   @override
-  State<AddListingScreen> createState() => _AddListingScreenState();
+  Widget build(BuildContext context) {
+    final controller = context.watch<AddListingController>();
+
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: AppColors.background,
+          body: CustomScrollView(
+            slivers: [
+              // ── App bar ──────────────────────────────────────────────────
+              SliverAppBar(
+                pinned: true,
+                title: const Text('Add Listing'),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => context.pop(),
+                ),
+                backgroundColor: AppColors.surface,
+                foregroundColor: AppColors.textPrimary,
+                elevation: 1,
+              ),
+
+              // ── Form sections ────────────────────────────────────────────
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppConstants.spacingMd,
+                  AppConstants.spacingMd,
+                  AppConstants.spacingMd,
+                  AppConstants.spacingXxl,
+                ),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    // 1. Photos strip
+                    _PhotosSection(controller: controller),
+                    const SizedBox(height: AppConstants.spacingLg),
+
+                    // 2. Product name
+                    ThriftTextField(
+                      label: 'Product Name',
+                      controller: controller.nameCtrl,
+                      onChanged: controller.onNameChanged,
+                      error: controller.fieldErrors['name'],
+                    ),
+                    const SizedBox(height: AppConstants.spacingMd),
+
+                    // 3. Description + counter
+                    _DescriptionField(controller: controller),
+                    const SizedBox(height: AppConstants.spacingMd),
+
+                    // 4. Category
+                    _CategoryField(controller: controller),
+                    const SizedBox(height: AppConstants.spacingMd),
+
+                    // 5. Condition
+                    _ConditionField(controller: controller),
+                    const SizedBox(height: AppConstants.spacingMd),
+
+                    // 6. Brand (optional)
+                    ThriftTextField(
+                      label: 'Brand (optional)',
+                      controller: controller.brandCtrl,
+                    ),
+                    const SizedBox(height: AppConstants.spacingMd),
+
+                    // 7. Size (optional)
+                    ThriftTextField(
+                      label: 'Size (optional)',
+                      controller: controller.sizeCtrl,
+                    ),
+                    const SizedBox(height: AppConstants.spacingMd),
+
+                    // 8. Color (optional)
+                    ThriftTextField(
+                      label: 'Color (optional)',
+                      controller: controller.colorCtrl,
+                    ),
+                    const SizedBox(height: AppConstants.spacingMd),
+
+                    // 9. Selling format + pricing
+                    _SellingFormatSection(controller: controller),
+                    const SizedBox(height: AppConstants.spacingMd),
+
+                    // 10. Location (optional)
+                    ThriftTextField(
+                      label: 'Item Location (optional)',
+                      controller: controller.locationCtrl,
+                    ),
+                    const SizedBox(height: AppConstants.spacingMd),
+                  ]),
+                ),
+              ),
+            ],
+          ),
+
+          // ── Persistent bottom action bar ──────────────────────────────
+          bottomNavigationBar: BottomAppBar(
+            color: AppColors.surface,
+            elevation: 8,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppConstants.spacingMd,
+                vertical: AppConstants.spacingSm,
+              ),
+              child: ThriftButton(
+                label: 'Post Listing',
+                onPressed: controller.isLoading
+                    ? null
+                    : () => controller.postListing(context),
+              ),
+            ),
+          ),
+        ),
+
+        // ── Upload progress overlay (shown while isLoading) ───────────
+        if (controller.isLoading)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const LinearProgressIndicator(
+                    backgroundColor: AppColors.primaryLight,
+                    color: AppColors.primary,
+                  ),
+                  if (controller.uploadStatusMessage.isNotEmpty)
+                    Container(
+                      width: double.infinity,
+                      color: AppColors.textPrimary.withValues(alpha: 0.85),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppConstants.spacingMd,
+                        vertical: AppConstants.spacingSm,
+                      ),
+                      child: Text(
+                        controller.uploadStatusMessage,
+                        style: AppTypography.caption
+                            .copyWith(color: Colors.white),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }
 
-class _AddListingScreenState extends State<AddListingScreen> {
-  final _pageController = PageController();
-  int _step = 0;
+// ─────────────────────────────────────────────────────────────────────────────
+// Description field with live character counter
+// ─────────────────────────────────────────────────────────────────────────────
 
-  final _nameCtrl = TextEditingController();
-  final _brandCtrl = TextEditingController();
-  final _sizeCtrl = TextEditingController();
-  final _materialCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
-  final _priceCtrl = TextEditingController();
-  final _startBidCtrl = TextEditingController();
-  final _locationCtrl = TextEditingController();
+class _DescriptionField extends StatelessWidget {
+  const _DescriptionField({required this.controller});
 
-  ProductCategory _category = ProductCategory.tops;
-  ProductCondition _condition = ProductCondition.good;
-  SellingType _sellingType = SellingType.fixedPrice;
-  String _selectedColor = 'Black';
-  int _bidDays = 3;
-  double _bidIncrement = 20;
-  bool _standardShip = true;
-  bool _expressShip = false;
-  bool _meetup = false;
-  bool _freeShipping = false;
-
-  final List<String> _imageUrls = [];
-
-  static const _mockPhotoOptions = [
-    'https://images.unsplash.com/photo-1554568218-0f1715e72254?auto=format&fit=crop&q=80&w=600&h=600',
-    'https://images.unsplash.com/photo-1516762689617-e1cffcef479d?auto=format&fit=crop&q=80&w=600&h=600',
-    'https://images.unsplash.com/photo-1591369822096-ffd140ec948f?auto=format&fit=crop&q=80&w=600&h=600',
-    'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&q=80&w=600&h=600',
-    'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&q=80&w=600&h=600',
-    'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&q=80&w=600&h=600',
-    'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&q=80&w=600&h=600',
-    'https://images.unsplash.com/photo-1584916201218-f4242ceb4809?auto=format&fit=crop&q=80&w=600&h=600',
-  ];
-
-  Color _getColorValue(String colorName) {
-    switch (colorName) {
-      case 'Black': return Colors.black;
-      case 'White': return Colors.white;
-      case 'Red': return Colors.red.shade600;
-      case 'Blue': return Colors.blue.shade600;
-      case 'Green': return Colors.green.shade600;
-      case 'Yellow': return Colors.yellow.shade600;
-      case 'Pink': return Colors.pink.shade300;
-      case 'Purple': return Colors.purple.shade600;
-      case 'Orange': return Colors.orange.shade600;
-      case 'Brown': return Colors.brown.shade600;
-      case 'Gray': return Colors.grey.shade500;
-      case 'Navy': return const Color(0xFF1E3A8A);
-      case 'Beige': return const Color(0xFFF5F5DC);
-      case 'Cream': return const Color(0xFFFFFDD0);
-      case 'Olive': return const Color(0xFF808000);
-      default: return Colors.grey.shade300;
-    }
-  }
-
-  static const _colors = [
-    'Black', 'White', 'Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Purple',
-    'Orange', 'Brown', 'Gray', 'Navy', 'Beige', 'Cream', 'Olive', 'Multicolor',
-  ];
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    _nameCtrl.dispose();
-    _brandCtrl.dispose();
-    _sizeCtrl.dispose();
-    _materialCtrl.dispose();
-    _descCtrl.dispose();
-    _priceCtrl.dispose();
-    _startBidCtrl.dispose();
-    _locationCtrl.dispose();
-    super.dispose();
-  }
+  final AddListingController controller;
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: _step == 0,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _step > 0) {
-          _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-          setState(() => _step--);
-        }
-      },
-      child: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text('Add Listing (${_step + 1}/5)'),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () {
-                if (_step > 0) {
-                  _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-                  setState(() => _step--);
-                } else {
-                  context.pop();
-                }
-              },
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ThriftTextField(
+          label: 'Description',
+          controller: controller.descCtrl,
+          onChanged: controller.onDescChanged,
+          maxLines: 4,
+          error: controller.fieldErrors['description'],
+        ),
+        const SizedBox(height: 4),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            '${controller.descCtrl.text.length} / 500',
+            style: AppTypography.caption,
           ),
-          body: SafeArea(
-            child: Column(
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Category field — tappable, opens bottom sheet populated from DB
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CategoryField extends StatelessWidget {
+  const _CategoryField({required this.controller});
+
+  final AddListingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedName = controller.selectedCategoryName;
+    final hasError = controller.fieldErrors.containsKey('category');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Category', style: AppTypography.label.copyWith(color: AppColors.textPrimary)),
+        const SizedBox(height: AppConstants.spacingXs),
+        InkWell(
+          onTap: () => _showCategorySheet(context, controller),
+          borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+              border: Border.all(
+                color: hasError ? AppColors.error : AppColors.border,
+              ),
+            ),
+            child: Row(
               children: [
-                LinearProgressIndicator(value: (_step + 1) / 5, color: AppColors.primary, backgroundColor: AppColors.primaryLight),
+                const Icon(Icons.category_outlined, color: AppColors.textHint, size: 20),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      _photosStep(),
-                      _detailsStep(),
-                      _pricingStep(),
-                      _deliveryStep(),
-                      _reviewStep(),
-                    ],
-                  ),
+                  child: controller.categoriesLoading
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primary,
+                          ),
+                        )
+                      : Text(
+                          selectedName ?? 'Select a category',
+                          style: AppTypography.body.copyWith(
+                            color: selectedName != null
+                                ? AppColors.textPrimary
+                                : AppColors.textHint,
+                          ),
+                        ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(AppConstants.spacingMd),
-                  child: ThriftButton(
-                    label: _step == 4 ? 'Post Listing' : 'Continue',
-                    onPressed: _next,
-                  ),
-                ),
+                const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
               ],
             ),
           ),
         ),
+        if (hasError)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 12),
+            child: Text(
+              controller.fieldErrors['category']!,
+              style: AppTypography.caption.copyWith(color: AppColors.error),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _showCategorySheet(BuildContext context, AddListingController controller) {
+    if (controller.categoriesLoading) return;
+
+    ThriftBottomSheet.show(
+      context,
+      title: 'Select Category',
+      child: controller.categories.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.all(AppConstants.spacingLg),
+              child: Center(
+                child: Text(
+                  'No categories available. Pull down to retry.',
+                  style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            )
+          : Column(
+              children: controller.categories.map((cat) {
+                final isSelected = controller.selectedCategoryId == cat.id;
+                return ListTile(
+                  leading: Icon(
+                    Icons.sell_outlined,
+                    color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                  title: Text(
+                    cat.name,
+                    style: TextStyle(
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  trailing: isSelected
+                      ? const Icon(Icons.check, color: AppColors.primary)
+                      : null,
+                  onTap: () {
+                    controller.selectCategory(cat.id, cat.name);
+                    Navigator.pop(context);
+                  },
+                );
+              }).toList(),
+            ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Condition chip row (filled in task 8.4)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ConditionField extends StatelessWidget {
+  const _ConditionField({required this.controller});
+
+  final AddListingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasError = controller.fieldErrors.containsKey('condition');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Condition', style: AppTypography.label.copyWith(color: AppColors.textPrimary)),
+        const SizedBox(height: AppConstants.spacingSm),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: ProductCondition.values.map((c) {
+            final isSelected = controller.selectedCondition == c;
+            return ChoiceChip(
+              label: Text(c.label),
+              selected: isSelected,
+              selectedColor: AppColors.primaryLight,
+              labelStyle: TextStyle(
+                color: isSelected ? AppColors.primaryDark : AppColors.textSecondary,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+                side: BorderSide(
+                  color: isSelected ? AppColors.primary : AppColors.border,
+                ),
+              ),
+              onSelected: (_) => controller.selectCondition(c),
+            );
+          }).toList(),
+        ),
+        if (hasError)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(
+              controller.fieldErrors['condition']!,
+              style: AppTypography.caption.copyWith(color: AppColors.error),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Photos strip — placeholder, replaced in task 8.3
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PhotosSection extends StatelessWidget {
+  const _PhotosSection({required this.controller});
+
+  final AddListingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasError = controller.fieldErrors.containsKey('images');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Photos',
+          style: AppTypography.label.copyWith(color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: AppConstants.spacingXs),
+        Text(
+          'Add up to 3 photos. First photo is the cover.',
+          style: AppTypography.caption,
+        ),
+        const SizedBox(height: AppConstants.spacingSm),
+        SizedBox(
+          height: 90,
+          child: ReorderableListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: 3,
+            buildDefaultDragHandles: false,
+            onReorderItem: (oldIndex, newIndex) =>
+                controller.reorderImages(oldIndex, newIndex),
+            itemBuilder: (context, index) {
+              final isFilled = index < controller.images.length;
+              return ReorderableDragStartListener(
+                key: ValueKey('slot_$index'),
+                index: index,
+                child: GestureDetector(
+                  onTap: () => isFilled
+                      ? _showSlotOptions(context, index)
+                      : controller.pickImage(index),
+                  child: _ImageSlot(
+                    index: index,
+                    image: isFilled ? controller.images[index] : null,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        if (hasError)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(
+              controller.fieldErrors['images']!,
+              style: AppTypography.caption.copyWith(color: AppColors.error),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _showSlotOptions(BuildContext context, int index) {
+    ThriftBottomSheet.show(
+      context,
+      title: index == 0 ? 'Cover Photo' : 'Photo ${index + 1}',
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.swap_horiz, color: AppColors.primary),
+            title: const Text('Replace'),
+            onTap: () {
+              Navigator.pop(context);
+              controller.replaceImage(index);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete_outline, color: AppColors.error),
+            title: const Text('Remove',
+                style: TextStyle(color: AppColors.error)),
+            onTap: () {
+              Navigator.pop(context);
+              controller.removeImage(index);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Individual image slot widget
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ImageSlot extends StatelessWidget {
+  const _ImageSlot({required this.index, required this.image});
+
+  final int index;
+  final SelectedImage? image;
+
+  @override
+  Widget build(BuildContext context) {
+    final isCover = index == 0;
+    final label = isCover ? 'Cover' : 'Photo ${index + 1}';
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Container(
+        width: 80,
+        height: 80,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: AppColors.primaryLight,
+          borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+          border: Border.all(
+            color: image != null ? AppColors.primary : AppColors.border,
+            width: image != null ? 2 : 1,
+          ),
+        ),
+        child: image != null
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.memory(image!.bytes, fit: BoxFit.cover),
+                  if (isCover)
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        color: Colors.black54,
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: const Text(
+                          'Cover',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              )
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    isCover ? Icons.add_a_photo_outlined : Icons.add,
+                    color: AppColors.textHint,
+                    size: 22,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    style: AppTypography.caption.copyWith(fontSize: 9),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Selling format cards + conditional price/auction fields (task 8.5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SellingFormatSection extends StatelessWidget {
+  const _SellingFormatSection({required this.controller});
+
+  final AddListingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Selling Format',
+          style: AppTypography.label.copyWith(color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: AppConstants.spacingSm),
+
+        // Format cards
+        Row(
+          children: [
+            _FormatCard(
+              label: 'Fixed Price',
+              icon: Icons.tag,
+              format: ListingFormat.fixedPrice,
+              controller: controller,
+            ),
+            const SizedBox(width: 8),
+            _FormatCard(
+              label: 'Auction',
+              icon: Icons.gavel,
+              format: ListingFormat.auction,
+              controller: controller,
+            ),
+            const SizedBox(width: 8),
+            _FormatCard(
+              label: 'Live Session',
+              icon: Icons.live_tv_outlined,
+              format: ListingFormat.liveSession,
+              controller: controller,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppConstants.spacingMd),
+
+        // Conditional price / auction fields
+        if (controller.selectedFormat != ListingFormat.auction) ...[
+          ThriftTextField(
+            label: controller.selectedFormat == ListingFormat.liveSession
+                ? 'Starting Price (₱)'
+                : 'Price (₱)',
+            controller: controller.priceCtrl,
+            onChanged: controller.onPriceChanged,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            error: controller.fieldErrors['price'],
+          ),
+        ] else ...[
+          ThriftTextField(
+            label: 'Starting Bid (₱)',
+            controller: controller.startBidCtrl,
+            onChanged: controller.onStartBidChanged,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            error: controller.fieldErrors['price'],
+          ),
+          const SizedBox(height: AppConstants.spacingMd),
+          _SelectorField(
+            label: 'Auction Duration',
+            value: '${controller.auctionDurationDays} days',
+            icon: Icons.today_outlined,
+            onTap: () => _showDurationPicker(context, controller),
+          ),
+          const SizedBox(height: AppConstants.spacingMd),
+          _SelectorField(
+            label: 'Minimum Bid Increment',
+            value: '₱${controller.bidIncrement.toInt()}',
+            icon: Icons.add_circle_outline,
+            onTap: () => _showIncrementPicker(context, controller),
+          ),
+        ],
+      ],
+    );
+  }
+
+  void _showDurationPicker(
+      BuildContext context, AddListingController controller) {
+    ThriftBottomSheet.show(
+      context,
+      title: 'Auction Duration',
+      child: Column(
+        children: [1, 3, 5, 7].map((d) {
+          final isSelected = controller.auctionDurationDays == d;
+          return ListTile(
+            leading: Icon(
+              Icons.today,
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            ),
+            title: Text(
+              '$d days',
+              style: TextStyle(
+                fontWeight:
+                    isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            trailing: isSelected
+                ? const Icon(Icons.check, color: AppColors.primary)
+                : null,
+            onTap: () {
+              controller.selectAuctionDuration(d);
+              Navigator.pop(context);
+            },
+          );
+        }).toList(),
       ),
     );
   }
 
-  Widget _photosStep() => SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Photos', style: AppTypography.heading),
-            Text('Tap photos to select them. First photo will be the cover.', style: AppTypography.caption),
-            const SizedBox(height: 16),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-              ),
-              itemCount: 8,
-              itemBuilder: (_, i) {
-                final url = _mockPhotoOptions[i];
-                final isAdded = _imageUrls.contains(url);
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      if (isAdded) {
-                        _imageUrls.remove(url);
-                      } else {
-                        _imageUrls.add(url);
-                      }
-                    });
-                  },
-                  child: Container(
-                    clipBehavior: Clip.antiAlias,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isAdded ? AppColors.primary : AppColors.border,
-                        width: isAdded ? 2 : 1,
-                      ),
-                    ),
-                    child: isAdded
-                        ? Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              Image.network(url, fit: BoxFit.cover),
-                              if (_imageUrls.indexOf(url) == 0) // Cover marker
-                                Positioned(
-                                  bottom: 0,
-                                  left: 0,
-                                  right: 0,
-                                  child: Container(
-                                    color: Colors.black.withValues(alpha: 0.6),
-                                    padding: const EdgeInsets.symmetric(vertical: 2),
-                                    child: const Text(
-                                      'Cover',
-                                      style: TextStyle(color: Colors.white, fontSize: 8),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                                ),
-                              const Align(
-                                alignment: Alignment.topRight,
-                                child: Padding(
-                                  padding: EdgeInsets.all(2),
-                                  child: Icon(Icons.check_circle, color: AppColors.primary, size: 16),
-                                ),
-                              ),
-                            ],
-                          )
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(i == 0 ? Icons.add_a_photo : Icons.add, color: AppColors.textHint, size: 20),
-                              Text(i == 0 ? 'Cover' : 'Photo ${i + 1}', style: const TextStyle(fontSize: 9, color: AppColors.textHint)),
-                            ],
-                          ),
-                  ),
-                );
-              },
+  void _showIncrementPicker(
+      BuildContext context, AddListingController controller) {
+    ThriftBottomSheet.show(
+      context,
+      title: 'Minimum Bid Increment',
+      child: Column(
+        children: [10.0, 20.0, 50.0, 100.0].map((v) {
+          final isSelected = controller.bidIncrement == v;
+          return ListTile(
+            leading: Icon(
+              Icons.add_circle_outline,
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
             ),
-          ],
-        ),
-      );
+            title: Text(
+              '₱${v.toInt()}',
+              style: TextStyle(
+                fontWeight:
+                    isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            trailing: isSelected
+                ? const Icon(Icons.check, color: AppColors.primary)
+                : null,
+            onTap: () {
+              controller.selectBidIncrement(v);
+              Navigator.pop(context);
+            },
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
 
-  Widget _detailsStep() => SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ThriftTextField(label: 'Product Name', controller: _nameCtrl),
-            const SizedBox(height: 16),
-            _selectorField(
-              label: 'Category',
-              value: _category.label,
-              icon: Icons.category_outlined,
-              onTap: () => _showCategoryPicker(context),
-            ),
-            const SizedBox(height: 16),
-            Text('Condition', style: AppTypography.label),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              children: ProductCondition.values.map((c) {
-                final isSelected = _condition == c;
-                return ChoiceChip(
-                  label: Text(c.label),
-                  selected: isSelected,
-                  selectedColor: AppColors.primaryLight,
-                  labelStyle: TextStyle(
-                    color: isSelected ? AppColors.primaryDark : AppColors.textSecondary,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(color: isSelected ? AppColors.primary : AppColors.border),
-                  ),
-                  onSelected: (_) => setState(() => _condition = c),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-            ThriftTextField(label: 'Brand', controller: _brandCtrl),
-            const SizedBox(height: 16),
-            ThriftTextField(label: 'Size', controller: _sizeCtrl),
-            const SizedBox(height: 16),
-            _selectorField(
-              label: 'Color',
-              value: _selectedColor,
-              icon: Icons.palette_outlined,
-              onTap: () => _showColorPicker(context),
-            ),
-            const SizedBox(height: 16),
-            ThriftTextField(label: 'Material', controller: _materialCtrl),
-            const SizedBox(height: 16),
-            ThriftTextField(label: 'Description', controller: _descCtrl, maxLines: 4),
-            const SizedBox(height: 4),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                '${_descCtrl.text.length}/500',
-                style: AppTypography.caption,
-              ),
-            ),
-          ],
-        ),
-      );
+// ─────────────────────────────────────────────────────────────────────────────
+// Format card widget
+// ─────────────────────────────────────────────────────────────────────────────
 
-  Widget _pricingStep() => SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Selling Format', style: AppTypography.heading),
-            Text('Choose how you want to sell your item', style: AppTypography.caption),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                _formatCard(SellingType.fixedPrice, 'Fixed Price', Icons.tag),
-                const SizedBox(width: 8),
-                _formatCard(SellingType.auction, 'Auction', Icons.gavel),
-                const SizedBox(width: 8),
-                _formatCard(SellingType.both, 'Both Formats', Icons.grid_view),
-              ],
-            ),
-            const SizedBox(height: 24),
-            if (_sellingType != SellingType.auction) ...[
-              Text(
-                _sellingType == SellingType.both ? 'Buy Now Details' : 'Pricing Details',
-                style: AppTypography.subheading.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              ThriftTextField(
-                label: _sellingType == SellingType.both ? 'Buy Now Price (₱)' : 'Price (₱)',
-                controller: _priceCtrl,
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 20),
-            ],
-            if (_sellingType != SellingType.fixedPrice) ...[
-              Text('Bidding Details', style: AppTypography.subheading.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              ThriftTextField(label: 'Starting Bid (₱)', controller: _startBidCtrl, keyboardType: TextInputType.number),
-              const SizedBox(height: 16),
-              _selectorField(
-                label: 'Auction Duration',
-                value: '$_bidDays days',
-                icon: Icons.today_outlined,
-                onTap: () => _showBidDurationPicker(context),
-              ),
-              const SizedBox(height: 16),
-              _selectorField(
-                label: 'Minimum Bid Increment',
-                value: '₱${_bidIncrement.toInt()}',
-                icon: Icons.add_circle_outline_rounded,
-                onTap: () => _showBidIncrementPicker(context),
-              ),
-            ],
-          ],
-        ),
-      );
+class _FormatCard extends StatelessWidget {
+  const _FormatCard({
+    required this.label,
+    required this.icon,
+    required this.format,
+    required this.controller,
+  });
 
-  Widget _formatCard(SellingType type, String label, IconData icon) {
-    final isSelected = _sellingType == type;
+  final String label;
+  final IconData icon;
+  final ListingFormat format;
+  final AddListingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final isSelected = controller.selectedFormat == format;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _sellingType = type),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
+        onTap: () => controller.selectFormat(format),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
             color: isSelected ? AppColors.primaryLight : AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius:
+                BorderRadius.circular(AppConstants.radiusMd),
             border: Border.all(
               color: isSelected ? AppColors.primary : AppColors.border,
               width: isSelected ? 2 : 1,
@@ -374,13 +736,23 @@ class _AddListingScreenState extends State<AddListingScreen> {
           ),
           child: Column(
             children: [
-              Icon(icon, color: isSelected ? AppColors.primary : AppColors.textSecondary),
-              const SizedBox(height: 8),
+              Icon(
+                icon,
+                color: isSelected
+                    ? AppColors.primary
+                    : AppColors.textSecondary,
+                size: 22,
+              ),
+              const SizedBox(height: 6),
               Text(
                 label,
                 style: AppTypography.caption.copyWith(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? AppColors.primaryDark : AppColors.textPrimary,
+                  fontWeight: isSelected
+                      ? FontWeight.bold
+                      : FontWeight.normal,
+                  color: isSelected
+                      ? AppColors.primaryDark
+                      : AppColors.textPrimary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -390,26 +762,47 @@ class _AddListingScreenState extends State<AddListingScreen> {
       ),
     );
   }
+}
 
-  Widget _selectorField({
-    required String label,
-    required String value,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// Reusable selector field (tap-to-open pattern)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SelectorField extends StatelessWidget {
+  const _SelectorField({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTypography.label.copyWith(color: AppColors.textPrimary)),
+        Text(
+          label,
+          style: AppTypography.label
+              .copyWith(color: AppColors.textPrimary),
+        ),
         const SizedBox(height: AppConstants.spacingXs),
         InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius:
+              BorderRadius.circular(AppConstants.radiusMd),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
               color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius:
+                  BorderRadius.circular(AppConstants.radiusMd),
               border: Border.all(color: AppColors.border),
             ),
             child: Row(
@@ -419,229 +812,17 @@ class _AddListingScreenState extends State<AddListingScreen> {
                 Expanded(
                   child: Text(
                     value,
-                    style: AppTypography.body.copyWith(color: AppColors.textPrimary, fontSize: 15),
+                    style: AppTypography.body.copyWith(
+                        color: AppColors.textPrimary),
                   ),
                 ),
-                const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                const Icon(Icons.arrow_drop_down,
+                    color: AppColors.textSecondary),
               ],
             ),
           ),
         ),
       ],
     );
-  }
-
-  void _showCategoryPicker(BuildContext context) {
-    ThriftBottomSheet.show(
-      context,
-      title: 'Select Category',
-      child: Column(
-        children: ProductCategory.values.map((c) => ListTile(
-          leading: Icon(Icons.sell_outlined, color: _category == c ? AppColors.primary : AppColors.textSecondary),
-          title: Text(c.label, style: TextStyle(fontWeight: _category == c ? FontWeight.bold : FontWeight.normal)),
-          trailing: _category == c ? const Icon(Icons.check, color: AppColors.primary) : null,
-          onTap: () {
-            setState(() => _category = c);
-            Navigator.pop(context);
-          },
-        )).toList(),
-      ),
-    );
-  }
-
-  void _showColorPicker(BuildContext context) {
-    ThriftBottomSheet.show(
-      context,
-      title: 'Select Color',
-      child: Column(
-        children: _colors.map((c) => ListTile(
-          leading: Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _getColorValue(c),
-              border: Border.all(color: AppColors.border, width: 1.5),
-            ),
-          ),
-          title: Text(c, style: TextStyle(fontWeight: _selectedColor == c ? FontWeight.bold : FontWeight.normal)),
-          trailing: _selectedColor == c ? const Icon(Icons.check, color: AppColors.primary) : null,
-          onTap: () {
-            setState(() => _selectedColor = c);
-            Navigator.pop(context);
-          },
-        )).toList(),
-      ),
-    );
-  }
-
-  void _showBidDurationPicker(BuildContext context) {
-    ThriftBottomSheet.show(
-      context,
-      title: 'Auction Duration',
-      child: Column(
-        children: [1, 3, 5, 7].map((d) => ListTile(
-          leading: Icon(Icons.today, color: _bidDays == d ? AppColors.primary : AppColors.textSecondary),
-          title: Text('$d days', style: TextStyle(fontWeight: _bidDays == d ? FontWeight.bold : FontWeight.normal)),
-          trailing: _bidDays == d ? const Icon(Icons.check, color: AppColors.primary) : null,
-          onTap: () {
-            setState(() => _bidDays = d);
-            Navigator.pop(context);
-          },
-        )).toList(),
-      ),
-    );
-  }
-
-  void _showBidIncrementPicker(BuildContext context) {
-    ThriftBottomSheet.show(
-      context,
-      title: 'Minimum Bid Increment',
-      child: Column(
-        children: [10.0, 20.0, 50.0, 100.0].map((d) => ListTile(
-          leading: Icon(Icons.add_circle_outline, color: _bidIncrement == d ? AppColors.primary : AppColors.textSecondary),
-          title: Text('₱${d.toInt()}', style: TextStyle(fontWeight: _bidIncrement == d ? FontWeight.bold : FontWeight.normal)),
-          trailing: _bidIncrement == d ? const Icon(Icons.check, color: AppColors.primary) : null,
-          onTap: () {
-            setState(() => _bidIncrement = d);
-            Navigator.pop(context);
-          },
-        )).toList(),
-      ),
-    );
-  }
-
-  Widget _deliveryStep() => SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SwitchListTile(title: const Text('Standard Shipping'), value: _standardShip, onChanged: (v) => setState(() => _standardShip = v)),
-            SwitchListTile(title: const Text('Express Shipping'), value: _expressShip, onChanged: (v) => setState(() => _expressShip = v)),
-            SwitchListTile(title: const Text('Meet-up'), value: _meetup, onChanged: (v) => setState(() => _meetup = v)),
-            SwitchListTile(title: const Text('Free Shipping'), value: _freeShipping, onChanged: (v) => setState(() => _freeShipping = v)),
-            ThriftTextField(label: 'Item Location', controller: _locationCtrl),
-          ],
-        ),
-      );
-
-  Widget _reviewStep() {
-    final formatLabel = switch (_sellingType) {
-      SellingType.fixedPrice => 'Buy Now Only',
-      SellingType.auction => 'Auction Only',
-      SellingType.both => 'Auction + Buy Now',
-    };
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Review Listing', style: AppTypography.heading),
-          Text('Double check the details before posting', style: AppTypography.caption),
-          const SizedBox(height: 16),
-          ThriftCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_imageUrls.isNotEmpty) ...[
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(_imageUrls.first, height: 180, width: double.infinity, fit: BoxFit.cover),
-                  ),
-                  const SizedBox(height: 14),
-                ],
-                Text(
-                  _brandCtrl.text.isEmpty ? 'Unbranded' : _brandCtrl.text,
-                  style: AppTypography.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  _nameCtrl.text.isEmpty ? 'New Listing' : _nameCtrl.text,
-                  style: AppTypography.subheading.copyWith(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                const Divider(),
-                const SizedBox(height: 10),
-                _reviewRow('Format', formatLabel),
-                if (_sellingType != SellingType.auction && _priceCtrl.text.isNotEmpty)
-                  _reviewRow('Buy Now Price', '₱${_priceCtrl.text}'),
-                if (_sellingType != SellingType.fixedPrice) ...[
-                  if (_startBidCtrl.text.isNotEmpty) _reviewRow('Starting Bid', '₱${_startBidCtrl.text}'),
-                  _reviewRow('Bid Increment', '₱${_bidIncrement.toInt()}'),
-                  _reviewRow('Bid Duration', '$_bidDays days'),
-                ],
-                _reviewRow('Category', _category.label),
-                _reviewRow('Condition', _condition.label),
-                if (_sizeCtrl.text.isNotEmpty) _reviewRow('Size', _sizeCtrl.text),
-                _reviewRow('Color', _selectedColor),
-                if (_materialCtrl.text.isNotEmpty) _reviewRow('Material', _materialCtrl.text),
-                if (_locationCtrl.text.isNotEmpty) _reviewRow('Location', _locationCtrl.text),
-                const SizedBox(height: 10),
-                const Divider(),
-                const SizedBox(height: 10),
-                Text('Description', style: AppTypography.caption.copyWith(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Text(
-                  _descCtrl.text.isEmpty ? 'No description provided.' : _descCtrl.text,
-                  style: AppTypography.body.copyWith(color: AppColors.textSecondary),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _reviewRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
-          Text(value, style: AppTypography.body.copyWith(fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-
-  void _next() {
-    if (_step < 4) {
-      _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-      setState(() => _step++);
-      return;
-    }
-    final auth = context.read<AuthProvider>();
-    final username = auth.username ?? 'vintagevibes_ph';
-    context.read<DataProvider>().addProduct(ProductModel(
-      id: 'prod_${const Uuid().v4().substring(0, 8)}',
-      sellerUsername: username,
-      sellerName: auth.displayName ?? 'Shop',
-      sellerAvatar: 'https://i.pravatar.cc/150?u=$username',
-      sellerVerified: true,
-      title: _nameCtrl.text.isEmpty ? 'New Listing' : _nameCtrl.text,
-      description: _descCtrl.text.isEmpty
-          ? 'Pre-loved ${_nameCtrl.text.isEmpty ? 'item' : _nameCtrl.text} in great condition. Carefully curated and ready for a new home. Message seller for more details or measurements.'
-          : _descCtrl.text,
-      price: double.tryParse(_priceCtrl.text) ?? double.tryParse(_startBidCtrl.text) ?? 0,
-      category: _category,
-      condition: _condition,
-      imageUrls: _imageUrls.isNotEmpty ? _imageUrls : ['https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600&h=600'],
-      size: _sizeCtrl.text.isEmpty ? null : _sizeCtrl.text,
-      brand: _brandCtrl.text.isEmpty ? null : _brandCtrl.text,
-      color: _selectedColor,
-      material: _materialCtrl.text.isEmpty ? null : _materialCtrl.text,
-      location: _locationCtrl.text.isEmpty ? null : _locationCtrl.text,
-      createdAt: DateTime.now(),
-      sellingType: _sellingType,
-      startingBid: double.tryParse(_startBidCtrl.text),
-      currentBid: _sellingType == SellingType.auction ? double.tryParse(_startBidCtrl.text) : null,
-      bidEndTime: _sellingType != SellingType.fixedPrice ? DateTime.now().add(Duration(days: _bidDays)) : null,
-      bidIncrement: _bidIncrement,
-      buyNowEnabled: _sellingType == SellingType.both,
-    ));
-    showThriftSnackBar(context, 'Listing published!');
-    context.go(RouteNames.sellerHome);
   }
 }

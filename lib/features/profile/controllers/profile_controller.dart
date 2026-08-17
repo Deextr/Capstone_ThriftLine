@@ -1,4 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:storage_client/storage_client.dart' show FileOptions;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
@@ -18,12 +22,14 @@ class ProfileController extends ChangeNotifier {
   UserModel? _currentUser;
   bool _isLoading = false;
   bool _isSaving = false;
+  bool _isUploadingAvatar = false;
   String? _errorMessage;
   String? _successMessage;
 
   UserModel? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
+  bool get isUploadingAvatar => _isUploadingAvatar;
   String? get errorMessage => _errorMessage;
   String? get successMessage => _successMessage;
 
@@ -212,6 +218,66 @@ class ProfileController extends ChangeNotifier {
       _errorMessage = 'Failed to update profile: ${e.toString()}';
       notifyListeners();
       return false;
+    }
+  }
+
+  /// Opens the image picker, uploads the chosen photo to `avatars` Storage
+  /// bucket, then saves the public URL to `users.avatar`.
+  Future<void> pickAndUploadAvatar() async {
+    final currentUserId = _supabaseService.currentUser?.id ?? _currentUser?.id;
+    if (currentUserId == null) return;
+
+    final picker = ImagePicker();
+    final xfile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 85,
+    );
+    if (xfile == null) return;
+
+    _isUploadingAvatar = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final Uint8List bytes = await xfile.readAsBytes();
+      final path = '$currentUserId/avatar.jpg';
+
+      // Upload (upsert so repeated taps just overwrite)
+      await _supabaseService.client.storage.from('avatars').uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(contentType: 'image/jpeg', upsert: true),
+          );
+
+      final url =
+          _supabaseService.client.storage.from('avatars').getPublicUrl(path);
+
+      // Bust the CDN cache by appending a timestamp query param
+      final bustUrl = '$url?t=${DateTime.now().millisecondsSinceEpoch}';
+
+      // Persist to DB
+      await _supabaseService.updateUserProfile(
+        userId: currentUserId,
+        data: {'avatar': bustUrl, 'updated_at': DateTime.now().toIso8601String()},
+      );
+
+      // Update local state
+      if (_currentUser != null) {
+        _currentUser = _currentUser!.copyWith(avatarUrl: bustUrl);
+      }
+
+      if (_authProvider != null) {
+        await _authProvider.updateProfileData(avatarUrl: bustUrl);
+      }
+
+      _successMessage = 'Avatar updated!';
+    } catch (e) {
+      _errorMessage = 'Failed to upload avatar: $e';
+    } finally {
+      _isUploadingAvatar = false;
+      notifyListeners();
     }
   }
 

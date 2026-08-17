@@ -7,11 +7,12 @@ import '../../../../core/routes/route_names.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/data_provider.dart';
 import '../../../../widgets/curved_navigation_bar.dart';
+import '../../../../widgets/thrift_drawer.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../profile/screens/seller_profile_tab.dart';
 import 'seller_dashboard_tab.dart';
 import 'seller_listings_tab.dart';
 import 'seller_orders_tab.dart';
-import 'seller_profile_tab.dart';
 
 class SellerShellScreen extends StatefulWidget {
   const SellerShellScreen({super.key});
@@ -92,6 +93,7 @@ class _SellerShellScreenState extends State<SellerShellScreen> {
     ];
 
     return Scaffold(
+      drawer: const ThriftDrawer(),
       extendBody: true,
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),

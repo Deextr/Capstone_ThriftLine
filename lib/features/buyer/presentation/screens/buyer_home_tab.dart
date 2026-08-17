@@ -247,6 +247,18 @@ class _TopHeader extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // Drawer Menu Button
+          Builder(
+            builder: (ctx) => IconButton(
+              icon: const Icon(Icons.menu_rounded),
+              color: AppColors.textPrimary,
+              iconSize: 26,
+              onPressed: () => Scaffold.of(ctx).openDrawer(),
+              tooltip: 'Open menu',
+              constraints: const BoxConstraints(),
+              padding: const EdgeInsets.only(right: 6),
+            ),
+          ),
           // Expanded Search Bar
           Expanded(
             child: GestureDetector(
