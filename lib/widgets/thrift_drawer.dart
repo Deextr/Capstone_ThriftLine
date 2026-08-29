@@ -194,6 +194,17 @@ class ThriftDrawer extends StatelessWidget {
                   },
                 ),
 
+                if (auth.isAdmin)
+                  _DrawerItem(
+                    icon: Icons.admin_panel_settings_outlined,
+                    label: 'Seller reviews',
+                    badgeText: 'Admin',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.go(RouteNames.adminHome);
+                    },
+                  ),
+
                 // 3. Seller Dashboard
                 _DrawerItem(
                   icon: Icons.storefront_rounded,

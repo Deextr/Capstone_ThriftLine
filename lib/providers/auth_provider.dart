@@ -9,6 +9,7 @@ import '../core/services/shared_preferences_service.dart';
 import '../features/auth/data/auth_service.dart';
 import '../features/auth/data/auth_result.dart';
 import '../features/auth/domain/auth_user.dart';
+import '../features/auth/domain/legal_documents.dart';
 import '../models/enums.dart';
 
 /// Manages authentication state, session persistence, and role detection.
@@ -41,8 +42,7 @@ class AuthProvider extends ChangeNotifier {
   String? get displayName => _user?.displayName;
 
   String get homeRoute {
-    // Admin route can be added in a future module.
-    // For now, admin users go to the buyer home.
+    if (isAdmin) return RouteNames.adminHome;
     if (isSeller) return RouteNames.sellerHome;
     return RouteNames.buyerHome;
   }
@@ -98,12 +98,14 @@ class AuthProvider extends ChangeNotifier {
   // Sign In
   // ─────────────────────────────────────────────────────────────────────────
 
-  /// Signs in with email and password.
+  /// Signs in with email and password after the user has accepted the legal
+  /// documents.
   ///
   /// Returns an error message on failure, or `null` on success.
   Future<String?> loginWithEmail({
     required String email,
     required String password,
+    required LegalConsent consent,
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -111,6 +113,7 @@ class AuthProvider extends ChangeNotifier {
     final result = await _authService.signInWithEmail(
       email: email,
       password: password,
+      consent: consent,
     );
 
     if (!result.success) {
@@ -127,14 +130,14 @@ class AuthProvider extends ChangeNotifier {
     return null;
   }
 
-  /// Signs in with Google.
+  /// Signs in with Google after the user has accepted the legal documents.
   ///
   /// Returns an error message on failure, or `null` on success.
-  Future<String?> loginWithGoogle() async {
+  Future<String?> loginWithGoogle({required LegalConsent consent}) async {
     _isLoading = true;
     notifyListeners();
 
-    final result = await _authService.signInWithGoogle();
+    final result = await _authService.signInWithGoogle(consent: consent);
 
     if (!result.success) {
       _isLoading = false;
@@ -161,6 +164,7 @@ class AuthProvider extends ChangeNotifier {
     required String email,
     required String password,
     required String name,
+    required LegalConsent consent,
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -169,6 +173,7 @@ class AuthProvider extends ChangeNotifier {
       email: email,
       password: password,
       name: name,
+      consent: consent,
     );
 
     if (!result.success) {
@@ -184,6 +189,8 @@ class AuthProvider extends ChangeNotifier {
     }
 
     if (result.requiresEmailVerification) {
+      // Supabase withheld the session pending confirmation, so the app must
+      // not treat the account as signed in.
       _user = null;
       await _clearSession();
     } else {
@@ -219,17 +226,26 @@ class AuthProvider extends ChangeNotifier {
   // Profile Updates
   // ─────────────────────────────────────────────────────────────────────────
 
+  /// Persists the user-editable subset of the profile.
+  ///
+  /// `role`, `trust_score` and `rating_average` are deliberately absent. They
+  /// are owned by the database — `trg_users_column_guard` reverts any client
+  /// write to them — so sending them would silently do nothing.
+  ///
+  /// An empty username is sent as `null`. `users.username` is UNIQUE, and an
+  /// empty string is a real value, so the second account to save a blank
+  /// username would collide; NULLs do not.
   Future<void> updateCurrentUser(AuthUser updatedUser) async {
     _user = updatedUser;
+    final username = updatedUser.username.trim();
     await _authService.updateUserRecord(updatedUser.id, {
       'full_name': updatedUser.name,
-      'username': updatedUser.username,
+      'username': username.isEmpty ? null : username,
       'email': updatedUser.email,
       'phone_number': updatedUser.phone,
       'avatar': updatedUser.avatarUrl.isEmpty ? null : updatedUser.avatarUrl,
-      'role': updatedUser.role.name,
-      'trust_score': updatedUser.trustScore,
-      'rating_average': updatedUser.rating,
+      if (updatedUser.bio != null) 'bio': updatedUser.bio,
+      if (updatedUser.location.isNotEmpty) 'location': updatedUser.location,
     });
     await _saveSession(_user!);
     notifyListeners();
@@ -264,50 +280,30 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> submitSellerApplication({
-    required String storeName,
-    required String address,
-    required String region,
+  /// Sends a phone OTP through the server-side iProgSMS function.
+  Future<String?> sendPhoneOtp(String phone) {
+    return _authService.sendPhoneOtp(phone);
+  }
+
+  /// Confirms the SMS code, then reloads the profile so `isPhoneVerified` updates.
+  Future<String?> verifyPhoneOtp({
+    required String phone,
+    required String token,
   }) async {
-    if (_user == null) return;
-    final updated = _user!.copyWith(
-      shopName: storeName,
-      location: '$region, Davao City',
-      verificationStatus: 'pending',
-      verificationRejectionReason: null,
-    );
-    await updateCurrentUser(updated);
+    final error = await _authService.verifyPhoneOtp(phone: phone, token: token);
+    if (error == null) await reloadUser();
+    return error;
   }
 
-  Future<void> simulateApproveApplication() async {
+  /// Lets a rejected applicant fill the form again. The rejected row stays
+  /// in the database; a new pending application can be inserted.
+  void prepareVerificationReapply() {
     if (_user == null) return;
-    final updated = _user!.copyWith(
-      role: UserRole.seller,
-      isVerified: true,
-      verificationStatus: 'approved',
-      verificationRejectionReason: null,
-    );
-    await updateCurrentUser(updated);
-  }
-
-  Future<void> simulateRejectApplication(String reason) async {
-    if (_user == null) return;
-    final updated = _user!.copyWith(
-      role: UserRole.buyer,
-      isVerified: false,
-      verificationStatus: 'rejected',
-      verificationRejectionReason: reason,
-    );
-    await updateCurrentUser(updated);
-  }
-
-  Future<void> resetVerificationStatus() async {
-    if (_user == null) return;
-    final updated = _user!.copyWith(
+    _user = _user!.copyWith(
       verificationStatus: 'none',
       verificationRejectionReason: null,
     );
-    await updateCurrentUser(updated);
+    notifyListeners();
   }
 
   // ─────────────────────────────────────────────────────────────────────────

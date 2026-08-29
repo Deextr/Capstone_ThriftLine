@@ -11,6 +11,8 @@ import 'features/auth/data/auth_service.dart';
 import 'providers/app_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/data_provider.dart';
+import 'providers/notifications_provider.dart';
+import 'providers/settings_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +34,8 @@ Future<void> main() async {
   final authProvider = AuthProvider(prefs, authService);
   final appProvider = AppProvider(prefs);
   final dataProvider = DataProvider();
+  final notificationsProvider = NotificationsProvider(supabaseService);
+  final settingsProvider = SettingsProvider(supabaseService);
 
   await authProvider.init();
 
@@ -47,6 +51,8 @@ Future<void> main() async {
       authProvider: authProvider,
       appProvider: appProvider,
       dataProvider: dataProvider,
+      notificationsProvider: notificationsProvider,
+      settingsProvider: settingsProvider,
       supabaseService: supabaseService,
     ),
   );

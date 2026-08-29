@@ -5,11 +5,15 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/routes/route_names.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../models/address_model.dart';
 import '../../../../models/enums.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/data_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../profile/data/address_service.dart';
 
 class PaymentDeliveryScreen extends StatefulWidget {
   const PaymentDeliveryScreen({super.key, required this.productId});
@@ -23,8 +27,28 @@ class PaymentDeliveryScreen extends StatefulWidget {
 class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
   DeliveryMethod _delivery = DeliveryMethod.standard;
   PaymentMethod _payment = PaymentMethod.gcash;
-  final _address = '123 Katipunan Ave, Quezon City, Metro Manila';
+  AddressModel? _address;
+  bool _addressLoading = true;
   final _meetupLocation = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAddress();
+  }
+
+  Future<void> _loadAddress() async {
+    try {
+      final saved = await AddressService(context.read<SupabaseService>()).defaultAddress();
+      if (!mounted) return;
+      setState(() {
+        _address = saved;
+        _addressLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _addressLoading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -60,8 +84,22 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
                 ThriftCard(
                   child: Row(
                     children: [
-                      Expanded(child: Text(_address, style: AppTypography.body)),
-                      TextButton(onPressed: () => showThriftSnackBar(context, 'Address picker coming soon'), child: const Text('Change')),
+                      Expanded(
+                        child: Text(
+                          _addressLoading
+                              ? 'Loading address…'
+                              : (_address?.formatted ??
+                                  'No saved address yet. Add one before placing an order.'),
+                          style: AppTypography.body,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          await context.push(RouteNames.addresses);
+                          if (mounted) await _loadAddress();
+                        },
+                        child: Text(_address == null ? 'Add' : 'Change'),
+                      ),
                     ],
                   ),
                 ),
@@ -101,6 +139,10 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
                 ThriftButton(
                   label: 'Place Order',
                   onPressed: () {
+                    if (_delivery != DeliveryMethod.meetup && _address == null) {
+                      showThriftSnackBar(context, 'Add a delivery address first.', isError: true);
+                      return;
+                    }
                     final auth = context.read<AuthProvider>();
                     final user = auth.user;
                     final order = data.createOrder(
@@ -111,7 +153,9 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
                       quantity: qty,
                       delivery: _delivery,
                       payment: _payment,
-                      address: _delivery == DeliveryMethod.meetup ? _meetupLocation.text : _address,
+                      address: _delivery == DeliveryMethod.meetup
+                          ? _meetupLocation.text
+                          : _address!.formatted,
                       size: product.size,
                     );
                     context.go('/order-confirm/${order.id}');

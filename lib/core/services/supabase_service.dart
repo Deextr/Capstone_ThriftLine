@@ -53,12 +53,16 @@ class SupabaseService {
   }
 
   /// Checks if [username] is available (i.e. not used by any user other than [currentUserId]).
+  ///
+  /// Reads `user_public_profiles` rather than `users`: RLS restricts the base
+  /// table to the caller's own row, so a direct query would always report the
+  /// name as free and the write would then fail on the unique index.
   Future<bool> checkUsernameAvailability(
     String username,
     String currentUserId,
   ) async {
     final response = await client
-        .from('users')
+        .from('user_public_profiles')
         .select('user_id')
         .eq('username', username)
         .neq('user_id', currentUserId);

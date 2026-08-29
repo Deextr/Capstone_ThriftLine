@@ -410,7 +410,7 @@ class _PhotosSection extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             itemCount: 3,
             buildDefaultDragHandles: false,
-            onReorderItem: (oldIndex, newIndex) =>
+            onReorder: (oldIndex, newIndex) =>
                 controller.reorderImages(oldIndex, newIndex),
             itemBuilder: (context, index) {
               final isFilled = index < controller.images.length;

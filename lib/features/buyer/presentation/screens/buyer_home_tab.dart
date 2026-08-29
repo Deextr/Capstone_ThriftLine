@@ -7,9 +7,9 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/data/mock_data.dart';
 import '../../../../core/routes/route_names.dart';
-import '../../../../providers/auth_provider.dart';
 import '../../../../providers/cart_provider.dart';
 import '../../../../providers/data_provider.dart';
+import '../../../../providers/notifications_provider.dart';
 import '../../../../widgets/product_card.dart';
 import '../../../../widgets/thrift_widgets.dart';
 
@@ -62,11 +62,9 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
     final cart = context.watch<CartProvider>();
-    final notifCount =
-        data.unreadNotificationCount(auth.user?.id ?? 'buyer_maya');
+    final notifCount = context.watch<NotificationsProvider>().unreadCount;
 
     final trendingProducts = data.trendingProducts;
 

@@ -9,6 +9,8 @@ import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../domain/legal_documents.dart';
+import '../widgets/legal_consent_checkbox.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -23,6 +25,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
+  // Consent is never pre-granted: the user must tick the box on every sign-in.
+  bool _hasAgreedToLegal = false;
+  bool _showConsentError = false;
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -30,12 +36,22 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// Blocks the sign-in unless consent has been explicitly given.
+  bool _ensureConsent() {
+    if (_hasAgreedToLegal) return true;
+    setState(() => _showConsentError = true);
+    return false;
+  }
+
   Future<void> _loginWithEmail() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_ensureConsent()) return;
+
     final auth = context.read<AuthProvider>();
     final error = await auth.loginWithEmail(
       email: _emailController.text.trim(),
       password: _passwordController.text,
+      consent: LegalConsent.now(),
     );
     if (!mounted) return;
     if (error != null) {
@@ -46,8 +62,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _loginWithGoogle() async {
+    if (!_ensureConsent()) return;
+
     final auth = context.read<AuthProvider>();
-    final error = await auth.loginWithGoogle();
+    final error = await auth.loginWithGoogle(consent: LegalConsent.now());
     if (!mounted) return;
     if (error != null) {
       showThriftSnackBar(context, error, isError: true);
@@ -121,7 +139,22 @@ class _LoginScreenState extends State<LoginScreen> {
                           setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
+
+                  // Terms & Privacy consent gate
+                  LegalConsentCheckbox(
+                    value: _hasAgreedToLegal,
+                    enabled: !auth.isLoading,
+                    errorText: _showConsentError
+                        ? 'You must agree to the Terms and Conditions and '
+                              'Privacy Policy to continue.'
+                        : null,
+                    onChanged: (value) => setState(() {
+                      _hasAgreedToLegal = value;
+                      if (value) _showConsentError = false;
+                    }),
+                  ),
+                  const SizedBox(height: 24),
 
                   // Login button
                   ThriftButton(

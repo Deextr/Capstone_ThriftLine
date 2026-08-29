@@ -1,8 +1,18 @@
+import '../../features/auth/domain/legal_documents.dart';
+
 abstract final class RouteNames {
   static const String splash = '/';
   static const String onboarding = '/onboarding';
   static const String login = '/login';
   static const String signup = '/signup';
+  static const String legal = '/legal/:doc';
+
+  /// Concrete path for the Terms and Conditions or Privacy Policy reader.
+  static String legalDocument(LegalDocumentType type) => switch (type) {
+    LegalDocumentType.terms => '/legal/terms',
+    LegalDocumentType.privacy => '/legal/privacy',
+  };
+
   static const String buyerHome = '/buyer';
   static const String sellerHome = '/seller';
   static const String search = '/search';
@@ -28,4 +38,8 @@ abstract final class RouteNames {
   static const String reportSeller = '/report-seller';
   static const String myReports = '/my-reports';
   static const String myShop = '/my-shop';
+  static const String adminHome = '/admin';
+  static const String adminReview = '/admin/review/:id';
+  static const String verifyPhone = '/verify-phone';
+  static const String addresses = '/addresses';
 }

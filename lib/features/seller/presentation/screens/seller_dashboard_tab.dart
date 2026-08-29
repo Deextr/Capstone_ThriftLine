@@ -12,6 +12,7 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../models/enums.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/data_provider.dart';
+import '../../../../providers/notifications_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 
 class SellerDashboardTab extends StatelessWidget {
@@ -148,9 +149,13 @@ class _TopBar extends StatelessWidget {
             ),
           ),
           // Notification icon
-          _IconBtn(
-            icon: Icons.notifications_outlined,
-            onTap: () => context.push(RouteNames.notifications),
+          Badge(
+            isLabelVisible: context.watch<NotificationsProvider>().unreadCount > 0,
+            label: Text('${context.watch<NotificationsProvider>().unreadCount}'),
+            child: _IconBtn(
+              icon: Icons.notifications_outlined,
+              onTap: () => context.push(RouteNames.notifications),
+            ),
           ),
           const SizedBox(width: 6),
           _IconBtn(

@@ -9,6 +9,8 @@ import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../domain/legal_documents.dart';
+import '../widgets/legal_consent_checkbox.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -25,6 +27,10 @@ class _SignupScreenState extends State<SignupScreen> {
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
 
+  // Consent starts unchecked and must be given before registration proceeds.
+  bool _hasAgreedToLegal = false;
+  bool _showConsentError = false;
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -36,11 +42,17 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _signUpWithEmail() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_hasAgreedToLegal) {
+      setState(() => _showConsentError = true);
+      return;
+    }
+
     final auth = context.read<AuthProvider>();
     final result = await auth.signUpWithEmail(
       email: _emailController.text.trim(),
       password: _passwordController.text,
       name: _nameController.text.trim(),
+      consent: LegalConsent.now(),
     );
     if (!mounted) return;
     if (!result.success) {
@@ -162,7 +174,20 @@ class _SignupScreenState extends State<SignupScreen> {
                     icon: Icons.lock_reset_outlined,
                     validator: _confirmPasswordValidator,
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
+                  LegalConsentCheckbox(
+                    value: _hasAgreedToLegal,
+                    enabled: !auth.isLoading,
+                    errorText: _showConsentError
+                        ? 'You must agree to the Terms and Conditions and '
+                              'Privacy Policy to create an account.'
+                        : null,
+                    onChanged: (value) => setState(() {
+                      _hasAgreedToLegal = value;
+                      if (value) _showConsentError = false;
+                    }),
+                  ),
+                  const SizedBox(height: 24),
                   ThriftButton(
                     label: 'Sign Up',
                     onPressed: auth.isLoading ? null : _signUpWithEmail,

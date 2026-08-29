@@ -12,6 +12,9 @@ class AuthResult {
   final bool success;
   final AuthUser? user;
   final String? errorMessage;
+
+  /// Supabase created the account but withheld a session until the address is
+  /// confirmed via the link it emailed.
   final bool requiresEmailVerification;
 
   factory AuthResult.success(

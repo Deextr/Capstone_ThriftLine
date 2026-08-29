@@ -7,7 +7,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/routes/route_names.dart';
 import '../../../providers/auth_provider.dart';
-import '../../../providers/data_provider.dart';
+import '../../../providers/settings_provider.dart';
 import '../../../widgets/thrift_widgets.dart';
 
 /// Profile tab for **seller** users.
@@ -27,7 +27,6 @@ class SellerProfileTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final data = context.watch<DataProvider>();
     final user = auth.user;
 
     return SafeArea(
@@ -110,7 +109,7 @@ class SellerProfileTab extends StatelessWidget {
                 label: 'Edit Profile',
                 onTap: () => context.push(RouteNames.editProfile),
               ),
-              _NotificationToggle(data: data),
+              _NotificationToggle(),
               _MenuItem(
                 icon: Icons.payment_outlined,
                 label: 'Payment Methods',
@@ -119,7 +118,7 @@ class SellerProfileTab extends StatelessWidget {
               _MenuItem(
                 icon: Icons.location_on_outlined,
                 label: 'Addresses',
-                onTap: () => showThriftSnackBar(context, 'Coming soon'),
+                onTap: () => context.push(RouteNames.addresses),
               ),
               _MenuItem(
                 icon: Icons.settings_outlined,
@@ -277,18 +276,18 @@ class _MenuItem extends StatelessWidget {
 // =============================================================================
 
 class _NotificationToggle extends StatelessWidget {
-  const _NotificationToggle({required this.data});
-  final DataProvider data;
+  const _NotificationToggle();
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: const Icon(Icons.notifications_none_outlined, color: AppColors.textPrimary, size: 22),
       title: Text('Notifications', style: AppTypography.body),
       trailing: Switch(
-        value: data.notificationsEnabled,
-        onChanged: (_) => data.toggleNotifications(),
+        value: settings.pushNotificationsEnabled,
+        onChanged: settings.setPushNotifications,
         activeTrackColor: AppColors.primary.withValues(alpha: 0.4),
         activeThumbColor: AppColors.primary,
       ),

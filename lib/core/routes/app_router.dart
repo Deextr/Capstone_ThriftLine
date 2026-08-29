@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../features/auth/domain/legal_documents.dart';
+import '../../features/auth/presentation/screens/legal_document_screen.dart';
+import '../../features/admin/presentation/screens/admin_review_screen.dart';
+import '../../features/admin/presentation/screens/admin_shell_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/signup_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
+import '../../features/auth/presentation/screens/verify_phone_screen.dart';
+import '../../features/profile/presentation/screens/address_book_screen.dart';
 import '../../features/buyer/presentation/screens/become_seller_screen.dart';
 import '../../features/buyer/presentation/screens/buyer_shell_screen.dart';
 import '../../features/buyer/presentation/screens/buy_now_screen.dart';
@@ -51,19 +57,30 @@ GoRouter createAppRouter({
       final isOnboarding = location == RouteNames.onboarding;
       final isLogin = location == RouteNames.login;
       final isSignup = location == RouteNames.signup;
+      final isLegal = location.startsWith('/legal/');
 
       if (isSplash) return null;
+
+      // The legal documents must stay reachable at every stage, including
+      // while the user is deciding whether to consent.
+      if (isLegal) return null;
 
       if (!appProvider.isOnboardingComplete && !isOnboarding) {
         return RouteNames.onboarding;
       }
 
-      if (!authProvider.isAuthenticated && !isLogin && !isSignup && !isOnboarding) {
+      if (!authProvider.isAuthenticated &&
+          !isLogin &&
+          !isSignup &&
+          !isOnboarding) {
         return RouteNames.login;
       }
 
       if (authProvider.isAuthenticated) {
         if (isLogin || isSignup || isOnboarding) return authProvider.homeRoute;
+        if (location.startsWith('/admin') && !authProvider.isAdmin) {
+          return authProvider.homeRoute;
+        }
         if (authProvider.isSeller && location == RouteNames.buyerHome) {
           return RouteNames.sellerHome;
         }
@@ -81,6 +98,14 @@ GoRouter createAppRouter({
       ),
       GoRoute(path: RouteNames.login, builder: (_, _) => const LoginScreen()),
       GoRoute(path: RouteNames.signup, builder: (_, _) => const SignupScreen()),
+      GoRoute(
+        path: RouteNames.legal,
+        builder: (_, state) => LegalDocumentScreen(
+          type: state.pathParameters['doc'] == 'privacy'
+              ? LegalDocumentType.privacy
+              : LegalDocumentType.terms,
+        ),
+      ),
       GoRoute(
         path: RouteNames.buyerHome,
         builder: (_, _) => const BuyerShellScreen(),
@@ -198,6 +223,23 @@ GoRouter createAppRouter({
       GoRoute(
         path: RouteNames.myShop,
         builder: (_, _) => const MyShopScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.adminHome,
+        builder: (_, _) => const AdminShellScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.adminReview,
+        builder: (_, state) =>
+            AdminReviewScreen(verificationId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: RouteNames.verifyPhone,
+        builder: (_, _) => const VerifyPhoneScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.addresses,
+        builder: (_, _) => const AddressBookScreen(),
       ),
     ],
     errorBuilder: (_, state) =>

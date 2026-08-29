@@ -11,6 +11,8 @@ import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/data_provider.dart';
+import '../providers/notifications_provider.dart';
+import '../providers/settings_provider.dart';
 
 class ThriftlineApp extends StatelessWidget {
   const ThriftlineApp({
@@ -20,6 +22,8 @@ class ThriftlineApp extends StatelessWidget {
     required this.authProvider,
     required this.appProvider,
     required this.dataProvider,
+    required this.notificationsProvider,
+    required this.settingsProvider,
     required this.supabaseService,
   });
 
@@ -28,6 +32,8 @@ class ThriftlineApp extends StatelessWidget {
   final AuthProvider authProvider;
   final AppProvider appProvider;
   final DataProvider dataProvider;
+  final NotificationsProvider notificationsProvider;
+  final SettingsProvider settingsProvider;
   final SupabaseService supabaseService;
 
   @override
@@ -42,14 +48,60 @@ class ThriftlineApp extends StatelessWidget {
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
         ChangeNotifierProvider<AppProvider>.value(value: appProvider),
         ChangeNotifierProvider<DataProvider>.value(value: dataProvider),
+        ChangeNotifierProvider<NotificationsProvider>.value(
+          value: notificationsProvider,
+        ),
+        ChangeNotifierProvider<SettingsProvider>.value(value: settingsProvider),
         ChangeNotifierProvider<CartProvider>(create: (_) => CartProvider()),
       ],
-      child: MaterialApp.router(
-        title: AppConstants.appName,
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        routerConfig: router,
+      child: _SessionBindings(
+        child: MaterialApp.router(
+          title: AppConstants.appName,
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light,
+          routerConfig: router,
+        ),
       ),
     );
+  }
+}
+
+/// Starts notification realtime and settings once a user is signed in.
+class _SessionBindings extends StatefulWidget {
+  const _SessionBindings({required this.child});
+  final Widget child;
+
+  @override
+  State<_SessionBindings> createState() => _SessionBindingsState();
+}
+
+class _SessionBindingsState extends State<_SessionBindings> {
+  String? _boundUserId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final userId = context.read<AuthProvider>().user?.id;
+    if (userId == _boundUserId) return;
+    _boundUserId = userId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<NotificationsProvider>().startForUser(userId);
+      context.read<SettingsProvider>().loadForUser(userId);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final userId = context.watch<AuthProvider>().user?.id;
+    if (userId != _boundUserId) {
+      _boundUserId = userId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.read<NotificationsProvider>().startForUser(userId);
+        context.read<SettingsProvider>().loadForUser(userId);
+      });
+    }
+    return widget.child;
   }
 }

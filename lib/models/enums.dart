@@ -51,10 +51,11 @@ enum ProductCondition {
   }
 }
 
+/// Mirrors `product_status_enum` in Postgres.
 enum ProductStatus {
   active,
-  paused,
   sold,
+  removed,
   draft;
 
   static ProductStatus fromString(String value) => ProductStatus.values
@@ -146,6 +147,9 @@ enum NotificationType {
   message,
   saved,
   orderConfirmed,
+  verificationSubmitted,
+  verificationApproved,
+  verificationRejected,
   system;
 
   static NotificationType fromString(String value) =>

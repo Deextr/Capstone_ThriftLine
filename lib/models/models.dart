@@ -1,3 +1,4 @@
+export 'address_model.dart';
 export 'bid_model.dart';
 export 'buyer_model.dart';
 export 'chat_model.dart';

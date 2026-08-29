@@ -21,6 +21,7 @@ class AuthUser {
     this.verificationStatus = 'none',
     this.verificationRejectionReason,
     this.trustScore = 80,
+    this.isPhoneVerified = false,
   });
 
   final String id;
@@ -40,6 +41,7 @@ class AuthUser {
   final String verificationStatus; // 'none', 'pending', 'approved', 'rejected'
   final String? verificationRejectionReason;
   final int trustScore;
+  final bool isPhoneVerified;
 
   String get displayName => role == UserRole.seller ? (shopName ?? name) : name;
   bool get isBuyer => role == UserRole.buyer;
@@ -69,9 +71,15 @@ class AuthUser {
   /// yet or if it is temporarily unavailable.
   factory AuthUser.fromSupabase(
     User supabaseUser,
-    Map<String, dynamic>? profile,
-  ) {
+    Map<String, dynamic>? profile, {
+    Map<String, dynamic>? verification,
+    Map<String, dynamic>? sellerProfile,
+  }) {
     final meta = supabaseUser.userMetadata ?? {};
+    final status = verification?['verification_status'] as String? ?? 'none';
+    final shopName = sellerProfile?['shop_name'] as String? ??
+        verification?['shop_name'] as String?;
+    final approved = sellerProfile?['is_approved'] as bool? ?? false;
 
     return AuthUser(
       id: supabaseUser.id,
@@ -93,15 +101,20 @@ class AuthUser {
           meta['picture'] as String? ??
           meta['avatar'] as String? ??
           '',
-      location: profile?['location'] as String? ?? '',
-      shopName: null,
+      location: profile?['location'] as String? ??
+          [
+            verification?['barangay'],
+            verification?['city'] ?? sellerProfile?['city'],
+          ].whereType<String>().where((s) => s.trim().isNotEmpty).join(', '),
+      shopName: shopName,
       rating: (profile?['rating_average'] as num?)?.toDouble(),
-      sales: null,
-      isVerified: false,
-      bio: null,
-      verificationStatus: 'none',
-      verificationRejectionReason: null,
+      sales: sellerProfile?['total_sales'] as int?,
+      isVerified: approved,
+      bio: profile?['bio'] as String? ?? sellerProfile?['shop_bio'] as String?,
+      verificationStatus: approved ? 'approved' : status,
+      verificationRejectionReason: verification?['rejection_reason'] as String?,
       trustScore: (profile?['trust_score'] as num?)?.toInt() ?? 80,
+      isPhoneVerified: profile?['is_phone_verified'] as bool? ?? false,
     );
   }
 
@@ -123,6 +136,7 @@ class AuthUser {
     String? verificationStatus,
     String? verificationRejectionReason,
     int? trustScore,
+    bool? isPhoneVerified,
   }) {
     return AuthUser(
       id: id ?? this.id,
@@ -143,6 +157,7 @@ class AuthUser {
       verificationRejectionReason:
           verificationRejectionReason ?? this.verificationRejectionReason,
       trustScore: trustScore ?? this.trustScore,
+      isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
     );
   }
 }

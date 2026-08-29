@@ -6,8 +6,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../models/enums.dart';
-import '../../../../providers/auth_provider.dart';
-import '../../../../providers/data_provider.dart';
+import '../../../../models/notification_model.dart';
+import '../../../../providers/notifications_provider.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -16,7 +16,8 @@ class NotificationsScreen extends StatefulWidget {
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen> with SingleTickerProviderStateMixin {
+class _NotificationsScreenState extends State<NotificationsScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tab;
 
   @override
@@ -33,18 +34,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    final data = context.watch<DataProvider>();
-    final userId = auth.user?.id ?? 'buyer_maya';
-    final all = data.notificationsFor(userId);
+    final notifications = context.watch<NotificationsProvider>();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Notifications'),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
         actions: [
           TextButton(
-            onPressed: () => data.markAllNotificationsRead(userId),
+            onPressed: notifications.markAllRead,
             child: const Text('Mark all read'),
           ),
         ],
@@ -65,16 +66,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
               ],
             ),
             Expanded(
-              child: TabBarView(
-                controller: _tab,
-                children: [
-                  _list(all),
-                  _list(all.where((n) => n.type == NotificationType.shipped || n.type == NotificationType.orderConfirmed).toList()),
-                  _list(all.where((n) => n.type == NotificationType.outbid || n.type == NotificationType.wonBid).toList()),
-                  _list(all.where((n) => n.type == NotificationType.message).toList()),
-                  _list(all.where((n) => n.type == NotificationType.system).toList()),
-                ],
-              ),
+              child: notifications.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : TabBarView(
+                      controller: _tab,
+                      children: [
+                        _list(notifications.items),
+                        _list(notifications.forTab('orders')),
+                        _list(notifications.forTab('bids')),
+                        _list(notifications.forTab('messages')),
+                        _list(notifications.forTab('system')),
+                      ],
+                    ),
             ),
           ],
         ),
@@ -82,29 +85,43 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     );
   }
 
-  Widget _list(List notifications) {
-    if (notifications.isEmpty) {
+  Widget _list(List<NotificationModel> items) {
+    if (items.isEmpty) {
       return const Center(child: Text('No notifications'));
     }
     return ListView.builder(
-      itemCount: notifications.length,
+      itemCount: items.length,
       itemBuilder: (_, i) {
-        final n = notifications[i];
+        final n = items[i];
         return ListTile(
           leading: CircleAvatar(
             backgroundColor: _colorFor(n.type).withValues(alpha: 0.15),
             child: Text(_emojiFor(n.type), style: const TextStyle(fontSize: 18)),
           ),
-          title: Text(n.title, style: AppTypography.body.copyWith(fontWeight: n.isRead ? FontWeight.w400 : FontWeight.w600)),
+          title: Text(
+            n.title,
+            style: AppTypography.body.copyWith(
+              fontWeight: n.isRead ? FontWeight.w400 : FontWeight.w600,
+            ),
+          ),
           subtitle: Text(n.body, style: AppTypography.caption),
           trailing: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(formatRelativeTime(n.createdAt), style: AppTypography.caption),
-              if (!n.isRead) Container(width: 8, height: 8, margin: const EdgeInsets.only(top: 4), decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
+              if (!n.isRead)
+                Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.only(top: 4),
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
             ],
           ),
-          onTap: () => context.read<DataProvider>().markNotificationRead(n.id),
+          onTap: () => context.read<NotificationsProvider>().markRead(n.id),
         );
       },
     );
@@ -117,6 +134,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         NotificationType.message => '💬',
         NotificationType.saved => '❤️',
         NotificationType.orderConfirmed => '✅',
+        NotificationType.verificationSubmitted => '📄',
+        NotificationType.verificationApproved => '✅',
+        NotificationType.verificationRejected => '⚠️',
         NotificationType.system => 'ℹ️',
       };
 
@@ -127,6 +147,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         NotificationType.message => AppColors.textSecondary,
         NotificationType.saved => const Color(0xFFEC4899),
         NotificationType.orderConfirmed => AppColors.success,
+        NotificationType.verificationSubmitted => AppColors.warning,
+        NotificationType.verificationApproved => AppColors.success,
+        NotificationType.verificationRejected => AppColors.error,
         NotificationType.system => AppColors.textHint,
       };
 }

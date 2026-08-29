@@ -194,7 +194,7 @@ class _PhotosSection extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             itemCount: 3,
             buildDefaultDragHandles: false,
-            onReorderItem: (o, n) => c.reorderImages(o, n),
+            onReorder: (o, n) => c.reorderImages(o, n),
             itemBuilder: (context, index) {
               final isFilled = index < c.slots.length;
               return ReorderableDragStartListener(
