@@ -29,6 +29,10 @@ void main() {
       expect(SellerIdType.tryParse('sss_id'), SellerIdType.sssId);
     });
 
+    test('does not treat unspecified storage as a user-selected type', () {
+      expect(SellerIdType.tryParse(SellerIdType.unspecifiedStorageValue), isNull);
+    });
+
     test('rejects prohibited and unknown types', () {
       expect(SellerIdType.tryParse('voters_id'), isNull);
       expect(SellerIdType.tryParse('voter_id'), isNull);

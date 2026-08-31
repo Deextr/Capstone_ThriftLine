@@ -6,7 +6,6 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../widgets/thrift_widgets.dart';
-import '../../../seller/domain/seller_id_type.dart';
 import '../../data/admin_verification_service.dart';
 
 class AdminReviewScreen extends StatefulWidget {
@@ -153,15 +152,7 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
                       const SizedBox(height: 16),
                       _LivenessChips(result: app.livenessResult),
                       const SizedBox(height: 20),
-                      Text(
-                        () {
-                          final label = SellerIdType.tryParse(app.idType)?.label;
-                          return label == null
-                              ? 'Government ID'
-                              : 'Government ID ($label)';
-                        }(),
-                        style: AppTypography.subheading,
-                      ),
+                      Text('Government ID', style: AppTypography.subheading),
                       const SizedBox(height: 8),
                       Text('Front', style: AppTypography.caption),
                       const SizedBox(height: 6),

@@ -39,76 +39,73 @@ void main() {
   });
 
   group('Consent gate', () {
-    testWidgets('signup is blocked until the user agrees', (tester) async {
+    testWidgets('signup shows a text notice instead of a consent checkbox', (
+      tester,
+    ) async {
       final auth = await _buildAuthProvider();
       await tester.pumpWidget(_wrap(const SignupScreen(), auth));
-
-      await tester.enterText(find.byType(TextFormField).at(0), 'Thrift Fan');
-      await tester.enterText(
-        find.byType(TextFormField).at(1),
-        'fan@example.com',
-      );
-      await tester.enterText(find.byType(TextFormField).at(2), 'sup3rsecret');
-      await tester.enterText(find.byType(TextFormField).at(3), 'sup3rsecret');
       await tester.pump();
 
-      await tester.ensureVisible(find.text('Sign Up'));
-      await tester.tap(find.text('Sign Up'));
-      await tester.pumpAndSettle();
-
+      expect(find.byType(Checkbox), findsNothing);
+      expect(find.text('ThriftLine'), findsOneWidget);
+      expect(find.text('Create Account'), findsOneWidget);
       expect(
-        find.textContaining('must agree to the Terms and Conditions'),
+        find.textContaining('By continuing, you agree'),
         findsOneWidget,
       );
-      // The gate stops the request before any auth work begins.
-      expect(auth.isLoading, isFalse);
-      expect(auth.isAuthenticated, isFalse);
+      expect(find.textContaining('Terms and Conditions'), findsOneWidget);
+      expect(find.textContaining('Privacy Policy'), findsOneWidget);
     });
 
-    testWidgets('checkbox starts unchecked and confirms once ticked', (
+    testWidgets('signup fits a compact Android phone without overflow', (
       tester,
     ) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       final auth = await _buildAuthProvider();
-      await tester.pumpWidget(_wrap(const LoginScreen(), auth));
-
-      final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
-      expect(checkbox.value, isFalse);
-      expect(find.textContaining('Consent recorded'), findsNothing);
-
-      await tester.tap(find.byType(Checkbox));
-      await tester.pumpAndSettle();
-
-      expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isTrue);
-      expect(find.textContaining('Consent recorded'), findsOneWidget);
-    });
-
-    testWidgets('agreeing clears the outstanding consent error', (
-      tester,
-    ) async {
-      final auth = await _buildAuthProvider();
-      await tester.pumpWidget(_wrap(const LoginScreen(), auth));
-
-      await tester.enterText(
-        find.byType(TextFormField).at(0),
-        'fan@example.com',
-      );
-      await tester.enterText(find.byType(TextFormField).at(1), 'sup3rsecret');
+      await tester.pumpWidget(_wrap(const SignupScreen(), auth));
       await tester.pump();
 
-      // Distinct from the checkbox's own "You must agree before you can
-      // continue." copy, which is always present.
-      final errorText = find.textContaining(
-        'must agree to the Terms and Conditions',
+      expect(tester.takeException(), isNull);
+      expect(find.text('Sign Up'), findsOneWidget);
+      expect(find.text('Create Account'), findsOneWidget);
+    });
+
+    testWidgets('login shows a text notice instead of a consent checkbox', (
+      tester,
+    ) async {
+      final auth = await _buildAuthProvider();
+      await tester.pumpWidget(_wrap(const LoginScreen(), auth));
+      await tester.pump();
+
+      expect(find.byType(Checkbox), findsNothing);
+      expect(find.text('ThriftLine'), findsOneWidget);
+      expect(
+        find.textContaining('By continuing, you agree'),
+        findsOneWidget,
       );
+      expect(find.textContaining('Terms and Conditions'), findsOneWidget);
+      expect(find.textContaining('Privacy Policy'), findsOneWidget);
+    });
 
-      await tester.ensureVisible(find.text('Login'));
-      await tester.tap(find.text('Login'));
-      await tester.pumpAndSettle();
-      expect(errorText, findsOneWidget);
+    testWidgets('login fits a compact Android phone without overflow', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.tap(find.byType(Checkbox));
-      await tester.pumpAndSettle();
-      expect(errorText, findsNothing);
+      final auth = await _buildAuthProvider();
+      await tester.pumpWidget(_wrap(const LoginScreen(), auth));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Login'), findsOneWidget);
+      expect(find.text('Continue with Google'), findsOneWidget);
     });
   });
 }

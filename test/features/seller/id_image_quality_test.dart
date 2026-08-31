@@ -44,9 +44,26 @@ List<int> _sharpId({int width = _w, int height = _h}) {
 
 List<int> _tinyId() {
   final luma = _fill(_w, _h, 96);
-  for (var y = 38; y < 62; y++) {
-    for (var x = 64; x < 96; x++) {
-      luma[y * _w + x] = (x + y).isEven ? 20 : 235;
+  const left = 68;
+  const right = 102;
+  const top = 42;
+  const bottom = 62;
+  for (var y = top; y <= bottom; y++) {
+    for (var x = left; x <= right; x++) {
+      luma[y * _w + x] = 210;
+    }
+  }
+  for (var y = top; y <= bottom; y++) {
+    luma[y * _w + left] = 24;
+    luma[y * _w + right] = 24;
+  }
+  for (var x = left; x <= right; x++) {
+    luma[top * _w + x] = 24;
+    luma[bottom * _w + x] = 24;
+  }
+  for (final lineY in [45, 49, 53, 57]) {
+    for (var x = 74; x < 98; x++) {
+      luma[lineY * _w + x] = 30;
     }
   }
   return luma;
@@ -71,11 +88,134 @@ List<int> _clutter() {
   return luma;
 }
 
+/// ID painted over a textured table so a full-image bbox would swallow the photo.
+List<int> _sharpIdOnTexturedTable() {
+  final luma = _fill(_w, _h, 78);
+  for (var y = 0; y < _h; y++) {
+    for (var x = 0; x < _w; x++) {
+      luma[y * _w + x] = 70 + ((x * 3 + y * 5) % 40);
+    }
+  }
+  const left = 28;
+  const right = 132;
+  const top = 20;
+  const bottom = 84;
+  for (var y = top; y <= bottom; y++) {
+    for (var x = left; x <= right; x++) {
+      luma[y * _w + x] = 210;
+    }
+  }
+  for (var y = top; y <= bottom; y++) {
+    luma[y * _w + left] = 24;
+    luma[y * _w + right] = 24;
+  }
+  for (var x = left; x <= right; x++) {
+    luma[top * _w + x] = 24;
+    luma[bottom * _w + x] = 24;
+  }
+  for (var y = 28; y < 72; y++) {
+    for (var x = 36; x < 60; x++) {
+      luma[y * _w + x] = 110;
+    }
+  }
+  for (final lineY in [30, 38, 46, 54, 62, 70]) {
+    for (var x = 66; x < 124; x++) {
+      luma[lineY * _w + x] = 30;
+      luma[(lineY + 1) * _w + x] = 30;
+    }
+  }
+  return luma;
+}
+
+/// Card filling almost the entire bitmap (would trip the old 2px edge check).
+List<int> _fullBleedId() {
+  final luma = _fill(_w, _h, 210);
+  for (var y = 0; y < _h; y++) {
+    luma[y * _w] = 24;
+    luma[y * _w + _w - 1] = 24;
+  }
+  for (var x = 0; x < _w; x++) {
+    luma[x] = 24;
+    luma[(_h - 1) * _w + x] = 24;
+  }
+  for (var y = 18; y < 82; y++) {
+    for (var x = 10; x < 42; x++) {
+      luma[y * _w + x] = 110;
+    }
+  }
+  for (final lineY in [16, 28, 40, 52, 64, 76, 88]) {
+    if (lineY + 1 >= _h) continue;
+    for (var x = 48; x < 150; x++) {
+      luma[lineY * _w + x] = 30;
+      luma[(lineY + 1) * _w + x] = 30;
+    }
+  }
+  return luma;
+}
+
+/// ID hanging off the left of the overlay crop (partially out of frame).
+List<int> _clippedLeftId() {
+  final luma = _fill(_w, _h, 78);
+  const left = 31;
+  const right = 80;
+  const top = 22;
+  const bottom = 78;
+  for (var y = top; y <= bottom; y++) {
+    for (var x = left; x <= right; x++) {
+      luma[y * _w + x] = 210;
+    }
+  }
+  for (var y = top; y <= bottom; y++) {
+    luma[y * _w + left] = 24;
+    luma[y * _w + right] = 24;
+  }
+  for (var x = left; x <= right; x++) {
+    luma[top * _w + x] = 24;
+    luma[bottom * _w + x] = 24;
+  }
+  for (var y = 28; y < 70; y++) {
+    for (var x = 36; x < 52; x++) {
+      luma[y * _w + x] = 110;
+    }
+  }
+  for (final lineY in [30, 38, 46, 54, 62]) {
+    for (var x = 54; x < 76; x++) {
+      luma[lineY * _w + x] = 30;
+      luma[(lineY + 1) * _w + x] = 30;
+    }
+  }
+  return luma;
+}
+
+/// Rectangular object with a border but no text lines — like a charger.
+List<int> _charger() {
+  final luma = _fill(_w, _h, 88);
+  const left = 28;
+  const right = 132;
+  const top = 20;
+  const bottom = 84;
+  for (var y = top; y <= bottom; y++) {
+    for (var x = left; x <= right; x++) {
+      luma[y * _w + x] = 170;
+    }
+  }
+  for (var y = top; y <= bottom; y++) {
+    luma[y * _w + left] = 28;
+    luma[y * _w + right] = 28;
+  }
+  for (var x = left; x <= right; x++) {
+    luma[top * _w + x] = 28;
+    luma[bottom * _w + x] = 28;
+  }
+  return luma;
+}
+
 IdQualityResult _eval(
   List<int> luma, {
   DocumentEvidence evidence = const DocumentEvidence.unknown(),
   int sourceWidth = _source,
   int sourceHeight = _source,
+  bool requireIdPhoto = false,
 }) {
   return IdImageMetrics.evaluate(
     luma: luma,
@@ -84,8 +224,17 @@ IdQualityResult _eval(
     sourceWidth: sourceWidth,
     sourceHeight: sourceHeight,
     evidence: evidence,
+    requireIdPhoto: requireIdPhoto,
   );
 }
+
+const _frontIdEvidence = DocumentEvidence(
+  available: true,
+  alphanumericChars: 24,
+  blockCount: 4,
+  faceCoverage: 0.12,
+  textCoverage: 0.35,
+);
 
 void main() {
   group('IdImageMetrics', () {
@@ -116,8 +265,8 @@ void main() {
       );
     });
 
-    test('rejects a flat mid-gray image as poor contrast', () {
-      expect(_eval(_fill(_w, _h, 128)).issue, IdQualityIssue.lowContrast);
+    test('rejects a flat mid-gray image as not an ID', () {
+      expect(_eval(_fill(_w, _h, 128)).issue, IdQualityIssue.notId);
     });
 
     test('Test 1 — sharp ID passes', () {
@@ -126,31 +275,22 @@ void main() {
       expect(result.severity, IdQualitySeverity.pass);
     });
 
-    test('Test 2 — slightly blurry ID warns and blocks proceed', () {
+    test('Test 2 — slightly soft but still readable ID can pass', () {
       final sharp = _sharpId();
       final blurred = IdImageMetrics.boxBlur(sharp, _w, _h, 1);
       final result = _eval(_mix(sharp, blurred, 3, 1));
-      expect(result.passed, isFalse, reason: result.message);
-      expect(
-        result.issue,
-        anyOf(IdQualityIssue.slightlySoft, IdQualityIssue.blurry),
-      );
-      if (result.issue == IdQualityIssue.slightlySoft) {
-        expect(result.severity, IdQualitySeverity.warning);
-      }
-      expect(result.message.toLowerCase(), contains('blurry'));
+      expect(result.passed, isTrue, reason: result.debug ?? result.message);
     });
 
-    test('Test 3 — heavily blurry ID fails', () {
-      var heavy = _sharpId();
-      heavy = IdImageMetrics.boxBlur(heavy, _w, _h, 4);
-      heavy = IdImageMetrics.boxBlur(heavy, _w, _h, 4);
+    test('Test 3 — heavily blurry ID fails as blur, not as cropped', () {
+      final heavy = IdImageMetrics.boxBlur(_sharpId(), _w, _h, 2);
       final result = _eval(heavy);
-      expect(result.passed, isFalse);
-      expect(result.issue, IdQualityIssue.blurry);
+      expect(result.passed, isFalse, reason: result.debug ?? result.message);
+      expect(result.issue, isNot(IdQualityIssue.poorFraming));
+      expect(result.issue, isNot(IdQualityIssue.notId));
       expect(
-        result.message,
-        'Image too blurry. Please hold your phone steady and retake the photo.',
+        result.issue,
+        anyOf(IdQualityIssue.blurry, IdQualityIssue.slightlySoft),
       );
     });
 
@@ -163,14 +303,97 @@ void main() {
       );
     });
 
-    test('Test 5 — blurry random object is not an ID', () {
+    test('Test 5 — blurry random object is rejected', () {
       final blurry = IdImageMetrics.boxBlur(_clutter(), _w, _h, 3);
       final result = _eval(blurry);
+      expect(result.passed, isFalse);
       expect(
         result.issue,
-        anyOf(IdQualityIssue.notId, IdQualityIssue.blurry, IdQualityIssue.lowContrast),
+        anyOf(IdQualityIssue.notId, IdQualityIssue.lowContrast),
       );
+    });
+
+    test('a sharp rectangular charger is not an ID', () {
+      final result = _eval(_charger());
+      expect(result.issue, IdQualityIssue.notId, reason: result.debug);
+      expect(
+        result.message,
+        'No ID detected. Please place your ID inside the frame and try again.',
+      );
+    });
+
+    test('a blurry charger is not an ID, not blur-first', () {
+      final blurry = IdImageMetrics.boxBlur(_charger(), _w, _h, 3);
+      final result = _eval(blurry);
       expect(result.passed, isFalse);
+      expect(result.issue, isNot(IdQualityIssue.blurry));
+      expect(result.issue, isNot(IdQualityIssue.slightlySoft));
+      expect(result.issue, IdQualityIssue.notId, reason: result.debug);
+    });
+
+    test('OCR with no text labels a charger as not an ID even if it is sharp', () {
+      final result = _eval(
+        _charger(),
+        evidence: const DocumentEvidence(
+          available: true,
+          alphanumericChars: 0,
+          blockCount: 0,
+        ),
+      );
+      expect(result.issue, IdQualityIssue.notId, reason: result.debug);
+    });
+
+    test('OCR with no text labels a blurry charger as not an ID, not blurry', () {
+      final blurry = IdImageMetrics.boxBlur(_charger(), _w, _h, 3);
+      final result = _eval(
+        blurry,
+        evidence: const DocumentEvidence(
+          available: true,
+          alphanumericChars: 0,
+          blockCount: 0,
+        ),
+      );
+      expect(result.issue, IdQualityIssue.notId, reason: result.debug);
+      expect(result.issue, isNot(IdQualityIssue.blurry));
+      expect(result.issue, isNot(IdQualityIssue.slightlySoft));
+    });
+
+    test('OCR with no text still allows a banded ID via geometry', () {
+      final result = _eval(
+        _sharpId(),
+        evidence: const DocumentEvidence(
+          available: true,
+          alphanumericChars: 0,
+          blockCount: 0,
+        ),
+      );
+      expect(result.passed, isTrue, reason: result.debug);
+    });
+
+    test('readable OCR text does not skip blur on a heavily defocused ID', () {
+      var heavy = _sharpId();
+      heavy = IdImageMetrics.boxBlur(heavy, _w, _h, 4);
+      heavy = IdImageMetrics.boxBlur(heavy, _w, _h, 4);
+      final result = _eval(
+        heavy,
+        evidence: _frontIdEvidence,
+        requireIdPhoto: true,
+      );
+      expect(result.passed, isFalse, reason: result.debug);
+      expect(
+        result.issue,
+        anyOf(IdQualityIssue.blurry, IdQualityIssue.slightlySoft),
+      );
+    });
+
+    test('an ID clipped on one side of the frame fails as poor framing', () {
+      final result = _eval(_clippedLeftId());
+      expect(result.passed, isFalse, reason: result.debug ?? result.message);
+      expect(result.issue, IdQualityIssue.poorFraming);
+      expect(
+        result.message,
+        'Make sure the entire ID is visible inside the frame.',
+      );
     });
 
     test('Test 6 — dark ID is too dark', () {
@@ -190,16 +413,185 @@ void main() {
       expect(_eval(_sharpId()).passed, isTrue);
     });
 
+    test('aligned ID on a textured table is not flagged as cropped', () {
+      final result = _eval(_sharpIdOnTexturedTable());
+      expect(result.passed, isTrue, reason: result.debug ?? result.message);
+      expect(result.issue, isNot(IdQualityIssue.poorFraming));
+    });
+
+    test('full-bleed ID that touches the image edges is not flagged as cropped', () {
+      final result = _eval(_fullBleedId());
+      expect(result.passed, isTrue, reason: result.debug ?? result.message);
+      expect(result.issue, isNot(IdQualityIssue.poorFraming));
+      expect(
+        IdImageMetrics.measureGeometry(
+          _fullBleedId(),
+          _w,
+          _h,
+          180,
+        ).poorlyFramed,
+        isFalse,
+      );
+    });
+
+    test('center guide on a portrait capture is a landscape ID-1 window', () {
+      final window = IdImageMetrics.centerCardWindow(1080, 1920);
+      expect(window.width / window.height, closeTo(IdCaptureGuide.cardAspect, 0.05));
+      expect(window.width, lessThan(1080));
+      expect(window.height, lessThan(1920 * 0.7));
+      expect(window.x0, greaterThan(0));
+      expect(window.y0, greaterThan(0));
+    });
+
     test('OCR text can confirm a card-shaped region', () {
+      final result = _eval(
+        _sharpId(),
+        evidence: _frontIdEvidence,
+        requireIdPhoto: true,
+      );
+      expect(result.passed, isTrue, reason: result.debug);
+    });
+
+    test('charger plus high OCR counts is not an ID', () {
+      const leakedLaptopText = DocumentEvidence(
+        available: true,
+        alphanumericChars: 80,
+        blockCount: 10,
+        faceCoverage: 0,
+        textCoverage: 0.2,
+      );
+      expect(
+        _eval(
+          _charger(),
+          evidence: leakedLaptopText,
+          requireIdPhoto: true,
+        ).issue,
+        IdQualityIssue.notId,
+      );
+      expect(
+        _eval(
+          _charger(),
+          evidence: leakedLaptopText,
+        ).issue,
+        IdQualityIssue.notId,
+      );
+    });
+
+    test('front without a detected face can still pass a real ID card', () {
       final result = _eval(
         _sharpId(),
         evidence: const DocumentEvidence(
           available: true,
           alphanumericChars: 24,
           blockCount: 4,
+          faceCoverage: 0,
+          textCoverage: 0.35,
+        ),
+        requireIdPhoto: true,
+      );
+      expect(result.passed, isTrue, reason: result.debug);
+    });
+
+    test('back without a face can pass when shape and text hold', () {
+      final result = _eval(
+        _sharpId(),
+        evidence: const DocumentEvidence(
+          available: true,
+          alphanumericChars: 24,
+          blockCount: 4,
+          faceCoverage: 0,
+          textCoverage: 0.35,
         ),
       );
-      expect(result.passed, isTrue);
+      expect(result.passed, isTrue, reason: result.debug);
+    });
+
+    test('a monitor-like text fill is not an ID', () {
+      final result = _eval(
+        _sharpId(),
+        evidence: const DocumentEvidence(
+          available: true,
+          alphanumericChars: 80,
+          blockCount: 12,
+          faceCoverage: 0.12,
+          textCoverage: 0.92,
+        ),
+        requireIdPhoto: true,
+      );
+      expect(result.issue, IdQualityIssue.notId, reason: result.debug);
+    });
+
+    test('overlay ignores blocks whose center sits outside the hole', () {
+      const hole = OverlayNormRect(left: 0.2, top: 0.2, right: 0.8, bottom: 0.8);
+      expect(
+        hole.includesBlock(left: 0.0, top: 0.0, right: 0.12, bottom: 0.12),
+        isFalse,
+      );
+      expect(
+        hole.includesBlock(left: 0.3, top: 0.3, right: 0.55, bottom: 0.5),
+        isTrue,
+      );
+      expect(
+        hole.intersectionArea(0.0, 0.0, 0.1, 0.1) / hole.area,
+        0,
+      );
+    });
+
+    test('live alignment requires a card filling the guide', () {
+      expect(
+        IdImageMetrics.isLiveAligned(
+          luma: _sharpId(),
+          width: _w,
+          height: _h,
+        ),
+        isTrue,
+      );
+      expect(
+        IdImageMetrics.isLiveAligned(
+          luma: _tinyId(),
+          width: _w,
+          height: _h,
+        ),
+        isFalse,
+      );
+      expect(
+        IdImageMetrics.isLiveAligned(
+          luma: _fill(_w, _h, 128),
+          width: _w,
+          height: _h,
+        ),
+        isFalse,
+      );
+      expect(
+        IdImageMetrics.isLiveAligned(
+          luma: _clippedLeftId(),
+          width: _w,
+          height: _h,
+        ),
+        isFalse,
+      );
+    });
+
+    test('Y-plane copy strips row padding', () {
+      const width = 8;
+      const height = 4;
+      const stride = 10;
+      final bytes = List<int>.filled(stride * height, 9);
+      for (var y = 0; y < height; y++) {
+        for (var x = 0; x < width; x++) {
+          bytes[y * stride + x] = y * width + x;
+        }
+      }
+      final luma = IdImageMetrics.copyYPlane(
+        bytes: bytes,
+        width: width,
+        height: height,
+        bytesPerRow: stride,
+      );
+      expect(luma.length, width * height);
+      expect(luma[0], 0);
+      expect(luma[width], width);
+      expect(luma.last, width * height - 1);
     });
 
     test('a dominant face with almost no text is not an ID', () {

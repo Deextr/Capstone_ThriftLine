@@ -10,7 +10,9 @@ import '../../../../core/utils/validators.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../domain/legal_documents.dart';
-import '../widgets/legal_consent_checkbox.dart';
+import '../widgets/auth_branding.dart';
+import '../widgets/legal_consent_notice.dart';
+import '../widgets/login_video_background.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -27,10 +29,6 @@ class _SignupScreenState extends State<SignupScreen> {
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
 
-  // Consent starts unchecked and must be given before registration proceeds.
-  bool _hasAgreedToLegal = false;
-  bool _showConsentError = false;
-
   @override
   void dispose() {
     _nameController.dispose();
@@ -42,10 +40,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _signUpWithEmail() async {
     if (!_formKey.currentState!.validate()) return;
-    if (!_hasAgreedToLegal) {
-      setState(() => _showConsentError = true);
-      return;
-    }
 
     final auth = context.read<AuthProvider>();
     final result = await auth.signUpWithEmail(
@@ -90,133 +84,191 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final compact = screenHeight < 700;
+    const fieldLabelColor = Colors.white;
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go(RouteNames.login),
-            style: IconButton.styleFrom(backgroundColor: Colors.transparent),
-          ),
-        ),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppConstants.spacingLg),
-            child: Form(
-              key: _formKey,
+        backgroundColor: AppColors.primaryDark,
+        resizeToAvoidBottomInset: true,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            const LoginVideoBackground(),
+            const AuthVideoScrim(),
+            SafeArea(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Center(
-                    child: Image.asset(
-                      'assets/images/thriftline-app-icon.png',
-                      height: 84,
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => context.go(RouteNames.login),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Create Account',
-                    style: AppTypography.display,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Join ThriftLine and start selling or shopping today.',
-                    style: AppTypography.body.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 28),
-                  ThriftTextField(
-                    label: 'Full Name',
-                    hint: 'Enter your full name',
-                    controller: _nameController,
-                    icon: Icons.person_outline,
-                    validator: Validators.name,
-                  ),
-                  const SizedBox(height: 16),
-                  ThriftTextField(
-                    label: 'Email Address',
-                    hint: 'Enter your email address',
-                    controller: _emailController,
-                    icon: Icons.email_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: Validators.email,
-                  ),
-                  const SizedBox(height: 16),
-                  ThriftTextField(
-                    label: 'Password',
-                    hint: 'Create a password',
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    icon: Icons.lock_outline,
-                    validator: Validators.password,
-                    suffix: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                      ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ThriftTextField(
-                    label: 'Confirm Password',
-                    hint: 'Confirm your password',
-                    controller: _confirmPasswordController,
-                    obscureText: _obscurePassword,
-                    icon: Icons.lock_reset_outlined,
-                    validator: _confirmPasswordValidator,
-                  ),
-                  const SizedBox(height: 24),
-                  LegalConsentCheckbox(
-                    value: _hasAgreedToLegal,
-                    enabled: !auth.isLoading,
-                    errorText: _showConsentError
-                        ? 'You must agree to the Terms and Conditions and '
-                              'Privacy Policy to create an account.'
-                        : null,
-                    onChanged: (value) => setState(() {
-                      _hasAgreedToLegal = value;
-                      if (value) _showConsentError = false;
-                    }),
-                  ),
-                  const SizedBox(height: 24),
-                  ThriftButton(
-                    label: 'Sign Up',
-                    onPressed: auth.isLoading ? null : _signUpWithEmail,
-                    isLoading: auth.isLoading,
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Already have an account? ',
-                        style: AppTypography.body,
-                      ),
-                      GestureDetector(
-                        onTap: () => context.go(RouteNames.login),
-                        child: Text(
-                          'Log In',
-                          style: AppTypography.body.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          padding: EdgeInsets.fromLTRB(
+                            AppConstants.spacingLg,
+                            compact ? 4 : AppConstants.spacingSm,
+                            AppConstants.spacingLg,
+                            AppConstants.spacingLg,
                           ),
-                        ),
-                      ),
-                    ],
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight -
+                                  (compact ? 4 : AppConstants.spacingSm) -
+                                  AppConstants.spacingLg,
+                            ),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Center(
+                                    child: AuthBrandLogo(
+                                      size: compact ? 72 : 84,
+                                    ),
+                                  ),
+                                  SizedBox(height: compact ? 12 : 16),
+                                  Text(
+                                    'ThriftLine',
+                                    style: AppTypography.display.copyWith(
+                                      color: Colors.white,
+                                      letterSpacing: -0.4,
+                                      shadows: const [
+                                        Shadow(
+                                          color: Color(0x66000000),
+                                          blurRadius: 8,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Create Account',
+                                    style: AppTypography.heading.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Join ThriftLine and start selling or shopping today.',
+                                    style: AppTypography.body.copyWith(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.82,
+                                      ),
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  SizedBox(height: compact ? 20 : 28),
+                                  ThriftTextField(
+                                    label: 'Full Name',
+                                    hint: 'Enter your full name',
+                                    controller: _nameController,
+                                    icon: Icons.person_outline,
+                                    validator: Validators.name,
+                                    labelColor: fieldLabelColor,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ThriftTextField(
+                                    label: 'Email Address',
+                                    hint: 'Enter your email address',
+                                    controller: _emailController,
+                                    icon: Icons.email_outlined,
+                                    keyboardType: TextInputType.emailAddress,
+                                    validator: Validators.email,
+                                    labelColor: fieldLabelColor,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ThriftTextField(
+                                    label: 'Password',
+                                    hint: 'Create a password',
+                                    controller: _passwordController,
+                                    obscureText: _obscurePassword,
+                                    icon: Icons.lock_outline,
+                                    validator: Validators.password,
+                                    labelColor: fieldLabelColor,
+                                    suffix: IconButton(
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                      ),
+                                      onPressed: () => setState(
+                                        () => _obscurePassword =
+                                            !_obscurePassword,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ThriftTextField(
+                                    label: 'Confirm Password',
+                                    hint: 'Confirm your password',
+                                    controller: _confirmPasswordController,
+                                    obscureText: _obscurePassword,
+                                    icon: Icons.lock_reset_outlined,
+                                    validator: _confirmPasswordValidator,
+                                    labelColor: fieldLabelColor,
+                                  ),
+                                  SizedBox(height: compact ? 20 : 24),
+                                  ThriftButton(
+                                    label: 'Sign Up',
+                                    onPressed: auth.isLoading
+                                        ? null
+                                        : _signUpWithEmail,
+                                    isLoading: auth.isLoading,
+                                  ),
+                                  SizedBox(height: compact ? 16 : 20),
+                                  const LegalConsentNotice(),
+                                  const SizedBox(height: 20),
+                                  Wrap(
+                                    alignment: WrapAlignment.center,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    children: [
+                                      Text(
+                                        'Already have an account? ',
+                                        style: AppTypography.body.copyWith(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.88,
+                                          ),
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () =>
+                                            context.go(RouteNames.login),
+                                        child: Text(
+                                          'Log In',
+                                          style: AppTypography.body.copyWith(
+                                            color: AppColors.primaryLight,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
+          ],
         ),
       ),
     );

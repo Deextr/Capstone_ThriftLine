@@ -43,7 +43,6 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   bool _barangaysLoading = true;
   String? _barangayError;
 
-  SellerIdType? _idType;
   Uint8List? _idFrontBytes;
   Uint8List? _idBackBytes;
   IdQualityResult? _frontQuality;
@@ -56,10 +55,8 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   int _currentStep = 0;
   LivenessResult? _liveness;
 
-  bool get _idGateOpen {
-    if (SellerIdType.tryParse(_idType?.storageValue) == null) return false;
-    return IdCapturePair(front: _frontQuality, back: _backQuality).canProceed;
-  }
+  bool get _idGateOpen =>
+      IdCapturePair(front: _frontQuality, back: _backQuality).canProceed;
 
   @override
   void initState() {
@@ -381,25 +378,26 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Select your ID type, then capture the front and back with the camera. '
-          'Both sides must look like an ID and pass a quality check before you can continue.',
+          'Capture the front and back of an accepted ID. Both sides must look '
+          'like an ID and pass a quality check before you can continue.',
           style: AppTypography.body.copyWith(color: AppColors.textSecondary),
         ),
         const SizedBox(height: 20),
-        Text('ID type', style: AppTypography.subheading),
+        Text('Accepted IDs', style: AppTypography.subheading),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
             for (final type in SellerIdType.values)
-              ChoiceChip(
-                label: Text(type.label),
-                selected: _idType == type,
-                onSelected: (selected) {
-                  if (!selected) return;
-                  setState(() => _idType = type);
-                },
+              Chip(
+                label: Text(
+                  type.label,
+                  style: AppTypography.caption.copyWith(color: AppColors.textPrimary),
+                ),
+                backgroundColor: AppColors.surfaceVariant.withValues(alpha: 0.5),
+                side: const BorderSide(color: AppColors.border),
+                avatar: const Icon(Icons.check, size: 16, color: AppColors.success),
               ),
           ],
         ),
@@ -432,13 +430,11 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
           child: Text(
             pair.canProceed
                 ? 'Both ID photos passed the quality check.'
-                : _idType == null
-                    ? 'Select an ID type, then capture both sides.'
-                    : pair.blockingIssue == IdQualityIssue.missing
-                        ? 'Both front and back photos are required.'
-                        : pair.blockingIssue == IdQualityIssue.notId
-                            ? 'No ID detected on one of the photos. Place the ID in the frame and retake.'
-                            : 'Retake the photo that did not pass before continuing.',
+                : pair.blockingIssue == IdQualityIssue.missing
+                    ? 'Both front and back photos are required.'
+                    : pair.blockingIssue == IdQualityIssue.notId
+                        ? 'No ID detected on one of the photos. Place the ID in the frame and retake.'
+                        : 'Retake the photo that did not pass before continuing.',
             style: AppTypography.body.copyWith(
               color: pair.canProceed ? AppColors.success : AppColors.textSecondary,
               fontWeight: FontWeight.w600,
@@ -464,7 +460,8 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Complete the live face check: look left, look right, then blink. A still photo is captured only after those steps pass.',
+                'Complete the live face check: look left, look right, then blink. '
+                'After that, take a selfie. Your face must still be clearly visible in the final photo.',
                 style: AppTypography.body.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 24),
@@ -577,6 +574,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
               _tipRow(Icons.light_mode_outlined, 'Use good lighting'),
               _tipRow(Icons.swipe_outlined, 'Look left, then right, when asked'),
               _tipRow(Icons.visibility_outlined, 'Blink once when the prompt appears'),
+              _tipRow(Icons.face_outlined, 'Stay in the frame when you take the photo'),
             ],
           ),
         ),
@@ -981,10 +979,6 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   }
 
   void _continueFromId() {
-    if (SellerIdType.tryParse(_idType?.storageValue) == null) {
-      showThriftSnackBar(context, 'Please select a valid ID type.');
-      return;
-    }
     final pair = IdCapturePair(front: _frontQuality, back: _backQuality);
     if (!pair.canProceed) {
       showThriftSnackBar(
@@ -999,15 +993,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   }
 
   Future<void> _captureIdSide(IdCaptureSide side) async {
-    final type = _idType;
-    if (type == null || SellerIdType.tryParse(type.storageValue) == null) {
-      showThriftSnackBar(context, 'Please select an ID type first.');
-      return;
-    }
-
     final result = await Navigator.of(context).push<IdCaptureResult>(
       MaterialPageRoute(
-        builder: (_) => IdCaptureScreen(side: side, idType: type),
+        builder: (_) => IdCaptureScreen(side: side),
       ),
     );
     if (!mounted || result == null) return;
@@ -1024,7 +1012,10 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       }
     });
 
-    final quality = await _qualityAnalyzer.analyze(result.bytes);
+    final quality = await _qualityAnalyzer.analyze(
+      result.bytes,
+      requireIdPhoto: result.side == IdCaptureSide.front,
+    );
     if (!mounted) return;
     setState(() {
       if (result.side == IdCaptureSide.front) {
@@ -1042,10 +1033,18 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       MaterialPageRoute(builder: (_) => const LivenessCaptureScreen()),
     );
     if (!mounted || result == null) return;
-    if (!result.passed) {
+    if (!result.livenessPassed) {
       showThriftSnackBar(
         context,
         'Complete look left, look right, and a blink before capturing.',
+        isError: true,
+      );
+      return;
+    }
+    if (!result.imageQualityPassed || !result.passed) {
+      showThriftSnackBar(
+        context,
+        'No face detected. Please position your face inside the frame.',
         isError: true,
       );
       return;
@@ -1057,13 +1056,12 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   }
 
   Future<void> _submit(AuthProvider auth) async {
-    final idType = SellerIdType.tryParse(_idType?.storageValue);
     final front = _idFrontBytes;
     final back = _idBackBytes;
     final liveness = _liveness;
     final pair = IdCapturePair(front: _frontQuality, back: _backQuality);
 
-    if (idType == null || front == null || back == null || !pair.canProceed) {
+    if (front == null || back == null || !pair.canProceed) {
       showThriftSnackBar(
         context,
         'Please complete ID capture and pass the quality check first.',
@@ -1099,7 +1097,6 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       await SellerVerificationService(context.read<SupabaseService>())
           .submitApplication(
         address: address,
-        idType: idType,
         idFrontBytes: front,
         idBackBytes: back,
         selfieBytes: liveness.imageBytes,
@@ -1113,11 +1110,11 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
           'Seller application submitted. An admin will review it.',
         );
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         showThriftSnackBar(
           context,
-          'Could not submit the application. Check your connection and try again.',
+          sellerSubmitUserMessage(error),
           isError: true,
         );
       }
@@ -1129,7 +1126,6 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   void _handleReapply(AuthProvider auth) {
     setState(() {
       _currentStep = 0;
-      _idType = null;
       _idFrontBytes = null;
       _idBackBytes = null;
       _frontQuality = null;

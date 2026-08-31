@@ -114,6 +114,7 @@ class ThriftTextField extends StatelessWidget {
     this.readOnly = false,
     this.autofocus = false,
     this.validator,
+    this.labelColor,
   });
 
   final String? label;
@@ -132,6 +133,7 @@ class ThriftTextField extends StatelessWidget {
   final bool readOnly;
   final bool autofocus;
   final String? Function(String?)? validator;
+  final Color? labelColor;
 
   @override
   Widget build(BuildContext context) {
@@ -142,7 +144,12 @@ class ThriftTextField extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label!, style: AppTypography.label.copyWith(color: AppColors.textPrimary)),
+              Text(
+                label!,
+                style: AppTypography.label.copyWith(
+                  color: labelColor ?? AppColors.textPrimary,
+                ),
+              ),
               ?labelSuffix,
             ],
           ),

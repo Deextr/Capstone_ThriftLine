@@ -8,29 +8,20 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../data/selfie_image_quality_analyzer.dart';
+import '../../domain/liveness_result.dart';
 
-class LivenessResult {
-  const LivenessResult({
-    required this.imageBytes,
-    required this.fileName,
-    required this.challenges,
-  });
-
-  final Uint8List imageBytes;
-  final String fileName;
-  final Map<String, bool> challenges;
-
-  bool get passed =>
-      challenges['face'] == true &&
-      challenges['blink'] == true &&
-      challenges['lookLeft'] == true &&
-      challenges['lookRight'] == true;
-}
+export '../../domain/liveness_result.dart';
 
 enum _Challenge { face, lookRight, lookLeft, blink, capture }
 
 class LivenessCaptureScreen extends StatefulWidget {
-  const LivenessCaptureScreen({super.key});
+  const LivenessCaptureScreen({
+    super.key,
+    this.qualityAnalyzer,
+  });
+
+  final SelfieImageQualityAnalyzer? qualityAnalyzer;
 
   @override
   State<LivenessCaptureScreen> createState() => _LivenessCaptureScreenState();
@@ -39,9 +30,13 @@ class LivenessCaptureScreen extends StatefulWidget {
 class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
   CameraController? _controller;
   FaceDetector? _detector;
+  late final SelfieImageQualityAnalyzer _qualityAnalyzer;
   bool _busy = false;
   bool _ready = false;
+  bool _checking = false;
+  bool _faceVisible = false;
   String? _error;
+  String? _retakeHint;
   _Challenge _step = _Challenge.face;
   bool _eyesWereOpen = false;
   final Map<String, bool> _done = {
@@ -51,9 +46,16 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
     'blink': false,
   };
 
+  bool get _livenessComplete =>
+      _done['face'] == true &&
+      _done['lookRight'] == true &&
+      _done['lookLeft'] == true &&
+      _done['blink'] == true;
+
   @override
   void initState() {
     super.initState();
+    _qualityAnalyzer = widget.qualityAnalyzer ?? SelfieImageQualityAnalyzer();
     _start();
   }
 
@@ -94,13 +96,20 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
   }
 
   Future<void> _onFrame(CameraImage image) async {
-    if (_busy || _detector == null || !_ready) return;
+    if (_busy || _checking || _detector == null || !_ready) return;
     _busy = true;
     try {
       final input = _toInputImage(image, _controller!.description);
       if (input == null) return;
       final faces = await _detector!.processImage(input);
-      if (!mounted || faces.isEmpty) return;
+      if (!mounted) return;
+      if (faces.isEmpty) {
+        if (_faceVisible) setState(() => _faceVisible = false);
+        return;
+      }
+      if (!_faceVisible) {
+        setState(() => _faceVisible = true);
+      }
       _evaluate(faces.first);
     } catch (_) {
       // Frame conversion can fail on some devices; keep streaming.
@@ -139,27 +148,87 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
 
   Future<void> _capture() async {
     final controller = _controller;
-    if (controller == null || !controller.value.isInitialized) return;
+    if (controller == null ||
+        !controller.value.isInitialized ||
+        _checking ||
+        !_livenessComplete) {
+      return;
+    }
+
+    setState(() {
+      _checking = true;
+      _retakeHint = null;
+    });
+
+    String? capturePath;
     try {
       if (controller.value.isStreamingImages) {
         await controller.stopImageStream();
       }
       final file = await controller.takePicture();
+      capturePath = file.path;
       final bytes = await file.readAsBytes();
+      if (!mounted) {
+        await _deleteQuietly(capturePath);
+        return;
+      }
+
+      final quality = await _qualityAnalyzer.analyze(
+        bytes,
+        filePath: capturePath,
+      );
+      await _deleteQuietly(capturePath);
+      capturePath = null;
+
       if (!mounted) return;
+
+      if (!quality.passed) {
+        setState(() {
+          _checking = false;
+          _retakeHint = quality.message;
+        });
+        showThriftSnackBar(context, quality.message, isError: true);
+        await _restartStream();
+        return;
+      }
+
       Navigator.pop(
         context,
         LivenessResult(
           imageBytes: bytes,
           fileName: 'liveness.jpg',
           challenges: Map<String, bool>.from(_done),
+          imageQualityPassed: true,
         ),
       );
-    } catch (e) {
-      if (mounted) {
-        showThriftSnackBar(context, 'Could not capture the photo.', isError: true);
-      }
+    } catch (_) {
+      await _deleteQuietly(capturePath);
+      if (!mounted) return;
+      setState(() => _checking = false);
+      showThriftSnackBar(context, 'Could not capture the photo.', isError: true);
+      await _restartStream();
     }
+  }
+
+  Future<void> _restartStream() async {
+    final controller = _controller;
+    if (controller == null ||
+        !controller.value.isInitialized ||
+        !mounted ||
+        controller.value.isStreamingImages) {
+      return;
+    }
+    try {
+      await controller.startImageStream(_onFrame);
+    } catch (_) {}
+  }
+
+  Future<void> _deleteQuietly(String? path) async {
+    if (path == null || path.isEmpty) return;
+    try {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+    } catch (_) {}
   }
 
   InputImage? _toInputImage(CameraImage image, CameraDescription camera) {
@@ -198,7 +267,9 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
         _Challenge.lookRight => 'Slowly look to your right',
         _Challenge.lookLeft => 'Slowly look to your left',
         _Challenge.blink => 'Blink both eyes',
-        _Challenge.capture => 'Hold still, then capture',
+        _Challenge.capture => _faceVisible
+            ? 'Hold still, then capture'
+            : 'Keep your face in the circle, then capture',
       };
 
   @override
@@ -245,10 +316,21 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
                   _chip('Blink', _done['blink'] == true),
                 ],
               ),
+              if (_retakeHint != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _retakeHint!,
+                  style: AppTypography.body.copyWith(color: AppColors.error),
+                  textAlign: TextAlign.center,
+                ),
+              ],
               const SizedBox(height: 16),
               ThriftButton(
-                label: 'Capture face photo',
-                onPressed: _step == _Challenge.capture ? _capture : null,
+                label: _checking ? 'Checking selfie…' : 'Capture face photo',
+                isLoading: _checking,
+                onPressed: _step == _Challenge.capture && !_checking
+                    ? _capture
+                    : null,
               ),
             ],
           ),

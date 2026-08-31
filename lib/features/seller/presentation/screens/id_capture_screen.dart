@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_typography.dart';
 import '../../../../widgets/thrift_widgets.dart';
-import '../../domain/seller_id_type.dart';
+import '../../data/id_preview_luma.dart';
+import '../../domain/id_image_quality.dart';
 import '../widgets/id_capture_overlay.dart';
 
 enum IdCaptureSide { front, back }
@@ -23,26 +24,34 @@ class IdCaptureScreen extends StatefulWidget {
   const IdCaptureScreen({
     super.key,
     required this.side,
-    required this.idType,
   });
 
   final IdCaptureSide side;
-  final SellerIdType idType;
 
   @override
   State<IdCaptureScreen> createState() => _IdCaptureScreenState();
 }
 
 class _IdCaptureScreenState extends State<IdCaptureScreen> {
+  static const _analyzeInterval = Duration(milliseconds: 150);
+  static const _greenHold = Duration(milliseconds: 400);
+
   CameraController? _controller;
   bool _ready = false;
   bool _capturing = false;
   String? _error;
   bool _permissionDenied = false;
   Uint8List? _preview;
+  bool _frameAligned = false;
+  bool _busyFrame = false;
+  DateTime? _lastAnalyzed;
+  DateTime? _alignedSince;
 
   String get _sideLabel =>
       widget.side == IdCaptureSide.front ? 'Front of ID' : 'Back of ID';
+
+  bool get _canCapture =>
+      _ready && !_capturing && _frameAligned && _preview == null;
 
   @override
   void initState() {
@@ -56,6 +65,8 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
       _permissionDenied = false;
       _ready = false;
       _preview = null;
+      _frameAligned = false;
+      _alignedSince = null;
     });
 
     if (kIsWeb || !(Platform.isAndroid || Platform.isIOS)) {
@@ -79,6 +90,9 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
         back,
         ResolutionPreset.high,
         enableAudio: false,
+        imageFormatGroup: Platform.isAndroid
+            ? ImageFormatGroup.nv21
+            : ImageFormatGroup.yuv420,
       );
       await controller.initialize();
       if (!mounted) {
@@ -86,6 +100,8 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
         return;
       }
       _controller = controller;
+      await _beginStream();
+      if (!mounted) return;
       setState(() => _ready = true);
     } on CameraException catch (e) {
       if (!mounted) return;
@@ -108,14 +124,79 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
     }
   }
 
+  Future<void> _beginStream() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+    if (controller.value.isStreamingImages) return;
+    try {
+      await controller.startImageStream(_onFrame);
+    } catch (_) {
+      _applyAlignment(false);
+    }
+  }
+
+  Future<void> _stopStream() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isStreamingImages) return;
+    try {
+      await controller.stopImageStream();
+    } catch (_) {}
+  }
+
+  void _onFrame(CameraImage image) {
+    if (_busyFrame || _capturing || _preview != null || !_ready) return;
+    final now = DateTime.now();
+    final last = _lastAnalyzed;
+    if (last != null && now.difference(last) < _analyzeInterval) return;
+    _lastAnalyzed = now;
+    _busyFrame = true;
+    try {
+      final sampled = IdPreviewLuma.sample(image);
+      if (sampled == null) {
+        _applyAlignment(false);
+        return;
+      }
+      final aligned = IdImageMetrics.isLiveAligned(
+        luma: sampled.luma,
+        width: sampled.width,
+        height: sampled.height,
+      );
+      _applyAlignment(aligned);
+    } catch (_) {
+      _applyAlignment(false);
+    } finally {
+      _busyFrame = false;
+    }
+  }
+
+  void _applyAlignment(bool alignedNow) {
+    if (!mounted) return;
+    if (!alignedNow) {
+      _alignedSince = null;
+      if (_frameAligned) {
+        setState(() => _frameAligned = false);
+      }
+      return;
+    }
+    _alignedSince ??= DateTime.now();
+    if (_frameAligned) return;
+    if (DateTime.now().difference(_alignedSince!) >= _greenHold) {
+      setState(() => _frameAligned = true);
+    }
+  }
+
   Future<void> _capture() async {
     final controller = _controller;
-    if (controller == null || !controller.value.isInitialized || _capturing) {
+    if (controller == null ||
+        !controller.value.isInitialized ||
+        _capturing ||
+        !_frameAligned) {
       return;
     }
     setState(() => _capturing = true);
     String? tempPath;
     try {
+      await _stopStream();
       final file = await controller.takePicture();
       tempPath = file.path;
       final bytes = await file.readAsBytes();
@@ -123,10 +204,14 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
       setState(() {
         _preview = bytes;
         _capturing = false;
+        _frameAligned = false;
+        _alignedSince = null;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() => _capturing = false);
+      await _beginStream();
+      if (!mounted) return;
       showThriftSnackBar(
         context,
         'Could not capture the photo. Please try again.',
@@ -142,8 +227,13 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
     }
   }
 
-  void _retake() {
-    setState(() => _preview = null);
+  Future<void> _retake() async {
+    setState(() {
+      _preview = null;
+      _frameAligned = false;
+      _alignedSince = null;
+    });
+    await _beginStream();
   }
 
   void _usePhoto() {
@@ -156,7 +246,15 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
 
   @override
   void dispose() {
-    _controller?.dispose();
+    final controller = _controller;
+    _controller = null;
+    if (controller != null) {
+      if (controller.value.isInitialized && controller.value.isStreamingImages) {
+        controller.stopImageStream().whenComplete(controller.dispose);
+      } else {
+        controller.dispose();
+      }
+    }
     super.dispose();
   }
 
@@ -217,7 +315,9 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
           child: Text(
-            'Align the ${widget.idType.label} inside the frame. Avoid glare and hold still.',
+            _frameAligned
+                ? 'ID is in the frame. Hold still, then capture.'
+                : 'Place your ID inside the frame. Avoid glare and hold still.',
             style: AppTypography.body.copyWith(color: Colors.white),
             textAlign: TextAlign.center,
           ),
@@ -246,7 +346,7 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
                         color: Colors.black,
                         child: Center(child: CircularProgressIndicator()),
                       ),
-                    const IdCaptureOverlay(),
+                    IdCaptureOverlay(aligned: _frameAligned),
                   ],
                 ),
               ),
@@ -257,9 +357,13 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
           child: ThriftButton(
-            label: _capturing ? 'Capturing…' : 'Capture $_sideLabel',
+            label: _capturing
+                ? 'Capturing…'
+                : _frameAligned
+                    ? 'Capture $_sideLabel'
+                    : 'Place ID in the frame',
             isLoading: _capturing,
-            onPressed: _ready && !_capturing ? _capture : null,
+            onPressed: _canCapture ? _capture : null,
           ),
         ),
       ],

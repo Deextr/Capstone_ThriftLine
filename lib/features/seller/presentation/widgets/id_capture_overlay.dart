@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../domain/id_image_quality.dart';
 
 /// Darkened camera overlay with an ID-1 card window and placement hint.
 class IdCaptureOverlay extends StatelessWidget {
-  const IdCaptureOverlay({super.key});
+  const IdCaptureOverlay({super.key, this.aligned = false});
 
-  static const double cardAspect = 1.586;
+  /// Green when a document-like card fills the guide; red otherwise.
+  final bool aligned;
+
+  static const double cardAspect = IdCaptureGuide.cardAspect;
 
   @override
   Widget build(BuildContext context) {
@@ -18,26 +22,32 @@ class IdCaptureOverlay extends StatelessWidget {
           return Stack(
             fit: StackFit.expand,
             children: [
-              CustomPaint(painter: _CutoutPainter(hole: hole)),
+              CustomPaint(
+                painter: _CutoutPainter(hole: hole, aligned: aligned),
+              ),
               Positioned.fromRect(
                 rect: hole,
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        'PLACE ID HERE',
-                        style: AppTypography.subheading.copyWith(
-                          color: Colors.white,
-                          letterSpacing: 1.2,
-                          shadows: const [
-                            Shadow(blurRadius: 8, color: Colors.black54),
-                          ],
+                      if (!aligned) ...[
+                        Text(
+                          'PLACE ID HERE',
+                          style: AppTypography.subheading.copyWith(
+                            color: Colors.white,
+                            letterSpacing: 1.2,
+                            shadows: const [
+                              Shadow(blurRadius: 8, color: Colors.black54),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
+                        const SizedBox(height: 6),
+                      ],
                       Text(
-                        'Keep the entire ID inside the frame',
+                        aligned
+                            ? 'ID in frame — hold still'
+                            : 'Place ID inside the frame',
                         style: AppTypography.caption.copyWith(
                           color: Colors.white,
                           shadows: const [
@@ -61,8 +71,8 @@ class IdCaptureOverlay extends StatelessWidget {
     const inset = 20.0;
     var width = size.width - inset * 2;
     var height = width / cardAspect;
-    if (height > size.height * 0.62) {
-      height = size.height * 0.62;
+    if (height > size.height * IdCaptureGuide.maxHeightFraction) {
+      height = size.height * IdCaptureGuide.maxHeightFraction;
       width = height * cardAspect;
     }
     return Rect.fromCenter(
@@ -74,9 +84,10 @@ class IdCaptureOverlay extends StatelessWidget {
 }
 
 class _CutoutPainter extends CustomPainter {
-  const _CutoutPainter({required this.hole});
+  const _CutoutPainter({required this.hole, required this.aligned});
 
   final Rect hole;
+  final bool aligned;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -91,13 +102,13 @@ class _CutoutPainter extends CustomPainter {
     canvas.drawRRect(
       RRect.fromRectAndRadius(hole, const Radius.circular(16)),
       Paint()
-        ..color = AppColors.primary
+        ..color = aligned ? AppColors.success : AppColors.error
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5,
+        ..strokeWidth = aligned ? 3.5 : 2.5,
     );
   }
 
   @override
   bool shouldRepaint(covariant _CutoutPainter oldDelegate) =>
-      oldDelegate.hole != hole;
+      oldDelegate.hole != hole || oldDelegate.aligned != aligned;
 }

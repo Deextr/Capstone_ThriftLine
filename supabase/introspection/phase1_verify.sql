@@ -74,6 +74,18 @@ WITH checks AS (
          NOT has_table_privilege('authenticated', 'public.notifications', 'INSERT'),
          '20260822070000'
 
+  UNION ALL SELECT 14, 'government_id_number is nullable',
+         (SELECT is_nullable FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'user_verifications'
+            AND column_name = 'government_id_number') = 'YES',
+         '20260831010000'
+
+  UNION ALL SELECT 15, 'notifications has an INSERT policy for notify_user',
+         (SELECT count(*) FROM pg_policies
+          WHERE schemaname = 'public' AND tablename = 'notifications'
+            AND cmd = 'INSERT') >= 1,
+         '20260831010000'
+
 )
 SELECT
   seq,

@@ -1,6 +1,10 @@
 # Environment variables (credentials)
 .env
 
+# Local ID-capture samples for analyzer tuning. Never commit real IDs.
+test/fixtures/id_capture/*
+!test/fixtures/id_capture/README.md
+
 # Miscellaneous
 *.class
 *.log

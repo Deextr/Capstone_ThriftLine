@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -10,7 +11,9 @@ import '../../../../core/utils/validators.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../domain/legal_documents.dart';
-import '../widgets/legal_consent_checkbox.dart';
+import '../widgets/auth_branding.dart';
+import '../widgets/legal_consent_notice.dart';
+import '../widgets/login_video_background.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -25,10 +28,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
-  // Consent is never pre-granted: the user must tick the box on every sign-in.
-  bool _hasAgreedToLegal = false;
-  bool _showConsentError = false;
-
   @override
   void dispose() {
     _emailController.dispose();
@@ -36,16 +35,8 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  /// Blocks the sign-in unless consent has been explicitly given.
-  bool _ensureConsent() {
-    if (_hasAgreedToLegal) return true;
-    setState(() => _showConsentError = true);
-    return false;
-  }
-
   Future<void> _loginWithEmail() async {
     if (!_formKey.currentState!.validate()) return;
-    if (!_ensureConsent()) return;
 
     final auth = context.read<AuthProvider>();
     final error = await auth.loginWithEmail(
@@ -62,8 +53,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _loginWithGoogle() async {
-    if (!_ensureConsent()) return;
-
     final auth = context.read<AuthProvider>();
     final error = await auth.loginWithGoogle(consent: LegalConsent.now());
     if (!mounted) return;
@@ -77,162 +66,188 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final compact = screenHeight < 700;
+    const fieldLabelColor = Colors.white;
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppConstants.spacingLg),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 48),
-                  Center(
-                    child: Image.asset(
-                      'assets/images/thriftline-app-icon.png',
-                      height: 100,
+        backgroundColor: AppColors.primaryDark,
+        resizeToAvoidBottomInset: true,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            const LoginVideoBackground(),
+            const AuthVideoScrim(),
+            SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(
+                      AppConstants.spacingLg,
+                      compact ? AppConstants.spacingMd : AppConstants.spacingXl,
+                      AppConstants.spacingLg,
+                      AppConstants.spacingLg,
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Thriftline',
-                    style: AppTypography.display,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Buy and sell pre-loved fashion',
-                    style: AppTypography.body.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 40),
-
-                  // Email field
-                  ThriftTextField(
-                    label: 'Email',
-                    hint: 'your@email.com',
-                    controller: _emailController,
-                    icon: Icons.email_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: Validators.email,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Password field
-                  ThriftTextField(
-                    label: 'Password',
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    icon: Icons.lock_outline,
-                    validator: Validators.password,
-                    suffix: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight -
+                            (compact
+                                ? AppConstants.spacingMd
+                                : AppConstants.spacingXl) -
+                            AppConstants.spacingLg,
                       ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Terms & Privacy consent gate
-                  LegalConsentCheckbox(
-                    value: _hasAgreedToLegal,
-                    enabled: !auth.isLoading,
-                    errorText: _showConsentError
-                        ? 'You must agree to the Terms and Conditions and '
-                              'Privacy Policy to continue.'
-                        : null,
-                    onChanged: (value) => setState(() {
-                      _hasAgreedToLegal = value;
-                      if (value) _showConsentError = false;
-                    }),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Login button
-                  ThriftButton(
-                    label: 'Login',
-                    onPressed: auth.isLoading ? null : _loginWithEmail,
-                    isLoading: auth.isLoading,
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Divider
-                  _OrDivider(),
-                  const SizedBox(height: 24),
-
-                  // Google Sign-In button
-                  _GoogleSignInButton(
-                    onPressed: auth.isLoading ? null : _loginWithGoogle,
-                    isLoading: auth.isLoading,
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Sign up link
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        "Don't have an account? ",
-                        style: AppTypography.body,
-                      ),
-                      GestureDetector(
-                        onTap: () => context.go(RouteNames.signup),
-                        child: Text(
-                          'Sign up',
-                          style: AppTypography.body.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Center(
+                              child: AuthBrandLogo(size: compact ? 84 : 100),
+                            ),
+                            SizedBox(height: compact ? 16 : 24),
+                            Text(
+                              'ThriftLine',
+                              style: AppTypography.display.copyWith(
+                                color: Colors.white,
+                                letterSpacing: -0.4,
+                                shadows: const [
+                                  Shadow(
+                                    color: Color(0x66000000),
+                                    blurRadius: 8,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Welcome back',
+                              style: AppTypography.heading.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Buy and sell pre-loved fashion',
+                              style: AppTypography.body.copyWith(
+                                color: Colors.white.withValues(alpha: 0.82),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: compact ? 28 : 40),
+                            ThriftTextField(
+                              label: 'Email',
+                              hint: 'your@email.com',
+                              controller: _emailController,
+                              icon: Icons.email_outlined,
+                              keyboardType: TextInputType.emailAddress,
+                              validator: Validators.email,
+                              labelColor: fieldLabelColor,
+                            ),
+                            const SizedBox(height: 16),
+                            ThriftTextField(
+                              label: 'Password',
+                              controller: _passwordController,
+                              obscureText: _obscurePassword,
+                              icon: Icons.lock_outline,
+                              validator: Validators.password,
+                              labelColor: fieldLabelColor,
+                              suffix: IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
+                                onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword,
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: compact ? 20 : 24),
+                            ThriftButton(
+                              label: 'Login',
+                              onPressed:
+                                  auth.isLoading ? null : _loginWithEmail,
+                              isLoading: auth.isLoading,
+                            ),
+                            SizedBox(height: compact ? 16 : 24),
+                            const _OrDivider(),
+                            SizedBox(height: compact ? 16 : 24),
+                            _GoogleSignInButton(
+                              onPressed:
+                                  auth.isLoading ? null : _loginWithGoogle,
+                              isLoading: auth.isLoading,
+                            ),
+                            SizedBox(height: compact ? 20 : 24),
+                            const LegalConsentNotice(),
+                            const SizedBox(height: 20),
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  "Don't have an account? ",
+                                  style: AppTypography.body.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.88),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () => context.go(RouteNames.signup),
+                                  child: Text(
+                                    'Sign up',
+                                    style: AppTypography.body.copyWith(
+                                      color: AppColors.primaryLight,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                ],
+                    ),
+                  );
+                },
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared auth widgets
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// "or continue with" divider used on both login and signup screens.
 class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
   @override
   Widget build(BuildContext context) {
+    final line = Colors.white.withValues(alpha: 0.28);
     return Row(
       children: [
-        Expanded(child: Divider(color: AppColors.textSecondary.withValues(alpha: 0.3))),
+        Expanded(child: Divider(color: line)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            'or continue with',
+            'or',
             style: AppTypography.caption.copyWith(
-              color: AppColors.textSecondary,
+              color: Colors.white.withValues(alpha: 0.78),
             ),
           ),
         ),
-        Expanded(child: Divider(color: AppColors.textSecondary.withValues(alpha: 0.3))),
+        Expanded(child: Divider(color: line)),
       ],
     );
   }
 }
 
-/// Google Sign-In button with the Google logo.
 class _GoogleSignInButton extends StatelessWidget {
   const _GoogleSignInButton({this.onPressed, this.isLoading = false});
 
@@ -246,7 +261,9 @@ class _GoogleSignInButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          side: BorderSide(color: AppColors.textSecondary.withValues(alpha: 0.3)),
+          foregroundColor: Colors.white,
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.42)),
+          backgroundColor: Colors.white.withValues(alpha: 0.10),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppConstants.radiusMd),
           ),
@@ -255,35 +272,36 @@ class _GoogleSignInButton extends StatelessWidget {
             ? const SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Google "G" logo
                   Container(
                     width: 24,
                     height: 24,
+                    padding: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Center(
-                      child: Text(
-                        'G',
-                        style: TextStyle(
-                          color: Colors.blue.shade700,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                        ),
-                      ),
+                    child: SvgPicture.asset(
+                      'assets/images/google_g.svg',
+                      fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    'Continue with Google',
-                    style: AppTypography.body.copyWith(
-                      fontWeight: FontWeight.w600,
+                  Flexible(
+                    child: Text(
+                      'Continue with Google',
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.body.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],

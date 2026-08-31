@@ -16,6 +16,9 @@ enum SellerIdType {
   final String storageValue;
   final String label;
 
+  /// Stored when the applicant is not asked to pick a specific type.
+  static const String unspecifiedStorageValue = 'accepted_id';
+
   static const List<String> prohibitedStorageValues = [
     'voters_id',
     'voter_id',
