@@ -54,12 +54,19 @@ class SharedPreferencesService {
   Future<bool> setDisplayName(String value) =>
       _prefs.setString(AppConstants.keyDisplayName, value);
 
+  bool get isEmailOtpPending =>
+      _prefs.getBool(AppConstants.keyEmailOtpPending) ?? false;
+
+  Future<bool> setEmailOtpPending(bool value) =>
+      _prefs.setBool(AppConstants.keyEmailOtpPending, value);
+
   Future<void> clearAuthSession() async {
     await setLoggedIn(false);
     await remove(AppConstants.keyUserRole);
     await remove(AppConstants.keyUsername);
     await remove(AppConstants.keyUserId);
     await remove(AppConstants.keyDisplayName);
+    await remove(AppConstants.keyEmailOtpPending);
   }
 
   // Generic helpers

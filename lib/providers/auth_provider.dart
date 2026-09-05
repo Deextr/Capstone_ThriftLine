@@ -12,6 +12,13 @@ import '../features/auth/domain/auth_user.dart';
 import '../features/auth/domain/legal_documents.dart';
 import '../models/enums.dart';
 
+/// Router-facing gate: a restored session is not enough while email OTP is
+/// still outstanding.
+bool authIsFullyAuthenticated({
+  required bool hasSession,
+  required bool emailOtpPending,
+}) => hasSession && !emailOtpPending;
+
 /// Manages authentication state, session persistence, and role detection.
 ///
 /// Wraps [AuthService] (Supabase) and caches minimal session data
@@ -25,6 +32,7 @@ class AuthProvider extends ChangeNotifier {
   AuthUser? _user;
   bool _isLoading = false;
   bool _isInitialized = false;
+  bool _emailOtpPending = false;
 
   StreamSubscription? _authSubscription;
 
@@ -32,6 +40,13 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isInitialized => _isInitialized;
   bool get isAuthenticated => _user != null;
+  bool get isEmailOtpPending => _emailOtpPending;
+
+  /// Session exists and the email OTP step is not still outstanding.
+  bool get isFullyAuthenticated => authIsFullyAuthenticated(
+    hasSession: isAuthenticated,
+    emailOtpPending: _emailOtpPending,
+  );
 
   bool get isBuyer => _user?.isBuyer ?? false;
   bool get isSeller => _user?.isSeller ?? false;
@@ -56,6 +71,7 @@ class AuthProvider extends ChangeNotifier {
       final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         _user = currentUser;
+        _emailOtpPending = _prefs.isEmailOtpPending;
         await _saveSession(currentUser);
       } else {
         await _clearSession();
@@ -80,6 +96,7 @@ class AuthProvider extends ChangeNotifier {
 
     if (authEvent == AuthChangeEvent.signedOut) {
       _user = null;
+      _emailOtpPending = false;
       await _clearSession();
       notifyListeners();
     } else if (authEvent == AuthChangeEvent.signedIn ||
@@ -108,6 +125,7 @@ class AuthProvider extends ChangeNotifier {
     required LegalConsent consent,
   }) async {
     _isLoading = true;
+    await _setEmailOtpPending(true);
     notifyListeners();
 
     final result = await _authService.signInWithEmail(
@@ -117,6 +135,7 @@ class AuthProvider extends ChangeNotifier {
     );
 
     if (!result.success) {
+      await _setEmailOtpPending(false);
       _isLoading = false;
       notifyListeners();
       return result.errorMessage;
@@ -124,9 +143,11 @@ class AuthProvider extends ChangeNotifier {
 
     _user = result.user;
     await _saveSession(_user!);
+    await _setEmailOtpPending(true);
 
     _isLoading = false;
     notifyListeners();
+    await sendEmailOtp();
     return null;
   }
 
@@ -147,6 +168,7 @@ class AuthProvider extends ChangeNotifier {
 
     _user = result.user;
     await _saveSession(_user!);
+    await _setEmailOtpPending(false);
 
     _isLoading = false;
     notifyListeners();
@@ -167,6 +189,7 @@ class AuthProvider extends ChangeNotifier {
     required LegalConsent consent,
   }) async {
     _isLoading = true;
+    await _setEmailOtpPending(true);
     notifyListeners();
 
     final result = await _authService.signUpWithEmail(
@@ -177,12 +200,14 @@ class AuthProvider extends ChangeNotifier {
     );
 
     if (!result.success) {
+      await _setEmailOtpPending(false);
       _isLoading = false;
       notifyListeners();
       return result;
     }
 
     if (!result.requiresEmailVerification && result.user == null) {
+      await _setEmailOtpPending(false);
       _isLoading = false;
       notifyListeners();
       return AuthResult.failure('Something went wrong. Please try again.');
@@ -197,11 +222,17 @@ class AuthProvider extends ChangeNotifier {
       _user = result.user;
       if (_user != null) {
         await _saveSession(_user!);
+        if (result.requiresEmailOtp) {
+          await _setEmailOtpPending(true);
+        }
       }
     }
 
     _isLoading = false;
     notifyListeners();
+    if (result.requiresEmailOtp && _user != null) {
+      await sendEmailOtp();
+    }
     return result;
   }
 
@@ -216,6 +247,7 @@ class AuthProvider extends ChangeNotifier {
 
     await _authService.signOut();
     _user = null;
+    _emailOtpPending = false;
     await _clearSession();
 
     _isLoading = false;
@@ -280,6 +312,18 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Sends a login/signup email OTP through the Gmail SMTP Edge Function.
+  Future<String?> sendEmailOtp() {
+    return _authService.sendEmailOtp();
+  }
+
+  /// Confirms the email code, then clears the pending-OTP gate.
+  Future<String?> verifyEmailOtp({required String token}) async {
+    final error = await _authService.verifyEmailOtp(token: token);
+    if (error == null) await _setEmailOtpPending(false);
+    return error;
+  }
+
   /// Sends a phone OTP through the server-side iProgSMS function.
   Future<String?> sendPhoneOtp(String phone) {
     return _authService.sendPhoneOtp(phone);
@@ -318,7 +362,13 @@ class AuthProvider extends ChangeNotifier {
     await _prefs.setDisplayName(user.displayName);
   }
 
+  Future<void> _setEmailOtpPending(bool value) async {
+    _emailOtpPending = value;
+    await _prefs.setEmailOtpPending(value);
+  }
+
   Future<void> _clearSession() async {
+    _emailOtpPending = false;
     await _prefs.clearAuthSession();
   }
 

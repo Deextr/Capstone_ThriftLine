@@ -49,7 +49,9 @@ class _LoginScreenState extends State<LoginScreen> {
       showThriftSnackBar(context, error, isError: true);
       return;
     }
-    context.go(auth.homeRoute);
+    context.go(
+      auth.isEmailOtpPending ? RouteNames.verifyEmailOtp : auth.homeRoute,
+    );
   }
 
   Future<void> _loginWithGoogle() async {

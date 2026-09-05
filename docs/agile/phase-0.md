@@ -45,13 +45,13 @@ Applied in order in Supabase SQL Editor:
 
 ### 4. Seed Accounts
 
-Created demo accounts for testing:
+Promotes the existing project admin (created in Studio or the app) to `admin`:
 
-- 1 **admin** — approve sellers, handle reports (Studio + seed script)
-- 1 **seller** — test listing creation
-- 1 **buyer** — test buyer flows
+- **admin** — `dexter041711@gmail.com` — approve sellers, handle reports
 
 Script: `supabase/seed/001_role_assignments.sql`
+
+Passwords stay in Studio. The script only updates `public.users.role`.
 
 ---
 
@@ -111,6 +111,6 @@ Phase 0 is done. The database has:
 - Secure RLS on core tables
 - Protected user roles and trust scores
 - Reliable signup → profile creation flow
-- Seed accounts for buyer, seller, and admin testing
+- Seed script that promotes `dexter041711@gmail.com` to admin
 
 **Next:** Phase 1 — Seller verification and admin approval workflow.

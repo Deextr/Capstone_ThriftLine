@@ -41,5 +41,6 @@ abstract final class RouteNames {
   static const String adminHome = '/admin';
   static const String adminReview = '/admin/review/:id';
   static const String verifyPhone = '/verify-phone';
+  static const String verifyEmailOtp = '/verify-email-otp';
   static const String addresses = '/addresses';
 }

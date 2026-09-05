@@ -9,6 +9,7 @@ import '../../features/admin/presentation/screens/admin_shell_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/signup_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
+import '../../features/auth/presentation/screens/verify_email_otp_screen.dart';
 import '../../features/auth/presentation/screens/verify_phone_screen.dart';
 import '../../features/profile/presentation/screens/address_book_screen.dart';
 import '../../features/buyer/presentation/screens/become_seller_screen.dart';
@@ -58,6 +59,7 @@ GoRouter createAppRouter({
       final isLogin = location == RouteNames.login;
       final isSignup = location == RouteNames.signup;
       final isLegal = location.startsWith('/legal/');
+      final isVerifyEmailOtp = location == RouteNames.verifyEmailOtp;
 
       if (isSplash) return null;
 
@@ -69,15 +71,23 @@ GoRouter createAppRouter({
         return RouteNames.onboarding;
       }
 
-      if (!authProvider.isAuthenticated &&
+      if (authProvider.isEmailOtpPending) {
+        if (!authProvider.isAuthenticated) return RouteNames.login;
+        if (!isVerifyEmailOtp) return RouteNames.verifyEmailOtp;
+        return null;
+      }
+
+      if (!authProvider.isFullyAuthenticated &&
           !isLogin &&
           !isSignup &&
           !isOnboarding) {
         return RouteNames.login;
       }
 
-      if (authProvider.isAuthenticated) {
-        if (isLogin || isSignup || isOnboarding) return authProvider.homeRoute;
+      if (authProvider.isFullyAuthenticated) {
+        if (isLogin || isSignup || isOnboarding || isVerifyEmailOtp) {
+          return authProvider.homeRoute;
+        }
         if (location.startsWith('/admin') && !authProvider.isAdmin) {
           return authProvider.homeRoute;
         }
@@ -98,6 +108,10 @@ GoRouter createAppRouter({
       ),
       GoRoute(path: RouteNames.login, builder: (_, _) => const LoginScreen()),
       GoRoute(path: RouteNames.signup, builder: (_, _) => const SignupScreen()),
+      GoRoute(
+        path: RouteNames.verifyEmailOtp,
+        builder: (_, _) => const VerifyEmailOtpScreen(),
+      ),
       GoRoute(
         path: RouteNames.legal,
         builder: (_, state) => LegalDocumentScreen(

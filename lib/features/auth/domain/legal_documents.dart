@@ -33,8 +33,8 @@ class LegalDocument {
 /// Bump [version] whenever the wording changes materially so that acceptance
 /// records remain auditable.
 abstract final class LegalDocuments {
-  static const String version = '2026.08.1';
-  static const String lastUpdated = 'August 2026';
+  static const String version = '2026.09.1';
+  static const String lastUpdated = 'September 2026';
 
   static const LegalDocument terms = LegalDocument(
     type: LegalDocumentType.terms,
@@ -142,10 +142,11 @@ abstract final class LegalDocuments {
       LegalSection(
         heading: '4. Email Verification',
         body:
-            'When you register, we send a confirmation link to the address you '
-            'provided so we can verify that it belongs to you. The link is '
-            'generated and validated by our authentication provider and can '
-            'only be used once.',
+            'When you register with email and password, and each time you sign '
+            'in that way, we send a one-time 6-digit code to the address you '
+            'provided so we can confirm that you can access that inbox. The '
+            'code expires after a few minutes and can be used only once. '
+            'Google sign-in does not use this step.',
       ),
       LegalSection(
         heading: '5. Sharing and Disclosure',

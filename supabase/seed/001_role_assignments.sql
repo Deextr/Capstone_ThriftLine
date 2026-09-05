@@ -7,9 +7,10 @@
 -- ---------------------------------------------------------------------------
 -- PREREQUISITE
 -- ---------------------------------------------------------------------------
--- Create the three accounts first in Supabase Studio:
+-- Create the admin account first in Supabase Studio (or sign up in the app):
 --
 --   Authentication -> Users -> Add user -> Create new user
+--   Email: dexter041711@gmail.com
 --   Tick "Auto Confirm User" so no email round-trip is needed.
 --
 -- Do NOT insert into auth.users by hand. GoTrue owns that table: passwords are
@@ -34,23 +35,16 @@
 -- SQL Editor — so running this here works while the same UPDATE from the app
 -- would silently revert.
 --
--- Idempotent: re-running changes nothing once the roles are correct.
+-- Idempotent: re-running changes nothing once the role is correct.
 
 -- ---------------------------------------------------------------------------
--- Edit these addresses to match the accounts you created.
---
--- Tip: if you want confirmation and password-reset emails to actually arrive,
--- use plus-addressing on a mailbox you own — you+admin@gmail.com,
--- you+seller@gmail.com, you+buyer@gmail.com all deliver to the same inbox but
--- are distinct identities to Supabase.
+-- Edit this address only if the admin mailbox changes.
 -- ---------------------------------------------------------------------------
 
 DO $$
 DECLARE
   v_seed CONSTANT jsonb := '[
-    {"email": "thriftline.admin@example.com",  "role": "admin",  "full_name": "ThriftLine Admin"},
-    {"email": "thriftline.seller@example.com", "role": "seller", "full_name": "Demo Seller"},
-    {"email": "thriftline.buyer@example.com",  "role": "buyer",  "full_name": "Demo Buyer"}
+    {"email": "dexter041711@gmail.com", "role": "admin", "full_name": "Admin"}
   ]'::jsonb;
 
   v_entry    jsonb;
@@ -93,7 +87,7 @@ BEGIN
 
     UPDATE public.users u
     SET    role      = v_role,
-           full_name = COALESCE(NULLIF(TRIM(v_entry->>'full_name'), ''), u.full_name)
+           full_name = COALESCE(NULLIF(TRIM(u.full_name), ''), v_entry->>'full_name')
     WHERE  u.user_id = v_uid;
 
     INSERT INTO seed_results VALUES (
@@ -107,12 +101,12 @@ $$;
 SELECT * FROM seed_results ORDER BY email;
 
 -- ---------------------------------------------------------------------------
--- Confirm the result. The admin row is the one that matters: until it exists,
--- is_admin() returns false for every account and every admin-only policy in the
--- database is unreachable.
+-- Confirm the result. Until an admin row exists, is_admin() returns false for
+-- every account and every admin-only policy in the database is unreachable.
 -- ---------------------------------------------------------------------------
 
 SELECT u.username, u.full_name, u.role, u.account_status, u.trust_score
 FROM public.users u
-WHERE u.role IN ('admin', 'seller')
+WHERE lower(u.email) = 'dexter041711@gmail.com'
+   OR u.role = 'admin'::user_role_enum
 ORDER BY u.role, u.username;

@@ -67,6 +67,11 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
+    if (result.requiresEmailOtp || auth.isEmailOtpPending) {
+      context.go(RouteNames.verifyEmailOtp);
+      return;
+    }
+
     context.go(auth.homeRoute);
   }
 
