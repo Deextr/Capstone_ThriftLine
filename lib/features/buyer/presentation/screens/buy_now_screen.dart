@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
-import '../../../../providers/auth_provider.dart';
 import '../../../../providers/data_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 

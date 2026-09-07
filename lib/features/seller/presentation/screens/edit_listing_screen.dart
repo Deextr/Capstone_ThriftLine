@@ -7,8 +7,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../models/enums.dart';
 import '../../../../widgets/thrift_widgets.dart';
-import '../../controllers/add_listing_controller.dart'
-    show CategoryItem, ListingFormat, SelectedImage;
+import '../../controllers/add_listing_controller.dart' show ListingFormat;
 import '../../controllers/edit_listing_controller.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────

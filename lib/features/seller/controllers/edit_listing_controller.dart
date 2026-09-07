@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -473,12 +471,7 @@ class EditListingController extends ChangeNotifier {
 
   // ── DB helpers ─────────────────────────────────────────────────────────────
 
-  ProductCondition _conditionFromDb(String s) {
-    if (s == 'new') return ProductCondition.newWithTags;
-    if (s == 'like_new') return ProductCondition.likeNew;
-    if (s == 'good') return ProductCondition.good;
-    return ProductCondition.fair;
-  }
+  ProductCondition _conditionFromDb(String s) => ProductCondition.fromDbString(s);
 
   ListingFormat _formatFromDb(String s) {
     if (s == 'auction') return ListingFormat.auction;

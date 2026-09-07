@@ -52,22 +52,15 @@ enum ListingFormat { fixedPrice, auction, liveSession }
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Maps a [ProductCondition] to its corresponding DB string.
-///
-/// Exposed at package level so tests can call it without instantiating
-/// [AddListingController]. Annotated [@visibleForTesting] to signal that
-/// production code should go through the controller's private `_conditionToDb`.
-@visibleForTesting
 String conditionToDbString(ProductCondition condition) => switch (condition) {
       ProductCondition.newWithTags => 'new',
       ProductCondition.likeNew => 'like_new',
       ProductCondition.good => 'good',
       ProductCondition.fair => 'fair',
+      ProductCondition.poor => 'poor',
     };
 
 /// Maps a [ListingFormat] to its corresponding DB string.
-///
-/// Exposed at package level for testability; see [conditionToDbString].
-@visibleForTesting
 String formatToDbString(ListingFormat format) => switch (format) {
       ListingFormat.fixedPrice => 'fixed_price',
       ListingFormat.auction => 'auction',

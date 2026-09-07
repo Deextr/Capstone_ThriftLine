@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-
+import 'package:provider/provider.dart';
 
 import '../../../../core/routes/route_names.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../widgets/curved_navigation_bar.dart';
 import '../../../../widgets/thrift_drawer.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../profile/screens/buyer_profile_tab.dart';
+import '../../controllers/home_controller.dart';
 import 'buyer_bids_tab.dart';
 import 'buyer_home_tab.dart';
 import 'buyer_looking_for_tab.dart';
@@ -21,14 +23,26 @@ class BuyerShellScreen extends StatefulWidget {
 class _BuyerShellScreenState extends State<BuyerShellScreen> {
   int _index = 0;
 
+  /// The Home tab is wrapped in a [ChangeNotifierProvider] so
+  /// [HomeController] is scoped to the buyer shell lifetime.
+  /// Other tabs remain simple const widgets.
+  late final List<Widget> _tabs;
 
-  static const _tabs = [
-    BuyerHomeTab(),
-    BuyerBidsTab(),
-    BuyerLookingForTab(),
-    _MessagesTab(),
-    BuyerProfileTab(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _tabs = [
+      ChangeNotifierProvider(
+        create: (context) =>
+            HomeController(supabase: context.read<SupabaseService>()),
+        child: const BuyerHomeTab(),
+      ),
+      const BuyerBidsTab(),
+      const BuyerLookingForTab(),
+      const _MessagesTab(),
+      const BuyerProfileTab(),
+    ];
+  }
 
   static const _navItems = [
     CurvedNavItem(
@@ -74,15 +88,9 @@ class _BuyerShellScreenState extends State<BuyerShellScreen> {
         switchInCurve: Curves.easeOut,
         switchOutCurve: Curves.easeIn,
         transitionBuilder: (child, animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: child,
-          );
+          return FadeTransition(opacity: animation, child: child);
         },
-        child: KeyedSubtree(
-          key: ValueKey<int>(_index),
-          child: _tabs[_index],
-        ),
+        child: KeyedSubtree(key: ValueKey<int>(_index), child: _tabs[_index]),
       ),
       bottomNavigationBar: CurvedNavigationBar(
         selectedIndex: _index,

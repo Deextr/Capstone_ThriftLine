@@ -38,7 +38,8 @@ enum ProductCondition {
   newWithTags('New with tags'),
   likeNew('Like new'),
   good('Good'),
-  fair('Fair');
+  fair('Fair'),
+  poor('Poor');
 
   const ProductCondition(this.label);
   final String label;
@@ -49,6 +50,16 @@ enum ProductCondition {
     }
     return ProductCondition.good;
   }
+
+  /// Parses the Supabase `product_condition_enum` value.
+  static ProductCondition fromDbString(String value) => switch (value) {
+    'new' => ProductCondition.newWithTags,
+    'like_new' => ProductCondition.likeNew,
+    'good' => ProductCondition.good,
+    'fair' => ProductCondition.fair,
+    'poor' => ProductCondition.poor,
+    _ => ProductCondition.good,
+  };
 }
 
 /// Mirrors `product_status_enum` in Postgres.
@@ -60,17 +71,35 @@ enum ProductStatus {
 
   static ProductStatus fromString(String value) => ProductStatus.values
       .firstWhere((e) => e.name == value, orElse: () => ProductStatus.active);
+
+  /// Parses the Supabase `product_status_enum` value.
+  static ProductStatus fromDbString(String value) => switch (value) {
+    'active' => ProductStatus.active,
+    'sold' => ProductStatus.sold,
+    'removed' => ProductStatus.removed,
+    'draft' => ProductStatus.draft,
+    _ => ProductStatus.active,
+  };
 }
 
 enum SellingType {
   fixedPrice,
   auction,
-  both;
+  both,
+  liveSession;
 
   static SellingType fromString(String value) => SellingType.values.firstWhere(
     (e) => e.name == value,
     orElse: () => SellingType.fixedPrice,
   );
+
+  /// Parses the Supabase `listing_type_enum` value.
+  static SellingType fromDbString(String value) => switch (value) {
+    'fixed_price' => SellingType.fixedPrice,
+    'auction' => SellingType.auction,
+    'live_session' => SellingType.liveSession,
+    _ => SellingType.fixedPrice,
+  };
 }
 
 enum BidStatus {
