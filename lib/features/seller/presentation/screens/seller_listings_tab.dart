@@ -344,7 +344,7 @@ class _ListingCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'â‚±${item.price.toStringAsFixed(2)}',
+                    '\u20B1${item.price.toStringAsFixed(2)}',
                     style: AppTypography.body.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.bold,

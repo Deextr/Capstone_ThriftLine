@@ -84,18 +84,18 @@ class _ProductCardState extends State<ProductCard>
         child: Container(
           decoration: BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.07),
-                blurRadius: 14,
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 10,
                 spreadRadius: 0,
-                offset: const Offset(0, 4),
+                offset: const Offset(0, 3),
               ),
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -119,8 +119,8 @@ class _ProductCardState extends State<ProductCard>
 
                       // Condition badge — top left
                       Positioned(
-                        top: 8,
-                        left: 8,
+                        top: 6,
+                        left: 6,
                         child: _ConditionBadge(
                           label: widget.product.condition.label,
                         ),
@@ -130,8 +130,8 @@ class _ProductCardState extends State<ProductCard>
                       if (widget.showCountdown &&
                           widget.product.bidEndTime != null)
                         Positioned(
-                          top: 8,
-                          right: 8,
+                          top: 6,
+                          right: 6,
                           child: _CountdownPill(
                             endTime: widget.product.bidEndTime!,
                           ),
@@ -139,8 +139,8 @@ class _ProductCardState extends State<ProductCard>
 
                       // Save / heart — bottom right of image
                       Positioned(
-                        bottom: 8,
-                        right: 8,
+                        bottom: 6,
+                        right: 6,
                         child: _SaveButton(
                           saved: saved,
                           controller: _heartController,
@@ -157,10 +157,10 @@ class _ProductCardState extends State<ProductCard>
                 // ── Content section — auto height, no overflow ────────────
                 Padding(
                   padding: EdgeInsets.fromLTRB(
-                    12,
-                    widget.compact ? 6 : 8,
-                    12,
-                    widget.compact ? 10 : 14,
+                    10,
+                    widget.compact ? 5 : 6,
+                    10,
+                    widget.compact ? 8 : 10,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,13 +172,13 @@ class _ProductCardState extends State<ProductCard>
                         Text(
                           widget.product.brand!,
                           style: AppTypography.caption.copyWith(
-                            fontSize: widget.compact ? 10 : 11,
+                            fontSize: widget.compact ? 9 : 10,
                             color: AppColors.textSecondary,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 1),
                       ],
 
                       // Product title
@@ -186,15 +186,15 @@ class _ProductCardState extends State<ProductCard>
                         widget.product.title,
                         style: AppTypography.body.copyWith(
                           fontWeight: FontWeight.w700,
-                          fontSize: widget.compact ? 12 : 13,
-                          height: 1.25,
+                          fontSize: widget.compact ? 11.5 : 12,
+                          height: 1.2,
                           color: AppColors.textPrimary,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
 
-                      SizedBox(height: widget.compact ? 3 : 5),
+                      SizedBox(height: widget.compact ? 2 : 3),
 
                       // Seller row
                       GestureDetector(
@@ -204,14 +204,14 @@ class _ProductCardState extends State<ProductCard>
                           children: [
                             ThriftAvatar(
                               imageUrl: widget.product.sellerAvatar,
-                              size: widget.compact ? 16 : 20,
+                              size: widget.compact ? 14 : 16,
                             ),
-                            const SizedBox(width: 5),
+                            const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 widget.product.sellerName,
                                 style: AppTypography.caption.copyWith(
-                                  fontSize: widget.compact ? 10 : 11,
+                                  fontSize: widget.compact ? 9.5 : 10,
                                   fontWeight: FontWeight.w500,
                                   color: AppColors.textPrimary,
                                 ),
@@ -222,14 +222,14 @@ class _ProductCardState extends State<ProductCard>
                             if (widget.product.sellerVerified)
                               Icon(
                                 Icons.verified_rounded,
-                                size: widget.compact ? 12 : 14,
+                                size: widget.compact ? 11 : 12,
                                 color: AppColors.primary,
                               ),
                           ],
                         ),
                       ),
 
-                      SizedBox(height: widget.compact ? 3 : 4),
+                      SizedBox(height: widget.compact ? 2 : 3),
 
                       // Bid label (conditional)
                       if (hasBid)
@@ -238,7 +238,7 @@ class _ProductCardState extends State<ProductCard>
                           child: Text(
                             'Current Bid',
                             style: AppTypography.caption.copyWith(
-                              fontSize: widget.compact ? 9 : 10,
+                              fontSize: widget.compact ? 8.5 : 9,
                               color: AppColors.textHint,
                               fontWeight: FontWeight.w500,
                             ),
@@ -254,7 +254,7 @@ class _ProductCardState extends State<ProductCard>
                               formatCurrency(widget.product.displayPrice),
                               style: AppTypography.subheading.copyWith(
                                 color: AppColors.primary,
-                                fontSize: widget.compact ? 13 : 14,
+                                fontSize: widget.compact ? 12 : 13,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: -0.3,
                                 height: 1.2,
@@ -269,15 +269,15 @@ class _ProductCardState extends State<ProductCard>
                             const SizedBox(width: 4),
                             Icon(
                               Icons.location_on_outlined,
-                              size: widget.compact ? 11 : 12,
+                              size: widget.compact ? 10 : 11,
                               color: AppColors.textHint,
                             ),
-                            const SizedBox(width: 2),
+                            const SizedBox(width: 1),
                             Flexible(
                               child: Text(
                                 widget.product.location!,
                                 style: AppTypography.caption.copyWith(
-                                  fontSize: widget.compact ? 9 : 10,
+                                  fontSize: widget.compact ? 8.5 : 9,
                                   color: AppColors.textHint,
                                 ),
                                 maxLines: 1,
@@ -508,10 +508,10 @@ class _ConditionBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
@@ -525,7 +525,7 @@ class _ConditionBadge extends StatelessWidget {
         style: AppTypography.caption.copyWith(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.w600,
-          fontSize: 11,
+          fontSize: 9.5,
         ),
       ),
     );
@@ -541,10 +541,10 @@ class _CountdownPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.5),
       decoration: BoxDecoration(
         color: AppColors.primary,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withValues(alpha: 0.35),
@@ -556,14 +556,14 @@ class _CountdownPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.schedule_rounded, color: Colors.white, size: 12),
-          const SizedBox(width: 4),
+          const Icon(Icons.schedule_rounded, color: Colors.white, size: 10),
+          const SizedBox(width: 3),
           CountdownTimer(
             endTime: endTime,
             style: AppTypography.caption.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w700,
-              fontSize: 11,
+              fontSize: 9.5,
             ),
           ),
         ],
@@ -588,15 +588,15 @@ class _SaveButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 32,
-        height: 32,
+        width: 28,
+        height: 28,
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.95),
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 6,
+              blurRadius: 5,
               offset: const Offset(0, 2),
             ),
           ],
@@ -607,7 +607,7 @@ class _SaveButton extends StatelessWidget {
             builder: (_, _) => Icon(
               saved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
               color: saved ? AppColors.error : AppColors.textSecondary,
-              size: 17,
+              size: 15,
             ),
           ),
         ),

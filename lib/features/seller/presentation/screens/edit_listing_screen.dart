@@ -603,7 +603,7 @@ class _SellingFormatSection extends StatelessWidget {
         const SizedBox(height: AppConstants.spacingMd),
         if (c.selectedFormat != ListingFormat.auction)
           ThriftTextField(
-            label: 'Price (â‚±)',
+            label: 'Price (₱)',
             controller: c.priceCtrl,
             onChanged: c.onPriceChanged,
             keyboardType:
@@ -612,7 +612,7 @@ class _SellingFormatSection extends StatelessWidget {
           )
         else ...[
           ThriftTextField(
-            label: 'Starting Bid (â‚±)',
+            label: 'Starting Bid (₱)',
             controller: c.startBidCtrl,
             onChanged: c.onStartBidChanged,
             keyboardType:
@@ -629,7 +629,7 @@ class _SellingFormatSection extends StatelessWidget {
           const SizedBox(height: AppConstants.spacingMd),
           _SelectorField(
             label: 'Minimum Bid Increment',
-            value: 'â‚±${c.bidIncrement.toInt()}',
+            value: '₱${c.bidIncrement.toInt()}',
             icon: Icons.add_circle_outline,
             onTap: () => _showIncrementPicker(context),
           ),
@@ -680,7 +680,7 @@ class _SellingFormatSection extends StatelessWidget {
                 color: isSelected
                     ? AppColors.primary
                     : AppColors.textSecondary),
-            title: Text('â‚±${v.toInt()}',
+            title: Text('₱${v.toInt()}',
                 style: TextStyle(
                     fontWeight: isSelected
                         ? FontWeight.bold

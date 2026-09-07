@@ -61,7 +61,8 @@ class HomeController extends ChangeNotifier {
       try {
         final spResponse = await _supabase.client
             .from('seller_profiles')
-            .select('*, user:user_public_profiles(*)');
+            .select('*, user:user_public_profiles(*)')
+            .eq('is_approved', true);
 
         final spRows = spResponse as List<dynamic>;
         for (final sp in spRows) {
@@ -69,14 +70,41 @@ class HomeController extends ChangeNotifier {
             sellerProfilesMap[sp['seller_id'] as String] = sp;
           }
         }
-        if (spRows.isNotEmpty) {
-          _verifiedSellers = spRows
-              .map((r) => SellerProfile.fromSupabase(r as Map<String, dynamic>))
-              .toList();
-        }
       } catch (e) {
         debugPrint('HomeController: seller_profiles fetch error ($e)');
       }
+
+      // Also ensure any verified seller with role == 'seller' in user_public_profiles is included
+      try {
+        final sellersResponse = await _supabase.client
+            .from('user_public_profiles')
+            .select()
+            .eq('role', 'seller');
+
+        final sellerUsers = sellersResponse as List<dynamic>;
+        for (final u in sellerUsers) {
+          if (u is Map<String, dynamic>) {
+            final uid = u['user_id'] as String?;
+            if (uid != null && !sellerProfilesMap.containsKey(uid)) {
+              sellerProfilesMap[uid] = {
+                'seller_id': uid,
+                'shop_name': (u['full_name'] as String?)?.trim().isNotEmpty == true
+                    ? u['full_name']
+                    : (u['username'] ?? 'Seller'),
+                'is_approved': true,
+                'user': u,
+              };
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('HomeController: sellers lookup error ($e)');
+      }
+
+      _verifiedSellers = sellerProfilesMap.values
+          .map((r) => SellerProfile.fromSupabase(r))
+          .where((s) => s.isVerified)
+          .toList();
 
       // 2. Query active products with joined seller public profile, images, category
       final response = await _supabase.client
@@ -174,8 +202,20 @@ class HomeController extends ChangeNotifier {
         }).toList();
       } catch (e) {
         debugPrint('HomeController: auctions fetch error ($e)');
-        // Non-fatal â€” auction enrichment is best-effort
+        // Non-fatal — auction enrichment is best-effort
       }
+
+      // 4. Enrich verified sellers with active product count
+      final countsBySeller = <String, int>{};
+      for (final p in _products) {
+        if (p.sellerId != null && p.sellerId!.isNotEmpty) {
+          countsBySeller[p.sellerId!] = (countsBySeller[p.sellerId!] ?? 0) + 1;
+        }
+      }
+      _verifiedSellers = _verifiedSellers.map((s) {
+        final count = s.sellerId != null ? (countsBySeller[s.sellerId!] ?? s.itemCount) : s.itemCount;
+        return s.copyWith(itemCount: count);
+      }).toList();
 
       _errorMessage = null;
     } catch (e) {

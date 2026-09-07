@@ -5,10 +5,8 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
-import '../../../../core/data/mock_data.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../providers/cart_provider.dart';
-import '../../../../providers/data_provider.dart';
 import '../../../../providers/notifications_provider.dart';
 import '../../../../widgets/product_card.dart';
 import '../../../../widgets/thrift_widgets.dart';
@@ -159,7 +157,7 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                   ),
                   SliverToBoxAdapter(
                     child: SizedBox(
-                      height: 290,
+                      height: 245,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -167,9 +165,9 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                         itemBuilder: (_, i) {
                           final p = home.endingSoonProducts[i];
                           return SizedBox(
-                            width: 175,
+                            width: 152,
                             child: Padding(
-                              padding: const EdgeInsets.only(right: 12),
+                              padding: const EdgeInsets.only(right: 10),
                               child: ProductCard(
                                 product: p,
                                 showCountdown: true,
@@ -187,9 +185,9 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                   ),
                 ],
 
-                // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                // ─────────────────────────────────────────────────────────────
                 // Trending Products Grid
-                // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                // ─────────────────────────────────────────────────────────────
                 SliverToBoxAdapter(
                   child: _SectionHeader(
                     title: 'Trending Now',
@@ -203,15 +201,16 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
-                          mainAxisSpacing: 14,
-                          crossAxisSpacing: 14,
-                          childAspectRatio: 0.52,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 0.67,
                         ),
                     delegate: SliverChildBuilderDelegate((_, i) {
                       if (i >= trendingProducts.length) return null;
                       final p = trendingProducts[i];
                       return ProductCard(
                         product: p,
+                        compact: true,
                         onTap: () => context.push('/product/${p.id}'),
                         onSellerTap: () =>
                             context.push('/seller-profile/${p.sellerUsername}'),
@@ -220,17 +219,19 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                   ),
                 ),
 
-                // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                // Verified Sellers
-                // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                SliverToBoxAdapter(
-                  child: _SectionHeader(
-                    title: 'Verified Sellers',
-                    actionLabel: null,
-                    onActionTap: null,
+                // ─────────────────────────────────────────────────────────────
+                // Verified Sellers (from Supabase)
+                // ─────────────────────────────────────────────────────────────
+                if (home.verifiedSellers.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: _SectionHeader(
+                      title: 'Verified Sellers',
+                      actionLabel: null,
+                      onActionTap: null,
+                    ),
                   ),
-                ),
-                SliverToBoxAdapter(child: _VerifiedSellersList()),
+                  SliverToBoxAdapter(child: _VerifiedSellersList()),
+                ],
 
                 const SliverToBoxAdapter(child: SizedBox(height: 36)),
               ],
@@ -594,53 +595,61 @@ class _SectionHeader extends StatelessWidget {
 class _VerifiedSellersList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final home = context.watch<HomeController>();
+    final sellers = home.verifiedSellers;
+
+    if (sellers.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return SizedBox(
-      height: 136,
+      height: 116,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: MockData.sellers.length,
+        itemCount: sellers.length,
         itemBuilder: (_, i) {
-          final s = MockData.sellers[i];
+          final s = sellers[i];
+          final targetRoute = '/seller-profile/${s.username.isNotEmpty ? s.username : (s.sellerId ?? '')}';
           return Padding(
             padding: const EdgeInsets.only(right: 12),
             child: Container(
-              width: 230,
+              width: 220,
               decoration: BoxDecoration(
                 color: AppColors.surface,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: AppColors.border.withValues(alpha: 0.6),
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
+                    blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
                 ],
               ),
               child: Material(
                 color: Colors.transparent,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: () {},
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => context.push(targetRoute),
                   child: Padding(
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.all(12),
                     child: Row(
                       children: [
                         // Avatar with verified badge overlay
                         Stack(
                           children: [
-                            ThriftAvatar(imageUrl: s.avatarUrl, size: 52),
+                            ThriftAvatar(imageUrl: s.avatarUrl, size: 46),
                             if (s.isVerified)
                               Positioned(
                                 bottom: 0,
                                 right: 0,
                                 child: Container(
-                                  width: 18,
-                                  height: 18,
+                                  width: 17,
+                                  height: 17,
                                   decoration: const BoxDecoration(
                                     color: AppColors.primary,
                                     shape: BoxShape.circle,
@@ -648,13 +657,13 @@ class _VerifiedSellersList extends StatelessWidget {
                                   child: const Icon(
                                     Icons.check_rounded,
                                     color: Colors.white,
-                                    size: 11,
+                                    size: 10.5,
                                   ),
                                 ),
                               ),
                           ],
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 11),
                         // Shop info
                         Expanded(
                           child: Column(
@@ -665,7 +674,7 @@ class _VerifiedSellersList extends StatelessWidget {
                                 s.shopName,
                                 style: AppTypography.body.copyWith(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 13,
+                                  fontSize: 12.5,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -680,43 +689,56 @@ class _VerifiedSellersList extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 2),
                                   Text(
-                                    '${s.rating}',
+                                    s.rating > 0 ? s.rating.toStringAsFixed(1) : '5.0',
                                     style: AppTypography.caption.copyWith(
                                       fontWeight: FontWeight.w600,
-                                      fontSize: 11,
+                                      fontSize: 10.5,
                                     ),
                                   ),
                                   Text(
-                                    '  Â·  ',
+                                    ' · ',
                                     style: AppTypography.caption.copyWith(
-                                      fontSize: 11,
+                                      fontSize: 10.5,
+                                      color: AppColors.textHint,
                                     ),
                                   ),
                                   Text(
-                                    '${s.itemCount} items',
+                                    '${s.itemCount} ${s.itemCount == 1 ? 'item' : 'items'}',
                                     style: AppTypography.caption.copyWith(
-                                      fontSize: 11,
+                                      fontSize: 10.5,
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 5),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 3,
+                                  horizontal: 6,
+                                  vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
                                   color: AppColors.primaryLight,
                                   borderRadius: BorderRadius.circular(6),
                                 ),
-                                child: Text(
-                                  '${s.distanceKm} km away',
-                                  style: AppTypography.caption.copyWith(
-                                    color: AppColors.primaryDark,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 10,
-                                  ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.verified_rounded,
+                                      size: 11,
+                                      color: AppColors.primary,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      'Verified Seller',
+                                      style: AppTypography.caption.copyWith(
+                                        color: AppColors.primaryDark,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 9.5,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],

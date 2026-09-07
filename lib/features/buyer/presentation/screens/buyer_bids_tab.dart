@@ -682,7 +682,7 @@ class _RaiseBidContentState extends State<_RaiseBidContent> {
           keyboardType: TextInputType.number,
           style: AppTypography.subheading,
           decoration: InputDecoration(
-            prefixText: 'â‚± ',
+            prefixText: '\u20B1 ',
             prefixStyle: AppTypography.subheading,
             filled: true,
             fillColor: AppColors.surface,
