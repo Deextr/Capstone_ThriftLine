@@ -87,7 +87,7 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
                       Expanded(
                         child: Text(
                           _addressLoading
-                              ? 'Loading address…'
+                              ? 'Loading addressâ€¦'
                               : (_address?.formatted ??
                                   'No saved address yet. Add one before placing an order.'),
                           style: AppTypography.body,
@@ -106,7 +106,7 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
                 const SizedBox(height: 20),
                 Text('Delivery Method', style: AppTypography.subheading),
                 ...DeliveryMethod.values.map((d) => RadioListTile<DeliveryMethod>(
-                  title: Text('${d.label} — ${formatCurrency(d.fee)}'),
+                  title: Text('${d.label} â€” ${formatCurrency(d.fee)}'),
                   value: d,
                   groupValue: _delivery,
                   onChanged: (v) => setState(() => _delivery = v!),
@@ -147,7 +147,7 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
                     final user = auth.user;
                     final order = data.createOrder(
                       product: product,
-                      buyerId: auth.user?.id ?? 'buyer_maya',
+                      buyerId: auth.user?.id ?? '',
                       buyerName: user?.name ?? 'Buyer',
                       buyerAvatar: user?.avatarUrl ?? '',
                       quantity: qty,

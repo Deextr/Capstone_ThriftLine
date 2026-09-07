@@ -12,6 +12,7 @@ import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/data_provider.dart';
 import '../providers/notifications_provider.dart';
+import '../providers/saved_items_provider.dart';
 import '../providers/settings_provider.dart';
 
 class ThriftlineApp extends StatelessWidget {
@@ -24,6 +25,8 @@ class ThriftlineApp extends StatelessWidget {
     required this.dataProvider,
     required this.notificationsProvider,
     required this.settingsProvider,
+    required this.savedItemsProvider,
+    required this.cartProvider,
     required this.supabaseService,
   });
 
@@ -34,6 +37,8 @@ class ThriftlineApp extends StatelessWidget {
   final DataProvider dataProvider;
   final NotificationsProvider notificationsProvider;
   final SettingsProvider settingsProvider;
+  final SavedItemsProvider savedItemsProvider;
+  final CartProvider cartProvider;
   final SupabaseService supabaseService;
 
   @override
@@ -52,7 +57,10 @@ class ThriftlineApp extends StatelessWidget {
           value: notificationsProvider,
         ),
         ChangeNotifierProvider<SettingsProvider>.value(value: settingsProvider),
-        ChangeNotifierProvider<CartProvider>(create: (_) => CartProvider()),
+        ChangeNotifierProvider<SavedItemsProvider>.value(
+          value: savedItemsProvider,
+        ),
+        ChangeNotifierProvider<CartProvider>.value(value: cartProvider),
       ],
       child: _SessionBindings(
         child: MaterialApp.router(
@@ -66,7 +74,7 @@ class ThriftlineApp extends StatelessWidget {
   }
 }
 
-/// Starts notification realtime and settings once a user is signed in.
+/// Starts notification realtime, settings, saved items, and cart once a user is signed in.
 class _SessionBindings extends StatefulWidget {
   const _SessionBindings({required this.child});
   final Widget child;
@@ -88,6 +96,8 @@ class _SessionBindingsState extends State<_SessionBindings> {
       if (!mounted) return;
       context.read<NotificationsProvider>().startForUser(userId);
       context.read<SettingsProvider>().loadForUser(userId);
+      context.read<SavedItemsProvider>().startForUser(userId);
+      context.read<CartProvider>().startForUser(userId);
     });
   }
 
@@ -100,6 +110,8 @@ class _SessionBindingsState extends State<_SessionBindings> {
         if (!mounted) return;
         context.read<NotificationsProvider>().startForUser(userId);
         context.read<SettingsProvider>().loadForUser(userId);
+        context.read<SavedItemsProvider>().startForUser(userId);
+        context.read<CartProvider>().startForUser(userId);
       });
     }
     return widget.child;

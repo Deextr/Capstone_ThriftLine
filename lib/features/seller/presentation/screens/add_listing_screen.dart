@@ -9,13 +9,13 @@ import '../../../../models/enums.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/add_listing_controller.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Screen
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// Single-scroll listing creation screen.
 ///
-/// Pure UI — all state and logic live in [AddListingController].
+/// Pure UI â€” all state and logic live in [AddListingController].
 /// Observes the controller via [context.watch] and delegates every action to it.
 ///
 /// Requirements: 1.1, 1.2, 1.3, 1.4, 8.1, 8.2, 9.2, 9.3
@@ -32,7 +32,7 @@ class AddListingScreen extends StatelessWidget {
           backgroundColor: AppColors.background,
           body: CustomScrollView(
             slivers: [
-              // ── App bar ──────────────────────────────────────────────────
+              // â”€â”€ App bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverAppBar(
                 pinned: true,
                 title: const Text('Add Listing'),
@@ -45,7 +45,7 @@ class AddListingScreen extends StatelessWidget {
                 elevation: 1,
               ),
 
-              // ── Form sections ────────────────────────────────────────────
+              // â”€â”€ Form sections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(
                   AppConstants.spacingMd,
@@ -117,7 +117,7 @@ class AddListingScreen extends StatelessWidget {
             ],
           ),
 
-          // ── Persistent bottom action bar ──────────────────────────────
+          // â”€â”€ Persistent bottom action bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           bottomNavigationBar: BottomAppBar(
             color: AppColors.surface,
             elevation: 8,
@@ -136,7 +136,7 @@ class AddListingScreen extends StatelessWidget {
           ),
         ),
 
-        // ── Upload progress overlay (shown while isLoading) ───────────
+        // â”€â”€ Upload progress overlay (shown while isLoading) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (controller.isLoading)
           Positioned(
             top: 0,
@@ -174,9 +174,9 @@ class AddListingScreen extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Description field with live character counter
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _DescriptionField extends StatelessWidget {
   const _DescriptionField({required this.controller});
@@ -199,7 +199,7 @@ class _DescriptionField extends StatelessWidget {
         Align(
           alignment: Alignment.centerRight,
           child: Text(
-            '${controller.descCtrl.text.length} / 500',
+            '${controller.descCtrl.text.length} / 150',
             style: AppTypography.caption,
           ),
         ),
@@ -208,9 +208,9 @@ class _DescriptionField extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Category field — tappable, opens bottom sheet populated from DB
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Category field â€” tappable, opens bottom sheet populated from DB
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _CategoryField extends StatelessWidget {
   const _CategoryField({required this.controller});
@@ -324,9 +324,9 @@ class _CategoryField extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Condition chip row (filled in task 8.4)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _ConditionField extends StatelessWidget {
   const _ConditionField({required this.controller});
@@ -378,9 +378,9 @@ class _ConditionField extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Photos strip — placeholder, replaced in task 8.3
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Photos strip â€” placeholder, replaced in task 8.3
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _PhotosSection extends StatelessWidget {
   const _PhotosSection({required this.controller});
@@ -471,9 +471,9 @@ class _PhotosSection extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Individual image slot widget
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _ImageSlot extends StatelessWidget {
   const _ImageSlot({required this.index, required this.image});
@@ -547,9 +547,9 @@ class _ImageSlot extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Selling format cards + conditional price/auction fields (task 8.5)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _SellingFormatSection extends StatelessWidget {
   const _SellingFormatSection({required this.controller});
@@ -583,13 +583,6 @@ class _SellingFormatSection extends StatelessWidget {
               format: ListingFormat.auction,
               controller: controller,
             ),
-            const SizedBox(width: 8),
-            _FormatCard(
-              label: 'Live Session',
-              icon: Icons.live_tv_outlined,
-              format: ListingFormat.liveSession,
-              controller: controller,
-            ),
           ],
         ),
         const SizedBox(height: AppConstants.spacingMd),
@@ -597,9 +590,7 @@ class _SellingFormatSection extends StatelessWidget {
         // Conditional price / auction fields
         if (controller.selectedFormat != ListingFormat.auction) ...[
           ThriftTextField(
-            label: controller.selectedFormat == ListingFormat.liveSession
-                ? 'Starting Price (₱)'
-                : 'Price (₱)',
+            label: 'Price (â‚±)',
             controller: controller.priceCtrl,
             onChanged: controller.onPriceChanged,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -607,7 +598,7 @@ class _SellingFormatSection extends StatelessWidget {
           ),
         ] else ...[
           ThriftTextField(
-            label: 'Starting Bid (₱)',
+            label: 'Starting Bid (â‚±)',
             controller: controller.startBidCtrl,
             onChanged: controller.onStartBidChanged,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -623,7 +614,7 @@ class _SellingFormatSection extends StatelessWidget {
           const SizedBox(height: AppConstants.spacingMd),
           _SelectorField(
             label: 'Minimum Bid Increment',
-            value: '₱${controller.bidIncrement.toInt()}',
+            value: 'â‚±${controller.bidIncrement.toInt()}',
             icon: Icons.add_circle_outline,
             onTap: () => _showIncrementPicker(context, controller),
           ),
@@ -679,7 +670,7 @@ class _SellingFormatSection extends StatelessWidget {
               color: isSelected ? AppColors.primary : AppColors.textSecondary,
             ),
             title: Text(
-              '₱${v.toInt()}',
+              'â‚±${v.toInt()}',
               style: TextStyle(
                 fontWeight:
                     isSelected ? FontWeight.bold : FontWeight.normal,
@@ -699,9 +690,9 @@ class _SellingFormatSection extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Format card widget
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _FormatCard extends StatelessWidget {
   const _FormatCard({
@@ -764,9 +755,9 @@ class _FormatCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Reusable selector field (tap-to-open pattern)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _SelectorField extends StatelessWidget {
   const _SelectorField({

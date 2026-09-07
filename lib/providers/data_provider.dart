@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
-import '../core/data/mock_data.dart';
 import '../models/bid_model.dart';
 import '../models/chat_model.dart';
 import '../models/enums.dart';
@@ -13,22 +12,25 @@ import '../models/product_model.dart';
 
 class DataProvider extends ChangeNotifier {
   DataProvider() {
-    _products = List.from(MockData.products);
-    _lookingFor = List.from(MockData.lookingForPosts);
-    _userBids = List.from(MockData.mayaBids);
-    _notifications = List.from(MockData.notifications);
-    _chats = List.from(MockData.chats);
-    _messages = List.from(MockData.messages);
-    _orders = List.from(MockData.orders);
-    _recentSearches = [
-      'vintage denim jacket size M',
-      'baggy 90s jeans size 29',
-      'y2k butterfly top',
-      'platform boots size 7',
-      'korean blazer',
-    ];
-    _savedProductIds = {'prod_3', 'prod_8', 'prod_11'};
+    _products = [];
+    _lookingFor = [];
+    _userBids = [];
+    _notifications = [];
+    _chats = [];
+    _messages = [];
+    _orders = [];
+    _recentSearches = [];
+    _savedProductIds = {};
   }
+
+  static const List<String> _defaultPopularSearches = [
+    'Vintage Denim',
+    'Streetwear',
+    'Baggy Jeans',
+    'Y2K',
+    'Leather Jacket',
+    'Sneakers',
+  ];
 
   final _uuid = const Uuid();
   late List<ProductModel> _products;
@@ -45,7 +47,7 @@ class DataProvider extends ChangeNotifier {
   List<ProductModel> get products => _products;
   List<LookingForModel> get lookingForPosts => _lookingFor;
   List<String> get recentSearches => _recentSearches;
-  List<String> get popularSearches => MockData.popularSearches;
+  List<String> get popularSearches => _defaultPopularSearches;
   bool get notificationsEnabled => _notificationsEnabled;
 
   List<ProductModel> get endingSoonBids => _products
@@ -249,18 +251,7 @@ class DataProvider extends ChangeNotifier {
     return order;
   }
 
-  String _sellerIdFor(String username) {
-    switch (username) {
-      case 'vintagevibes_ph':
-        return 'seller_carla';
-      case 'thrift_trendy':
-        return 'seller_rico';
-      case 'preloved_gems':
-        return 'seller_anna';
-      default:
-        return 'seller_carla';
-    }
-  }
+  String _sellerIdFor(String username) => username;
 
   List<OrderModel> ordersForBuyer(String buyerId) =>
       _orders.where((o) => o.buyerId == buyerId).toList();
@@ -382,9 +373,9 @@ class DataProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Seller follow system (in-memory mock)
-  // ─────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   final Set<String> _followedSellerUsernames = {};
 
@@ -400,7 +391,7 @@ class DataProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Mock follower count — base value derived from username hash + follow delta.
+  /// Mock follower count â€” base value derived from username hash + follow delta.
   int followersCount(String sellerUsername) {
     final base = switch (sellerUsername) {
       'vintagevibes_ph' => 128,
@@ -451,9 +442,9 @@ class DataProvider extends ChangeNotifier {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Trust & Safety — Reports / Complaints / Appeals
-  // ─────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Trust & Safety â€” Reports / Complaints / Appeals
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   final List<ReportModel> _reports = [
     // Seed demo reports so the screen is not empty on first visit
@@ -553,9 +544,9 @@ class DataProvider extends ChangeNotifier {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Report Model
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class ReportModel {
   const ReportModel({

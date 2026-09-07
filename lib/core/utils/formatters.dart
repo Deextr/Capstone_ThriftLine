@@ -2,7 +2,7 @@ import 'package:intl/intl.dart';
 
 final _currencyFormat = NumberFormat.currency(
   locale: 'en_PH',
-  symbol: '₱',
+  symbol: 'â‚±',
   decimalDigits: 0,
 );
 
@@ -18,13 +18,12 @@ String formatRelativeTime(DateTime dateTime) {
 }
 
 String formatCountdown(Duration remaining) {
-  if (remaining.isNegative) return 'Ended';
+  if (remaining.isNegative || remaining.inSeconds <= 0) return 'Ended';
   final days = remaining.inDays;
-  final hours = remaining.inHours % 24;
-  final minutes = remaining.inMinutes % 60;
-  final seconds = remaining.inSeconds % 60;
+  final hours = (remaining.inHours % 24).toString().padLeft(2, '0');
+  final minutes = (remaining.inMinutes % 60).toString().padLeft(2, '0');
   if (days > 0) {
-    return '${days}d ${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
+    return '${days}d $hours:$minutes';
   }
-  return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  return '$hours:$minutes';
 }

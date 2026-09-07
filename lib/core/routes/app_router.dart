@@ -15,12 +15,14 @@ import '../../features/buyer/presentation/screens/become_seller_screen.dart';
 import '../../features/buyer/presentation/screens/buyer_shell_screen.dart';
 import '../../features/buyer/presentation/screens/buy_now_screen.dart';
 import '../../features/buyer/presentation/screens/checkout_screen.dart';
+import '../../features/profile/controllers/seller_public_profile_controller.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
 import '../../features/profile/screens/seller_public_profile_screen.dart';
 import '../../features/buyer/presentation/screens/order_confirmation_screen.dart';
 import '../../features/buyer/presentation/screens/order_tracking_screen.dart';
 import '../../features/buyer/presentation/screens/payment_delivery_screen.dart';
 import '../../features/buyer/presentation/screens/payment_proof_screen.dart';
+import '../../features/buyer/controllers/product_detail_controller.dart';
 import '../../features/buyer/presentation/screens/product_detail_screen.dart';
 import '../../features/buyer/presentation/screens/purchase_history_screen.dart';
 import '../../features/buyer/presentation/screens/saved_items_screen.dart';
@@ -117,8 +119,14 @@ GoRouter createAppRouter({
       GoRoute(path: RouteNames.search, builder: (_, _) => const SearchScreen()),
       GoRoute(
         path: RouteNames.product,
-        builder: (_, state) =>
-            ProductDetailScreen(productId: state.pathParameters['id']!),
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => ProductDetailController(
+            productId: state.pathParameters['id']!,
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+          ),
+          child: ProductDetailScreen(productId: state.pathParameters['id']!),
+        ),
       ),
       GoRoute(
         path: RouteNames.buyNow,
@@ -203,8 +211,16 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: RouteNames.sellerProfile,
-        builder: (_, state) =>
-            SellerPublicProfileScreen(username: state.pathParameters['username']!),
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => SellerPublicProfileController(
+            username: state.pathParameters['username']!,
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+          ),
+          child: SellerPublicProfileScreen(
+            username: state.pathParameters['username']!,
+          ),
+        ),
       ),
       GoRoute(
         path: RouteNames.checkout,

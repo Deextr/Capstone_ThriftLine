@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:storage_client/storage_client.dart' show FileOptions;
+import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 import 'package:uuid/uuid.dart';
 
 import '../../../core/routes/route_names.dart';
@@ -12,9 +12,9 @@ import '../../../models/enums.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../widgets/thrift_widgets.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Category model (fetched from DB)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// A category row fetched from the `categories` table.
 class CategoryItem {
@@ -24,13 +24,13 @@ class CategoryItem {
   final String name;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Local models and enums
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// A device image that the seller has selected for this listing.
 ///
-/// [bytes] holds the raw image data — works on both mobile and web.
+/// [bytes] holds the raw image data â€” works on both mobile and web.
 /// [name] is the original filename, used to derive the MIME type.
 class SelectedImage {
   const SelectedImage({required this.bytes, required this.name});
@@ -42,14 +42,13 @@ class SelectedImage {
 /// The selling format the seller chooses for their listing.
 ///
 /// Maps to the `listing_type_enum` DB values:
-///   - [fixedPrice]  → `'fixed_price'`
-///   - [auction]     → `'auction'`
-///   - [liveSession] → `'live_session'`
-enum ListingFormat { fixedPrice, auction, liveSession }
+///   - [fixedPrice]  â†’ `'fixed_price'`
+///   - [auction]     â†’ `'auction'`
+enum ListingFormat { fixedPrice, auction }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Enum mapping helpers (package-level for testability)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// Maps a [ProductCondition] to its corresponding DB string.
 String conditionToDbString(ProductCondition condition) => switch (condition) {
@@ -64,12 +63,11 @@ String conditionToDbString(ProductCondition condition) => switch (condition) {
 String formatToDbString(ListingFormat format) => switch (format) {
       ListingFormat.fixedPrice => 'fixed_price',
       ListingFormat.auction => 'auction',
-      ListingFormat.liveSession => 'live_session',
     };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Controller
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// Owns all state, validation, image-picker interactions, and Supabase I/O for
 /// the "Add Listing" flow.
@@ -89,19 +87,19 @@ class AddListingController extends ChangeNotifier {
     loadCategories();
   }
 
-  // ── Dependencies ──────────────────────────────────────────────────────────
+  // â”€â”€ Dependencies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   final SupabaseService _supabase;
   final AuthProvider _auth;
   final ImagePicker _imagePicker;
 
-  // ── Image state ───────────────────────────────────────────────────────────
+  // â”€â”€ Image state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Ordered list of images selected by the seller (max 8).
   /// Index 0 is always the cover image.
   List<SelectedImage> images = [];
 
-  // ── Text controllers ──────────────────────────────────────────────────────
+  // â”€â”€ Text controllers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   final TextEditingController nameCtrl = TextEditingController();
   final TextEditingController descCtrl = TextEditingController();
@@ -112,7 +110,7 @@ class AddListingController extends ChangeNotifier {
   final TextEditingController colorCtrl = TextEditingController();
   final TextEditingController locationCtrl = TextEditingController();
 
-  // ── Selection state ───────────────────────────────────────────────────────
+  // â”€â”€ Selection state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Categories fetched from the `categories` table.
   List<CategoryItem> categories = [];
@@ -132,7 +130,7 @@ class AddListingController extends ChangeNotifier {
   /// Currently selected listing format; defaults to [ListingFormat.fixedPrice].
   ListingFormat selectedFormat = ListingFormat.fixedPrice;
 
-  // ── Auction-specific state ────────────────────────────────────────────────
+  // â”€â”€ Auction-specific state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Duration of the auction in days. Options: 1, 3, 5, 7.
   int auctionDurationDays = 3;
@@ -140,16 +138,16 @@ class AddListingController extends ChangeNotifier {
   /// Minimum bid increment amount (e.g. 10, 20, 50, 100).
   double bidIncrement = 10;
 
-  // ── Async / progress state ────────────────────────────────────────────────
+  // â”€â”€ Async / progress state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Whether a post-listing operation is in progress.
   bool isLoading = false;
 
   /// Human-readable status shown while [isLoading] is true
-  /// (e.g. `"Uploading images… (2/5)"`, `"Saving listing…"`).
+  /// (e.g. `"Uploading imagesâ€¦ (2/5)"`, `"Saving listingâ€¦"`).
   String uploadStatusMessage = '';
 
-  // ── Validation state ──────────────────────────────────────────────────────
+  // â”€â”€ Validation state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Field-level validation errors keyed by field name.
   ///
@@ -157,7 +155,7 @@ class AddListingController extends ChangeNotifier {
   /// `'condition'`, `'price'`.
   Map<String, String> fieldErrors = {};
 
-  // ── Field change handlers ─────────────────────────────────────────────────
+  // â”€â”€ Field change handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Clears the `'name'` field error when the user edits the name field.
   void onNameChanged(String value) {
@@ -203,7 +201,7 @@ class AddListingController extends ChangeNotifier {
               ))
           .toList();
     } catch (_) {
-      // Non-fatal — the picker will just show an empty list
+      // Non-fatal â€” the picker will just show an empty list
     } finally {
       categoriesLoading = false;
       notifyListeners();
@@ -228,6 +226,7 @@ class AddListingController extends ChangeNotifier {
   /// Sets [selectedFormat] to the given [format].
   void selectFormat(ListingFormat format) {
     selectedFormat = format;
+    fieldErrors.remove('price');
     notifyListeners();
   }
 
@@ -243,7 +242,7 @@ class AddListingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Post listing ──────────────────────────────────────────────────────────
+  // â”€â”€ Post listing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Validates, uploads images, and inserts the listing into Supabase.
   ///
@@ -256,7 +255,7 @@ class AddListingController extends ChangeNotifier {
   /// 6. Uploads images to Storage and inserts rows into `product_images`.
   /// 7. Navigates to [RouteNames.sellerHome] on success.
   ///
-  /// Satisfies Requirements 4.1–4.4, 8.1–8.4.
+  /// Satisfies Requirements 4.1â€“4.4, 8.1â€“8.4.
   Future<void> postListing(BuildContext context) async {
     // 1. Auth guard
     if (_auth.user?.id == null) {
@@ -273,7 +272,7 @@ class AddListingController extends ChangeNotifier {
 
     // 3. Set loading state
     isLoading = true;
-    uploadStatusMessage = 'Preparing…';
+    uploadStatusMessage = 'Preparingâ€¦';
     notifyListeners();
 
     // 4. Generate product ID
@@ -307,6 +306,22 @@ class AddListingController extends ChangeNotifier {
         'boosted': false,
       });
 
+      // c2. If auction, also create the auctions row
+      if (selectedFormat == ListingFormat.auction) {
+        final now = DateTime.now().toUtc();
+        final endsAt = now.add(Duration(days: auctionDurationDays));
+
+        await _supabase.client.from('auctions').insert({
+          'product_id': productId,
+          'starting_price': priceValue,
+          'minimum_increment': bidIncrement,
+          'current_price': priceValue,
+          'starts_at': now.toIso8601String(),
+          'ends_at': endsAt.toIso8601String(),
+          'status': 'active',
+        });
+      }
+
       // d. Upload images (with cleanup on failure)
       List<String> imageUrls;
       try {
@@ -322,7 +337,7 @@ class AddListingController extends ChangeNotifier {
       }
 
       // e. Update status message
-      uploadStatusMessage = 'Saving listing…';
+      uploadStatusMessage = 'Saving listingâ€¦';
       notifyListeners();
 
       // f. Insert product_images rows
@@ -355,7 +370,7 @@ class AddListingController extends ChangeNotifier {
     }
   }
 
-  // ── Lifecycle ─────────────────────────────────────────────────────────────
+  // â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   @override
   void dispose() {
@@ -370,7 +385,7 @@ class AddListingController extends ChangeNotifier {
     super.dispose();
   }
 
-  // ── Image management ──────────────────────────────────────────────────────
+  // â”€â”€ Image management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Removes the image at [slotIndex] from [images].
   ///
@@ -396,7 +411,7 @@ class AddListingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Image picker actions ──────────────────────────────────────────────────
+  // â”€â”€ Image picker actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Opens the gallery and inserts a new image at [slotIndex].
   ///
@@ -439,7 +454,7 @@ class AddListingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Validation ────────────────────────────────────────────────────────────
+  // â”€â”€ Validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Validates all required fields before posting a listing.
   ///
@@ -466,8 +481,8 @@ class AddListingController extends ChangeNotifier {
     final desc = descCtrl.text.trim();
     if (desc.isEmpty) {
       fieldErrors['description'] = 'Description is required.';
-    } else if (desc.length > 500) {
-      fieldErrors['description'] = 'Description must be 500 characters or fewer.';
+    } else if (desc.length > 150) {
+      fieldErrors['description'] = 'Description must be 150 characters or fewer.';
     }
 
     // Category
@@ -481,8 +496,7 @@ class AddListingController extends ChangeNotifier {
     }
 
     // Price
-    if (selectedFormat == ListingFormat.fixedPrice ||
-        selectedFormat == ListingFormat.liveSession) {
+    if (selectedFormat == ListingFormat.fixedPrice) {
       final price = double.tryParse(priceCtrl.text);
       if (price == null || price <= 0) {
         fieldErrors['price'] = 'Please enter a valid price.';
@@ -498,7 +512,7 @@ class AddListingController extends ChangeNotifier {
     return fieldErrors.isEmpty;
   }
 
-  // ── DB mapping helpers ────────────────────────────────────────────────────
+  // â”€â”€ DB mapping helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Maps a [ProductCondition] value to the corresponding DB string.
   String _conditionToDb(ProductCondition condition) =>
@@ -507,7 +521,7 @@ class AddListingController extends ChangeNotifier {
   /// Maps a [ListingFormat] value to the corresponding DB string.
   String _formatToDb(ListingFormat format) => formatToDbString(format);
 
-  // ── Image upload ─────────────────────────────────────────────────────────
+  // â”€â”€ Image upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Uploads each image in [images] to the `product-images` Storage bucket.
   ///
@@ -523,7 +537,7 @@ class AddListingController extends ChangeNotifier {
     final urls = <String>[];
 
     for (var i = 0; i < images.length; i++) {
-      uploadStatusMessage = 'Uploading images… (${i + 1}/${images.length})';
+      uploadStatusMessage = 'Uploading imagesâ€¦ (${i + 1}/${images.length})';
       notifyListeners();
 
       final path = '$sellerId/$productId/$i.jpg';
@@ -544,14 +558,14 @@ class AddListingController extends ChangeNotifier {
     return urls;
   }
 
-  // ── Image cleanup ─────────────────────────────────────────────────────────
+  // â”€â”€ Image cleanup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Removes already-uploaded images from Storage when an upload fails
   /// mid-way through the sequence.
   ///
   /// Builds the list of storage paths for indices `0` to `uploadedCount - 1`
   /// under `product-images/$sellerId/$productId/` and calls `remove` on the
-  /// bucket. Any exception is swallowed — this is best-effort cleanup.
+  /// bucket. Any exception is swallowed â€” this is best-effort cleanup.
   ///
   /// Satisfies Requirement 2.8.
   Future<void> _cleanupImages(
@@ -565,7 +579,7 @@ class AddListingController extends ChangeNotifier {
     try {
       await _supabase.client.storage.from('product-images').remove(paths);
     } catch (_) {
-      // Best-effort — ignore any errors during cleanup.
+      // Best-effort â€” ignore any errors during cleanup.
     }
   }
 }

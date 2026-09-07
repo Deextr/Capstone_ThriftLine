@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
-import '../../../../core/data/mock_data.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../models/enums.dart';
@@ -23,7 +22,7 @@ class SellerDashboardTab extends StatelessWidget {
     final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
     final user = auth.user;
-    final sellerId = auth.user?.id ?? 'seller_carla';
+    final sellerId = auth.user?.id ?? '';
     final listings = data.productsForSeller(auth.username ?? '');
     final pending = data.pendingOrdersForSeller(sellerId);
     final recentOrders = data.ordersForSeller(sellerId).take(3).toList();
@@ -41,12 +40,12 @@ class SellerDashboardTab extends StatelessWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              // ── Sticky top bar ───────────────────────────────────────
+              // â”€â”€ Sticky top bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverToBoxAdapter(
                 child: _TopBar(user: user),
               ),
 
-              // ── Hero banner: earnings + mini stats ───────────────────
+              // â”€â”€ Hero banner: earnings + mini stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverToBoxAdapter(
                 child: _EarningsBanner(
                   listings: listings.length,
@@ -55,17 +54,17 @@ class SellerDashboardTab extends StatelessWidget {
                 ),
               ),
 
-              // ── Quick actions ────────────────────────────────────────
+              // â”€â”€ Quick actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverToBoxAdapter(
                 child: _QuickActionBar(),
               ),
 
-              // ── Chart ────────────────────────────────────────────────
+              // â”€â”€ Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverToBoxAdapter(
                 child: _ChartSection(),
               ),
 
-              // ── Recent Orders ────────────────────────────────────────
+              // â”€â”€ Recent Orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverToBoxAdapter(
                 child: _SectionLabel(
                   title: 'Recent Orders',
@@ -85,7 +84,7 @@ class SellerDashboardTab extends StatelessWidget {
                 ),
               ),
 
-              // ── Looking For ──────────────────────────────────────────
+              // â”€â”€ Looking For â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverToBoxAdapter(
                 child: _SectionLabel(
                   title: 'Buyers Looking For',
@@ -128,14 +127,6 @@ class _TopBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(
         children: [
-          // Drawer Menu Button
-          Builder(
-            builder: (ctx) => _IconBtn(
-              icon: Icons.menu_rounded,
-              onTap: () => Scaffold.of(ctx).openDrawer(),
-            ),
-          ),
-          const SizedBox(width: 10),
           // Avatar
           ThriftAvatar(imageUrl: user?.avatarUrl ?? '', size: 42),
           const SizedBox(width: 12),
@@ -326,7 +317,7 @@ class _EarningsBanner extends StatelessWidget {
                       _VertDivider(),
                       _MiniStat(
                         label: 'Rating',
-                        value: '$rating ★',
+                        value: '$rating â˜…',
                         icon: Icons.star_rounded,
                       ),
                     ],
@@ -621,12 +612,15 @@ class _ChartSection extends StatelessWidget {
                     borderData: FlBorderData(show: false),
                     lineBarsData: [
                       LineChartBarData(
-                        spots: MockData.salesChartData
-                            .asMap()
-                            .entries
-                            .map((e) =>
-                                FlSpot(e.key.toDouble(), e.value / 100))
-                            .toList(),
+                        spots: const [
+                          FlSpot(0, 0),
+                          FlSpot(1, 0),
+                          FlSpot(2, 0),
+                          FlSpot(3, 0),
+                          FlSpot(4, 0),
+                          FlSpot(5, 0),
+                          FlSpot(6, 0),
+                        ],
                         isCurved: true,
                         color: AppColors.primary,
                         barWidth: 2.5,

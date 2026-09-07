@@ -40,7 +40,7 @@ class _SellerOrdersTabState extends State<SellerOrdersTab>
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
-    final orders = data.ordersForSeller(auth.user?.id ?? 'seller_carla');
+    final orders = data.ordersForSeller(auth.user?.id ?? '');
 
     return SafeArea(
       child: Column(
@@ -177,7 +177,7 @@ class _SellerOrdersTabState extends State<SellerOrdersTab>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${o.paymentMethod.label} • ${o.deliveryMethod.label}',
+                  '${o.paymentMethod.label} â€¢ ${o.deliveryMethod.label}',
                   style: AppTypography.caption,
                 ),
                 const SizedBox(height: 8),

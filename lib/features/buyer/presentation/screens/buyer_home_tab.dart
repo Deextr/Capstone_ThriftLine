@@ -63,13 +63,9 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final data = context.watch<DataProvider>();
+    final home = context.watch<HomeController>();
     final cart = context.watch<CartProvider>();
     final notifCount = context.watch<NotificationsProvider>().unreadCount;
-    final home = context.watch<HomeController>();
-    final notifCount = data.unreadNotificationCount(
-      auth.user?.id ?? 'buyer_maya',
-    );
 
     final trendingProducts = home.trendingProducts;
 
@@ -83,9 +79,9 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              // ──────────────────────────────────────────────────────────────
+              // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               // Top Navigation Header (Search, Favorite, Bag)
-              // ──────────────────────────────────────────────────────────────
+              // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverToBoxAdapter(
                 child: _TopHeader(
                   notifCount: notifCount,
@@ -97,9 +93,9 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                 ),
               ),
 
-              // ──────────────────────────────────────────────────────────────
+              // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               // Featured Banners
-              // ──────────────────────────────────────────────────────────────
+              // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -128,9 +124,9 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                 ),
               ),
 
-              // ──────────────────────────────────────────────────────────────
+              // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               // Loading / Error / Content states
-              // ──────────────────────────────────────────────────────────────
+              // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               if (home.isLoading && home.products.isEmpty) ...[
                 // Shimmer loading state
                 const SliverToBoxAdapter(child: _HomeLoadingShimmer()),
@@ -150,9 +146,9 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                   child: _HomeEmptyState(),
                 ),
               ] else ...[
-                // ──────────────────────────────────────────────────────────
+                // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 // Ending Soon Auctions
-                // ──────────────────────────────────────────────────────────
+                // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 if (home.endingSoonProducts.isNotEmpty) ...[
                   SliverToBoxAdapter(
                     child: _SectionHeader(
@@ -191,9 +187,9 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                   ),
                 ],
 
-                // ──────────────────────────────────────────────────────────
+                // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 // Trending Products Grid
-                // ──────────────────────────────────────────────────────────
+                // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 SliverToBoxAdapter(
                   child: _SectionHeader(
                     title: 'Trending Now',
@@ -224,9 +220,9 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                   ),
                 ),
 
-                // ──────────────────────────────────────────────────────────
+                // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 // Verified Sellers
-                // ──────────────────────────────────────────────────────────
+                // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 SliverToBoxAdapter(
                   child: _SectionHeader(
                     title: 'Verified Sellers',
@@ -691,7 +687,7 @@ class _VerifiedSellersList extends StatelessWidget {
                                     ),
                                   ),
                                   Text(
-                                    '  ·  ',
+                                    '  Â·  ',
                                     style: AppTypography.caption.copyWith(
                                       fontSize: 11,
                                     ),
@@ -740,7 +736,7 @@ class _VerifiedSellersList extends StatelessWidget {
 }
 
 // =============================================================================
-// Loading Shimmer — skeleton grid shown while products load from Supabase
+// Loading Shimmer â€” skeleton grid shown while products load from Supabase
 // =============================================================================
 
 class _HomeLoadingShimmer extends StatelessWidget {
@@ -763,7 +759,7 @@ class _HomeLoadingShimmer extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          // 2×2 shimmer grid
+          // 2Ã—2 shimmer grid
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -867,7 +863,7 @@ class _ShimmerCard extends StatelessWidget {
 }
 
 // =============================================================================
-// Empty State — shown when no active products exist in the database
+// Empty State â€” shown when no active products exist in the database
 // =============================================================================
 
 class _HomeEmptyState extends StatelessWidget {
@@ -919,7 +915,7 @@ class _HomeEmptyState extends StatelessWidget {
 }
 
 // =============================================================================
-// Error State — shown when fetching products from Supabase fails
+// Error State â€” shown when fetching products from Supabase fails
 // =============================================================================
 
 class _HomeErrorState extends StatelessWidget {

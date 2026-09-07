@@ -61,20 +61,36 @@ class ProductModel {
   ///   category:categories (category_name)
   /// )
   /// ```
-  factory ProductModel.fromSupabase(Map<String, dynamic> row) {
-    // ── Seller info ────────────────────────────────────────────────────────
-    final seller = row['seller'] as Map<String, dynamic>?;
-    final sellerUsername = seller?['username'] as String? ?? '';
-    final sellerName = seller?['full_name'] as String? ?? sellerUsername;
-    final sellerAvatar = seller?['avatar'] as String? ?? '';
-    // A user is "verified" if their account is active and they have a
-    // rating_average above zero — this is a lightweight heuristic for the
-    // Home page; the full verification logic lives in user_verifications.
-    final sellerRatingAvg =
-        (seller?['rating_average'] as num?)?.toDouble() ?? 0;
-    final sellerVerified = sellerRatingAvg > 0;
+  factory ProductModel.fromSupabase(
+    Map<String, dynamic> row, {
+    Map<String, dynamic>? sellerProfile,
+  }) {
+    // â”€â”€ Seller info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    final seller = (row['seller'] ??
+            row['user_public_profiles'] ??
+            row['users'])
+        as Map<String, dynamic>?;
 
-    // ── Images ─────────────────────────────────────────────────────────────
+    final sellerUsername = seller?['username'] as String? ?? '';
+    final sellerFullName = seller?['full_name'] as String? ?? '';
+
+    // Shop name from seller_profiles if available, otherwise full_name or username
+    final rawShopName = sellerProfile?['shop_name'] as String?;
+    final shopName = (rawShopName != null && rawShopName.trim().isNotEmpty)
+        ? rawShopName.trim()
+        : (sellerFullName.trim().isNotEmpty
+            ? sellerFullName.trim()
+            : (sellerUsername.trim().isNotEmpty
+                ? sellerUsername.trim()
+                : 'Thrift Seller'));
+
+    final sellerAvatar = seller?['avatar'] as String? ?? '';
+    final isApproved = (sellerProfile?['is_approved'] as bool?) ?? false;
+    final isSellerRole = seller?['role'] == 'seller';
+    final ratingAvg = (seller?['rating_average'] as num?)?.toDouble() ?? 0.0;
+    final sellerVerified = isApproved || isSellerRole || ratingAvg > 0;
+
+    // â”€â”€ Images â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final rawImages = row['images'] as List<dynamic>? ?? [];
     final sortedImages =
         List<Map<String, dynamic>>.from(
@@ -92,18 +108,66 @@ class ProductModel {
         .map((img) => img['image_url'] as String)
         .toList();
 
-    // ── Category ───────────────────────────────────────────────────────────
+    // â”€â”€ Category â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final categoryRow = row['category'] as Map<String, dynamic>?;
     final categoryName = categoryRow?['category_name'] as String? ?? '';
     final category = ProductCategory.fromString(categoryName);
 
-    // ── Core fields ────────────────────────────────────────────────────────
+    // â”€â”€ Auction data (from joined auctions or fallback) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    final auctionsRaw = row['auctions'];
+    Map<String, dynamic>? activeAuction;
+    if (auctionsRaw is List && auctionsRaw.isNotEmpty) {
+      final activeList = auctionsRaw
+          .where((a) => (a as Map<String, dynamic>)['status'] == 'active')
+          .toList();
+      activeAuction = (activeList.isNotEmpty ? activeList.first : auctionsRaw.first)
+          as Map<String, dynamic>?;
+    } else if (auctionsRaw is Map<String, dynamic>) {
+      activeAuction = auctionsRaw;
+    }
+
+    final sellingType = SellingType.fromDbString(
+      row['listing_type'] as String? ?? 'fixed_price',
+    );
+
+    double? startingBid;
+    double? currentBid;
+    double bidIncrement = 20;
+    DateTime? bidEndTime;
+
+    if (activeAuction != null) {
+      startingBid = (activeAuction['starting_price'] as num?)?.toDouble();
+      currentBid =
+          (activeAuction['current_price'] as num?)?.toDouble() ?? startingBid;
+      bidIncrement =
+          (activeAuction['minimum_increment'] as num?)?.toDouble() ?? 20;
+      if (activeAuction['ends_at'] != null) {
+        bidEndTime = DateTime.tryParse(activeAuction['ends_at'] as String);
+      }
+    }
+
+    if (sellingType == SellingType.auction) {
+      final priceVal = (row['price'] as num?)?.toDouble() ?? 0;
+      startingBid ??= priceVal > 0 ? priceVal : 100;
+      currentBid ??= startingBid;
+      if (bidEndTime == null || !bidEndTime.isAfter(DateTime.now())) {
+        final createdAt = row['created_at'] != null
+            ? DateTime.tryParse(row['created_at'] as String) ?? DateTime.now()
+            : DateTime.now();
+        final defaultEnd = createdAt.add(const Duration(days: 3));
+        bidEndTime = defaultEnd.isAfter(DateTime.now())
+            ? defaultEnd
+            : DateTime.now().add(const Duration(days: 2));
+      }
+    }
+
+    // â”€â”€ Core fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     return ProductModel(
       id: row['product_id'] as String? ?? '',
       sellerId: row['seller_id'] as String?,
       categoryId: row['category_id'] as String?,
       sellerUsername: sellerUsername,
-      sellerName: sellerName,
+      sellerName: shopName,
       sellerAvatar: sellerAvatar,
       sellerVerified: sellerVerified,
       title: row['name'] as String? ?? '',
@@ -124,9 +188,11 @@ class ProductModel {
           : DateTime.now(),
       viewCount: row['views'] as int? ?? 0,
       favoriteCount: row['favorite_count'] as int? ?? 0,
-      sellingType: SellingType.fromDbString(
-        row['listing_type'] as String? ?? 'fixed_price',
-      ),
+      sellingType: sellingType,
+      startingBid: startingBid,
+      currentBid: currentBid,
+      bidIncrement: bidIncrement,
+      bidEndTime: bidEndTime,
     );
   }
 

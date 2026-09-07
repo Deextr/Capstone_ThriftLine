@@ -95,7 +95,14 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
               const Spacer(),
               ThriftButton(
                 label: 'Continue to Payment',
-                onPressed: () => context.push('/payment/${product.id}?qty=$_quantity'),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Checkout is coming soon!'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
               ),
             ],
           ),

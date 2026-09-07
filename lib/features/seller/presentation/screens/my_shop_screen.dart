@@ -32,7 +32,7 @@ class MyShopScreen extends StatelessWidget {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            // ── Cover Banner ─────────────────────────────────────────────
+            // â”€â”€ Cover Banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Stack(
               clipBehavior: Clip.none,
               children: [
@@ -81,7 +81,7 @@ class MyShopScreen extends StatelessWidget {
 
             const SizedBox(height: 52),
 
-            // ── Shop Name & Verification ──────────────────────────────────
+            // â”€â”€ Shop Name & Verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppConstants.spacingMd,
@@ -125,7 +125,7 @@ class MyShopScreen extends StatelessWidget {
                   const SizedBox(height: 4),
 
                   Text(
-                    '⭐ ${rating.toStringAsFixed(1)}  •  $sold sales',
+                    'â­ ${rating.toStringAsFixed(1)}  â€¢  $sold sales',
                     style: AppTypography.caption.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -148,7 +148,7 @@ class MyShopScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       _StatColumn(
-                        value: '${rating.toStringAsFixed(1)} ★',
+                        value: '${rating.toStringAsFixed(1)} â˜…',
                         label: 'Rating',
                       ),
                       const _Divider(),
@@ -217,7 +217,7 @@ class MyShopScreen extends StatelessWidget {
 
             const SizedBox(height: 28),
 
-            // ── Active Listings ───────────────────────────────────────────
+            // â”€â”€ Active Listings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppConstants.spacingMd,
@@ -293,7 +293,7 @@ class MyShopScreen extends StatelessWidget {
                     crossAxisCount: 2,
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    childAspectRatio: 0.52,
+                    childAspectRatio: 0.65,
                   ),
                   itemCount: products.length,
                   itemBuilder: (_, i) => ProductCard(
@@ -307,7 +307,7 @@ class MyShopScreen extends StatelessWidget {
 
             const SizedBox(height: 28),
 
-            // ── Shop Settings ─────────────────────────────────────────────
+            // â”€â”€ Shop Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppConstants.spacingMd,
@@ -365,9 +365,9 @@ class MyShopScreen extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Helper Widgets
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _StatColumn extends StatelessWidget {
   const _StatColumn({

@@ -9,11 +9,11 @@ import 'package:thriftline/models/enums.dart';
 // Property 8: listing format mapping is bijective and complete
 
 void main() {
-  // ─────────────────────────────────────────────────────────────────────────
-  // Property 7 — Condition mapping is bijective and complete
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Property 7 â€” Condition mapping is bijective and complete
   // Validates: Requirements 5.2
-  // ─────────────────────────────────────────────────────────────────────────
-  group('Property 7: conditionToDbString — bijective and complete', () {
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  group('Property 7: conditionToDbString â€” bijective and complete', () {
     test('returns a non-empty string for every ProductCondition value', () {
       for (final condition in ProductCondition.values) {
         final result = conditionToDbString(condition);
@@ -34,7 +34,7 @@ void main() {
         uniqueResults.length,
         equals(results.length),
         reason:
-            'Duplicate DB strings found: $results — mapping is not injective',
+            'Duplicate DB strings found: $results â€” mapping is not injective',
       );
     });
 
@@ -43,20 +43,21 @@ void main() {
       expect(conditionToDbString(ProductCondition.likeNew), equals('like_new'));
       expect(conditionToDbString(ProductCondition.good), equals('good'));
       expect(conditionToDbString(ProductCondition.fair), equals('fair'));
+      expect(conditionToDbString(ProductCondition.poor), equals('poor'));
     });
 
-    test('covers all four ProductCondition cases', () {
-      // Ensures the switch is exhaustive — the Dart compiler enforces this,
+    test('covers all five ProductCondition cases', () {
+      // Ensures the switch is exhaustive â€” the Dart compiler enforces this,
       // but this test makes the coverage requirement explicit.
-      expect(ProductCondition.values, hasLength(4));
+      expect(ProductCondition.values, hasLength(5));
     });
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Property 8 — Listing format mapping is bijective and complete
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Property 8 â€” Listing format mapping is bijective and complete
   // Validates: Requirements 6.5
-  // ─────────────────────────────────────────────────────────────────────────
-  group('Property 8: formatToDbString — bijective and complete', () {
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  group('Property 8: formatToDbString â€” bijective and complete', () {
     test('returns a non-empty string for every ListingFormat value', () {
       for (final format in ListingFormat.values) {
         final result = formatToDbString(format);
@@ -76,7 +77,7 @@ void main() {
         uniqueResults.length,
         equals(results.length),
         reason:
-            'Duplicate DB strings found: $results — mapping is not injective',
+            'Duplicate DB strings found: $results â€” mapping is not injective',
       );
     });
 
@@ -84,12 +85,10 @@ void main() {
       expect(
           formatToDbString(ListingFormat.fixedPrice), equals('fixed_price'));
       expect(formatToDbString(ListingFormat.auction), equals('auction'));
-      expect(
-          formatToDbString(ListingFormat.liveSession), equals('live_session'));
     });
 
-    test('covers all three ListingFormat cases', () {
-      expect(ListingFormat.values, hasLength(3));
+    test('covers all two ListingFormat cases', () {
+      expect(ListingFormat.values, hasLength(2));
     });
   });
 }

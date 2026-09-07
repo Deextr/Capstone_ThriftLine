@@ -33,7 +33,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
-    final userId = auth.user?.id ?? 'buyer_maya';
+    final userId = auth.user?.id ?? '';
     final messages = data.messagesFor(widget.chatId);
     final chat = data.chatsFor(userId).where((c) => c.id == widget.chatId).firstOrNull;
 

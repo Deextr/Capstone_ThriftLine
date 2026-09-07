@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:storage_client/storage_client.dart' show FileOptions;
+import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 
 import '../../../core/services/supabase_service.dart';
 import '../../../models/enums.dart';
@@ -15,9 +15,9 @@ import 'add_listing_controller.dart'
         conditionToDbString,
         formatToDbString;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Existing image (already on Supabase Storage)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// An image that already exists in `product_images` (has a URL, not bytes).
 class ExistingImage {
@@ -32,9 +32,9 @@ class ExistingImage {
   final int displayOrder;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// A slot in the image strip — either existing or newly picked
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// A slot in the image strip â€” either existing or newly picked
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 sealed class ImageSlot {}
 
@@ -48,9 +48,9 @@ class NewSlot extends ImageSlot {
   final SelectedImage image;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Controller
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class EditListingController extends ChangeNotifier {
   EditListingController({
@@ -69,14 +69,14 @@ class EditListingController extends ChangeNotifier {
   final AuthProvider _auth;
   final ImagePicker _imagePicker;
 
-  // ── Loading state ──────────────────────────────────────────────────────────
+  // â”€â”€ Loading state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   bool initialLoading = true;
   String? loadError;
 
-  // ── Image slots (max 3) ───────────────────────────────────────────────────
+  // â”€â”€ Image slots (max 3) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   List<ImageSlot> slots = [];
 
-  // ── Text controllers ──────────────────────────────────────────────────────
+  // â”€â”€ Text controllers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   final TextEditingController nameCtrl = TextEditingController();
   final TextEditingController descCtrl = TextEditingController();
   final TextEditingController priceCtrl = TextEditingController();
@@ -86,7 +86,7 @@ class EditListingController extends ChangeNotifier {
   final TextEditingController colorCtrl = TextEditingController();
   final TextEditingController locationCtrl = TextEditingController();
 
-  // ── Selection state ────────────────────────────────────────────────────────
+  // â”€â”€ Selection state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   List<CategoryItem> categories = [];
   bool categoriesLoading = false;
   String? selectedCategoryId;
@@ -96,15 +96,15 @@ class EditListingController extends ChangeNotifier {
   int auctionDurationDays = 3;
   double bidIncrement = 10;
 
-  // ── Save state ─────────────────────────────────────────────────────────────
+  // â”€â”€ Save state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   bool isSaving = false;
   String saveStatusMessage = '';
   Map<String, String> fieldErrors = {};
 
-  // ── IDs to delete from product_images on save ─────────────────────────────
+  // â”€â”€ IDs to delete from product_images on save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   final List<String> _removedImageIds = [];
 
-  // ── Init ──────────────────────────────────────────────────────────────────
+  // â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<void> _init() async {
     await Future.wait([_loadProduct(), _loadCategories()]);
@@ -173,7 +173,7 @@ class EditListingController extends ChangeNotifier {
         priceCtrl.text = price.toString();
       }
 
-      // Images — sort by display_order
+      // Images â€” sort by display_order
       final imgRows = (row['product_images'] as List? ?? []);
       imgRows.sort((a, b) =>
           (a['display_order'] as int).compareTo(b['display_order'] as int));
@@ -194,7 +194,7 @@ class EditListingController extends ChangeNotifier {
     }
   }
 
-  // ── Field change handlers ──────────────────────────────────────────────────
+  // â”€â”€ Field change handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   void onNameChanged(String _) {
     fieldErrors.remove('name');
@@ -244,7 +244,7 @@ class EditListingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Image management ───────────────────────────────────────────────────────
+  // â”€â”€ Image management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<void> pickImage(int slotIndex) async {
     if (slots.length >= 3) return;
@@ -298,7 +298,7 @@ class EditListingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Validation ─────────────────────────────────────────────────────────────
+  // â”€â”€ Validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   bool _validate() {
     fieldErrors = {};
@@ -317,8 +317,8 @@ class EditListingController extends ChangeNotifier {
     final desc = descCtrl.text.trim();
     if (desc.isEmpty) {
       fieldErrors['description'] = 'Description is required.';
-    } else if (desc.length > 500) {
-      fieldErrors['description'] = 'Description must be 500 characters or fewer.';
+    } else if (desc.length > 150) {
+      fieldErrors['description'] = 'Description must be 150 characters or fewer.';
     }
 
     if (selectedCategoryId == null) {
@@ -341,7 +341,7 @@ class EditListingController extends ChangeNotifier {
     return fieldErrors.isEmpty;
   }
 
-  // ── Save ──────────────────────────────────────────────────────────────────
+  // â”€â”€ Save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<void> saveChanges(BuildContext context) async {
     if (!_validate()) return;
@@ -353,7 +353,7 @@ class EditListingController extends ChangeNotifier {
     }
 
     isSaving = true;
-    saveStatusMessage = 'Saving…';
+    saveStatusMessage = 'Savingâ€¦';
     notifyListeners();
 
     try {
@@ -384,6 +384,36 @@ class EditListingController extends ChangeNotifier {
           'location': null,
       }).eq('product_id', productId);
 
+      // 1b. If auction format, update or create row in auctions table
+      if (selectedFormat == ListingFormat.auction) {
+        final now = DateTime.now().toUtc();
+        final endsAt = now.add(Duration(days: auctionDurationDays));
+
+        final existingAuction = await _supabase.client
+            .from('auctions')
+            .select('auction_id')
+            .eq('product_id', productId)
+            .maybeSingle();
+
+        if (existingAuction != null) {
+          await _supabase.client.from('auctions').update({
+            'starting_price': priceValue,
+            'minimum_increment': bidIncrement,
+            'ends_at': endsAt.toIso8601String(),
+          }).eq('auction_id', existingAuction['auction_id']);
+        } else {
+          await _supabase.client.from('auctions').insert({
+            'product_id': productId,
+            'starting_price': priceValue,
+            'minimum_increment': bidIncrement,
+            'current_price': priceValue,
+            'starts_at': now.toIso8601String(),
+            'ends_at': endsAt.toIso8601String(),
+            'status': 'active',
+          });
+        }
+      }
+
       // 2. Delete removed images from product_images table
       if (_removedImageIds.isNotEmpty) {
         await _supabase.client
@@ -404,7 +434,7 @@ class EditListingController extends ChangeNotifier {
         final idx = entry.key;
         final slot = entry.value as NewSlot;
         saveStatusMessage =
-            'Uploading image ${newSlots.indexOf(entry) + 1}/${newSlots.length}…';
+            'Uploading image ${newSlots.indexOf(entry) + 1}/${newSlots.length}â€¦';
         notifyListeners();
 
         final path = '$sellerId/$productId/edit_$idx.jpg';
@@ -426,7 +456,7 @@ class EditListingController extends ChangeNotifier {
       }
 
       // 4. Re-index display_order for all existing images
-      saveStatusMessage = 'Finishing up…';
+      saveStatusMessage = 'Finishing upâ€¦';
       notifyListeners();
       for (int i = 0; i < slots.length; i++) {
         final slot = slots[i];
@@ -454,7 +484,7 @@ class EditListingController extends ChangeNotifier {
     }
   }
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
+  // â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   @override
   void dispose() {
@@ -469,13 +499,12 @@ class EditListingController extends ChangeNotifier {
     super.dispose();
   }
 
-  // ── DB helpers ─────────────────────────────────────────────────────────────
+  // â”€â”€ DB helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   ProductCondition _conditionFromDb(String s) => ProductCondition.fromDbString(s);
 
   ListingFormat _formatFromDb(String s) {
     if (s == 'auction') return ListingFormat.auction;
-    if (s == 'live_session') return ListingFormat.liveSession;
     return ListingFormat.fixedPrice;
   }
 }

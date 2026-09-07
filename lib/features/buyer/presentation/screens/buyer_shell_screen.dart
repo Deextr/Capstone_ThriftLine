@@ -4,10 +4,11 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/curved_navigation_bar.dart';
-import '../../../../widgets/thrift_drawer.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../profile/screens/buyer_profile_tab.dart';
+import '../../controllers/buyer_bids_controller.dart';
 import '../../controllers/home_controller.dart';
 import 'buyer_bids_tab.dart';
 import 'buyer_home_tab.dart';
@@ -23,9 +24,8 @@ class BuyerShellScreen extends StatefulWidget {
 class _BuyerShellScreenState extends State<BuyerShellScreen> {
   int _index = 0;
 
-  /// The Home tab is wrapped in a [ChangeNotifierProvider] so
-  /// [HomeController] is scoped to the buyer shell lifetime.
-  /// Other tabs remain simple const widgets.
+  /// The Home and Bids tabs are wrapped in [ChangeNotifierProvider]
+  /// so their controllers are scoped to the buyer shell lifetime.
   late final List<Widget> _tabs;
 
   @override
@@ -37,7 +37,13 @@ class _BuyerShellScreenState extends State<BuyerShellScreen> {
             HomeController(supabase: context.read<SupabaseService>()),
         child: const BuyerHomeTab(),
       ),
-      const BuyerBidsTab(),
+      ChangeNotifierProvider(
+        create: (context) => BuyerBidsController(
+          supabase: context.read<SupabaseService>(),
+          auth: context.read<AuthProvider>(),
+        ),
+        child: const BuyerBidsTab(),
+      ),
       const BuyerLookingForTab(),
       const _MessagesTab(),
       const BuyerProfileTab(),
@@ -80,7 +86,6 @@ class _BuyerShellScreenState extends State<BuyerShellScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: const ThriftDrawer(),
       // Use extendBody so the curved nav bar can overlap the body edge
       extendBody: true,
       body: AnimatedSwitcher(

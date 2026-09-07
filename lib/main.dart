@@ -10,8 +10,10 @@ import 'core/services/supabase_service.dart';
 import 'features/auth/data/auth_service.dart';
 import 'providers/app_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/cart_provider.dart';
 import 'providers/data_provider.dart';
 import 'providers/notifications_provider.dart';
+import 'providers/saved_items_provider.dart';
 import 'providers/settings_provider.dart';
 
 Future<void> main() async {
@@ -36,6 +38,8 @@ Future<void> main() async {
   final dataProvider = DataProvider();
   final notificationsProvider = NotificationsProvider(supabaseService);
   final settingsProvider = SettingsProvider(supabaseService);
+  final savedItemsProvider = SavedItemsProvider(supabaseService);
+  final cartProvider = CartProvider(supabaseService);
 
   await authProvider.init();
 
@@ -53,6 +57,8 @@ Future<void> main() async {
       dataProvider: dataProvider,
       notificationsProvider: notificationsProvider,
       settingsProvider: settingsProvider,
+      savedItemsProvider: savedItemsProvider,
+      cartProvider: cartProvider,
       supabaseService: supabaseService,
     ),
   );

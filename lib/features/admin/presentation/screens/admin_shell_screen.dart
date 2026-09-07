@@ -4,10 +4,10 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/routes/route_names.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../providers/auth_provider.dart';
-import '../../../../widgets/thrift_drawer.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../data/admin_verification_service.dart';
 
@@ -56,13 +56,22 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     return Scaffold(
-      drawer: const ThriftDrawer(),
       appBar: AppBar(
         title: const Text('Seller reviews'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _load,
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Log out',
+            onPressed: () async {
+              await auth.logout();
+              if (context.mounted) {
+                context.go(RouteNames.login);
+              }
+            },
           ),
         ],
       ),

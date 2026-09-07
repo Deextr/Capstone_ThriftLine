@@ -16,7 +16,7 @@ class ChatListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
-    final userId = auth.user?.id ?? 'buyer_maya';
+    final userId = auth.user?.id ?? '';
     final chats = data.chatsFor(userId);
 
     return Scaffold(

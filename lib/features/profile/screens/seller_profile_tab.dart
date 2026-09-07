@@ -8,6 +8,7 @@ import '../../../core/constants/app_typography.dart';
 import '../../../core/routes/route_names.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/settings_provider.dart';
+import '../../../widgets/info_bottom_sheets.dart';
 import '../../../widgets/thrift_widgets.dart';
 
 /// Profile tab for **seller** users.
@@ -16,11 +17,11 @@ import '../../../widgets/thrift_widgets.dart';
 /// sections in one unified hub.
 ///
 /// Layout:
-/// ┌─ Profile Header (Avatar, Name, @Username)
-/// ├─ Buying
-/// ├─ Selling
-/// ├─ Account
-/// └─ Logout
+/// â”Œâ”€ Profile Header (Avatar, Name, @Username)
+/// â”œâ”€ Buying
+/// â”œâ”€ Selling
+/// â”œâ”€ Account
+/// â””â”€ Logout
 class SellerProfileTab extends StatelessWidget {
   const SellerProfileTab({super.key});
 
@@ -33,7 +34,7 @@ class SellerProfileTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.symmetric(vertical: AppConstants.spacingMd),
         children: [
-          // ── Profile Header ─────────────────────────────────────────────
+          // â”€â”€ Profile Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppConstants.spacingMd),
             child: _ProfileHeader(user: user),
@@ -41,7 +42,7 @@ class SellerProfileTab extends StatelessWidget {
 
           const SizedBox(height: 28),
 
-          // ── Buying ─────────────────────────────────────────────────────
+          // â”€â”€ Buying â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _SectionCard(
             title: 'Buying',
             children: [
@@ -68,7 +69,7 @@ class SellerProfileTab extends StatelessWidget {
             ],
           ),
 
-          // ── Selling ────────────────────────────────────────────────────
+          // â”€â”€ Selling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _SectionCard(
             title: 'Selling',
             children: [
@@ -100,7 +101,7 @@ class SellerProfileTab extends StatelessWidget {
             ],
           ),
 
-          // ── Account ────────────────────────────────────────────────────
+          // â”€â”€ Account â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _SectionCard(
             title: 'Account',
             children: [
@@ -128,9 +129,31 @@ class SellerProfileTab extends StatelessWidget {
             ],
           ),
 
+          // â”€â”€ Support & Legal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          _SectionCard(
+            title: 'Support & Legal',
+            children: [
+              _MenuItem(
+                icon: Icons.help_outline_rounded,
+                label: 'Help / Support / FAQ',
+                onTap: () => HelpSupportSheet.show(context),
+              ),
+              _MenuItem(
+                icon: Icons.gavel_rounded,
+                label: 'Terms & Privacy Policy',
+                onTap: () => TermsPrivacySheet.show(context),
+              ),
+              _MenuItem(
+                icon: Icons.info_outline_rounded,
+                label: 'About ThriftLine',
+                onTap: () => AboutThriftLineSheet.show(context),
+              ),
+            ],
+          ),
+
           const SizedBox(height: 16),
 
-          // ── Logout ─────────────────────────────────────────────────────
+          // â”€â”€ Logout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppConstants.spacingMd),
             child: ThriftButton(

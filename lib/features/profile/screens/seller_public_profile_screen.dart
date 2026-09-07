@@ -6,12 +6,18 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/routes/route_names.dart';
-import '../../../features/auth/domain/auth_user.dart';
-import '../../../models/product_model.dart';
+import '../../../core/utils/formatters.dart';
 import '../../../models/enums.dart';
-import '../../../providers/data_provider.dart';
+import '../../../models/product_model.dart';
+import '../../../models/review_model.dart';
+import '../../../models/seller_profile.dart';
 import '../../../widgets/thrift_widgets.dart';
+import '../controllers/seller_public_profile_controller.dart';
 
+/// Public Seller Profile Screen.
+///
+/// Renders the seller's public identity, trust score, stats, product catalog,
+/// and verified reviews fetched directly from the Supabase database.
 class SellerPublicProfileScreen extends StatelessWidget {
   const SellerPublicProfileScreen({super.key, required this.username});
 
@@ -19,107 +25,166 @@ class SellerPublicProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Get seller info from product data as a fallback.
-    // In a future module, this will fetch from the Supabase profiles table.
-    final data = context.watch<DataProvider>();
-    final sellerProducts = data.productsForSeller(username);
-    final firstProduct = sellerProducts.isNotEmpty ? sellerProducts.first : null;
+    final controller = context.watch<SellerPublicProfileController>();
 
-    // Build a temporary AuthUser from product data (mock-compatible).
-    final seller = AuthUser(
-      id: '',
-      username: username,
-      name: firstProduct?.sellerName ?? username,
-      email: '',
-      role: UserRole.seller,
-      avatarUrl: firstProduct?.sellerAvatar ?? '',
-      location: firstProduct?.location ?? '',
-      shopName: firstProduct?.sellerName,
-      isVerified: firstProduct?.sellerVerified ?? false,
-    );
-    if (firstProduct == null) {
+    // â”€â”€ Loading state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    if (controller.isLoading) {
       return Scaffold(
-        appBar: AppBar(leading: BackButton(onPressed: () => context.pop())),
-        body: const Center(child: Text('Seller not found')),
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.surface,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => context.pop(),
+          ),
+          title: Text(
+            '@$username',
+            style: AppTypography.subheading.copyWith(fontWeight: FontWeight.w700),
+          ),
+          centerTitle: true,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
       );
     }
 
+    // â”€â”€ Error state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    if (controller.hasError || controller.sellerProfile == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.surface,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => context.pop(),
+          ),
+          title: const Text('Seller Profile'),
+          centerTitle: true,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.person_off_outlined,
+                  size: 64,
+                  color: AppColors.textHint,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  controller.errorMessage ?? 'Seller not found',
+                  style: AppTypography.subheading.copyWith(fontWeight: FontWeight.w600),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'The user @$username may not have an active seller profile or is unavailable.',
+                  style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ThriftButton(
+                  label: 'Retry',
+                  variant: ThriftButtonVariant.primary,
+                  onPressed: controller.refresh,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
-    final products = sellerProducts;
-    final isFollowing = data.isFollowing(username);
-    final followers = data.followersCount(username);
-    final following = data.followingCount(username);
-    final sold = data.soldCount(username);
-    final reviews = data.reviewCount(username);
-    final rating = data.sellerRating(username);
+    final seller = controller.sellerProfile!;
+    final products = controller.products;
+    final reviews = controller.reviews;
 
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: _buildAppBar(context),
-        body: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) {
-            return [
-              SliverToBoxAdapter(
-                child: _buildProfileHeader(
-                  context,
-                  seller: seller,
-                  rating: rating,
-                  reviews: reviews,
-                  sold: sold,
-                  following: following,
-                  followers: followers,
-                  isFollowing: isFollowing,
-                  data: data,
-                ),
-              ),
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _SliverAppBarDelegate(
-                  TabBar(
-                    indicatorColor: AppColors.primary,
-                    indicatorWeight: 2,
-                    labelColor: AppColors.primary,
-                    unselectedLabelColor: AppColors.textSecondary,
-                    labelStyle: AppTypography.label.copyWith(fontWeight: FontWeight.w600),
-                    tabs: const [
-                      Tab(icon: Icon(Icons.grid_on)), // Shop Tab
-                      Tab(icon: Icon(Icons.star_border)), // Reviews Tab
-                    ],
+        appBar: _buildAppBar(context, seller),
+        body: RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: controller.refresh,
+          child: NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverToBoxAdapter(
+                  child: _buildProfileHeader(
+                    context,
+                    seller: seller,
+                    controller: controller,
                   ),
                 ),
-              ),
-            ];
-          },
-          body: TabBarView(
-            children: [
-              // Shop tab (Grid)
-              _buildProductGrid(context, products),
-
-              // Reviews tab (Empty state)
-              const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.rate_review_outlined, size: 48, color: AppColors.textHint),
-                    SizedBox(height: 16),
-                    Text('No reviews yet', style: TextStyle(color: AppColors.textSecondary)),
-                  ],
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _SliverTabBarDelegate(
+                    TabBar(
+                      indicatorColor: AppColors.primary,
+                      indicatorWeight: 3,
+                      labelColor: AppColors.primary,
+                      unselectedLabelColor: AppColors.textSecondary,
+                      labelStyle: AppTypography.label.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                      unselectedLabelStyle: AppTypography.label.copyWith(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                      tabs: [
+                        Tab(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.grid_on_rounded, size: 18),
+                              const SizedBox(width: 8),
+                              Text('Shop (${products.length})'),
+                            ],
+                          ),
+                        ),
+                        Tab(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.star_rounded, size: 18),
+                              const SizedBox(width: 8),
+                              Text('Reviews (${reviews.length})'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ];
+            },
+            body: TabBarView(
+              children: [
+                // â”€â”€ Shop tab (Grid) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                _buildProductGrid(context, products),
+
+                // â”€â”€ Reviews tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                _buildReviewsList(context, reviews, seller),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // App Bar
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
+  PreferredSizeWidget _buildAppBar(BuildContext context, SellerProfile seller) {
     return AppBar(
       backgroundColor: AppColors.surface,
       elevation: 0,
@@ -129,32 +194,30 @@ class SellerPublicProfileScreen extends StatelessWidget {
         onPressed: () => context.pop(),
       ),
       title: Text(
-        username,
+        '@${seller.username}',
         style: AppTypography.subheading.copyWith(fontWeight: FontWeight.w700),
       ),
       centerTitle: true,
       actions: [
         IconButton(
-          icon: const Icon(Icons.favorite_border, color: AppColors.textPrimary, size: 22),
-          onPressed: () => showThriftSnackBar(context, 'Seller saved!'),
-        ),
-        IconButton(
-          icon: const Icon(Icons.shopping_bag_outlined, color: AppColors.textPrimary, size: 22),
-          onPressed: () {},
+          icon: const Icon(Icons.share_outlined, color: AppColors.textPrimary, size: 22),
+          onPressed: () {
+            showThriftSnackBar(context, 'Seller profile link copied to clipboard!');
+          },
         ),
         IconButton(
           icon: const Icon(Icons.more_vert, color: AppColors.textPrimary, size: 22),
-          onPressed: () => _showMoreOptions(context),
+          onPressed: () => _showMoreOptions(context, seller),
         ),
       ],
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Three-dot menu bottom sheet
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // Three-dot bottom sheet menu
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-  void _showMoreOptions(BuildContext context) {
+  void _showMoreOptions(BuildContext context, SellerProfile seller) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -169,7 +232,8 @@ class SellerPublicProfileScreen extends StatelessWidget {
             children: [
               const SizedBox(height: 12),
               Container(
-                width: 40, height: 4,
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
                   color: AppColors.border,
                   borderRadius: BorderRadius.circular(2),
@@ -178,7 +242,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
               const SizedBox(height: 16),
               _OptionTile(
                 icon: Icons.share_outlined,
-                label: 'Share',
+                label: 'Share Profile',
                 onTap: () {
                   Navigator.pop(ctx);
                   showThriftSnackBar(context, 'Link copied to clipboard!');
@@ -186,18 +250,19 @@ class SellerPublicProfileScreen extends StatelessWidget {
               ),
               _OptionTile(
                 icon: Icons.block,
-                label: 'Block User',
+                label: 'Block Seller',
                 isDestructive: false,
                 onTap: () {
                   Navigator.pop(ctx);
                   _showConfirmationDialog(
                     context,
-                    title: 'Block User',
-                    message: 'Are you sure you want to block this user? You won\'t see their products or messages.',
+                    title: 'Block @${seller.username}',
+                    message:
+                        'Are you sure you want to block this seller? You will not see their listings or messages.',
                     confirmLabel: 'Block',
                     isDestructive: true,
                     onConfirm: () {
-                      showThriftSnackBar(context, 'User has been blocked');
+                      showThriftSnackBar(context, '@${seller.username} has been blocked');
                     },
                   );
                 },
@@ -208,7 +273,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
                 isDestructive: true,
                 onTap: () {
                   Navigator.pop(ctx);
-                  context.push('${RouteNames.reportSeller}?seller=$username');
+                  context.push('${RouteNames.reportSeller}?seller=${seller.username}');
                 },
               ),
               const SizedBox(height: 16),
@@ -232,11 +297,17 @@ class SellerPublicProfileScreen extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(title, style: AppTypography.heading),
-        content: Text(message, style: AppTypography.body.copyWith(color: AppColors.textSecondary)),
+        content: Text(
+          message,
+          style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: AppTypography.body.copyWith(color: AppColors.textSecondary)),
+            child: Text(
+              'Cancel',
+              style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+            ),
           ),
           TextButton(
             onPressed: () {
@@ -256,38 +327,66 @@ class SellerPublicProfileScreen extends StatelessWidget {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // Profile Header
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Widget _buildProfileHeader(
     BuildContext context, {
-    required dynamic seller,
-    required double rating,
-    required int reviews,
-    required int sold,
-    required int following,
-    required int followers,
-    required bool isFollowing,
-    required DataProvider data,
+    required SellerProfile seller,
+    required SellerPublicProfileController controller,
   }) {
+    final bio = seller.shopBio;
+    final rating = controller.averageRating;
+    final reviewCount = controller.totalReviewCount;
+    final sold = controller.soldCount;
+    final listings = seller.itemCount;
+    final followers = seller.followerCount;
+    final isFollowing = controller.isFollowing;
+
     return Container(
       color: AppColors.surface,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: Column(
         children: [
           // Avatar
-          ThriftAvatar(imageUrl: seller.avatarUrl, size: 80),
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              ThriftAvatar(imageUrl: seller.avatarUrl, size: 84),
+              if (seller.isVerified)
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_rounded,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                ),
+            ],
+          ),
 
           const SizedBox(height: 12),
 
-          // Shop Name & Verification Icon
+          // Shop Name & Verification Badge
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                seller.shopName ?? seller.name,
-                style: AppTypography.heading.copyWith(fontWeight: FontWeight.w700),
+              Flexible(
+                child: Text(
+                  seller.shopName,
+                  style: AppTypography.heading.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 20,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               if (seller.isVerified) ...[
                 const SizedBox(width: 6),
@@ -298,13 +397,31 @@ class SellerPublicProfileScreen extends StatelessWidget {
 
           const SizedBox(height: 2),
 
-          // Username
-          Text(
-            '@${seller.username}',
-            style: AppTypography.caption.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
+          // Username & Location
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '@${seller.username}',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (seller.location.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                const Text('â€¢', style: TextStyle(color: AppColors.textHint)),
+                const SizedBox(width: 8),
+                const Icon(Icons.location_on_outlined, size: 13, color: AppColors.textSecondary),
+                const SizedBox(width: 2),
+                Text(
+                  seller.location,
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
           ),
 
           const SizedBox(height: 12),
@@ -313,150 +430,197 @@ class SellerPublicProfileScreen extends StatelessWidget {
           SellerTrustBadge(
             trustScore: seller.trustScore,
             isVerified: seller.isVerified,
-            shopName: seller.shopName ?? seller.name,
+            shopName: seller.shopName,
           ),
 
           const SizedBox(height: 16),
 
           // Stats row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _StatColumn(
-                value: '${rating.toStringAsFixed(1)} ★',
-                label: '$reviews reviews',
-              ),
-              const SizedBox(width: 28),
-              _StatColumn(value: '$sold', label: 'sold'),
-              const SizedBox(width: 28),
-              _StatColumn(value: '$following', label: 'following'),
-              const SizedBox(width: 28),
-              _StatColumn(value: '$followers', label: 'followers'),
-            ],
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _StatColumn(
+                  value: '${rating.toStringAsFixed(1)} â˜…',
+                  label: '$reviewCount review${reviewCount == 1 ? '' : 's'}',
+                ),
+                Container(height: 28, width: 1, color: AppColors.border),
+                _StatColumn(
+                  value: '$sold',
+                  label: 'sold',
+                ),
+                Container(height: 28, width: 1, color: AppColors.border),
+                _StatColumn(
+                  value: '$listings',
+                  label: 'listings',
+                ),
+                Container(height: 28, width: 1, color: AppColors.border),
+                _StatColumn(
+                  value: '$followers',
+                  label: 'followers',
+                ),
+              ],
+            ),
           ),
 
-          const SizedBox(height: 12),
-
           // Bio
-          if (seller.bio != null && seller.bio!.isNotEmpty)
+          if (bio != null && bio.trim().isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              child: Text(
+                bio.trim(),
+                style: AppTypography.body.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                  fontSize: 13,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 18),
+
+          // Action buttons â€” Message & Follow (or Edit Profile if viewing own profile)
+          if (controller.isCurrentUser)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => context.push(RouteNames.editProfile),
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: Text(
+                  'Edit Public Profile',
+                  style: AppTypography.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  side: const BorderSide(color: AppColors.border, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            )
+          else
             Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Flexible(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                    child: Text(
-                      seller.bio!,
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => context.push('/chat'),
+                    icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                    label: Text(
+                      'Message',
                       style: AppTypography.body.copyWith(
-                        color: AppColors.textSecondary,
-                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
                       ),
-                      textAlign: TextAlign.center,
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.textPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      side: const BorderSide(color: AppColors.border, width: 1.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: controller.toggleFollow,
+                    icon: Icon(
+                      isFollowing ? Icons.check : Icons.add,
+                      size: 18,
+                      color: isFollowing ? AppColors.primary : Colors.white,
+                    ),
+                    label: Text(
+                      isFollowing ? 'Following' : 'Follow',
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: isFollowing ? AppColors.primary : Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isFollowing
+                          ? AppColors.primaryLight
+                          : AppColors.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: isFollowing
+                            ? const BorderSide(color: AppColors.primary, width: 1.5)
+                            : BorderSide.none,
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
-
-          const SizedBox(height: 20),
-
-          // Action buttons — Message & Follow
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => context.push('/chat'),
-                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                  label: Text(
-                    'Message',
-                    style: AppTypography.body.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: AppColors.border, width: 1.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => data.toggleFollow(username),
-                  icon: Icon(
-                    isFollowing ? Icons.check : Icons.add,
-                    size: 18,
-                    color: isFollowing ? AppColors.primary : Colors.white,
-                  ),
-                  label: Text(
-                    isFollowing ? 'Following' : 'Follow',
-                    style: AppTypography.body.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: isFollowing ? AppColors.primary : Colors.white,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isFollowing
-                        ? AppColors.primaryLight
-                        : AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: isFollowing
-                          ? const BorderSide(color: AppColors.primary, width: 1.5)
-                          : BorderSide.none,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Product Grid (3 columns — Instagram gallery style)
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // Product Grid (Instagram gallery style)
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Widget _buildProductGrid(BuildContext context, List<ProductModel> products) {
     if (products.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.textPrimary, width: 2),
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.grid_off_rounded,
+                  size: 40,
+                  color: AppColors.textSecondary,
+                ),
               ),
-              child: const Icon(Icons.grid_off, size: 48, color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No products available yet.',
-              style: AppTypography.subheading.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                'No products available',
+                style: AppTypography.subheading.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'This seller hasn\'t listed any items for sale yet.',
+                style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       );
     }
 
     return GridView.builder(
-      padding: EdgeInsets.zero,
+      padding: const EdgeInsets.all(2),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        mainAxisSpacing: 1, // minimal spacing
-        crossAxisSpacing: 1, // minimal spacing
-        childAspectRatio: 1.0, // perfect square
+        mainAxisSpacing: 2,
+        crossAxisSpacing: 2,
+        childAspectRatio: 1.0,
       ),
       itemCount: products.length,
       itemBuilder: (_, i) => _ShopGridItem(
@@ -465,13 +629,144 @@ class SellerPublicProfileScreen extends StatelessWidget {
       ),
     );
   }
+
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // Reviews List
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+  Widget _buildReviewsList(
+    BuildContext context,
+    List<ReviewModel> reviews,
+    SellerProfile seller,
+  ) {
+    if (reviews.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.rate_review_outlined,
+                  size: 40,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No reviews yet',
+                style: AppTypography.subheading.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Customer ratings and reviews will appear here after completed orders.',
+                style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final avgRating = reviews.fold<double>(0, (s, r) => s + r.rating) / reviews.length;
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      children: [
+        // Rating Summary Header
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        avgRating.toStringAsFixed(1),
+                        style: AppTypography.heading.copyWith(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '/ 5.0',
+                        style: AppTypography.caption.copyWith(color: AppColors.textHint),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: List.generate(5, (index) {
+                      return Icon(
+                        index < avgRating.round() ? Icons.star_rounded : Icons.star_border_rounded,
+                        color: Colors.amber[700],
+                        size: 18,
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Based on ${reviews.length} review${reviews.length == 1 ? '' : 's'}',
+                    style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.verified_user_outlined, size: 16, color: AppColors.primaryDark),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Verified Purchases',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.primaryDark,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Review Cards
+        ...reviews.map((r) => _ReviewCard(review: r)),
+      ],
+    );
+  }
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Helper Widgets
-// ═════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-/// Stat column used in the profile header (e.g. "128 followers").
 class _StatColumn extends StatelessWidget {
   const _StatColumn({required this.value, required this.label});
   final String value;
@@ -501,7 +796,6 @@ class _StatColumn extends StatelessWidget {
   }
 }
 
-/// Option tile used in the three-dot bottom sheet.
 class _OptionTile extends StatelessWidget {
   const _OptionTile({
     required this.icon,
@@ -537,7 +831,6 @@ class _OptionTile extends StatelessWidget {
   }
 }
 
-/// Instagram-style grid tile. Perfectly square, minimal spacing, no title/price, just image and status.
 class _ShopGridItem extends StatelessWidget {
   const _ShopGridItem({required this.product, required this.onTap});
   final ProductModel product;
@@ -550,13 +843,12 @@ class _ShopGridItem extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Product image with Hero animation
           Hero(
-            tag: 'product_image_${product.id}',
+            tag: 'seller_product_image_${product.id}',
             child: CachedNetworkImage(
               imageUrl: product.imageUrl,
               fit: BoxFit.cover,
-              memCacheWidth: 300,
+              memCacheWidth: 350,
               placeholder: (_, _) => Container(color: AppColors.surfaceVariant),
               errorWidget: (_, _, _) => Container(
                 color: AppColors.surfaceVariant,
@@ -567,31 +859,82 @@ class _ShopGridItem extends StatelessWidget {
             ),
           ),
           
-          // Status Overlay
+          // Gradient at bottom for text contrast
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 40,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.6),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Price Tag at bottom left
+          Positioned(
+            bottom: 6,
+            left: 6,
+            child: Text(
+              formatCurrency(product.price),
+              style: AppTypography.caption.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+                shadows: const [
+                  Shadow(color: Colors.black54, blurRadius: 4),
+                ],
+              ),
+            ),
+          ),
+
+          // Status Badges at top/bottom right
           if (product.status == ProductStatus.sold)
             Positioned(
-              bottom: 4,
-              right: 4,
+              top: 6,
+              right: 6,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.error.withValues(alpha: 0.9),
+                  color: AppColors.error,
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: Text('SOLD', style: AppTypography.caption.copyWith(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'SOLD',
+                  style: AppTypography.caption.copyWith(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             )
           else if (product.hasActiveBid)
             Positioned(
-              bottom: 4,
-              right: 4,
+              top: 6,
+              right: 6,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.9),
+                  color: AppColors.primary,
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: Text('BID', style: AppTypography.caption.copyWith(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'BID',
+                  style: AppTypography.caption.copyWith(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
         ],
@@ -600,12 +943,84 @@ class _ShopGridItem extends StatelessWidget {
   }
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// Sliver App Bar Delegate for Sticky TabBar
-// ═════════════════════════════════════════════════════════════════════════════
+class _ReviewCard extends StatelessWidget {
+  const _ReviewCard({required this.review});
+  final ReviewModel review;
 
-class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  _SliverAppBarDelegate(this._tabBar);
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              ThriftAvatar(imageUrl: review.reviewerAvatar, size: 38),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      review.reviewerName,
+                      style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    if (review.reviewerUsername.isNotEmpty)
+                      Text(
+                        '@${review.reviewerUsername}',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Text(
+                formatRelativeTime(review.createdAt),
+                style: AppTypography.caption.copyWith(color: AppColors.textHint, fontSize: 11),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: List.generate(5, (index) {
+              return Icon(
+                index < review.rating ? Icons.star_rounded : Icons.star_border_rounded,
+                color: Colors.amber[700],
+                size: 16,
+              );
+            }),
+          ),
+          if (review.comment.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              review.comment,
+              style: AppTypography.body.copyWith(
+                color: AppColors.textPrimary,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Sliver Persistent Header Delegate for TabBar
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
+  _SliverTabBarDelegate(this._tabBar);
 
   final TabBar _tabBar;
 
@@ -617,13 +1032,16 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
-      color: AppColors.surface,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border(
+          bottom: BorderSide(color: AppColors.border, width: 1),
+        ),
+      ),
       child: _tabBar,
     );
   }
 
   @override
-  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
-    return false;
-  }
+  bool shouldRebuild(_SliverTabBarDelegate oldDelegate) => false;
 }
