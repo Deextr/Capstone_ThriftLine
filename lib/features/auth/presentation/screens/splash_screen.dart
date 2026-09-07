@@ -114,7 +114,9 @@ class _SplashScreenState extends State<SplashScreen>
   void _navigate() {
     final auth = context.read<AuthProvider>();
     final app = context.read<AppProvider>();
-    if (auth.isAuthenticated) {
+    if (auth.isEmailOtpPending && auth.isAuthenticated) {
+      context.go(RouteNames.verifyEmailOtp);
+    } else if (auth.isFullyAuthenticated) {
       context.go(auth.homeRoute);
     } else if (!app.isOnboardingComplete) {
       context.go(RouteNames.onboarding);

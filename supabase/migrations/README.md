@@ -45,14 +45,25 @@ Edge Functions live in `../functions/send-phone-otp` and
 `../functions/verify-phone-otp`. Deploy them and set `FMCSMS_API_KEY` plus
 `OTP_PEPPER` before testing SMS. The Flutter app must never receive those values.
 
+## Email OTP (signup and login)
+
+| File | Purpose |
+| --- | --- |
+| `20260905010000_email_otp_challenges.sql` | Email OTP challenge table with **no client RLS** |
+
+Edge Functions live in `../functions/send-email-otp` and
+`../functions/verify-email-otp`. Deploy them and set `GMAIL_USER`,
+`GMAIL_APP_PASSWORD`, and `OTP_PEPPER`. Keep Auth "Confirm email" off so
+signup returns a session before the OTP screen. See `../../docs/agile/email-otp.md`.
+
 ## Seed data
 
 `../seed/` holds environment-specific data that is deliberately not part of the
 migration chain, because it depends on accounts that exist only in one project.
 
-`001_role_assignments.sql` promotes the demo admin / seller / buyer accounts to
-their roles. Create the accounts in Studio first — GoTrue owns `auth.users` and
-hand-written rows there break at login.
+`001_role_assignments.sql` promotes `dexter041711@gmail.com` to admin. Create
+that account in Studio first — GoTrue owns `auth.users` and hand-written rows
+there break at login. Passwords are never stored in this file.
 
 ## Conventions
 

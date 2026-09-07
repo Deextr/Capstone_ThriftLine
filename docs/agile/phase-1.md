@@ -99,7 +99,7 @@ In Supabase → Edge Functions → Secrets (or `supabase secrets set`):
 
 1. Sign in as a **buyer**. Become a Seller → pick a real ID photo → complete look left/right/blink → submit.
 2. Confirm the buyer sees “under review” and gets an in-app notification.
-3. Sign in as the **seeded admin**. Home should be Seller reviews. Open the application, inspect ID + face photo, approve or reject with a reason.
+3. Sign in as the **seeded admin** (`dexter041711@gmail.com`). Home should be Seller reviews. Open the application, inspect ID + face photo, approve or reject with a reason.
 4. After approve, reload the buyer: role becomes seller and listing tools unlock.
 5. After reject, the buyer can reapply (a new pending row is allowed).
 6. Add a default address and confirm Payment & Delivery uses it.

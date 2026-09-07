@@ -11,6 +11,7 @@ abstract final class AppConstants {
   static const String keyUsername = 'username';
   static const String keyUserId = 'user_id';
   static const String keyDisplayName = 'display_name';
+  static const String keyEmailOtpPending = 'email_otp_pending';
 
   // Breakpoints (mobile-first)
   static const double breakpointTablet = 600;

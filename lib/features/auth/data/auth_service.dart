@@ -77,6 +77,7 @@ class AuthService {
       final userRecord = await getUserRecord(supabaseUser.id);
       return AuthResult.success(
         await hydrateUser(supabaseUser, userRecord),
+        requiresEmailOtp: true,
       );
     } on AuthException catch (e) {
       debugPrint('AuthService.signUpWithEmail failed: ${_describe(e)}');
@@ -114,6 +115,7 @@ class AuthService {
       final userRecord = await getUserRecord(supabaseUser.id);
       return AuthResult.success(
         await hydrateUser(supabaseUser, userRecord),
+        requiresEmailOtp: true,
       );
     } on AuthException catch (e) {
       debugPrint('AuthService.signInWithEmail failed: ${_describe(e)}');
@@ -293,6 +295,46 @@ class AuthService {
       verification: verification,
       sellerProfile: sellerProfile,
     );
+  }
+
+  /// Sends a 6-digit email code through the `send-email-otp` Edge Function.
+  ///
+  /// Gmail SMTP credentials never leave the server. Returns an error message
+  /// on failure, or `null` on success.
+  Future<String?> sendEmailOtp() async {
+    try {
+      final response = await _supabaseService.client.functions.invoke(
+        'send-email-otp',
+      );
+      return _functionError(response);
+    } on FunctionException catch (e) {
+      debugPrint('AuthService.sendEmailOtp failed: ${e.reasonPhrase} ${e.details}');
+      return _functionExceptionMessage(e) ??
+          'We could not send the email. Please try again.';
+    } catch (e) {
+      debugPrint('AuthService.sendEmailOtp error: $e');
+      return 'We could not send the email. Please try again.';
+    }
+  }
+
+  /// Confirms the email code through the `verify-email-otp` Edge Function.
+  Future<String?> verifyEmailOtp({required String token}) async {
+    try {
+      final response = await _supabaseService.client.functions.invoke(
+        'verify-email-otp',
+        body: {'token': token},
+      );
+      return _functionError(response);
+    } on FunctionException catch (e) {
+      debugPrint(
+        'AuthService.verifyEmailOtp failed: ${e.reasonPhrase} ${e.details}',
+      );
+      return _functionExceptionMessage(e) ??
+          'Could not verify that code. Please try again.';
+    } catch (e) {
+      debugPrint('AuthService.verifyEmailOtp error: $e');
+      return 'Could not verify that code. Please try again.';
+    }
   }
 
   /// Sends a 6-digit SMS code through the `send-phone-otp` Edge Function.
