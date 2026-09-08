@@ -42,6 +42,8 @@ Signup must return a session immediately so the app can call `send-email-otp`.
 3. Confirm **Confirm email** is **disabled**.
 4. Save if you changed anything.
 
+Also apply `supabase/migrations/20260907010000_allow_google_identity_on_email_user.sql` in the SQL Editor (or `20260905020000` if you have not run either). That trigger only blocks attaching an **email/password** identity onto an existing Google user. Google sign-in onto an existing email account is allowed so you can still log in.
+
 ---
 
 ## Step 3 — Create the OTP table

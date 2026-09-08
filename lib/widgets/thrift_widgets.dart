@@ -33,64 +33,84 @@ class ThriftButton extends StatelessWidget {
         ? const SizedBox(
             height: 20,
             width: 20,
-            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white,
+            ),
           )
         : Row(
             mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: 8)],
-              Text(label, style: AppTypography.label.copyWith(fontSize: 14, color: _textColor)),
+              if (icon != null) ...[
+                Icon(icon, size: 18),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                label,
+                style: AppTypography.label.copyWith(
+                  fontSize: 14,
+                  color: _textColor,
+                ),
+              ),
             ],
           );
 
     final btn = switch (variant) {
       ThriftButtonVariant.primary => ElevatedButton(
-          onPressed: isLoading ? null : onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: color ?? AppColors.primary,
-            foregroundColor: Colors.white,
-            minimumSize: Size(expand ? double.infinity : 0, 48),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            elevation: 0,
+        onPressed: isLoading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color ?? AppColors.primary,
+          foregroundColor: Colors.white,
+          minimumSize: Size(expand ? double.infinity : 0, 48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: child,
+          elevation: 0,
         ),
+        child: child,
+      ),
       ThriftButtonVariant.secondary => ElevatedButton(
-          onPressed: isLoading ? null : onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: color ?? AppColors.secondary,
-            foregroundColor: Colors.white,
-            minimumSize: Size(expand ? double.infinity : 0, 48),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            elevation: 0,
+        onPressed: isLoading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color ?? AppColors.secondary,
+          foregroundColor: Colors.white,
+          minimumSize: Size(expand ? double.infinity : 0, 48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: child,
+          elevation: 0,
         ),
+        child: child,
+      ),
       ThriftButtonVariant.outline => OutlinedButton(
-          onPressed: isLoading ? null : onPressed,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: color ?? AppColors.primary,
-            minimumSize: Size(expand ? double.infinity : 0, 48),
-            side: BorderSide(color: color ?? AppColors.primary),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        onPressed: isLoading ? null : onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: color ?? AppColors.primary,
+          minimumSize: Size(expand ? double.infinity : 0, 48),
+          side: BorderSide(color: color ?? AppColors.primary),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: child,
         ),
+        child: child,
+      ),
       ThriftButtonVariant.ghost => TextButton(
-          onPressed: isLoading ? null : onPressed,
-          style: TextButton.styleFrom(
-            foregroundColor: color ?? AppColors.primary,
-            minimumSize: Size(expand ? double.infinity : 0, 48),
-          ),
-          child: child,
+        onPressed: isLoading ? null : onPressed,
+        style: TextButton.styleFrom(
+          foregroundColor: color ?? AppColors.primary,
+          minimumSize: Size(expand ? double.infinity : 0, 48),
         ),
+        child: child,
+      ),
     };
 
     return btn;
   }
 
-  Color get _textColor => variant == ThriftButtonVariant.outline || variant == ThriftButtonVariant.ghost
+  Color get _textColor =>
+      variant == ThriftButtonVariant.outline ||
+          variant == ThriftButtonVariant.ghost
       ? (color ?? AppColors.primary)
       : Colors.white;
 }
@@ -171,11 +191,16 @@ class ThriftTextField extends StatelessWidget {
               : AutovalidateMode.disabled,
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: icon != null ? Icon(icon, color: AppColors.textHint, size: 20) : null,
+            prefixIcon: icon != null
+                ? Icon(icon, color: AppColors.textHint, size: 20)
+                : null,
             suffixIcon: suffix,
             filled: true,
             fillColor: AppColors.surface,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: AppColors.border),
@@ -233,7 +258,11 @@ class ThriftCard extends StatelessWidget {
 enum BadgeVariant { primary, secondary, success, error, warning, neutral }
 
 class ThriftBadge extends StatelessWidget {
-  const ThriftBadge({super.key, required this.label, this.variant = BadgeVariant.primary});
+  const ThriftBadge({
+    super.key,
+    required this.label,
+    this.variant = BadgeVariant.primary,
+  });
 
   final String label;
   final BadgeVariant variant;
@@ -246,12 +275,24 @@ class ThriftBadge extends StatelessWidget {
       BadgeVariant.success => (const Color(0xFFD1FAE5), AppColors.success),
       BadgeVariant.error => (const Color(0xFFFEE2E2), AppColors.error),
       BadgeVariant.warning => (const Color(0xFFFEF3C7), AppColors.warning),
-      BadgeVariant.neutral => (AppColors.surfaceVariant, AppColors.textSecondary),
+      BadgeVariant.neutral => (
+        AppColors.surfaceVariant,
+        AppColors.textSecondary,
+      ),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-      child: Text(label, style: AppTypography.caption.copyWith(color: fg, fontWeight: FontWeight.w600)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.caption.copyWith(
+          color: fg,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
@@ -296,11 +337,7 @@ class ThriftAvatar extends StatelessWidget {
                 color: AppColors.primaryDark,
               ),
             )
-          : Icon(
-              Icons.person,
-              size: size * 0.5,
-              color: AppColors.primary,
-            ),
+          : Icon(Icons.person, size: size * 0.5, color: AppColors.primary),
     );
   }
 
@@ -371,7 +408,9 @@ class ThriftChip extends StatelessWidget {
           color: selected ? AppColors.primaryDark : AppColors.textSecondary,
           fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
         ),
-        side: BorderSide(color: selected ? AppColors.primary : AppColors.border),
+        side: BorderSide(
+          color: selected ? AppColors.primary : AppColors.border,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         padding: const EdgeInsets.symmetric(horizontal: 4),
       ),
@@ -385,7 +424,11 @@ class ThriftBottomSheet extends StatelessWidget {
   final Widget child;
   final String? title;
 
-  static Future<T?> show<T>(BuildContext context, {required Widget child, String? title}) {
+  static Future<T?> show<T>(
+    BuildContext context, {
+    required Widget child,
+    String? title,
+  }) {
     return showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
@@ -440,7 +483,11 @@ class ThriftBottomSheet extends StatelessWidget {
   }
 }
 
-void showThriftSnackBar(BuildContext context, String message, {bool isError = false}) {
+void showThriftSnackBar(
+  BuildContext context,
+  String message, {
+  bool isError = false,
+}) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text(message),
@@ -475,7 +522,8 @@ const List<TrustClassificationData> trustClassifications = [
     maxScore: 100,
     color: Color(0xFF0D9488), // Teal
     icon: Icons.verified_user_rounded,
-    description: 'Outstanding fulfillment speed, near-zero complaints, and highly rated items.',
+    description:
+        'Outstanding fulfillment speed, near-zero complaints, and highly rated items.',
   ),
   TrustClassificationData(
     label: 'Trusted Seller',
@@ -483,7 +531,8 @@ const List<TrustClassificationData> trustClassifications = [
     maxScore: 89,
     color: Color(0xFF10B981), // Emerald/Green
     icon: Icons.shield_rounded,
-    description: 'Consistently positive reviews, reliable shipping, and accurate descriptions.',
+    description:
+        'Consistently positive reviews, reliable shipping, and accurate descriptions.',
   ),
   TrustClassificationData(
     label: 'Developing Seller',
@@ -491,7 +540,8 @@ const List<TrustClassificationData> trustClassifications = [
     maxScore: 74,
     color: Color(0xFFF59E0B), // Amber
     icon: Icons.trending_up_rounded,
-    description: 'Newer shop building community presence or has minor feedback history.',
+    description:
+        'Newer shop building community presence or has minor feedback history.',
   ),
   TrustClassificationData(
     label: 'Under Review',
@@ -499,7 +549,8 @@ const List<TrustClassificationData> trustClassifications = [
     maxScore: 59,
     color: Color(0xFFF97316), // Orange
     icon: Icons.gpp_maybe_rounded,
-    description: 'Undergoing audit due to reports, high cancellation rate, or low ratings.',
+    description:
+        'Undergoing audit due to reports, high cancellation rate, or low ratings.',
   ),
   TrustClassificationData(
     label: 'Banned',
@@ -507,7 +558,8 @@ const List<TrustClassificationData> trustClassifications = [
     maxScore: 39,
     color: Color(0xFFEF4444), // Red
     icon: Icons.gpp_bad_rounded,
-    description: 'Accounts suspended due to serious policy violations or scam complaints.',
+    description:
+        'Accounts suspended due to serious policy violations or scam complaints.',
   ),
 ];
 
@@ -517,11 +569,13 @@ class SellerTrustBadge extends StatelessWidget {
     required this.trustScore,
     required this.isVerified,
     required this.shopName,
+    this.showNumericScore = true,
   });
 
   final int trustScore;
   final bool isVerified;
   final String shopName;
+  final bool showNumericScore;
 
   @override
   Widget build(BuildContext context) {
@@ -546,14 +600,12 @@ class SellerTrustBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              current.icon,
-              color: current.color,
-              size: 16,
-            ),
+            Icon(current.icon, color: current.color, size: 16),
             const SizedBox(width: 6),
             Text(
-              '${current.label} ($trustScore/100)',
+              showNumericScore
+                  ? '${current.label} ($trustScore/100)'
+                  : current.label,
               style: AppTypography.caption.copyWith(
                 color: current.color,
                 fontWeight: FontWeight.w700,
@@ -571,7 +623,10 @@ class SellerTrustBadge extends StatelessWidget {
     );
   }
 
-  void _showTrustInfoBottomSheet(BuildContext context, TrustClassificationData current) {
+  void _showTrustInfoBottomSheet(
+    BuildContext context,
+    TrustClassificationData current,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -601,12 +656,16 @@ class SellerTrustBadge extends StatelessWidget {
               const SizedBox(height: 20),
               Text(
                 'Trust & Verification',
-                style: AppTypography.heading.copyWith(fontWeight: FontWeight.w800),
+                style: AppTypography.heading.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 'How we ensure ThriftLine remains a safe community',
-                style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 20),
               Expanded(
@@ -630,7 +689,11 @@ class SellerTrustBadge extends StatelessWidget {
                                   color: current.color.withValues(alpha: 0.1),
                                   shape: BoxShape.circle,
                                 ),
-                                child: Icon(current.icon, color: current.color, size: 28),
+                                child: Icon(
+                                  current.icon,
+                                  color: current.color,
+                                  size: 28,
+                                ),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
@@ -639,37 +702,57 @@ class SellerTrustBadge extends StatelessWidget {
                                   children: [
                                     Text(
                                       shopName,
-                                      style: AppTypography.subheading.copyWith(fontWeight: FontWeight.w700),
+                                      style: AppTypography.subheading.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                     const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Text(
-                                          'Trust Score: ',
-                                          style: AppTypography.body.copyWith(color: AppColors.textSecondary),
-                                        ),
-                                        Text(
-                                          '$trustScore/100',
-                                          style: AppTypography.body.copyWith(
-                                            color: current.color,
-                                            fontWeight: FontWeight.bold,
+                                    if (showNumericScore)
+                                      Row(
+                                        children: [
+                                          Text(
+                                            'Trust Score: ',
+                                            style: AppTypography.body.copyWith(
+                                              color: AppColors.textSecondary,
+                                            ),
                                           ),
+                                          Text(
+                                            '$trustScore/100',
+                                            style: AppTypography.body.copyWith(
+                                              color: current.color,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    else
+                                      Text(
+                                        current.label,
+                                        style: AppTypography.body.copyWith(
+                                          color: current.color,
+                                          fontWeight: FontWeight.bold,
                                         ),
-                                      ],
-                                    ),
+                                      ),
                                   ],
                                 ),
                               ),
                               if (isVerified)
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: AppColors.primaryLight,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Row(
                                     children: [
-                                      Icon(Icons.verified, color: AppColors.primary, size: 14),
+                                      Icon(
+                                        Icons.verified,
+                                        color: AppColors.primary,
+                                        size: 14,
+                                      ),
                                       SizedBox(width: 4),
                                       Text(
                                         'Verified',
@@ -686,10 +769,17 @@ class SellerTrustBadge extends StatelessWidget {
                           ),
                           const Divider(height: 24, thickness: 1),
                           Text(
-                            isVerified
-                                ? '$shopName is a verified seller and currently rated as a ${current.label} based on their positive community feedback, fulfillment efficiency, and safety compliance.'
-                                : '$shopName is currently classified as a ${current.label} with a trust score of $trustScore/100.',
-                            style: AppTypography.body.copyWith(fontSize: 13, height: 1.4),
+                            showNumericScore
+                                ? (isVerified
+                                      ? '$shopName is a verified seller and currently rated as a ${current.label} based on their positive community feedback, fulfillment efficiency, and safety compliance.'
+                                      : '$shopName is currently classified as a ${current.label} with a trust score of $trustScore/100.')
+                                : (isVerified
+                                      ? '$shopName is a verified ${current.label} based on community feedback, fulfillment, and safety compliance.'
+                                      : '$shopName is currently classified as a ${current.label}.'),
+                            style: AppTypography.body.copyWith(
+                              fontSize: 13,
+                              height: 1.4,
+                            ),
                           ),
                         ],
                       ),
@@ -697,7 +787,9 @@ class SellerTrustBadge extends StatelessWidget {
                     const SizedBox(height: 24),
                     Text(
                       'Seller Trust Classifications',
-                      style: AppTypography.subheading.copyWith(fontWeight: FontWeight.w700),
+                      style: AppTypography.subheading.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     ...trustClassifications.map((item) {
@@ -709,7 +801,9 @@ class SellerTrustBadge extends StatelessWidget {
                           color: AppColors.surface,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isCurrent ? item.color : AppColors.border.withValues(alpha: 0.5),
+                            color: isCurrent
+                                ? item.color
+                                : AppColors.border.withValues(alpha: 0.5),
                             width: isCurrent ? 2 : 1,
                           ),
                           boxShadow: isCurrent
@@ -718,7 +812,7 @@ class SellerTrustBadge extends StatelessWidget {
                                     color: item.color.withValues(alpha: 0.15),
                                     blurRadius: 8,
                                     offset: const Offset(0, 4),
-                                  )
+                                  ),
                                 ]
                               : null,
                         ),
@@ -732,40 +826,57 @@ class SellerTrustBadge extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
                                         item.label,
                                         style: AppTypography.body.copyWith(
                                           fontWeight: FontWeight.w700,
-                                          color: isCurrent ? item.color : AppColors.textPrimary,
+                                          color: isCurrent
+                                              ? item.color
+                                              : AppColors.textPrimary,
                                         ),
                                       ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: item.color.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          '${item.minScore}-${item.maxScore}',
-                                          style: AppTypography.caption.copyWith(
-                                            color: item.color,
-                                            fontWeight: FontWeight.bold,
+                                      if (showNumericScore)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: item.color.withValues(
+                                              alpha: 0.1,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '${item.minScore}-${item.maxScore}',
+                                            style: AppTypography.caption
+                                                .copyWith(
+                                                  color: item.color,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                           ),
                                         ),
-                                      ),
                                     ],
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     item.description,
-                                    style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                                    style: AppTypography.caption.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
                                   ),
                                   if (isCurrent) ...[
                                     const SizedBox(height: 8),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: item.color,
                                         borderRadius: BorderRadius.circular(4),
@@ -798,7 +909,11 @@ class SellerTrustBadge extends StatelessWidget {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.verified_user_rounded, color: AppColors.primary, size: 20),
+                          const Icon(
+                            Icons.verified_user_rounded,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -815,7 +930,9 @@ class SellerTrustBadge extends StatelessWidget {
                                 Text(
                                   'Verified sellers have completed government-issued ID verification and face-match checks. This helps prevent fraud and ensures you are buying from a real, accountability-checked individual.',
                                   style: AppTypography.caption.copyWith(
-                                    color: AppColors.primaryDark.withValues(alpha: 0.8),
+                                    color: AppColors.primaryDark.withValues(
+                                      alpha: 0.8,
+                                    ),
                                     height: 1.3,
                                   ),
                                 ),

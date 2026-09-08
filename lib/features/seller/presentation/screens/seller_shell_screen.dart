@@ -4,10 +4,13 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/routes/route_names.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/data_provider.dart';
 import '../../../../widgets/curved_navigation_bar.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../buyer/controllers/looking_for_controller.dart';
+import '../../../buyer/presentation/screens/buyer_looking_for_tab.dart';
 import '../../../profile/screens/seller_profile_tab.dart';
 import 'seller_dashboard_tab.dart';
 import 'seller_listings_tab.dart';
@@ -22,14 +25,20 @@ class SellerShellScreen extends StatefulWidget {
 
 class _SellerShellScreenState extends State<SellerShellScreen> {
   int _index = 0;
+  late final List<Widget> _tabs;
 
-  static const _tabs = [
-    SellerDashboardTab(),
-    SellerListingsTab(),
-    SellerOrdersTab(),
-    _MessagesTab(),
-    SellerProfileTab(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _tabs = [
+      const SellerDashboardTab(),
+      const SellerListingsTab(),
+      const BuyerLookingForTab(sellerWorkspace: true),
+      const SellerOrdersTab(),
+      const _MessagesTab(),
+      const SellerProfileTab(),
+    ];
+  }
 
   void _onTabChanged(int newIndex) {
     if (newIndex == _index) return;
@@ -54,6 +63,11 @@ class _SellerShellScreenState extends State<SellerShellScreen> {
         icon: Icons.sell_outlined,
         activeIcon: Icons.sell_rounded,
         label: 'Listings',
+      ),
+      const CurvedNavItem(
+        icon: Icons.bookmark_outline_rounded,
+        activeIcon: Icons.bookmark_rounded,
+        label: 'Looking',
       ),
       CurvedNavItem(
         icon: Icons.inventory_2_outlined,
@@ -91,27 +105,27 @@ class _SellerShellScreenState extends State<SellerShellScreen> {
       ),
     ];
 
-    return Scaffold(
-      extendBody: true,
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        switchInCurve: Curves.easeOut,
-        switchOutCurve: Curves.easeIn,
-        transitionBuilder: (child, animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: child,
-          );
-        },
-        child: KeyedSubtree(
-          key: ValueKey<int>(_index),
-          child: _tabs[_index],
-        ),
+    return ChangeNotifierProvider(
+      create: (context) => LookingForController(
+        supabase: context.read<SupabaseService>(),
+        auth: context.read<AuthProvider>(),
       ),
-      bottomNavigationBar: CurvedNavigationBar(
-        selectedIndex: _index,
-        onTap: _onTabChanged,
-        items: navItems,
+      child: Scaffold(
+        extendBody: true,
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, animation) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          child: KeyedSubtree(key: ValueKey<int>(_index), child: _tabs[_index]),
+        ),
+        bottomNavigationBar: CurvedNavigationBar(
+          selectedIndex: _index,
+          onTap: _onTabChanged,
+          items: navItems,
+        ),
       ),
     );
   }

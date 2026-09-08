@@ -27,6 +27,9 @@ abstract final class RouteNames {
   static const String sellerOrder = '/seller-order/:id';
   static const String chat = '/chat';
   static const String chatDetail = '/chat/:id';
+  static String chatThread(String id) => '/chat/$id';
+  static const String lookingFor = '/looking-for/:id';
+  static String lookingForPost(String id) => '/looking-for/$id';
   static const String notifications = '/notifications';
   static const String editProfile = '/edit-profile';
   static const String settings = '/settings';

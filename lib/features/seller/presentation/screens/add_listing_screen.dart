@@ -138,34 +138,26 @@ class AddListingScreen extends StatelessWidget {
 
         // â”€â”€ Upload progress overlay (shown while isLoading) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (controller.isLoading)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const LinearProgressIndicator(
-                    backgroundColor: AppColors.primaryLight,
-                    color: AppColors.primary,
+          Positioned.fill(
+            child: ColoredBox(
+              color: Colors.black.withValues(alpha: 0.35),
+              child: const SafeArea(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: AppColors.primary),
+                      SizedBox(height: 16),
+                      Text(
+                        'Posting your listing…',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                  if (controller.uploadStatusMessage.isNotEmpty)
-                    Container(
-                      width: double.infinity,
-                      color: AppColors.textPrimary.withValues(alpha: 0.85),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppConstants.spacingMd,
-                        vertical: AppConstants.spacingSm,
-                      ),
-                      child: Text(
-                        controller.uploadStatusMessage,
-                        style: AppTypography.caption
-                            .copyWith(color: Colors.white),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                ],
+                ),
               ),
             ),
           ),
@@ -225,7 +217,10 @@ class _CategoryField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Category', style: AppTypography.label.copyWith(color: AppColors.textPrimary)),
+        Text(
+          'Category',
+          style: AppTypography.label.copyWith(color: AppColors.textPrimary),
+        ),
         const SizedBox(height: AppConstants.spacingXs),
         InkWell(
           onTap: () => _showCategorySheet(context, controller),
@@ -241,7 +236,11 @@ class _CategoryField extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.category_outlined, color: AppColors.textHint, size: 20),
+                const Icon(
+                  Icons.category_outlined,
+                  color: AppColors.textHint,
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: controller.categoriesLoading
@@ -262,7 +261,10 @@ class _CategoryField extends StatelessWidget {
                           ),
                         ),
                 ),
-                const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                const Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textSecondary,
+                ),
               ],
             ),
           ),
@@ -279,7 +281,10 @@ class _CategoryField extends StatelessWidget {
     );
   }
 
-  void _showCategorySheet(BuildContext context, AddListingController controller) {
+  void _showCategorySheet(
+    BuildContext context,
+    AddListingController controller,
+  ) {
     if (controller.categoriesLoading) return;
 
     ThriftBottomSheet.show(
@@ -291,7 +296,9 @@ class _CategoryField extends StatelessWidget {
               child: Center(
                 child: Text(
                   'No categories available. Pull down to retry.',
-                  style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -302,12 +309,16 @@ class _CategoryField extends StatelessWidget {
                 return ListTile(
                   leading: Icon(
                     Icons.sell_outlined,
-                    color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
                   ),
                   title: Text(
                     cat.name,
                     style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                   trailing: isSelected
@@ -340,7 +351,10 @@ class _ConditionField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Condition', style: AppTypography.label.copyWith(color: AppColors.textPrimary)),
+        Text(
+          'Condition',
+          style: AppTypography.label.copyWith(color: AppColors.textPrimary),
+        ),
         const SizedBox(height: AppConstants.spacingSm),
         Wrap(
           spacing: 8,
@@ -352,7 +366,9 @@ class _ConditionField extends StatelessWidget {
               selected: isSelected,
               selectedColor: AppColors.primaryLight,
               labelStyle: TextStyle(
-                color: isSelected ? AppColors.primaryDark : AppColors.textSecondary,
+                color: isSelected
+                    ? AppColors.primaryDark
+                    : AppColors.textSecondary,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
               shape: RoundedRectangleBorder(
@@ -458,8 +474,10 @@ class _PhotosSection extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.delete_outline, color: AppColors.error),
-            title: const Text('Remove',
-                style: TextStyle(color: AppColors.error)),
+            title: const Text(
+              'Remove',
+              style: TextStyle(color: AppColors.error),
+            ),
             onTap: () {
               Navigator.pop(context);
               controller.removeImage(index);
@@ -624,7 +642,9 @@ class _SellingFormatSection extends StatelessWidget {
   }
 
   void _showDurationPicker(
-      BuildContext context, AddListingController controller) {
+    BuildContext context,
+    AddListingController controller,
+  ) {
     ThriftBottomSheet.show(
       context,
       title: 'Auction Duration',
@@ -639,8 +659,7 @@ class _SellingFormatSection extends StatelessWidget {
             title: Text(
               '$d days',
               style: TextStyle(
-                fontWeight:
-                    isSelected ? FontWeight.bold : FontWeight.normal,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),
             trailing: isSelected
@@ -657,7 +676,9 @@ class _SellingFormatSection extends StatelessWidget {
   }
 
   void _showIncrementPicker(
-      BuildContext context, AddListingController controller) {
+    BuildContext context,
+    AddListingController controller,
+  ) {
     ThriftBottomSheet.show(
       context,
       title: 'Minimum Bid Increment',
@@ -672,8 +693,7 @@ class _SellingFormatSection extends StatelessWidget {
             title: Text(
               '₱${v.toInt()}',
               style: TextStyle(
-                fontWeight:
-                    isSelected ? FontWeight.bold : FontWeight.normal,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),
             trailing: isSelected
@@ -718,8 +738,7 @@ class _FormatCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
             color: isSelected ? AppColors.primaryLight : AppColors.surface,
-            borderRadius:
-                BorderRadius.circular(AppConstants.radiusMd),
+            borderRadius: BorderRadius.circular(AppConstants.radiusMd),
             border: Border.all(
               color: isSelected ? AppColors.primary : AppColors.border,
               width: isSelected ? 2 : 1,
@@ -729,18 +748,14 @@ class _FormatCard extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                color: isSelected
-                    ? AppColors.primary
-                    : AppColors.textSecondary,
+                color: isSelected ? AppColors.primary : AppColors.textSecondary,
                 size: 22,
               ),
               const SizedBox(height: 6),
               Text(
                 label,
                 style: AppTypography.caption.copyWith(
-                  fontWeight: isSelected
-                      ? FontWeight.bold
-                      : FontWeight.normal,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   color: isSelected
                       ? AppColors.primaryDark
                       : AppColors.textPrimary,
@@ -779,21 +794,17 @@ class _SelectorField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: AppTypography.label
-              .copyWith(color: AppColors.textPrimary),
+          style: AppTypography.label.copyWith(color: AppColors.textPrimary),
         ),
         const SizedBox(height: AppConstants.spacingXs),
         InkWell(
           onTap: onTap,
-          borderRadius:
-              BorderRadius.circular(AppConstants.radiusMd),
+          borderRadius: BorderRadius.circular(AppConstants.radiusMd),
           child: Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
               color: AppColors.surface,
-              borderRadius:
-                  BorderRadius.circular(AppConstants.radiusMd),
+              borderRadius: BorderRadius.circular(AppConstants.radiusMd),
               border: Border.all(color: AppColors.border),
             ),
             child: Row(
@@ -804,11 +815,14 @@ class _SelectorField extends StatelessWidget {
                   child: Text(
                     value,
                     style: AppTypography.body.copyWith(
-                        color: AppColors.textPrimary),
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ),
-                const Icon(Icons.arrow_drop_down,
-                    color: AppColors.textSecondary),
+                const Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textSecondary,
+                ),
               ],
             ),
           ),

@@ -33,7 +33,13 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        appBar: AppBar(title: const Text('Payment Proof'), leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop())),
+        appBar: AppBar(
+          title: const Text('Payment Proof'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
+        ),
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(AppConstants.spacingMd),
@@ -43,7 +49,10 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                   height: 150,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFE2E8F0), style: BorderStyle.solid),
+                    border: Border.all(
+                      color: const Color(0xFFE2E8F0),
+                      style: BorderStyle.solid,
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Column(
@@ -56,9 +65,16 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                ThriftTextField(label: 'Reference number', controller: _refCtrl),
+                ThriftTextField(
+                  label: 'Reference number',
+                  controller: _refCtrl,
+                ),
                 const SizedBox(height: 12),
-                ThriftTextField(label: 'Amount paid', controller: _amountCtrl, keyboardType: TextInputType.number),
+                ThriftTextField(
+                  label: 'Amount paid',
+                  controller: _amountCtrl,
+                  keyboardType: TextInputType.number,
+                ),
                 const SizedBox(height: 12),
                 ListTile(
                   title: Text('Date: ${_date.toString().split(' ').first}'),
@@ -77,7 +93,9 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                 ThriftButton(
                   label: 'Submit Proof',
                   onPressed: () {
-                    context.read<DataProvider>().submitPaymentProof(widget.orderId);
+                    context.read<DataProvider>().submitPaymentProof(
+                      widget.orderId,
+                    );
                     showThriftSnackBar(context, 'Payment proof submitted!');
                     context.go(RouteNames.buyerHome);
                   },

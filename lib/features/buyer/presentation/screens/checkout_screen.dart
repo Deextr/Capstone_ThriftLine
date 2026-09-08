@@ -23,7 +23,10 @@ class CheckoutScreen extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: AppColors.textPrimary,
+          ),
           onPressed: () => context.pop(),
         ),
         title: Column(
@@ -124,9 +127,7 @@ class _CartItemCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: AppColors.border.withValues(alpha: 0.6),
-          ),
+          border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
@@ -166,8 +167,10 @@ class _CartItemCard extends StatelessWidget {
                           color: AppColors.surfaceVariant,
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: const Icon(Icons.image_outlined,
-                            color: AppColors.textHint),
+                        child: const Icon(
+                          Icons.image_outlined,
+                          color: AppColors.textHint,
+                        ),
                       ),
                     ),
                   ),
@@ -207,8 +210,11 @@ class _CartItemCard extends StatelessWidget {
                         // Seller + condition row
                         Row(
                           children: [
-                            const Icon(Icons.storefront_outlined,
-                                size: 12, color: AppColors.textHint),
+                            const Icon(
+                              Icons.storefront_outlined,
+                              size: 12,
+                              color: AppColors.textHint,
+                            ),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
@@ -223,8 +229,11 @@ class _CartItemCard extends StatelessWidget {
                             if (product.sellerVerified)
                               const Padding(
                                 padding: EdgeInsets.only(left: 4),
-                                child: Icon(Icons.verified_rounded,
-                                    size: 13, color: AppColors.primary),
+                                child: Icon(
+                                  Icons.verified_rounded,
+                                  size: 13,
+                                  color: AppColors.primary,
+                                ),
                               ),
                           ],
                         ),
@@ -264,8 +273,11 @@ class _CartItemCard extends StatelessWidget {
                         color: AppColors.error.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.close_rounded,
-                          size: 16, color: AppColors.error),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        size: 16,
+                        color: AppColors.error,
+                      ),
                     ),
                   ),
                 ],
@@ -277,8 +289,7 @@ class _CartItemCard extends StatelessWidget {
 
             // â”€â”€ Price + Quantity controls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               child: Row(
                 children: [
                   // Unit price
@@ -314,7 +325,9 @@ class _CartItemCard extends StatelessWidget {
                           icon: Icons.remove_rounded,
                           onTap: item.quantity > 1
                               ? () => cart.updateQuantity(
-                                  product.id, item.quantity - 1)
+                                  product.id,
+                                  item.quantity - 1,
+                                )
                               : null,
                         ),
                         SizedBox(
@@ -332,7 +345,9 @@ class _CartItemCard extends StatelessWidget {
                         _StepperButton(
                           icon: Icons.add_rounded,
                           onTap: () => cart.updateQuantity(
-                              product.id, item.quantity + 1),
+                            product.id,
+                            item.quantity + 1,
+                          ),
                         ),
                       ],
                     ),
@@ -499,9 +514,7 @@ class _StepperButton extends StatelessWidget {
       child: Container(
         width: 32,
         height: 32,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
         child: Icon(
           icon,
           size: 16,
@@ -532,7 +545,9 @@ class _SummaryRow extends StatelessWidget {
           style: bold
               ? AppTypography.subheading.copyWith(fontSize: 15)
               : AppTypography.body.copyWith(
-                  fontSize: 13, color: AppColors.textSecondary),
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
         ),
         Text(
           value,

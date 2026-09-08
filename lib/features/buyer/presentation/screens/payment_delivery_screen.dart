@@ -39,7 +39,9 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
 
   Future<void> _loadAddress() async {
     try {
-      final saved = await AddressService(context.read<SupabaseService>()).defaultAddress();
+      final saved = await AddressService(
+        context.read<SupabaseService>(),
+      ).defaultAddress();
       if (!mounted) return;
       setState(() {
         _address = saved;
@@ -60,9 +62,17 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
   Widget build(BuildContext context) {
     final data = context.watch<DataProvider>();
     final product = data.productById(widget.productId);
-    if (product == null) return Scaffold(appBar: AppBar(), body: const Center(child: Text('Not found')));
+    if (product == null)
+      return Scaffold(
+        appBar: AppBar(),
+        body: const Center(child: Text('Not found')),
+      );
 
-    final qty = int.tryParse(GoRouterState.of(context).uri.queryParameters['qty'] ?? '1') ?? 1;
+    final qty =
+        int.tryParse(
+          GoRouterState.of(context).uri.queryParameters['qty'] ?? '1',
+        ) ??
+        1;
     final subtotal = product.price * qty;
     final shipping = _delivery.fee;
     final platform = subtotal * 0.02;
@@ -72,7 +82,13 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        appBar: AppBar(title: const Text('Payment & Delivery'), leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop())),
+        appBar: AppBar(
+          title: const Text('Payment & Delivery'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
+        ),
         body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppConstants.spacingMd),
@@ -89,7 +105,7 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
                           _addressLoading
                               ? 'Loading addressâ€¦'
                               : (_address?.formatted ??
-                                  'No saved address yet. Add one before placing an order.'),
+                                    'No saved address yet. Add one before placing an order.'),
                           style: AppTypography.body,
                         ),
                       ),
@@ -105,27 +121,38 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
                 ),
                 const SizedBox(height: 20),
                 Text('Delivery Method', style: AppTypography.subheading),
-                ...DeliveryMethod.values.map((d) => RadioListTile<DeliveryMethod>(
-                  title: Text('${d.label} â€” ${formatCurrency(d.fee)}'),
-                  value: d,
-                  groupValue: _delivery,
-                  onChanged: (v) => setState(() => _delivery = v!),
-                )),
+                ...DeliveryMethod.values.map(
+                  (d) => RadioListTile<DeliveryMethod>(
+                    title: Text('${d.label} â€” ${formatCurrency(d.fee)}'),
+                    value: d,
+                    groupValue: _delivery,
+                    onChanged: (v) => setState(() => _delivery = v!),
+                  ),
+                ),
                 if (_delivery == DeliveryMethod.meetup)
-                  ThriftTextField(label: 'Meet-up location', controller: _meetupLocation, hint: 'e.g. SM North EDSA'),
+                  ThriftTextField(
+                    label: 'Meet-up location',
+                    controller: _meetupLocation,
+                    hint: 'e.g. SM North EDSA',
+                  ),
                 const SizedBox(height: 20),
                 Text('Payment Method', style: AppTypography.subheading),
-                ...PaymentMethod.values.map((p) => RadioListTile<PaymentMethod>(
-                  title: Text(p.label),
-                  value: p,
-                  groupValue: _payment,
-                  onChanged: (v) => setState(() => _payment = v!),
-                )),
+                ...PaymentMethod.values.map(
+                  (p) => RadioListTile<PaymentMethod>(
+                    title: Text(p.label),
+                    value: p,
+                    groupValue: _payment,
+                    onChanged: (v) => setState(() => _payment = v!),
+                  ),
+                ),
                 if (_payment == PaymentMethod.cod)
                   ThriftCard(
                     child: Text(
                       '20% Downpayment Required: ${formatCurrency(codDown)}',
-                      style: AppTypography.body.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w600),
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 const SizedBox(height: 20),
@@ -139,8 +166,13 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
                 ThriftButton(
                   label: 'Place Order',
                   onPressed: () {
-                    if (_delivery != DeliveryMethod.meetup && _address == null) {
-                      showThriftSnackBar(context, 'Add a delivery address first.', isError: true);
+                    if (_delivery != DeliveryMethod.meetup &&
+                        _address == null) {
+                      showThriftSnackBar(
+                        context,
+                        'Add a delivery address first.',
+                        isError: true,
+                      );
                       return;
                     }
                     final auth = context.read<AuthProvider>();
@@ -170,13 +202,21 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
   }
 
   Widget _row(String label, String value, {bool bold = false}) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: bold ? AppTypography.subheading : AppTypography.body),
-            Text(value, style: bold ? AppTypography.subheading.copyWith(color: AppColors.primary) : AppTypography.body),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: bold ? AppTypography.subheading : AppTypography.body,
         ),
-      );
+        Text(
+          value,
+          style: bold
+              ? AppTypography.subheading.copyWith(color: AppColors.primary)
+              : AppTypography.body,
+        ),
+      ],
+    ),
+  );
 }

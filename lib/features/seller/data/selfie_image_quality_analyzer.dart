@@ -7,7 +7,7 @@ import 'selfie_face_reader.dart';
 /// Decodes a captured selfie and runs an independent face + quality check.
 class SelfieImageQualityAnalyzer {
   SelfieImageQualityAnalyzer({SelfieFaceReader? faceReader})
-      : _faceReader = faceReader ?? MlKitSelfieFaceReader();
+    : _faceReader = faceReader ?? MlKitSelfieFaceReader();
 
   final SelfieFaceReader _faceReader;
 
@@ -27,10 +27,7 @@ class SelfieImageQualityAnalyzer {
         return SelfieQualityResult.fail(SelfieQualityIssue.noFace);
       }
 
-      final faces = await _faceReader.detect(
-        bytes: bytes,
-        filePath: filePath,
-      );
+      final faces = await _faceReader.detect(bytes: bytes, filePath: filePath);
 
       return SelfieImageMetrics.evaluate(
         luma: sampled.luma,

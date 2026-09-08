@@ -28,6 +28,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -41,6 +42,8 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _signUpWithEmail() async {
     if (!_formKey.currentState!.validate()) return;
 
+    setState(() => _errorMessage = null);
+
     final auth = context.read<AuthProvider>();
     final result = await auth.signUpWithEmail(
       email: _emailController.text.trim(),
@@ -50,11 +53,10 @@ class _SignupScreenState extends State<SignupScreen> {
     );
     if (!mounted) return;
     if (!result.success) {
-      showThriftSnackBar(
-        context,
-        result.errorMessage ?? 'Something went wrong. Please try again.',
-        isError: true,
-      );
+      final message =
+          result.errorMessage ?? 'Something went wrong. Please try again.';
+      setState(() => _errorMessage = message);
+      showThriftSnackBar(context, message, isError: true);
       return;
     }
 
@@ -226,6 +228,17 @@ class _SignupScreenState extends State<SignupScreen> {
                                     labelColor: fieldLabelColor,
                                   ),
                                   SizedBox(height: compact ? 20 : 24),
+                                  if (_errorMessage != null) ...[
+                                    Text(
+                                      _errorMessage!,
+                                      style: AppTypography.body.copyWith(
+                                        color: const Color(0xFFFECACA),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    SizedBox(height: compact ? 12 : 16),
+                                  ],
                                   ThriftButton(
                                     label: 'Sign Up',
                                     onPressed: auth.isLoading

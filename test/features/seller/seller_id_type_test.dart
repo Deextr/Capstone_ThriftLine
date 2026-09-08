@@ -3,7 +3,7 @@ import 'package:thriftline/features/seller/domain/seller_id_type.dart';
 
 void main() {
   group('SellerIdType', () {
-    test('exposes only the six allowed labels', () {
+    test('exposes only the five allowed labels', () {
       expect(
         SellerIdType.values.map((type) => type.label).toList(),
         [
@@ -12,15 +12,15 @@ void main() {
           'Passport',
           'SSS ID',
           'UMID ID',
-          'Student ID',
         ],
       );
     });
 
-    test('does not include Voter\'s ID or PhilHealth ID', () {
+    test('does not include Voter\'s ID, PhilHealth ID, or Student ID', () {
       final labels = SellerIdType.values.map((type) => type.label.toLowerCase());
       expect(labels.any((label) => label.contains('voter')), isFalse);
       expect(labels.any((label) => label.contains('philhealth')), isFalse);
+      expect(labels.any((label) => label.contains('student')), isFalse);
     });
 
     test('parses allowed storage values', () {
@@ -39,6 +39,8 @@ void main() {
       expect(SellerIdType.tryParse('philhealth_id'), isNull);
       expect(SellerIdType.tryParse('philhealth'), isNull);
       expect(SellerIdType.tryParse('government_id'), isNull);
+      expect(SellerIdType.tryParse('student_id'), isNull);
+      expect(SellerIdType.tryParse('student'), isNull);
       expect(SellerIdType.tryParse(null), isNull);
     });
   });

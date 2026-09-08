@@ -48,7 +48,7 @@ class _ListingItem {
 
     return _ListingItem(
       productId: row['product_id'] as String,
-      name: row['name'] as String,
+      name: row['name'] as String? ?? row['title'] as String? ?? '',
       price: (row['price'] as num).toDouble(),
       status: row['status'] as String,
       listingType: row['listing_type'] as String,
@@ -193,7 +193,8 @@ class _SellerListingsTabState extends State<SellerListingsTab>
                         _ListingsList(
                           items: _active,
                           loading: _loading,
-                          emptyMessage: 'No active listings yet.\nTap + to add one.',
+                          emptyMessage:
+                              'No active listings yet.\nTap + to add one.',
                           onRefresh: _load,
                           onDeleted: _load,
                         ),
@@ -260,8 +261,9 @@ class _ListingsList extends StatelessWidget {
               child: Center(
                 child: Text(
                   emptyMessage,
-                  style: AppTypography.body
-                      .copyWith(color: AppColors.textSecondary),
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -446,11 +448,7 @@ class _ListingCard extends StatelessWidget {
           }
         } catch (e) {
           if (context.mounted) {
-            showThriftSnackBar(
-              context,
-              'Failed to delete: $e',
-              isError: true,
-            );
+            showThriftSnackBar(context, 'Failed to delete: $e', isError: true);
           }
         }
       }
@@ -506,8 +504,9 @@ class _ErrorView extends StatelessWidget {
             const SizedBox(height: AppConstants.spacingMd),
             Text(
               message,
-              style:
-                  AppTypography.body.copyWith(color: AppColors.textSecondary),
+              style: AppTypography.body.copyWith(
+                color: AppColors.textSecondary,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppConstants.spacingMd),

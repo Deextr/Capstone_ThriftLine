@@ -10,25 +10,19 @@ import '../../../providers/auth_provider.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../widgets/info_bottom_sheets.dart';
 import '../../../widgets/thrift_widgets.dart';
+import '../presentation/widgets/switch_account_sheet.dart';
+import '../presentation/widgets/switchable_avatar.dart';
 
-/// Profile tab for **seller** users.
+/// Profile tab for the **Seller** workspace.
 ///
-/// A seller can still buy, so the profile shows both buying and selling
-/// sections in one unified hub.
-///
-/// Layout:
-/// â”Œâ”€ Profile Header (Avatar, Name, @Username)
-/// â”œâ”€ Buying
-/// â”œâ”€ Selling
-/// â”œâ”€ Account
-/// â””â”€ Logout
+/// Buying tools stay on the Buyer account. Approved sellers switch accounts
+/// from the header or the Account section.
 class SellerProfileTab extends StatelessWidget {
   const SellerProfileTab({super.key});
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final user = auth.user;
 
     return SafeArea(
       child: ListView(
@@ -36,40 +30,15 @@ class SellerProfileTab extends StatelessWidget {
         children: [
           // â”€â”€ Profile Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppConstants.spacingMd),
-            child: _ProfileHeader(user: user),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppConstants.spacingMd,
+            ),
+            child: _ProfileHeader(auth: auth),
           ),
 
           const SizedBox(height: 28),
 
-          // â”€â”€ Buying â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-          _SectionCard(
-            title: 'Buying',
-            children: [
-              _MenuItem(
-                icon: Icons.receipt_long_outlined,
-                label: 'Purchase History',
-                onTap: () => context.push(RouteNames.purchaseHistory),
-              ),
-              _MenuItem(
-                icon: Icons.gavel_outlined,
-                label: 'Active Bids',
-                onTap: () => showThriftSnackBar(context, 'Coming soon'),
-              ),
-              _MenuItem(
-                icon: Icons.favorite_border_rounded,
-                label: 'Saved Items',
-                onTap: () => context.push(RouteNames.savedItems),
-              ),
-              _MenuItem(
-                icon: Icons.inventory_2_outlined,
-                label: 'My Requests',
-                onTap: () => showThriftSnackBar(context, 'Coming soon'),
-              ),
-            ],
-          ),
-
-          // â”€â”€ Selling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // Selling
           _SectionCard(
             title: 'Selling',
             children: [
@@ -105,6 +74,12 @@ class SellerProfileTab extends StatelessWidget {
           _SectionCard(
             title: 'Account',
             children: [
+              if (auth.canSwitchAccounts)
+                _MenuItem(
+                  icon: Icons.sync_alt_rounded,
+                  label: 'Switch Account',
+                  onTap: () => SwitchAccountSheet.show(context),
+                ),
               _MenuItem(
                 icon: Icons.person_outline_rounded,
                 label: 'Edit Profile',
@@ -155,7 +130,9 @@ class SellerProfileTab extends StatelessWidget {
 
           // â”€â”€ Logout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppConstants.spacingMd),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppConstants.spacingMd,
+            ),
             child: ThriftButton(
               label: 'Logout',
               variant: ThriftButtonVariant.ghost,
@@ -178,17 +155,23 @@ class SellerProfileTab extends StatelessWidget {
 // =============================================================================
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.user});
-  final dynamic user;
+  const _ProfileHeader({required this.auth});
+  final AuthProvider auth;
 
   @override
   Widget build(BuildContext context) {
-    final name = user?.name ?? '';
+    final user = auth.user;
+    final name = auth.displayName ?? user?.name ?? '';
     final username = user?.username ?? '';
 
     return Column(
       children: [
-        ThriftAvatar(imageUrl: user?.avatarUrl ?? '', name: name, size: 90),
+        SwitchableAvatar(
+          imageUrl: user?.avatarUrl ?? '',
+          name: name,
+          canSwitch: auth.canSwitchAccounts,
+          onSwitch: () => SwitchAccountSheet.show(context),
+        ),
         const SizedBox(height: 14),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -237,7 +220,9 @@ class _SectionCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
             child: Text(
               title,
-              style: AppTypography.subheading.copyWith(color: AppColors.textSecondary),
+              style: AppTypography.subheading.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           Material(
@@ -246,7 +231,9 @@ class _SectionCard extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+                border: Border.all(
+                  color: AppColors.border.withValues(alpha: 0.5),
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.02),
@@ -288,7 +275,11 @@ class _MenuItem extends StatelessWidget {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Icon(icon, color: AppColors.textPrimary, size: 22),
       title: Text(label, style: AppTypography.body),
-      trailing: const Icon(Icons.chevron_right, size: 20, color: AppColors.textHint),
+      trailing: const Icon(
+        Icons.chevron_right,
+        size: 20,
+        color: AppColors.textHint,
+      ),
       onTap: onTap,
     );
   }
@@ -306,7 +297,11 @@ class _NotificationToggle extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: const Icon(Icons.notifications_none_outlined, color: AppColors.textPrimary, size: 22),
+      leading: const Icon(
+        Icons.notifications_none_outlined,
+        color: AppColors.textPrimary,
+        size: 22,
+      ),
       title: Text('Notifications', style: AppTypography.body),
       trailing: Switch(
         value: settings.pushNotificationsEnabled,

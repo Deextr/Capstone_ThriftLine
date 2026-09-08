@@ -9,10 +9,12 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../models/enums.dart';
+import '../../../../models/looking_for_model.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/data_provider.dart';
 import '../../../../providers/notifications_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../buyer/controllers/looking_for_controller.dart';
 
 class SellerDashboardTab extends StatelessWidget {
   const SellerDashboardTab({super.key});
@@ -21,12 +23,13 @@ class SellerDashboardTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
+    final looking = context.watch<LookingForController>();
     final user = auth.user;
     final sellerId = auth.user?.id ?? '';
     final listings = data.productsForSeller(auth.username ?? '');
     final pending = data.pendingOrdersForSeller(sellerId);
     final recentOrders = data.ordersForSeller(sellerId).take(3).toList();
-    final lookingForPosts = data.lookingForPosts.take(3).toList();
+    final lookingForPosts = looking.posts.take(3).toList();
 
     return ColoredBox(
       color: AppColors.background,
@@ -34,16 +37,12 @@ class SellerDashboardTab extends StatelessWidget {
         child: RefreshIndicator(
           color: AppColors.primary,
           strokeWidth: 2.5,
-          onRefresh: () async {
-            await Future<void>.delayed(const Duration(milliseconds: 600));
-          },
+          onRefresh: () => context.read<LookingForController>().refresh(),
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               // â”€â”€ Sticky top bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-              SliverToBoxAdapter(
-                child: _TopBar(user: user),
-              ),
+              SliverToBoxAdapter(child: _TopBar(user: user)),
 
               // â”€â”€ Hero banner: earnings + mini stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverToBoxAdapter(
@@ -55,21 +54,14 @@ class SellerDashboardTab extends StatelessWidget {
               ),
 
               // â”€â”€ Quick actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-              SliverToBoxAdapter(
-                child: _QuickActionBar(),
-              ),
+              SliverToBoxAdapter(child: _QuickActionBar()),
 
               // â”€â”€ Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-              SliverToBoxAdapter(
-                child: _ChartSection(),
-              ),
+              SliverToBoxAdapter(child: _ChartSection()),
 
               // â”€â”€ Recent Orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverToBoxAdapter(
-                child: _SectionLabel(
-                  title: 'Recent Orders',
-                  onTap: () {},
-                ),
+                child: _SectionLabel(title: 'Recent Orders', onTap: () {}),
               ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
@@ -86,10 +78,7 @@ class SellerDashboardTab extends StatelessWidget {
 
               // â”€â”€ Looking For â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverToBoxAdapter(
-                child: _SectionLabel(
-                  title: 'Buyers Looking For',
-                  onTap: () {},
-                ),
+                child: _SectionLabel(title: 'Buyers Looking For'),
               ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
@@ -141,8 +130,11 @@ class _TopBar extends StatelessWidget {
           ),
           // Notification icon
           Badge(
-            isLabelVisible: context.watch<NotificationsProvider>().unreadCount > 0,
-            label: Text('${context.watch<NotificationsProvider>().unreadCount}'),
+            isLabelVisible:
+                context.watch<NotificationsProvider>().unreadCount > 0,
+            label: Text(
+              '${context.watch<NotificationsProvider>().unreadCount}',
+            ),
             child: _IconBtn(
               icon: Icons.notifications_outlined,
               onTap: () => context.push(RouteNames.notifications),
@@ -272,7 +264,9 @@ class _EarningsBanner extends StatelessWidget {
                   // Trend chip
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(20),
@@ -280,8 +274,11 @@ class _EarningsBanner extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.arrow_upward_rounded,
-                            color: Colors.white, size: 13),
+                        const Icon(
+                          Icons.arrow_upward_rounded,
+                          color: Colors.white,
+                          size: 13,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           '12.4% vs last month',
@@ -405,7 +402,9 @@ class _QuickActionBar extends StatelessWidget {
           final (icon, label, color) = item;
           return Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2), // Slightly reduced horizontal padding to fit 5 items
+              padding: const EdgeInsets.symmetric(
+                horizontal: 2,
+              ), // Slightly reduced horizontal padding to fit 5 items
               child: _ActionTile(
                 icon: icon,
                 label: label,
@@ -524,8 +523,7 @@ class _ChartSection extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Sales Overview',
-                            style: AppTypography.subheading),
+                        Text('Sales Overview', style: AppTypography.subheading),
                         const SizedBox(height: 2),
                         Text(
                           'Weekly performance',
@@ -536,7 +534,9 @@ class _ChartSection extends StatelessWidget {
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primaryLight,
                       borderRadius: BorderRadius.circular(20),
@@ -572,16 +572,24 @@ class _ChartSection extends StatelessWidget {
                     ),
                     titlesData: FlTitlesData(
                       rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false)),
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
                       topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false)),
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
                           reservedSize: 22,
                           getTitlesWidget: (value, _) {
                             const days = [
-                              'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
+                              'Mon',
+                              'Tue',
+                              'Wed',
+                              'Thu',
+                              'Fri',
+                              'Sat',
+                              'Sun',
                             ];
                             final i = value.toInt();
                             if (i >= 0 && i < days.length) {
@@ -589,8 +597,9 @@ class _ChartSection extends StatelessWidget {
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text(
                                   days[i],
-                                  style: AppTypography.caption
-                                      .copyWith(fontSize: 10),
+                                  style: AppTypography.caption.copyWith(
+                                    fontSize: 10,
+                                  ),
                                 ),
                               );
                             }
@@ -627,8 +636,7 @@ class _ChartSection extends StatelessWidget {
                         isStrokeCapRound: true,
                         dotData: FlDotData(
                           show: true,
-                          getDotPainter: (spot, _, _, _) =>
-                              FlDotCirclePainter(
+                          getDotPainter: (spot, _, _, _) => FlDotCirclePainter(
                             radius: 3,
                             color: AppColors.primary,
                             strokeWidth: 2,
@@ -684,9 +692,7 @@ class _SectionLabel extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          Expanded(
-            child: Text(title, style: AppTypography.subheading),
-          ),
+          Expanded(child: Text(title, style: AppTypography.subheading)),
           if (onTap != null)
             GestureDetector(
               onTap: onTap,
@@ -700,8 +706,11 @@ class _SectionLabel extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 2),
-                  const Icon(Icons.arrow_forward_ios_rounded,
-                      size: 11, color: AppColors.primary),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 11,
+                    color: AppColors.primary,
+                  ),
                 ],
               ),
             ),
@@ -721,7 +730,8 @@ class _OrderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isNew = order.status == OrderStatus.placed ||
+    final isNew =
+        order.status == OrderStatus.placed ||
         order.status == OrderStatus.paymentPending;
 
     return Container(
@@ -765,8 +775,11 @@ class _OrderTile extends StatelessWidget {
                     color: AppColors.surfaceVariant,
                     borderRadius: BorderRadius.circular(AppConstants.radiusMd),
                   ),
-                  child: const Icon(Icons.shopping_bag_outlined,
-                      color: AppColors.textSecondary, size: 20),
+                  child: const Icon(
+                    Icons.shopping_bag_outlined,
+                    color: AppColors.textSecondary,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 // Info
@@ -776,16 +789,14 @@ class _OrderTile extends StatelessWidget {
                     children: [
                       Text(
                         order.productTitle,
-                        style: AppTypography.body
-                            .copyWith(fontWeight: FontWeight.w600),
+                        style: AppTypography.body.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 3),
-                      Text(
-                        order.buyerName,
-                        style: AppTypography.caption,
-                      ),
+                      Text(order.buyerName, style: AppTypography.caption),
                     ],
                   ),
                 ),
@@ -809,7 +820,27 @@ class _OrderTile extends StatelessWidget {
 
 class _LookingForTile extends StatelessWidget {
   const _LookingForTile({required this.post});
-  final dynamic post;
+  final LookingForModel post;
+
+  Future<void> _openPost(BuildContext context) async {
+    await context.push(RouteNames.lookingForPost(post.id));
+    if (!context.mounted) return;
+    await context.read<LookingForController>().refresh();
+  }
+
+  Future<void> _iHaveThis(BuildContext context) async {
+    final looking = context.read<LookingForController>();
+    final result = await looking.sendIHaveThis(post);
+    if (!context.mounted) return;
+    if (!result.isOk) {
+      showThriftSnackBar(context, result.error!, isError: true);
+      return;
+    }
+    showThriftSnackBar(context, 'Message sent to the buyer.');
+    if (result.conversationId != null) {
+      context.push(RouteNames.chatThread(result.conversationId!));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -831,7 +862,7 @@ class _LookingForTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppConstants.radiusLg),
         child: InkWell(
           borderRadius: BorderRadius.circular(AppConstants.radiusLg),
-          onTap: () {},
+          onTap: () => _openPost(context),
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Row(
@@ -844,8 +875,11 @@ class _LookingForTile extends StatelessWidget {
                     color: AppColors.secondary.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(AppConstants.radiusMd),
                   ),
-                  child: const Icon(Icons.search_rounded,
-                      color: AppColors.secondary, size: 20),
+                  child: const Icon(
+                    Icons.search_rounded,
+                    color: AppColors.secondary,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 // Info
@@ -855,8 +889,9 @@ class _LookingForTile extends StatelessWidget {
                     children: [
                       Text(
                         post.title,
-                        style: AppTypography.body
-                            .copyWith(fontWeight: FontWeight.w600),
+                        style: AppTypography.body.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -871,21 +906,26 @@ class _LookingForTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Reply button
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+                if (context.read<LookingForController>().auth.user?.id !=
+                    post.buyerId)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLight,
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.radiusMd,
+                      ),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.reply_rounded,
+                        color: AppColors.primaryDark,
+                        size: 18,
+                      ),
+                      onPressed: () => _iHaveThis(context),
+                      padding: const EdgeInsets.all(8),
+                      constraints: const BoxConstraints(),
+                    ),
                   ),
-                  child: IconButton(
-                    icon: const Icon(Icons.reply_rounded,
-                        color: AppColors.primaryDark, size: 18),
-                    onPressed: () =>
-                        showThriftSnackBar(context, 'Response sent!'),
-                    padding: const EdgeInsets.all(8),
-                    constraints: const BoxConstraints(),
-                  ),
-                ),
               ],
             ),
           ),

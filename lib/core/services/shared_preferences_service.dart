@@ -60,6 +60,38 @@ class SharedPreferencesService {
   Future<bool> setEmailOtpPending(bool value) =>
       _prefs.setBool(AppConstants.keyEmailOtpPending, value);
 
+  /// Last Buyer/Seller workspace for [userId] on this device.
+  ///
+  /// Kept across logout so the same person returns to the mode they left.
+  /// A different user on this device does not inherit the previous mode.
+  String? activeAccountFor(String userId) {
+    final storedUserId = _prefs.getString(AppConstants.keyActiveAccountUserId);
+    if (storedUserId != userId) return null;
+    return _prefs.getString(AppConstants.keyActiveAccount);
+  }
+
+  Future<void> setActiveAccount({
+    required String userId,
+    required String mode,
+  }) async {
+    await _prefs.setString(AppConstants.keyActiveAccountUserId, userId);
+    await _prefs.setString(AppConstants.keyActiveAccount, mode);
+  }
+
+  List<String> recentSearchesFor(String userId) {
+    return _prefs.getStringList(
+          '${AppConstants.keyRecentSearchesPrefix}$userId',
+        ) ??
+        const [];
+  }
+
+  Future<void> setRecentSearches(String userId, List<String> queries) {
+    return _prefs.setStringList(
+      '${AppConstants.keyRecentSearchesPrefix}$userId',
+      queries,
+    );
+  }
+
   Future<void> clearAuthSession() async {
     await setLoggedIn(false);
     await remove(AppConstants.keyUserRole);

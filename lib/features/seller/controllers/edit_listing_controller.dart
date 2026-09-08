@@ -58,9 +58,9 @@ class EditListingController extends ChangeNotifier {
     required SupabaseService supabase,
     required AuthProvider auth,
     ImagePicker? imagePicker,
-  })  : _supabase = supabase,
-        _auth = auth,
-        _imagePicker = imagePicker ?? ImagePicker() {
+  }) : _supabase = supabase,
+       _auth = auth,
+       _imagePicker = imagePicker ?? ImagePicker() {
     _init();
   }
 
@@ -120,10 +120,12 @@ class EditListingController extends ChangeNotifier {
           .eq('is_active', true)
           .order('category_name');
       categories = (rows as List)
-          .map((r) => CategoryItem(
-                id: r['category_id'] as String,
-                name: r['category_name'] as String,
-              ))
+          .map(
+            (r) => CategoryItem(
+              id: r['category_id'] as String,
+              name: r['category_name'] as String,
+            ),
+          )
           .toList();
     } catch (_) {
     } finally {
@@ -145,7 +147,7 @@ class EditListingController extends ChangeNotifier {
           .single();
 
       // Text fields
-      nameCtrl.text = row['name'] as String? ?? '';
+      nameCtrl.text = row['name'] as String? ?? row['title'] as String? ?? '';
       descCtrl.text = row['description'] as String? ?? '';
       brandCtrl.text = row['brand'] as String? ?? '';
       sizeCtrl.text = row['size'] as String? ?? '';
@@ -175,14 +177,22 @@ class EditListingController extends ChangeNotifier {
 
       // Images â€” sort by display_order
       final imgRows = (row['product_images'] as List? ?? []);
-      imgRows.sort((a, b) =>
-          (a['display_order'] as int).compareTo(b['display_order'] as int));
+      imgRows.sort(
+        (a, b) =>
+            (a['display_order'] as int).compareTo(b['display_order'] as int),
+      );
       slots = imgRows
-          .map((i) => ExistingSlot(ExistingImage(
-                imageId: i['image_id'] as String,
-                imageUrl: i['image_url'] as String,
-                displayOrder: i['display_order'] as int,
-              )) as ImageSlot)
+          .map(
+            (i) =>
+                ExistingSlot(
+                      ExistingImage(
+                        imageId: i['image_id'] as String,
+                        imageUrl: i['image_url'] as String,
+                        displayOrder: i['display_order'] as int,
+                      ),
+                    )
+                    as ImageSlot,
+          )
           .toList();
 
       initialLoading = false;
@@ -248,8 +258,7 @@ class EditListingController extends ChangeNotifier {
 
   Future<void> pickImage(int slotIndex) async {
     if (slots.length >= 3) return;
-    final xfile =
-        await _imagePicker.pickImage(source: ImageSource.gallery);
+    final xfile = await _imagePicker.pickImage(source: ImageSource.gallery);
     if (xfile == null) return;
     final bytes = await xfile.readAsBytes();
     final newSlot = NewSlot(SelectedImage(bytes: bytes, name: xfile.name));
@@ -262,8 +271,7 @@ class EditListingController extends ChangeNotifier {
   }
 
   Future<void> replaceImage(int slotIndex) async {
-    final xfile =
-        await _imagePicker.pickImage(source: ImageSource.gallery);
+    final xfile = await _imagePicker.pickImage(source: ImageSource.gallery);
     if (xfile == null) return;
     final bytes = await xfile.readAsBytes();
     final newSlot = NewSlot(SelectedImage(bytes: bytes, name: xfile.name));
@@ -318,7 +326,8 @@ class EditListingController extends ChangeNotifier {
     if (desc.isEmpty) {
       fieldErrors['description'] = 'Description is required.';
     } else if (desc.length > 150) {
-      fieldErrors['description'] = 'Description must be 150 characters or fewer.';
+      fieldErrors['description'] =
+          'Description must be 150 characters or fewer.';
     }
 
     if (selectedCategoryId == null) {
@@ -362,27 +371,33 @@ class EditListingController extends ChangeNotifier {
           ? double.parse(startBidCtrl.text)
           : double.parse(priceCtrl.text);
 
-      await _supabase.client.from('products').update({
-        'name': nameCtrl.text.trim(),
-        'description': descCtrl.text.trim(),
-        'price': priceValue,
-        'condition': conditionToDbString(selectedCondition!),
-        'listing_type': formatToDbString(selectedFormat),
-        'category_id': selectedCategoryId,
-        if (sizeCtrl.text.isNotEmpty) 'size': sizeCtrl.text else 'size': null,
-        if (brandCtrl.text.isNotEmpty)
-          'brand': brandCtrl.text
-        else
-          'brand': null,
-        if (colorCtrl.text.isNotEmpty)
-          'color': colorCtrl.text
-        else
-          'color': null,
-        if (locationCtrl.text.isNotEmpty)
-          'location': locationCtrl.text
-        else
-          'location': null,
-      }).eq('product_id', productId);
+      await _supabase.client
+          .from('products')
+          .update({
+            'name': nameCtrl.text.trim(),
+            'description': descCtrl.text.trim(),
+            'price': priceValue,
+            'condition': conditionToDbString(selectedCondition!),
+            'listing_type': formatToDbString(selectedFormat),
+            'category_id': selectedCategoryId,
+            if (sizeCtrl.text.isNotEmpty)
+              'size': sizeCtrl.text
+            else
+              'size': null,
+            if (brandCtrl.text.isNotEmpty)
+              'brand': brandCtrl.text
+            else
+              'brand': null,
+            if (colorCtrl.text.isNotEmpty)
+              'color': colorCtrl.text
+            else
+              'color': null,
+            if (locationCtrl.text.isNotEmpty)
+              'location': locationCtrl.text
+            else
+              'location': null,
+          })
+          .eq('product_id', productId);
 
       // 1b. If auction format, update or create row in auctions table
       if (selectedFormat == ListingFormat.auction) {
@@ -396,11 +411,14 @@ class EditListingController extends ChangeNotifier {
             .maybeSingle();
 
         if (existingAuction != null) {
-          await _supabase.client.from('auctions').update({
-            'starting_price': priceValue,
-            'minimum_increment': bidIncrement,
-            'ends_at': endsAt.toIso8601String(),
-          }).eq('auction_id', existingAuction['auction_id']);
+          await _supabase.client
+              .from('auctions')
+              .update({
+                'starting_price': priceValue,
+                'minimum_increment': bidIncrement,
+                'ends_at': endsAt.toIso8601String(),
+              })
+              .eq('auction_id', existingAuction['auction_id']);
         } else {
           await _supabase.client.from('auctions').insert({
             'product_id': productId,
@@ -438,7 +456,9 @@ class EditListingController extends ChangeNotifier {
         notifyListeners();
 
         final path = '$sellerId/$productId/edit_$idx.jpg';
-        await _supabase.client.storage.from('product-images').uploadBinary(
+        await _supabase.client.storage
+            .from('product-images')
+            .uploadBinary(
               path,
               slot.image.bytes,
               fileOptions: FileOptions(contentType: 'image/jpeg'),
@@ -501,7 +521,8 @@ class EditListingController extends ChangeNotifier {
 
   // â”€â”€ DB helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  ProductCondition _conditionFromDb(String s) => ProductCondition.fromDbString(s);
+  ProductCondition _conditionFromDb(String s) =>
+      ProductCondition.fromDbString(s);
 
   ListingFormat _formatFromDb(String s) {
     if (s == 'auction') return ListingFormat.auction;

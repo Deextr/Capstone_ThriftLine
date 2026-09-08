@@ -4,10 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show AuthState, AuthChangeEvent;
 
-import '../core/routes/route_names.dart';
 import '../core/services/shared_preferences_service.dart';
 import '../features/auth/data/auth_service.dart';
 import '../features/auth/data/auth_result.dart';
+import '../features/auth/domain/account_mode.dart';
 import '../features/auth/domain/auth_user.dart';
 import '../features/auth/domain/legal_documents.dart';
 import '../models/enums.dart';
@@ -33,6 +33,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _isInitialized = false;
   bool _emailOtpPending = false;
+  AccountMode _activeAccount = AccountMode.buyer;
 
   StreamSubscription? _authSubscription;
 
@@ -48,18 +49,42 @@ class AuthProvider extends ChangeNotifier {
     emailOtpPending: _emailOtpPending,
   );
 
-  bool get isBuyer => _user?.isBuyer ?? false;
-  bool get isSeller => _user?.isSeller ?? false;
+  /// Current Buyer/Seller workspace. Independent of `users.role`.
+  AccountMode get activeAccount => _activeAccount;
+
+  bool get hasSellerAccess => _user?.hasSellerAccess ?? false;
+
+  bool get canSwitchAccounts =>
+      authCanSwitchAccounts(hasSellerAccess: hasSellerAccess, isAdmin: isAdmin);
+
+  bool get isBuyer => !isAdmin && _activeAccount == AccountMode.buyer;
+  bool get isSeller => !isAdmin && _activeAccount == AccountMode.seller;
   bool get isAdmin => _user?.isAdmin ?? false;
   UserRole? get role => _user?.role;
 
   String? get username => _user?.username;
-  String? get displayName => _user?.displayName;
+  String? get displayName {
+    final user = _user;
+    if (user == null) return null;
+    if (_activeAccount == AccountMode.seller) {
+      return user.shopName ?? user.name;
+    }
+    return user.name;
+  }
 
-  String get homeRoute {
-    if (isAdmin) return RouteNames.adminHome;
-    if (isSeller) return RouteNames.sellerHome;
-    return RouteNames.buyerHome;
+  String get homeRoute =>
+      homeRouteFor(isAdmin: isAdmin, activeAccount: _activeAccount);
+
+  /// Moves between Buyer and Seller chrome on the same authenticated user.
+  ///
+  /// Does not create credentials, change `users.role`, or copy profile rows.
+  Future<void> switchActiveAccount(AccountMode mode) async {
+    final user = _user;
+    if (user == null || !canSwitchAccounts) return;
+    if (_activeAccount == mode) return;
+    _activeAccount = mode;
+    await _prefs.setActiveAccount(userId: user.id, mode: mode.name);
+    notifyListeners();
   }
 
   /// Restores a session from Supabase (auto-login via persisted JWT).
@@ -72,6 +97,7 @@ class AuthProvider extends ChangeNotifier {
       if (currentUser != null) {
         _user = currentUser;
         _emailOtpPending = _prefs.isEmailOtpPending;
+        _syncActiveAccount(currentUser, restoreFromPrefs: true);
         await _saveSession(currentUser);
       } else {
         await _clearSession();
@@ -97,17 +123,24 @@ class AuthProvider extends ChangeNotifier {
     if (authEvent == AuthChangeEvent.signedOut) {
       _user = null;
       _emailOtpPending = false;
+      _activeAccount = AccountMode.buyer;
       await _clearSession();
       notifyListeners();
     } else if (authEvent == AuthChangeEvent.signedIn ||
         authEvent == AuthChangeEvent.tokenRefreshed ||
         authEvent == AuthChangeEvent.userUpdated) {
+      // A rejected Google→email signup signs the session back out. Ignore a
+      // stale signedIn that finishes after that sign-out.
+      if (_authService.currentSession == null) return;
       final currentUser = await _authService.getCurrentUser();
-      if (currentUser != null) {
-        _user = currentUser;
-        await _saveSession(currentUser);
-        notifyListeners();
-      }
+      if (currentUser == null || _authService.currentSession == null) return;
+      _user = currentUser;
+      _syncActiveAccount(
+        currentUser,
+        restoreFromPrefs: authEvent == AuthChangeEvent.signedIn,
+      );
+      await _saveSession(currentUser);
+      notifyListeners();
     }
   }
 
@@ -142,6 +175,7 @@ class AuthProvider extends ChangeNotifier {
     }
 
     _user = result.user;
+    _syncActiveAccount(_user!, restoreFromPrefs: true);
     await _saveSession(_user!);
     await _setEmailOtpPending(true);
 
@@ -167,6 +201,7 @@ class AuthProvider extends ChangeNotifier {
     }
 
     _user = result.user;
+    _syncActiveAccount(_user!, restoreFromPrefs: true);
     await _saveSession(_user!);
     await _setEmailOtpPending(false);
 
@@ -189,7 +224,6 @@ class AuthProvider extends ChangeNotifier {
     required LegalConsent consent,
   }) async {
     _isLoading = true;
-    await _setEmailOtpPending(true);
     notifyListeners();
 
     final result = await _authService.signUpWithEmail(
@@ -200,7 +234,9 @@ class AuthProvider extends ChangeNotifier {
     );
 
     if (!result.success) {
+      _user = null;
       await _setEmailOtpPending(false);
+      await _clearSession();
       _isLoading = false;
       notifyListeners();
       return result;
@@ -221,6 +257,7 @@ class AuthProvider extends ChangeNotifier {
     } else {
       _user = result.user;
       if (_user != null) {
+        _syncActiveAccount(_user!, restoreFromPrefs: true);
         await _saveSession(_user!);
         if (result.requiresEmailOtp) {
           await _setEmailOtpPending(true);
@@ -248,6 +285,7 @@ class AuthProvider extends ChangeNotifier {
     await _authService.signOut();
     _user = null;
     _emailOtpPending = false;
+    _activeAccount = AccountMode.buyer;
     await _clearSession();
 
     _isLoading = false;
@@ -307,6 +345,7 @@ class AuthProvider extends ChangeNotifier {
     final currentUser = await _authService.getCurrentUser();
     if (currentUser != null) {
       _user = currentUser;
+      _syncActiveAccount(currentUser, restoreFromPrefs: false);
       await _saveSession(currentUser);
       notifyListeners();
     }
@@ -354,12 +393,25 @@ class AuthProvider extends ChangeNotifier {
   // Session Persistence (SharedPreferences cache for fast cold-start)
   // ─────────────────────────────────────────────────────────────────────────
 
+  void _syncActiveAccount(AuthUser user, {required bool restoreFromPrefs}) {
+    _activeAccount = resolveAccountMode(
+      hasSellerAccess: user.hasSellerAccess,
+      isAdmin: user.isAdmin,
+      savedMode: _prefs.activeAccountFor(user.id),
+      currentMode: _activeAccount,
+      restoreFromPrefs: restoreFromPrefs,
+    );
+  }
+
   Future<void> _saveSession(AuthUser user) async {
     await _prefs.setLoggedIn(true);
     await _prefs.setUserRole(user.role.name);
     await _prefs.setUsername(user.username);
     await _prefs.setUserId(user.id);
-    await _prefs.setDisplayName(user.displayName);
+    await _prefs.setDisplayName(displayName ?? user.displayName);
+    if (user.hasSellerAccess && !user.isAdmin) {
+      await _prefs.setActiveAccount(userId: user.id, mode: _activeAccount.name);
+    }
   }
 
   Future<void> _setEmailOtpPending(bool value) async {

@@ -12,19 +12,23 @@ class LookingForCard extends StatelessWidget {
     super.key,
     required this.post,
     this.showRespondButton = false,
+    this.showShare = false,
+    this.showOwnerActions = false,
     this.onRespond,
-    this.onLike,
     this.onShare,
-    this.onComment,
+    this.onEdit,
+    this.onDelete,
     this.onTap,
   });
 
   final LookingForModel post;
   final bool showRespondButton;
+  final bool showShare;
+  final bool showOwnerActions;
   final VoidCallback? onRespond;
-  final VoidCallback? onLike;
   final VoidCallback? onShare;
-  final VoidCallback? onComment;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
   final VoidCallback? onTap;
 
   @override
@@ -36,7 +40,7 @@ class LookingForCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -50,7 +54,6 @@ class LookingForCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
@@ -71,33 +74,54 @@ class LookingForCard extends StatelessWidget {
                             children: [
                               Text(
                                 formatRelativeTime(post.createdAt),
-                                style: AppTypography.caption.copyWith(color: AppColors.textHint),
-                              ),
-                              const SizedBox(width: 4),
-                              const Text('•', style: TextStyle(color: AppColors.textHint, fontSize: 12)),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  post.location,
-                                  style: AppTypography.caption.copyWith(color: AppColors.textHint),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.textHint,
                                 ),
                               ),
+                              if (post.location.isNotEmpty) ...[
+                                const SizedBox(width: 4),
+                                const Text(
+                                  '•',
+                                  style: TextStyle(
+                                    color: AppColors.textHint,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    post.location,
+                                    style: AppTypography.caption.copyWith(
+                                      color: AppColors.textHint,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ],
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.more_horiz, color: AppColors.textHint),
-                      onPressed: () {}, // Options menu (future)
-                    ),
+                    if (showOwnerActions)
+                      PopupMenuButton<String>(
+                        icon: const Icon(
+                          Icons.more_horiz,
+                          color: AppColors.textHint,
+                        ),
+                        onSelected: (value) {
+                          if (value == 'edit') onEdit?.call();
+                          if (value == 'delete') onDelete?.call();
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(value: 'edit', child: Text('Edit')),
+                          PopupMenuItem(value: 'delete', child: Text('Delete')),
+                        ],
+                      ),
                   ],
                 ),
               ),
-
-              // Title & Description
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
@@ -108,16 +132,15 @@ class LookingForCard extends StatelessWidget {
                       style: AppTypography.heading.copyWith(fontSize: 18),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      post.description,
-                      style: AppTypography.body,
-                    ),
+                    Text(post.description, style: AppTypography.body),
                     const SizedBox(height: 12),
                     Row(
                       children: [
                         Text(
                           'Budget: ',
-                          style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
+                          style: AppTypography.body.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         Text(
                           '${formatCurrency(post.budgetMin)} – ${formatCurrency(post.budgetMax)}',
@@ -147,66 +170,51 @@ class LookingForCard extends StatelessWidget {
                   ],
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              // Optional Thumbnail Image
               if (post.thumbnailUrl != null) ...[
                 CachedNetworkImage(
                   imageUrl: post.thumbnailUrl!,
                   width: double.infinity,
                   height: 250,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(
+                  placeholder: (_, _) => Container(
                     height: 250,
                     color: AppColors.background,
-                    child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    child: const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                   ),
-                  errorWidget: (_, __, ___) => Container(
+                  errorWidget: (_, _, _) => Container(
                     height: 250,
                     color: AppColors.background,
-                    child: const Icon(Icons.image_not_supported, color: AppColors.textHint),
+                    child: const Icon(
+                      Icons.image_not_supported,
+                      color: AppColors.textHint,
+                    ),
                   ),
                 ),
               ],
-
-              // Actions Footer
               const Divider(height: 1),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _buildActionButton(
-                            icon: post.isLiked ? Icons.favorite : Icons.favorite_border,
-                            color: post.isLiked ? Colors.red : AppColors.textSecondary,
-                            label: post.likesCount > 0 ? post.likesCount.toString() : 'Like',
-                            onTap: onLike ?? () {},
-                          ),
-                          _buildActionButton(
-                            icon: Icons.chat_bubble_outline,
-                            label: post.responseCount > 0 ? post.responseCount.toString() : 'Comment',
-                            onTap: onComment ?? () {},
-                          ),
-                          _buildActionButton(
-                            icon: Icons.share_outlined,
-                            label: 'Share',
-                            onTap: onShare ?? () {},
-                          ),
-                        ],
+                    if (showShare)
+                      _buildActionButton(
+                        icon: Icons.share_outlined,
+                        label: 'Share',
+                        onTap: onShare ?? () {},
                       ),
-                    ),
+                    const Spacer(),
                     if (showRespondButton)
                       ThriftButton(
                         label: 'I Have This!',
                         variant: ThriftButtonVariant.primary,
                         expand: false,
-                        onPressed: onRespond ?? () {},
+                        onPressed: onRespond,
                       ),
                   ],
                 ),

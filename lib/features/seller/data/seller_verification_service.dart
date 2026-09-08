@@ -69,19 +69,32 @@ class SellerVerificationService {
 
       final frontPath = '$userId/$verificationId/id_front.jpg';
       final backPath = '$userId/$verificationId/id_back.jpg';
-      final selfiePath = '$userId/$verificationId/selfie${_ext(selfieFileName)}';
+      final selfiePath =
+          '$userId/$verificationId/selfie${_ext(selfieFileName)}';
 
-      await _supabase.client.storage.from('verification-docs').uploadBinary(
+      await _supabase.client.storage
+          .from('verification-docs')
+          .uploadBinary(
             frontPath,
             idFrontBytes,
-            fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'),
+            fileOptions: const FileOptions(
+              upsert: true,
+              contentType: 'image/jpeg',
+            ),
           );
-      await _supabase.client.storage.from('verification-docs').uploadBinary(
+      await _supabase.client.storage
+          .from('verification-docs')
+          .uploadBinary(
             backPath,
             idBackBytes,
-            fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'),
+            fileOptions: const FileOptions(
+              upsert: true,
+              contentType: 'image/jpeg',
+            ),
           );
-      await _supabase.client.storage.from('verification-docs').uploadBinary(
+      await _supabase.client.storage
+          .from('verification-docs')
+          .uploadBinary(
             selfiePath,
             selfieBytes,
             fileOptions: FileOptions(
@@ -90,13 +103,18 @@ class SellerVerificationService {
             ),
           );
 
-      await _supabase.client.from('user_verifications').update({
-        'government_id_front': frontPath,
-        'government_id_back': backPath,
-        'selfie_image': selfiePath,
-      }).eq('verification_id', verificationId);
+      await _supabase.client
+          .from('user_verifications')
+          .update({
+            'government_id_front': frontPath,
+            'government_id_back': backPath,
+            'selfie_image': selfiePath,
+          })
+          .eq('verification_id', verificationId);
     } catch (error) {
-      debugPrint('SellerVerificationService.submitApplication: ${_describe(error)}');
+      debugPrint(
+        'SellerVerificationService.submitApplication: ${_describe(error)}',
+      );
       throw SellerSubmitException(sellerSubmitUserMessage(error), error);
     }
   }
@@ -144,7 +162,9 @@ String sellerSubmitUserMessage(Object error) {
     if (code == '23505' || message.contains('one_pending')) {
       return 'You already have an application under review.';
     }
-    if (code == '23502' || message.contains('not-null') || message.contains('null value')) {
+    if (code == '23502' ||
+        message.contains('not-null') ||
+        message.contains('null value')) {
       return 'The application is missing a required field. Please try again.';
     }
     if (code == '42501' || message.contains('row-level security')) {

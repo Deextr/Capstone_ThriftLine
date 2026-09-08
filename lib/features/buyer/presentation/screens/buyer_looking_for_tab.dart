@@ -1,50 +1,143 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
-import '../../../../models/enums.dart';
+import '../../../../core/routes/route_names.dart';
 import '../../../../models/looking_for_model.dart';
-import '../../../../providers/auth_provider.dart';
-import '../../../../providers/data_provider.dart';
 import '../../../../widgets/looking_for_card.dart';
 import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../chat/presentation/widgets/share_looking_for_sheet.dart';
+import '../../controllers/looking_for_controller.dart';
+import '../widgets/create_looking_for_sheet.dart';
 
 class BuyerLookingForTab extends StatefulWidget {
-  const BuyerLookingForTab({super.key});
+  const BuyerLookingForTab({super.key, this.sellerWorkspace = false});
+
+  /// Seller workspace: browse buyer requests and use I Have This. No create FAB.
+  final bool sellerWorkspace;
 
   @override
   State<BuyerLookingForTab> createState() => _BuyerLookingForTabState();
 }
 
-class _BuyerLookingForTabState extends State<BuyerLookingForTab> with SingleTickerProviderStateMixin {
-  late TabController _tab;
-  final TextEditingController _searchCtrl = TextEditingController();
+class _BuyerLookingForTabState extends State<BuyerLookingForTab>
+    with SingleTickerProviderStateMixin {
+  TabController? _tab;
   String _selectedFilter = 'Recently Posted';
-  final List<String> _filters = ['Recently Posted', 'Most Popular', 'Nearest', 'Highest Budget'];
+  final List<String> _filters = [
+    'Recently Posted',
+    'Most Popular',
+    'Highest Budget',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 2, vsync: this);
+    if (!widget.sellerWorkspace) {
+      _tab = TabController(length: 2, vsync: this);
+    }
   }
 
   @override
   void dispose() {
-    _tab.dispose();
-    _searchCtrl.dispose();
+    _tab?.dispose();
     super.dispose();
+  }
+
+  Future<void> _openCreateSheet() async {
+    final looking = context.read<LookingForController>();
+    final created = await CreateLookingForSheet.show(
+      context,
+      controller: looking,
+    );
+    if (!created || !mounted) return;
+    await looking.refresh();
+    if (!mounted) return;
+    showThriftSnackBar(context, 'Request posted successfully!');
+  }
+
+  Future<void> _openPost(LookingForModel post) async {
+    await context.push(RouteNames.lookingForPost(post.id));
+    if (!mounted) return;
+    await context.read<LookingForController>().refresh();
+  }
+
+  Future<void> _share(LookingForModel post) async {
+    final looking = context.read<LookingForController>();
+    final sent = await ShareLookingForSheet.show(
+      context,
+      post: post,
+      controller: looking,
+    );
+    if (!sent || !mounted) return;
+    showThriftSnackBar(context, 'Request shared with selected sellers.');
+  }
+
+  Future<void> _iHaveThis(LookingForModel post) async {
+    final looking = context.read<LookingForController>();
+    final result = await looking.sendIHaveThis(post);
+    if (!mounted) return;
+    if (!result.isOk) {
+      showThriftSnackBar(context, result.error!, isError: true);
+      return;
+    }
+    showThriftSnackBar(context, 'Message sent to the buyer.');
+    if (result.conversationId != null) {
+      context.push(RouteNames.chatThread(result.conversationId!));
+    }
+  }
+
+  Future<void> _edit(LookingForModel post) async {
+    final looking = context.read<LookingForController>();
+    final saved = await CreateLookingForSheet.show(
+      context,
+      controller: looking,
+      existing: post,
+    );
+    if (!saved || !mounted) return;
+    await looking.refresh();
+    if (!mounted) return;
+    showThriftSnackBar(context, 'Request updated.');
+  }
+
+  Future<void> _delete(LookingForModel post) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete this request?'),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final error = await context.read<LookingForController>().deletePost(
+      post.id,
+    );
+    if (!mounted) return;
+    if (error != null) {
+      showThriftSnackBar(context, error, isError: true);
+      return;
+    }
+    showThriftSnackBar(context, 'Request deleted.');
   }
 
   @override
   Widget build(BuildContext context) {
-    final data = context.watch<DataProvider>();
-    final auth = context.watch<AuthProvider>();
-    final buyerId = auth.user?.id ?? 'buyer_maya';
-    final myPosts = data.lookingForPosts.where((p) => p.buyerId == buyerId).toList();
-    final browsePosts = data.lookingForPosts;
+    final looking = context.watch<LookingForController>();
+    final myPosts = _applyFilter(looking.myPosts);
+    final browsePosts = _applyFilter(looking.posts);
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -52,302 +145,211 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab> with SingleTick
         backgroundColor: AppColors.background,
         body: SafeArea(
           bottom: false,
-          child: DefaultTabController(
-            length: 2,
-            child: NestedScrollView(
-              headerSliverBuilder: (context, innerBoxIsScrolled) {
-                return [
-                  SliverAppBar(
-                    floating: true,
-                    pinned: true,
-                    snap: false,
-                    title: Text('Looking For', style: AppTypography.heading),
-                    backgroundColor: AppColors.surface,
-                    elevation: innerBoxIsScrolled ? 4 : 0,
-                    actions: [
-                      IconButton(
-                        icon: const Icon(Icons.filter_list, color: AppColors.textPrimary),
-                        onPressed: () {},
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.search, color: AppColors.textPrimary),
-                        onPressed: () {},
-                      ),
-                    ],
-                    bottom: PreferredSize(
-                      preferredSize: const Size.fromHeight(112),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Filter Chips
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            child: Row(
-                              children: _filters.map((filter) {
-                                final isSelected = _selectedFilter == filter;
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: FilterChip(
-                                    label: Text(
-                                      filter,
-                                      style: TextStyle(
-                                        color: isSelected ? Colors.white : AppColors.textPrimary,
-                                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                                      ),
-                                    ),
-                                    selected: isSelected,
-                                    onSelected: (bool selected) {
-                                      setState(() {
-                                        _selectedFilter = filter;
-                                      });
-                                    },
-                                    backgroundColor: AppColors.surface,
-                                    selectedColor: AppColors.primary,
-                                    checkmarkColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                      side: BorderSide(
-                                        color: isSelected ? AppColors.primary : AppColors.border,
-                                      ),
+          child: NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverAppBar(
+                  floating: true,
+                  pinned: true,
+                  snap: false,
+                  title: Text(
+                    widget.sellerWorkspace ? 'Buyer Requests' : 'Looking For',
+                    style: AppTypography.heading,
+                  ),
+                  backgroundColor: AppColors.surface,
+                  elevation: innerBoxIsScrolled ? 4 : 0,
+                  bottom: PreferredSize(
+                    preferredSize: Size.fromHeight(
+                      widget.sellerWorkspace ? 56 : 112,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            children: _filters.map((filter) {
+                              final isSelected = _selectedFilter == filter;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: FilterChip(
+                                  label: Text(
+                                    filter,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? Colors.white
+                                          : AppColors.textPrimary,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
                                     ),
                                   ),
-                                );
-                              }).toList(),
-                            ),
+                                  selected: isSelected,
+                                  onSelected: (_) {
+                                    setState(() => _selectedFilter = filter);
+                                  },
+                                  backgroundColor: AppColors.surface,
+                                  selectedColor: AppColors.primary,
+                                  checkmarkColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                    side: BorderSide(
+                                      color: isSelected
+                                          ? AppColors.primary
+                                          : AppColors.border,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
                           ),
+                        ),
+                        if (!widget.sellerWorkspace && _tab != null)
                           TabBar(
                             controller: _tab,
                             labelColor: AppColors.primary,
                             indicatorColor: AppColors.primary,
                             unselectedLabelColor: AppColors.textSecondary,
-                            tabs: const [Tab(text: 'Browse Requests'), Tab(text: 'My Requests')],
+                            tabs: const [
+                              Tab(text: 'Browse Requests'),
+                              Tab(text: 'My Requests'),
+                            ],
                           ),
-                        ],
-                      ),
+                      ],
                     ),
                   ),
-                ];
-              },
-              body: TabBarView(
-                controller: _tab,
-                children: [
-                  _buildList(browsePosts, true),
-                  _buildList(myPosts, false),
-                ],
-              ),
-            ),
+                ),
+              ];
+            },
+            body: widget.sellerWorkspace || _tab == null
+                ? _buildList(
+                    looking,
+                    browsePosts,
+                    showRespond: true,
+                    showShare: false,
+                  )
+                : TabBarView(
+                    controller: _tab,
+                    children: [
+                      _buildList(
+                        looking,
+                        browsePosts,
+                        showRespond: false,
+                        showShare: true,
+                      ),
+                      _buildList(
+                        looking,
+                        myPosts,
+                        showRespond: false,
+                        showShare: true,
+                        isMyTab: true,
+                      ),
+                    ],
+                  ),
           ),
         ),
-        floatingActionButton: Builder(
-          builder: (context) {
-            final bottomInset = MediaQuery.of(context).viewPadding.bottom;
-            return Padding(
-              padding: EdgeInsets.only(bottom: 80.0 + bottomInset),
-              child: FloatingActionButton.extended(
-                onPressed: () => _showPostSheet(context),
-                icon: const Icon(Icons.edit),
-                label: const Text('Post Request', style: TextStyle(fontWeight: FontWeight.w600)),
-                backgroundColor: AppColors.primary,
+        floatingActionButton: widget.sellerWorkspace
+            ? null
+            : Builder(
+                builder: (context) {
+                  final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: 80.0 + bottomInset),
+                    child: FloatingActionButton.extended(
+                      onPressed: _openCreateSheet,
+                      icon: const Icon(Icons.edit),
+                      label: const Text(
+                        'Post Request',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      backgroundColor: AppColors.primary,
+                    ),
+                  );
+                },
               ),
-            );
-          },
-        ),
       ),
     );
   }
 
-  Widget _buildList(List<LookingForModel> posts, bool isSellerView) {
-    if (posts.isEmpty) {
+  List<LookingForModel> _applyFilter(List<LookingForModel> posts) {
+    final copy = [...posts];
+    if (_selectedFilter == 'Most Popular') {
+      copy.sort((a, b) => b.responseCount.compareTo(a.responseCount));
+    } else if (_selectedFilter == 'Highest Budget') {
+      copy.sort((a, b) => b.budgetMax.compareTo(a.budgetMax));
+    } else {
+      copy.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+    return copy;
+  }
+
+  Widget _buildList(
+    LookingForController looking,
+    List<LookingForModel> posts, {
+    required bool showRespond,
+    required bool showShare,
+    bool isMyTab = false,
+  }) {
+    if (looking.isLoading && looking.posts.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      );
+    }
+    if (looking.errorMessage != null && looking.posts.isEmpty) {
+      return ErrorState(
+        message: looking.errorMessage!,
+        onRetry: looking.refresh,
+      );
+    }
+    if (lookingForShowsEmpty(
+      isLoading: looking.isLoading,
+      postCount: posts.length,
+    )) {
       return EmptyState(
         icon: Icons.post_add,
-        title: 'No requests found',
-        message: 'Be the first to post what you are looking for!',
-        actionLabel: 'Post a Request',
-        onAction: () => _showPostSheet(context),
+        title: widget.sellerWorkspace
+            ? 'No buyer requests yet'
+            : isMyTab
+            ? 'You have not posted a request'
+            : 'No requests found',
+        message: widget.sellerWorkspace
+            ? 'When buyers post what they are looking for, they will show up here.'
+            : isMyTab
+            ? 'Post a request so sellers can help you find the item.'
+            : 'Be the first to post what you are looking for!',
+        actionLabel: widget.sellerWorkspace ? null : 'Post a Request',
+        onAction: widget.sellerWorkspace ? null : _openCreateSheet,
       );
     }
 
+    final me = looking.auth.user?.id;
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     return RefreshIndicator(
-      onRefresh: () async => setState(() {}),
+      onRefresh: looking.refresh,
       color: AppColors.primary,
       child: ListView.builder(
-        // 96px base clearance for FAB + nav bar, plus any system bottom inset
-        // (home indicator / gesture bar) so content is never hidden on physical devices.
         padding: EdgeInsets.fromLTRB(16, 16, 16, 96.0 + bottomInset),
         itemCount: posts.length,
         itemBuilder: (_, i) {
           final post = posts[i];
+          final isOwn = me != null && me == post.buyerId;
           return LookingForCard(
             post: post,
-            showRespondButton: isSellerView,
-            onRespond: () => showThriftSnackBar(context, 'Response sent to ${post.buyerName}!'),
-            onLike: () {
-               setState(() {
-                 // Mock like toggle behavior
-               });
-            },
+            showShare: showShare,
+            showRespondButton: showRespond && !isOwn,
+            showOwnerActions: isOwn && !widget.sellerWorkspace,
+            onTap: () => _openPost(post),
+            onShare: () => _share(post),
+            onRespond: () => _iHaveThis(post),
+            onEdit: () => _edit(post),
+            onDelete: () => _delete(post),
           );
         },
       ),
     );
   }
-
-  void _showPostSheet(BuildContext context) {
-    final nameCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final sizeCtrl = TextEditingController();
-    final minCtrl = TextEditingController();
-    final maxCtrl = TextEditingController();
-    final locCtrl = TextEditingController(text: 'Quezon City, Metro Manila');
-    var category = ProductCategory.tops;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.9,
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          children: [
-            // Handle for bottom sheet
-            Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Create Request', style: AppTypography.heading),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  // Image Upload Placeholder
-                  Container(
-                    height: 120,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border, style: BorderStyle.solid),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.add_photo_alternate_outlined, size: 40, color: AppColors.textSecondary),
-                        const SizedBox(height: 8),
-                        Text('Add Reference Image (Optional)', style: AppTypography.caption),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  ThriftTextField(label: 'What are you looking for?', controller: nameCtrl, hint: 'e.g. Vintage Levi\'s 501'),
-                  const SizedBox(height: 16),
-                  
-                  DropdownButtonFormField<ProductCategory>(
-                    value: category,
-                    decoration: const InputDecoration(
-                      labelText: 'Category',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    items: ProductCategory.values.map((c) => DropdownMenuItem(value: c, child: Text(c.label))).toList(),
-                    onChanged: (v) => category = v!,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  ThriftTextField(
-                    label: 'Description',
-                    controller: descCtrl,
-                    maxLines: 4,
-                    hint: 'Describe the specific details, colors, or condition you want...',
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  ThriftTextField(label: 'Preferred Size', controller: sizeCtrl, hint: 'e.g. M, 32, One Size'),
-                  const SizedBox(height: 16),
-                  
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ThriftTextField(
-                          label: 'Budget Min (₱)',
-                          controller: minCtrl,
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ThriftTextField(
-                          label: 'Budget Max (₱)',
-                          controller: maxCtrl,
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  ThriftTextField(label: 'Your Location', controller: locCtrl),
-                  const SizedBox(height: 40),
-                  
-                  ThriftButton(
-                    label: 'Post Request',
-                    onPressed: () {
-                      if (nameCtrl.text.isEmpty) {
-                        showThriftSnackBar(context, 'Please enter what you are looking for.');
-                        return;
-                      }
-                      final auth = context.read<AuthProvider>();
-                      final user = auth.user;
-                      context.read<DataProvider>().addLookingFor(LookingForModel(
-                        id: const Uuid().v4(),
-                        buyerId: user?.id ?? 'buyer_maya',
-                        buyerName: user?.displayName ?? 'Maya Santos',
-                        buyerAvatar: 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(user?.displayName ?? 'Maya Santos')}&background=0D9488&color=fff&size=150',
-                        title: nameCtrl.text,
-                        description: descCtrl.text,
-                        category: category,
-                        budgetMin: double.tryParse(minCtrl.text) ?? 0,
-                        budgetMax: double.tryParse(maxCtrl.text) ?? 0,
-                        size: sizeCtrl.text,
-                        location: locCtrl.text,
-                        createdAt: DateTime.now(),
-                      ));
-                      Navigator.pop(context);
-                      showThriftSnackBar(context, 'Request posted successfully!');
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
-

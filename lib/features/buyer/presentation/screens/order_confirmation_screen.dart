@@ -19,9 +19,14 @@ class OrderConfirmationScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final order = context.watch<DataProvider>().orderById(orderId);
-    if (order == null) return Scaffold(appBar: AppBar(), body: const Center(child: Text('Order not found')));
+    if (order == null)
+      return Scaffold(
+        appBar: AppBar(),
+        body: const Center(child: Text('Order not found')),
+      );
 
-    final needsProof = order.paymentMethod != PaymentMethod.cod &&
+    final needsProof =
+        order.paymentMethod != PaymentMethod.cod &&
         order.status == OrderStatus.paymentPending;
 
     return Scaffold(
@@ -38,18 +43,30 @@ class OrderConfirmationScreen extends StatelessWidget {
                     color: AppColors.success.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.check_circle, size: 64, color: AppColors.success),
+                  child: const Icon(
+                    Icons.check_circle,
+                    size: 64,
+                    color: AppColors.success,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 Text('Order Placed!', style: AppTypography.display),
-                Text('Order #${order.orderNumber}', style: AppTypography.body.copyWith(color: AppColors.textSecondary)),
+                Text(
+                  'Order #${order.orderNumber}',
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
                 const SizedBox(height: 24),
                 ThriftCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(order.productTitle, style: AppTypography.subheading),
-                      Text('Seller: ${order.sellerName}', style: AppTypography.caption),
+                      Text(
+                        'Seller: ${order.sellerName}',
+                        style: AppTypography.caption,
+                      ),
                       const Divider(),
                       _row('Item', formatCurrency(order.amount)),
                       _row('Shipping', formatCurrency(order.shippingFee)),
@@ -98,13 +115,18 @@ class OrderConfirmationScreen extends StatelessWidget {
   }
 
   Widget _row(String label, String value, {bool bold = false}) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: AppTypography.caption),
-            Text(value, style: bold ? AppTypography.subheading.copyWith(color: AppColors.primary) : AppTypography.body),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 2),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: AppTypography.caption),
+        Text(
+          value,
+          style: bold
+              ? AppTypography.subheading.copyWith(color: AppColors.primary)
+              : AppTypography.body,
         ),
-      );
+      ],
+    ),
+  );
 }

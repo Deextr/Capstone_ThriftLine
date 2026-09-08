@@ -4,6 +4,7 @@ import '../../../core/services/supabase_service.dart';
 import '../../../models/enums.dart';
 import '../../../models/product_model.dart';
 import '../../../models/seller_profile.dart';
+import '../data/catalog_product_query.dart';
 
 /// Owns the state and data-fetching logic for the Buyer Home / Discover feed.
 ///
@@ -56,156 +57,31 @@ class HomeController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. Fetch seller profiles to build seller_id -> shop info mapping
-      final Map<String, Map<String, dynamic>> sellerProfilesMap = {};
-      try {
-        final spResponse = await _supabase.client
-            .from('seller_profiles')
-            .select('*, user:user_public_profiles(*)')
-            .eq('is_approved', true);
-
-        final spRows = spResponse as List<dynamic>;
-        for (final sp in spRows) {
-          if (sp is Map<String, dynamic> && sp['seller_id'] != null) {
-            sellerProfilesMap[sp['seller_id'] as String] = sp;
-          }
-        }
-      } catch (e) {
-        debugPrint('HomeController: seller_profiles fetch error ($e)');
-      }
-
-      // Also ensure any verified seller with role == 'seller' in user_public_profiles is included
-      try {
-        final sellersResponse = await _supabase.client
-            .from('user_public_profiles')
-            .select()
-            .eq('role', 'seller');
-
-        final sellerUsers = sellersResponse as List<dynamic>;
-        for (final u in sellerUsers) {
-          if (u is Map<String, dynamic>) {
-            final uid = u['user_id'] as String?;
-            if (uid != null && !sellerProfilesMap.containsKey(uid)) {
-              sellerProfilesMap[uid] = {
-                'seller_id': uid,
-                'shop_name': (u['full_name'] as String?)?.trim().isNotEmpty == true
-                    ? u['full_name']
-                    : (u['username'] ?? 'Seller'),
-                'is_approved': true,
-                'user': u,
-              };
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('HomeController: sellers lookup error ($e)');
-      }
-
-      _verifiedSellers = sellerProfilesMap.values
-          .map((r) => SellerProfile.fromSupabase(r))
-          .where((s) => s.isVerified)
-          .toList();
-
-      // 2. Query active products with joined seller public profile, images, category
-      final response = await _supabase.client
-          .from('products')
-          .select('''
-            *,
-            seller:user_public_profiles (
-              user_id,
-              username,
-              full_name,
-              avatar,
-              rating_average,
-              trust_score,
-              role
-            ),
-            images:product_images (
-              image_url,
-              is_primary,
-              display_order
-            ),
-            category:categories (
-              category_name
-            ),
-            auctions (
-              auction_id,
-              starting_price,
-              minimum_increment,
-              current_price,
-              starts_at,
-              ends_at,
-              status
-            )
-          ''')
-          .eq('status', 'active')
-          .order('created_at', ascending: false)
-          .limit(30);
+      final response = await runProductCatalogSelect((select) async {
+        return await _supabase.client
+            .from('products')
+            .select(select)
+            .eq('status', 'active')
+            .order('created_at', ascending: false)
+            .limit(30);
+      });
 
       final rows = response as List<dynamic>;
+      final extraIds = rows
+          .map((r) => (r as Map<String, dynamic>)['seller_id'] as String?)
+          .whereType<String>();
+      final sellerProfilesMap = await fetchSellerProfilesMap(
+        _supabase.client,
+        extraSellerIds: extraIds,
+      );
 
-      _products = rows.map((row) {
-        final r = row as Map<String, dynamic>;
-        final sellerId = r['seller_id'] as String?;
-        return ProductModel.fromSupabase(
-          r,
-          sellerProfile: sellerId != null ? sellerProfilesMap[sellerId] : null,
-        );
-      }).where((p) => p.status == ProductStatus.active).toList();
+      _products = hydrateCatalogProducts(
+        rows,
+        sellerProfilesMap,
+      ).where((p) => p.status == ProductStatus.active).toList();
 
-      // 3. Fetch active auctions to enrich auction-type products with
-      //    bidEndTime, currentBid, etc. for the "Ending Soon" carousel.
-      try {
-        final auctionResponse = await _supabase.client
-            .from('auctions')
-            .select()
-            .eq('status', 'active');
+      _verifiedSellers = verifiedSellersFromProfiles(sellerProfilesMap);
 
-        final auctionRows = auctionResponse as List<dynamic>;
-        final auctionMap = <String, Map<String, dynamic>>{};
-        for (final a in auctionRows) {
-          final aMap = a as Map<String, dynamic>;
-          final productId = aMap['product_id'] as String?;
-          if (productId != null) {
-            auctionMap[productId] = aMap;
-          }
-        }
-
-        // Enrich products that have auction data
-        _products = _products.map((p) {
-          if (p.sellingType != SellingType.auction) return p;
-          final auction = auctionMap[p.id];
-          if (auction != null) {
-            return p.copyWith(
-              currentBid: (auction['current_price'] as num?)?.toDouble() ?? p.currentBid,
-              startingBid: (auction['starting_price'] as num?)?.toDouble() ?? p.startingBid,
-              bidIncrement:
-                  (auction['minimum_increment'] as num?)?.toDouble() ?? p.bidIncrement,
-              bidEndTime: auction['ends_at'] != null
-                  ? DateTime.tryParse(auction['ends_at'] as String)
-                  : p.bidEndTime,
-            );
-          }
-          // Ensure valid fallback if no auction row exists in auctions table
-          if (p.bidEndTime == null || !p.bidEndTime!.isAfter(DateTime.now())) {
-            final fallbackEnd = p.createdAt.add(const Duration(days: 3));
-            return p.copyWith(
-              startingBid: p.startingBid ?? (p.price > 0 ? p.price : 100),
-              currentBid: p.currentBid ?? (p.price > 0 ? p.price : 100),
-              bidIncrement: p.bidIncrement > 0 ? p.bidIncrement : 20,
-              bidEndTime: fallbackEnd.isAfter(DateTime.now())
-                  ? fallbackEnd
-                  : DateTime.now().add(const Duration(days: 2)),
-            );
-          }
-          return p;
-        }).toList();
-      } catch (e) {
-        debugPrint('HomeController: auctions fetch error ($e)');
-        // Non-fatal — auction enrichment is best-effort
-      }
-
-      // 4. Enrich verified sellers with active product count
       final countsBySeller = <String, int>{};
       for (final p in _products) {
         if (p.sellerId != null && p.sellerId!.isNotEmpty) {
@@ -213,7 +89,9 @@ class HomeController extends ChangeNotifier {
         }
       }
       _verifiedSellers = _verifiedSellers.map((s) {
-        final count = s.sellerId != null ? (countsBySeller[s.sellerId!] ?? s.itemCount) : s.itemCount;
+        final count = s.sellerId != null
+            ? (countsBySeller[s.sellerId!] ?? s.itemCount)
+            : s.itemCount;
         return s.copyWith(itemCount: count);
       }).toList();
 

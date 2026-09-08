@@ -10,6 +10,7 @@ import '../../../../widgets/thrift_widgets.dart';
 import '../../../profile/screens/buyer_profile_tab.dart';
 import '../../controllers/buyer_bids_controller.dart';
 import '../../controllers/home_controller.dart';
+import '../../controllers/looking_for_controller.dart';
 import 'buyer_bids_tab.dart';
 import 'buyer_home_tab.dart';
 import 'buyer_looking_for_tab.dart';
@@ -85,22 +86,27 @@ class _BuyerShellScreenState extends State<BuyerShellScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // Use extendBody so the curved nav bar can overlap the body edge
-      extendBody: true,
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        switchInCurve: Curves.easeOut,
-        switchOutCurve: Curves.easeIn,
-        transitionBuilder: (child, animation) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        child: KeyedSubtree(key: ValueKey<int>(_index), child: _tabs[_index]),
+    return ChangeNotifierProvider(
+      create: (context) => LookingForController(
+        supabase: context.read<SupabaseService>(),
+        auth: context.read<AuthProvider>(),
       ),
-      bottomNavigationBar: CurvedNavigationBar(
-        selectedIndex: _index,
-        onTap: _onTabChanged,
-        items: _navItems,
+      child: Scaffold(
+        extendBody: true,
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, animation) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          child: KeyedSubtree(key: ValueKey<int>(_index), child: _tabs[_index]),
+        ),
+        bottomNavigationBar: CurvedNavigationBar(
+          selectedIndex: _index,
+          onTap: _onTabChanged,
+          items: _navItems,
+        ),
       ),
     );
   }

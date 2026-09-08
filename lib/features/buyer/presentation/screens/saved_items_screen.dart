@@ -24,7 +24,10 @@ class SavedItemsScreen extends StatelessWidget {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: AppColors.textPrimary,
+          ),
           onPressed: () => context.pop(),
         ),
         title: Row(
@@ -102,13 +105,19 @@ class SavedItemsScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 'Unable to load saved items',
-                style: AppTypography.subheading.copyWith(fontWeight: FontWeight.w700),
+                style: AppTypography.subheading.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
-                provider.errorMessage ?? 'Please check your connection and try again.',
-                style: AppTypography.body.copyWith(color: AppColors.textSecondary, fontSize: 13),
+                provider.errorMessage ??
+                    'Please check your connection and try again.',
+                style: AppTypography.body.copyWith(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
@@ -119,7 +128,9 @@ class SavedItemsScreen extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primary,
                   side: const BorderSide(color: AppColors.primary),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ],
@@ -183,17 +194,15 @@ class SavedItemsScreen extends StatelessWidget {
               crossAxisSpacing: 14,
               childAspectRatio: 0.62,
             ),
-            delegate: SliverChildBuilderDelegate(
-              (_, i) {
-                final product = saved[i];
-                return ProductCard(
-                  product: product,
-                  onTap: () => context.push('/product/${product.id}'),
-                  onSellerTap: () => context.push('/seller-profile/${product.sellerUsername}'),
-                );
-              },
-              childCount: saved.length,
-            ),
+            delegate: SliverChildBuilderDelegate((_, i) {
+              final product = saved[i];
+              return ProductCard(
+                product: product,
+                onTap: () => context.push('/product/${product.id}'),
+                onSellerTap: () =>
+                    context.push('/seller-profile/${product.sellerUsername}'),
+              );
+            }, childCount: saved.length),
           ),
         ),
       ],

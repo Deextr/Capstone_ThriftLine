@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../core/services/supabase_service.dart';
+import '../features/buyer/data/catalog_product_query.dart';
 import '../models/enums.dart';
 import '../models/product_model.dart';
 
@@ -51,55 +52,33 @@ class SavedItemsProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. Fetch seller profiles to map shop names / verified badges
-      final Map<String, Map<String, dynamic>> sellerProfilesMap = {};
-      try {
-        final spResponse = await _supabase.client
-            .from('seller_profiles')
-            .select('*, user:user_public_profiles(*)');
-
-        final spRows = spResponse as List<dynamic>;
-        for (final sp in spRows) {
-          if (sp is Map<String, dynamic> && sp['seller_id'] != null) {
-            sellerProfilesMap[sp['seller_id'] as String] = sp;
-          }
-        }
-      } catch (e) {
-        debugPrint('SavedItemsProvider: seller_profiles fetch error ($e)');
-      }
-
-      // 2. Fetch saved_items joined with product details
-      final response = await _supabase.client
-          .from('saved_items')
-          .select('''
+      final response = await runProductCatalogSelect((select) async {
+        return await _supabase.client
+            .from('saved_items')
+            .select('''
             saved_item_id,
             product_id,
             created_at,
-            product:products (
-              *,
-              seller:user_public_profiles (
-                user_id,
-                username,
-                full_name,
-                avatar,
-                rating_average,
-                trust_score,
-                role
-              ),
-              images:product_images (
-                image_url,
-                is_primary,
-                display_order
-              ),
-              category:categories (
-                category_name
-              )
-            )
+            product:products ($select)
           ''')
-          .eq('user_id', userId)
-          .order('created_at', ascending: false);
+            .eq('user_id', userId)
+            .order('created_at', ascending: false);
+      });
 
       final rows = response as List<dynamic>;
+      final extraIds = <String>[];
+      for (final row in rows) {
+        final productRaw =
+            (row as Map<String, dynamic>)['product'] as Map<String, dynamic>?;
+        final sellerId = productRaw?['seller_id'] as String?;
+        if (sellerId != null) extraIds.add(sellerId);
+      }
+      final sellerProfilesMap = await fetchSellerProfilesMap(
+        _supabase.client,
+        extraSellerIds: extraIds,
+        includeApproved: false,
+      );
+
       _savedProductIds.clear();
       final List<ProductModel> products = [];
 
@@ -115,10 +94,13 @@ class SavedItemsProvider extends ChangeNotifier {
           final sellerId = productRaw['seller_id'] as String?;
           final p = ProductModel.fromSupabase(
             productRaw,
-            sellerProfile: sellerId != null ? sellerProfilesMap[sellerId] : null,
+            sellerProfile: sellerId != null
+                ? sellerProfilesMap[sellerId]
+                : null,
           );
           // Only show active or sold products
-          if (p.status == ProductStatus.active || p.status == ProductStatus.sold) {
+          if (p.status == ProductStatus.active ||
+              p.status == ProductStatus.sold) {
             products.add(p);
           }
         }
@@ -163,10 +145,14 @@ class SavedItemsProvider extends ChangeNotifier {
             .eq('user_id', userId)
             .eq('product_id', productId);
       } else {
-        await _supabase.client.from('saved_items').insert({
-          'user_id': userId,
-          'product_id': productId,
-        });
+        try {
+          await _supabase.client.from('saved_items').insert({
+            'user_id': userId,
+            'product_id': productId,
+          });
+        } catch (e) {
+          if (!isUniqueViolation(e)) rethrow;
+        }
 
         // If we didn't have the full ProductModel, fetch it
         if (product == null) {
@@ -185,7 +171,9 @@ class SavedItemsProvider extends ChangeNotifier {
         }
       } else {
         _savedProductIds.remove(productId);
-        _savedProducts = _savedProducts.where((p) => p.id != productId).toList();
+        _savedProducts = _savedProducts
+            .where((p) => p.id != productId)
+            .toList();
       }
       notifyListeners();
       return false;

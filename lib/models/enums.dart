@@ -161,12 +161,20 @@ enum DeliveryMethod {
 enum MessageType {
   text,
   image,
-  offer;
+  offer,
+  lookingFor;
 
-  static MessageType fromString(String value) => MessageType.values.firstWhere(
-    (e) => e.name == value,
-    orElse: () => MessageType.text,
-  );
+  String get dbValue => switch (this) {
+    MessageType.lookingFor => 'looking_for',
+    _ => name,
+  };
+
+  static MessageType fromString(String value) => switch (value) {
+    'looking_for' || 'lookingFor' => MessageType.lookingFor,
+    'image' => MessageType.image,
+    'offer' => MessageType.offer,
+    _ => MessageType.text,
+  };
 }
 
 enum NotificationType {

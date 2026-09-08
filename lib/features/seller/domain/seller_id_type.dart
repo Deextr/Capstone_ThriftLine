@@ -1,14 +1,13 @@
 /// Government IDs accepted for Phase 1 seller verification.
 ///
-/// Voter's ID and PhilHealth ID are intentionally absent and must not be
-/// added as hidden, fallback, or selectable values.
+/// Voter's ID, PhilHealth ID, and Student ID are intentionally absent and
+/// must not be added as hidden, fallback, or selectable values.
 enum SellerIdType {
   nationalId('national_id', 'National ID'),
   driversLicense('drivers_license', "Driver's License"),
   passport('passport', 'Passport'),
   sssId('sss_id', 'SSS ID'),
-  umidId('umid_id', 'UMID ID'),
-  studentId('student_id', 'Student ID');
+  umidId('umid_id', 'UMID ID');
 
   const SellerIdType(this.storageValue, this.label);
 
@@ -25,6 +24,8 @@ enum SellerIdType {
     "voter's_id",
     'philhealth_id',
     'philhealth',
+    'student_id',
+    'student',
   ];
 
   static SellerIdType? tryParse(String? raw) {

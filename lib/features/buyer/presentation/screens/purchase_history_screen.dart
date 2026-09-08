@@ -13,10 +13,18 @@ class PurchaseHistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final orders = context.watch<DataProvider>().ordersForBuyer(auth.user?.id ?? '');
+    final orders = context.watch<DataProvider>().ordersForBuyer(
+      auth.user?.id ?? '',
+    );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Purchase History'), leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop())),
+      appBar: AppBar(
+        title: const Text('Purchase History'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+      ),
       body: SafeArea(
         child: orders.isEmpty
             ? const Center(child: Text('No purchases yet'))
@@ -27,7 +35,13 @@ class PurchaseHistoryScreen extends StatelessWidget {
                   return ListTile(
                     title: Text(o.productTitle, style: AppTypography.body),
                     subtitle: Text('#${o.orderNumber} â€¢ ${o.status.name}'),
-                    trailing: Text(formatCurrency(o.total), style: AppTypography.subheading.copyWith(color: const Color(0xFF0D9488), fontSize: 14)),
+                    trailing: Text(
+                      formatCurrency(o.total),
+                      style: AppTypography.subheading.copyWith(
+                        color: const Color(0xFF0D9488),
+                        fontSize: 14,
+                      ),
+                    ),
                     onTap: () => context.push('/track-order/${o.id}'),
                   );
                 },

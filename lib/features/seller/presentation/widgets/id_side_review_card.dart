@@ -13,14 +13,16 @@ class IdSideReviewCard extends StatelessWidget {
     required this.bytes,
     required this.quality,
     required this.checking,
-    required this.onCapture,
+    this.onCapture,
+    this.actionLabel,
   });
 
   final String title;
   final Uint8List? bytes;
   final IdQualityResult? quality;
   final bool checking;
-  final VoidCallback onCapture;
+  final VoidCallback? onCapture;
+  final String? actionLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -30,10 +32,10 @@ class IdSideReviewCard extends StatelessWidget {
     final border = passed
         ? AppColors.success
         : warning
-            ? AppColors.warning
-            : failed
-                ? AppColors.error
-                : AppColors.primary.withValues(alpha: 0.45);
+        ? AppColors.warning
+        : failed
+        ? AppColors.error
+        : AppColors.primary.withValues(alpha: 0.45);
 
     return Container(
       width: double.infinity,
@@ -63,7 +65,11 @@ class IdSideReviewCard extends StatelessWidget {
                         ),
                       ),
                     )
-                  : Image.memory(bytes!, fit: BoxFit.cover, width: double.infinity),
+                  : Image.memory(
+                      bytes!,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                    ),
             ),
           ),
           const SizedBox(height: 12),
@@ -76,13 +82,20 @@ class IdSideReviewCard extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
                 const SizedBox(width: 8),
-                Text('Checking ID and photo quality…', style: AppTypography.caption),
+                Text(
+                  'Checking ID and photo quality…',
+                  style: AppTypography.caption,
+                ),
               ],
             )
           else if (quality == null)
             Text(
-              'Required. Open the camera to capture this side.',
-              style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+              bytes == null
+                  ? 'Required. Open the camera to capture this side.'
+                  : 'Preparing photo quality check…',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+              ),
             )
           else
             Row(
@@ -92,14 +105,14 @@ class IdSideReviewCard extends StatelessWidget {
                   passed
                       ? Icons.check_circle
                       : warning
-                          ? Icons.warning_amber_rounded
-                          : Icons.cancel,
+                      ? Icons.warning_amber_rounded
+                      : Icons.cancel,
                   size: 18,
                   color: passed
                       ? AppColors.success
                       : warning
-                          ? AppColors.warning
-                          : AppColors.error,
+                      ? AppColors.warning
+                      : AppColors.error,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -109,8 +122,8 @@ class IdSideReviewCard extends StatelessWidget {
                       color: passed
                           ? AppColors.success
                           : warning
-                              ? AppColors.warning
-                              : AppColors.error,
+                          ? AppColors.warning
+                          : AppColors.error,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -118,14 +131,20 @@ class IdSideReviewCard extends StatelessWidget {
               ],
             ),
           const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: checking ? null : onCapture,
-              icon: Icon(bytes == null ? Icons.photo_camera_outlined : Icons.refresh),
-              label: Text(bytes == null ? 'Capture $title' : 'Retake $title'),
+          if (onCapture != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: checking ? null : onCapture,
+                icon: Icon(
+                  bytes == null ? Icons.photo_camera_outlined : Icons.refresh,
+                ),
+                label: Text(
+                  actionLabel ??
+                      (bytes == null ? 'Capture $title' : 'Retake $title'),
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );

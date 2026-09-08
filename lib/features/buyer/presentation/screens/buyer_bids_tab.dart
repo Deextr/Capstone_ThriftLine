@@ -487,8 +487,10 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -511,8 +513,9 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                         Text(
                           b.username,
                           style: AppTypography.body.copyWith(
-                            fontWeight:
-                                isMe ? FontWeight.w600 : FontWeight.w400,
+                            fontWeight: isMe
+                                ? FontWeight.w600
+                                : FontWeight.w400,
                           ),
                         ),
                         if (isMe) ...[
@@ -571,10 +574,7 @@ class _RaiseBidContent extends StatefulWidget {
   final ProductModel product;
   final UserBid bid;
 
-  const _RaiseBidContent({
-    required this.product,
-    required this.bid,
-  });
+  const _RaiseBidContent({required this.product, required this.bid});
 
   @override
   State<_RaiseBidContent> createState() => _RaiseBidContentState();
@@ -583,8 +583,7 @@ class _RaiseBidContent extends StatefulWidget {
 class _RaiseBidContentState extends State<_RaiseBidContent> {
   late double minBid;
   late double selectedBid;
-  final TextEditingController _customAmountController =
-      TextEditingController();
+  final TextEditingController _customAmountController = TextEditingController();
   bool _submitting = false;
 
   @override
@@ -611,8 +610,7 @@ class _RaiseBidContentState extends State<_RaiseBidContent> {
 
   @override
   Widget build(BuildContext context) {
-    final currentAmount =
-        double.tryParse(_customAmountController.text) ?? 0.0;
+    final currentAmount = double.tryParse(_customAmountController.text) ?? 0.0;
     final isError = currentAmount < minBid;
 
     return Column(
@@ -634,9 +632,7 @@ class _RaiseBidContentState extends State<_RaiseBidContent> {
             Expanded(
               child: Text(
                 widget.product.title,
-                style: AppTypography.body.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
                 maxLines: 2,
               ),
             ),
@@ -650,12 +646,8 @@ class _RaiseBidContentState extends State<_RaiseBidContent> {
           children: [
             Text('Current highest:', style: AppTypography.body),
             Text(
-              formatCurrency(
-                widget.product.currentBid ?? widget.product.price,
-              ),
-              style: AppTypography.body.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              formatCurrency(widget.product.currentBid ?? widget.product.price),
+              style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
             ),
           ],
         ),

@@ -40,7 +40,9 @@ class SellerPublicProfileScreen extends StatelessWidget {
           ),
           title: Text(
             '@$username',
-            style: AppTypography.subheading.copyWith(fontWeight: FontWeight.w700),
+            style: AppTypography.subheading.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
           centerTitle: true,
         ),
@@ -78,13 +80,17 @@ class SellerPublicProfileScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 Text(
                   controller.errorMessage ?? 'Seller not found',
-                  style: AppTypography.subheading.copyWith(fontWeight: FontWeight.w600),
+                  style: AppTypography.subheading.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'The user @$username may not have an active seller profile or is unavailable.',
-                  style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
@@ -200,13 +206,24 @@ class SellerPublicProfileScreen extends StatelessWidget {
       centerTitle: true,
       actions: [
         IconButton(
-          icon: const Icon(Icons.share_outlined, color: AppColors.textPrimary, size: 22),
+          icon: const Icon(
+            Icons.share_outlined,
+            color: AppColors.textPrimary,
+            size: 22,
+          ),
           onPressed: () {
-            showThriftSnackBar(context, 'Seller profile link copied to clipboard!');
+            showThriftSnackBar(
+              context,
+              'Seller profile link copied to clipboard!',
+            );
           },
         ),
         IconButton(
-          icon: const Icon(Icons.more_vert, color: AppColors.textPrimary, size: 22),
+          icon: const Icon(
+            Icons.more_vert,
+            color: AppColors.textPrimary,
+            size: 22,
+          ),
           onPressed: () => _showMoreOptions(context, seller),
         ),
       ],
@@ -262,7 +279,10 @@ class SellerPublicProfileScreen extends StatelessWidget {
                     confirmLabel: 'Block',
                     isDestructive: true,
                     onConfirm: () {
-                      showThriftSnackBar(context, '@${seller.username} has been blocked');
+                      showThriftSnackBar(
+                        context,
+                        '@${seller.username} has been blocked',
+                      );
                     },
                   );
                 },
@@ -273,7 +293,9 @@ class SellerPublicProfileScreen extends StatelessWidget {
                 isDestructive: true,
                 onTap: () {
                   Navigator.pop(ctx);
-                  context.push('${RouteNames.reportSeller}?seller=${seller.username}');
+                  context.push(
+                    '${RouteNames.reportSeller}?seller=${seller.username}',
+                  );
                 },
               ),
               const SizedBox(height: 16),
@@ -306,7 +328,9 @@ class SellerPublicProfileScreen extends StatelessWidget {
             onPressed: () => Navigator.pop(ctx),
             child: Text(
               'Cancel',
-              style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+              style: AppTypography.body.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           TextButton(
@@ -401,23 +425,35 @@ class SellerPublicProfileScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                '@${seller.username}',
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
+              Flexible(
+                child: Text(
+                  '@${seller.username}',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (seller.location.isNotEmpty) ...[
                 const SizedBox(width: 8),
-                const Text('â€¢', style: TextStyle(color: AppColors.textHint)),
+                const Text('•', style: TextStyle(color: AppColors.textHint)),
                 const SizedBox(width: 8),
-                const Icon(Icons.location_on_outlined, size: 13, color: AppColors.textSecondary),
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 13,
+                  color: AppColors.textSecondary,
+                ),
                 const SizedBox(width: 2),
-                Text(
-                  seller.location,
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.textSecondary,
+                Flexible(
+                  child: Text(
+                    seller.location,
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -431,6 +467,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
             trustScore: seller.trustScore,
             isVerified: seller.isVerified,
             shopName: seller.shopName,
+            showNumericScore: false,
           ),
 
           const SizedBox(height: 16),
@@ -446,24 +483,19 @@ class SellerPublicProfileScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _StatColumn(
-                  value: '${rating.toStringAsFixed(1)} â˜…',
-                  label: '$reviewCount review${reviewCount == 1 ? '' : 's'}',
+                  value: controller.hasReviews
+                      ? '${rating.toStringAsFixed(1)} ★'
+                      : '—',
+                  label: controller.hasReviews
+                      ? '$reviewCount review${reviewCount == 1 ? '' : 's'}'
+                      : 'No reviews yet',
                 ),
                 Container(height: 28, width: 1, color: AppColors.border),
-                _StatColumn(
-                  value: '$sold',
-                  label: 'sold',
-                ),
+                _StatColumn(value: '$sold', label: 'sold'),
                 Container(height: 28, width: 1, color: AppColors.border),
-                _StatColumn(
-                  value: '$listings',
-                  label: 'listings',
-                ),
+                _StatColumn(value: '$listings', label: 'listings'),
                 Container(height: 28, width: 1, color: AppColors.border),
-                _StatColumn(
-                  value: '$followers',
-                  label: 'followers',
-                ),
+                _StatColumn(value: '$followers', label: 'followers'),
               ],
             ),
           ),
@@ -487,8 +519,9 @@ class SellerPublicProfileScreen extends StatelessWidget {
 
           const SizedBox(height: 18),
 
-          // Action buttons â€” Message & Follow (or Edit Profile if viewing own profile)
-          if (controller.isCurrentUser)
+          // Action buttons — Edit only in Seller workspace. Own shop in Buyer
+          // mode is a public view (no self-follow, no edit).
+          if (controller.canEditPublicProfile)
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -511,6 +544,8 @@ class SellerPublicProfileScreen extends StatelessWidget {
                 ),
               ),
             )
+          else if (controller.isOwnShop)
+            const SizedBox.shrink()
           else
             Row(
               children: [
@@ -528,7 +563,10 @@ class SellerPublicProfileScreen extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.textPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 13),
-                      side: const BorderSide(color: AppColors.border, width: 1.5),
+                      side: const BorderSide(
+                        color: AppColors.border,
+                        width: 1.5,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -560,7 +598,10 @@ class SellerPublicProfileScreen extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                         side: isFollowing
-                            ? const BorderSide(color: AppColors.primary, width: 1.5)
+                            ? const BorderSide(
+                                color: AppColors.primary,
+                                width: 1.5,
+                              )
                             : BorderSide.none,
                       ),
                     ),
@@ -600,12 +641,16 @@ class SellerPublicProfileScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 'No products available',
-                style: AppTypography.subheading.copyWith(fontWeight: FontWeight.w600),
+                style: AppTypography.subheading.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
                 'This seller hasn\'t listed any items for sale yet.',
-                style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                style: AppTypography.body.copyWith(
+                  color: AppColors.textSecondary,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -661,12 +706,16 @@ class SellerPublicProfileScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 'No reviews yet',
-                style: AppTypography.subheading.copyWith(fontWeight: FontWeight.w600),
+                style: AppTypography.subheading.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
                 'Customer ratings and reviews will appear here after completed orders.',
-                style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                style: AppTypography.body.copyWith(
+                  color: AppColors.textSecondary,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -675,7 +724,8 @@ class SellerPublicProfileScreen extends StatelessWidget {
       );
     }
 
-    final avgRating = reviews.fold<double>(0, (s, r) => s + r.rating) / reviews.length;
+    final avgRating =
+        reviews.fold<double>(0, (s, r) => s + r.rating) / reviews.length;
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -708,7 +758,9 @@ class SellerPublicProfileScreen extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         '/ 5.0',
-                        style: AppTypography.caption.copyWith(color: AppColors.textHint),
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textHint,
+                        ),
                       ),
                     ],
                   ),
@@ -716,7 +768,9 @@ class SellerPublicProfileScreen extends StatelessWidget {
                   Row(
                     children: List.generate(5, (index) {
                       return Icon(
-                        index < avgRating.round() ? Icons.star_rounded : Icons.star_border_rounded,
+                        index < avgRating.round()
+                            ? Icons.star_rounded
+                            : Icons.star_border_rounded,
                         color: Colors.amber[700],
                         size: 18,
                       );
@@ -725,20 +779,29 @@ class SellerPublicProfileScreen extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     'Based on ${reviews.length} review${reviews.length == 1 ? '' : 's'}',
-                    style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primaryLight,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.verified_user_outlined, size: 16, color: AppColors.primaryDark),
+                    const Icon(
+                      Icons.verified_user_outlined,
+                      size: 16,
+                      color: AppColors.primaryDark,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'Verified Purchases',
@@ -853,12 +916,16 @@ class _ShopGridItem extends StatelessWidget {
               errorWidget: (_, _, _) => Container(
                 color: AppColors.surfaceVariant,
                 child: const Center(
-                  child: Icon(Icons.image_outlined, color: AppColors.textHint, size: 24),
+                  child: Icon(
+                    Icons.image_outlined,
+                    color: AppColors.textHint,
+                    size: 24,
+                  ),
                 ),
               ),
             ),
           ),
-          
+
           // Gradient at bottom for text contrast
           Positioned(
             bottom: 0,
@@ -889,9 +956,7 @@ class _ShopGridItem extends StatelessWidget {
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 11,
-                shadows: const [
-                  Shadow(color: Colors.black54, blurRadius: 4),
-                ],
+                shadows: const [Shadow(color: Colors.black54, blurRadius: 4)],
               ),
             ),
           ),
@@ -970,7 +1035,9 @@ class _ReviewCard extends StatelessWidget {
                   children: [
                     Text(
                       review.reviewerName,
-                      style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     if (review.reviewerUsername.isNotEmpty)
                       Text(
@@ -985,7 +1052,10 @@ class _ReviewCard extends StatelessWidget {
               ),
               Text(
                 formatRelativeTime(review.createdAt),
-                style: AppTypography.caption.copyWith(color: AppColors.textHint, fontSize: 11),
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textHint,
+                  fontSize: 11,
+                ),
               ),
             ],
           ),
@@ -993,7 +1063,9 @@ class _ReviewCard extends StatelessWidget {
           Row(
             children: List.generate(5, (index) {
               return Icon(
-                index < review.rating ? Icons.star_rounded : Icons.star_border_rounded,
+                index < review.rating
+                    ? Icons.star_rounded
+                    : Icons.star_border_rounded,
                 color: Colors.amber[700],
                 size: 16,
               );
@@ -1030,13 +1102,15 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => _tabBar.preferredSize.height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
-        border: Border(
-          bottom: BorderSide(color: AppColors.border, width: 1),
-        ),
+        border: Border(bottom: BorderSide(color: AppColors.border, width: 1)),
       ),
       child: _tabBar,
     );

@@ -56,6 +56,27 @@ Edge Functions live in `../functions/send-email-otp` and
 `GMAIL_APP_PASSWORD`, and `OTP_PEPPER`. Keep Auth "Confirm email" off so
 signup returns a session before the OTP screen. See `../../docs/agile/email-otp.md`.
 
+## One email → one account
+
+| File | Purpose |
+| --- | --- |
+| `20260905020000_prevent_cross_provider_identity_link.sql` | Blocks attaching an **email/password** identity onto a Google/OAuth user |
+| `20260907010000_allow_google_identity_on_email_user.sql` | Same function, corrected: Google sign-in onto an existing email user is allowed |
+
+Apply `20260907010000` even if you already ran `20260905020000`. The older
+function body rejected **any** second provider, so Google login onto an
+email/password account (including the Studio admin user) returned
+`Error creating identity`.
+
+Apply this after the email OTP migration. It does **not** delete or merge
+existing rows. If Google auto-link already attached a password to a Google
+user, run `../introspection/duplicate_identities_report.sql` and clean those
+up separately.
+
+In the Dashboard, set **Authentication → Providers → (identity linking)** to
+**Manual** if the control is available, so GoTrue itself refuses unauthenticated
+linking. The trigger is the repo-owned enforcement.
+
 ## Seed data
 
 `../seed/` holds environment-specific data that is deliberately not part of the
@@ -64,6 +85,16 @@ migration chain, because it depends on accounts that exist only in one project.
 `001_role_assignments.sql` promotes `dexter041711@gmail.com` to admin. Create
 that account in Studio first — GoTrue owns `auth.users` and hand-written rows
 there break at login. Passwords are never stored in this file.
+
+## Phase 2 — catalog and discovery
+
+| File | Purpose |
+| --- | --- |
+| `20260908010000_phase2_catalog.sql` | Product `name` / search vector / quantity, `follows`, looking-for columns, view-count RPC |
+| `20260909010000_looking_for_reference_images.sql` | Optional `reference_image_url`, public `looking-for` storage bucket, open-thread response SELECT |
+| `20260909020000_conversations.sql` | Minimal `conversations` / `messages` for Looking For share and I Have This (Phase 4 can expand these) |
+
+Run `../introspection/phase2_verify.sql` afterwards. Saved-items RLS was already added in `20260902010000_saved_items_rls.sql`. Cart and bidding migrations dated `20260907` are later-phase coworker work, not Phase 2. Apply `20260909010000` as well if buyers will attach reference photos or sellers will read comments on open requests.
 
 ## Conventions
 

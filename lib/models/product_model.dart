@@ -65,11 +65,15 @@ class ProductModel {
     Map<String, dynamic> row, {
     Map<String, dynamic>? sellerProfile,
   }) {
-    // â”€â”€ Seller info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    final seller = (row['seller'] ??
-            row['user_public_profiles'] ??
-            row['users'])
-        as Map<String, dynamic>?;
+    final nestedSellerUser = sellerProfile?['user'];
+    final seller =
+        (row['seller'] ??
+                row['user_public_profiles'] ??
+                row['users'] ??
+                (nestedSellerUser is Map<String, dynamic>
+                    ? nestedSellerUser
+                    : null))
+            as Map<String, dynamic>?;
 
     final sellerUsername = seller?['username'] as String? ?? '';
     final sellerFullName = seller?['full_name'] as String? ?? '';
@@ -79,10 +83,10 @@ class ProductModel {
     final shopName = (rawShopName != null && rawShopName.trim().isNotEmpty)
         ? rawShopName.trim()
         : (sellerFullName.trim().isNotEmpty
-            ? sellerFullName.trim()
-            : (sellerUsername.trim().isNotEmpty
-                ? sellerUsername.trim()
-                : 'Thrift Seller'));
+              ? sellerFullName.trim()
+              : (sellerUsername.trim().isNotEmpty
+                    ? sellerUsername.trim()
+                    : 'Thrift Seller'));
 
     final sellerAvatar = seller?['avatar'] as String? ?? '';
     final isApproved = (sellerProfile?['is_approved'] as bool?) ?? false;
@@ -105,7 +109,9 @@ class ProductModel {
           );
         });
     final imageUrls = sortedImages
-        .map((img) => img['image_url'] as String)
+        .map((img) => img['image_url'] as String?)
+        .whereType<String>()
+        .where((url) => url.isNotEmpty)
         .toList();
 
     // â”€â”€ Category â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -120,8 +126,9 @@ class ProductModel {
       final activeList = auctionsRaw
           .where((a) => (a as Map<String, dynamic>)['status'] == 'active')
           .toList();
-      activeAuction = (activeList.isNotEmpty ? activeList.first : auctionsRaw.first)
-          as Map<String, dynamic>?;
+      activeAuction =
+          (activeList.isNotEmpty ? activeList.first : auctionsRaw.first)
+              as Map<String, dynamic>?;
     } else if (auctionsRaw is Map<String, dynamic>) {
       activeAuction = auctionsRaw;
     }
@@ -148,17 +155,8 @@ class ProductModel {
 
     if (sellingType == SellingType.auction) {
       final priceVal = (row['price'] as num?)?.toDouble() ?? 0;
-      startingBid ??= priceVal > 0 ? priceVal : 100;
+      startingBid ??= priceVal > 0 ? priceVal : null;
       currentBid ??= startingBid;
-      if (bidEndTime == null || !bidEndTime.isAfter(DateTime.now())) {
-        final createdAt = row['created_at'] != null
-            ? DateTime.tryParse(row['created_at'] as String) ?? DateTime.now()
-            : DateTime.now();
-        final defaultEnd = createdAt.add(const Duration(days: 3));
-        bidEndTime = defaultEnd.isAfter(DateTime.now())
-            ? defaultEnd
-            : DateTime.now().add(const Duration(days: 2));
-      }
     }
 
     // â”€â”€ Core fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -170,7 +168,9 @@ class ProductModel {
       sellerName: shopName,
       sellerAvatar: sellerAvatar,
       sellerVerified: sellerVerified,
-      title: row['name'] as String? ?? '',
+      title: (row['name'] as String?)?.trim().isNotEmpty == true
+          ? row['name'] as String
+          : (row['title'] as String? ?? ''),
       description: row['description'] as String? ?? '',
       price: (row['price'] as num?)?.toDouble() ?? 0,
       category: category,
@@ -186,8 +186,8 @@ class ProductModel {
       createdAt: row['created_at'] != null
           ? DateTime.parse(row['created_at'] as String)
           : DateTime.now(),
-      viewCount: row['views'] as int? ?? 0,
-      favoriteCount: row['favorite_count'] as int? ?? 0,
+      viewCount: (row['views'] as num?)?.toInt() ?? 0,
+      favoriteCount: (row['favorite_count'] as num?)?.toInt() ?? 0,
       sellingType: sellingType,
       startingBid: startingBid,
       currentBid: currentBid,

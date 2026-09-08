@@ -10,7 +10,6 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../features/auth/domain/auth_user.dart';
 import '../../../../features/seller/data/davao_barangay_service.dart';
-import '../../../../features/seller/data/id_image_quality_analyzer.dart';
 import '../../../../features/seller/data/seller_verification_service.dart';
 import '../../../../features/seller/domain/davao_barangay.dart';
 import '../../../../features/seller/domain/id_image_quality.dart';
@@ -36,7 +35,6 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   final _addressLine1Ctrl = TextEditingController();
   final _addressLine2Ctrl = TextEditingController();
   final _barangayService = DavaoBarangayService();
-  final _qualityAnalyzer = IdImageQualityAnalyzer();
 
   List<DavaoBarangay> _barangays = const [];
   DavaoBarangay? _selectedBarangay;
@@ -47,8 +45,6 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   Uint8List? _idBackBytes;
   IdQualityResult? _frontQuality;
   IdQualityResult? _backQuality;
-  bool _checkingFront = false;
-  bool _checkingBack = false;
 
   bool _selfieUploaded = false;
   bool _submitting = false;
@@ -56,6 +52,8 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   LivenessResult? _liveness;
 
   bool get _idGateOpen =>
+      _idFrontBytes != null &&
+      _idBackBytes != null &&
       IdCapturePair(front: _frontQuality, back: _backQuality).canProceed;
 
   @override
@@ -159,7 +157,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                         color: Colors.black.withValues(alpha: 0.02),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
-                      )
+                      ),
                     ],
                   ),
                   child: Column(
@@ -179,8 +177,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                         children: [
                           Text(
                             _getStepTitle(),
-                            style: AppTypography.subheading
-                                .copyWith(color: AppColors.primary),
+                            style: AppTypography.subheading.copyWith(
+                              color: AppColors.primary,
+                            ),
                           ),
                           Text(
                             'Step ${_currentStep + 1} of 3',
@@ -206,7 +205,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                         color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, -4),
-                      )
+                      ),
                     ],
                   ),
                   child: _buildBottomActions(auth),
@@ -248,9 +247,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       case 0:
         return 'Seller information & address';
       case 1:
-        return 'ID verification';
+        return 'Capture your ID';
       case 2:
-        return 'Selfie verification';
+        return 'Take a selfie';
       default:
         return '';
     }
@@ -339,19 +338,34 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.stars_outlined, color: AppColors.primary, size: 20),
+                  const Icon(
+                    Icons.stars_outlined,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Why sell on Thriftline?',
-                    style: AppTypography.subheading.copyWith(color: AppColors.primary),
+                    style: AppTypography.subheading.copyWith(
+                      color: AppColors.primary,
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              _benefitRow(Icons.trending_up_outlined, 'Reach thousands of thrift buyers'),
-              _benefitRow(Icons.auto_awesome_outlined, 'AI-powered pricing suggestions'),
+              _benefitRow(
+                Icons.trending_up_outlined,
+                'Reach thousands of thrift buyers',
+              ),
+              _benefitRow(
+                Icons.auto_awesome_outlined,
+                'AI-powered pricing suggestions',
+              ),
               _benefitRow(Icons.security_outlined, 'Secure payment processing'),
-              _benefitRow(Icons.local_shipping_outlined, 'Integrated shipping options'),
+              _benefitRow(
+                Icons.local_shipping_outlined,
+                'Integrated shipping options',
+              ),
             ],
           ),
         ),
@@ -374,222 +388,209 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
   Widget _idCaptureStep() {
     final pair = IdCapturePair(front: _frontQuality, back: _backQuality);
+    if (_idGateOpen) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Both sides of your ID passed the ID check.',
+            style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 20),
+          IdSideReviewCard(
+            title: 'Front ID',
+            bytes: _idFrontBytes,
+            quality: _frontQuality,
+            checking: false,
+          ),
+          const SizedBox(height: 16),
+          IdSideReviewCard(
+            title: 'Back ID',
+            bytes: _idBackBytes,
+            quality: _backQuality,
+            checking: false,
+          ),
+          const SizedBox(height: 16),
+          ThriftButton(
+            label: 'Retake ID photos',
+            variant: ThriftButtonVariant.outline,
+            onPressed: _startIdCaptureFlow,
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              _idPairStatusMessage(pair),
+              style: AppTypography.body.copyWith(
+                color: AppColors.success,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Capture the front and back of an accepted ID. Both sides must look '
-          'like an ID and pass a quality check before you can continue.',
+          'Use one of the accepted IDs below. You will photograph the front, '
+          'then the back.',
           style: AppTypography.body.copyWith(color: AppColors.textSecondary),
         ),
         const SizedBox(height: 20),
         Text('Accepted IDs', style: AppTypography.subheading),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final type in SellerIdType.values)
-              Chip(
-                label: Text(
-                  type.label,
-                  style: AppTypography.caption.copyWith(color: AppColors.textPrimary),
-                ),
-                backgroundColor: AppColors.surfaceVariant.withValues(alpha: 0.5),
-                side: const BorderSide(color: AppColors.border),
-                avatar: const Icon(Icons.check, size: 16, color: AppColors.success),
-              ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        IdSideReviewCard(
-          title: 'Front ID',
-          bytes: _idFrontBytes,
-          quality: _frontQuality,
-          checking: _checkingFront,
-          onCapture: () => _captureIdSide(IdCaptureSide.front),
-        ),
+        for (final type in SellerIdType.values) ...[
+          _acceptedIdRow(type.label),
+          const SizedBox(height: 8),
+        ],
         const SizedBox(height: 16),
-        IdSideReviewCard(
-          title: 'Back ID',
-          bytes: _idBackBytes,
-          quality: _backQuality,
-          checking: _checkingBack,
-          onCapture: () => _captureIdSide(IdCaptureSide.back),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: pair.canProceed
-                ? AppColors.success.withValues(alpha: 0.08)
-                : AppColors.surfaceVariant,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            pair.canProceed
-                ? 'Both ID photos passed the quality check.'
-                : pair.blockingIssue == IdQualityIssue.missing
-                    ? 'Both front and back photos are required.'
-                    : pair.blockingIssue == IdQualityIssue.notId
-                        ? 'No ID detected on one of the photos. Place the ID in the frame and retake.'
-                        : 'Retake the photo that did not pass before continuing.',
-            style: AppTypography.body.copyWith(
-              color: pair.canProceed ? AppColors.success : AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+        ThriftButton(
+          label: 'Proceed to capture',
+          onPressed: _startIdCaptureFlow,
         ),
       ],
+    );
+  }
+
+  Widget _acceptedIdRow(String label) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle_outline, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _selfieStep() {
+    if (_selfieUploaded) {
+      return Column(
+        children: [
+          const Icon(
+            Icons.check_circle_outline,
+            color: AppColors.success,
+            size: 56,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Face check passed',
+            style: AppTypography.subheading.copyWith(color: AppColors.success),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Look left, look right, and a blink were completed. The selfie was captured automatically.',
+            style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          TextButton.icon(
+            onPressed: _startLiveness,
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('Retake face check'),
+          ),
+        ],
+      );
+    }
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+          'Look at the camera, then look right, look left, and blink. '
+          'The selfie is taken automatically once your face is clear and still.',
+          style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 28),
+        Icon(
+          Icons.account_circle_outlined,
+          size: 96,
+          color: AppColors.textHint.withValues(alpha: 0.8),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _bannedIcon(Icons.visibility_outlined),
+            const SizedBox(width: 20),
+            _bannedIcon(Icons.school_outlined),
+            const SizedBox(width: 20),
+            _bannedIcon(Icons.masks_outlined),
+          ],
+        ),
+        const SizedBox(height: 24),
         Container(
-          padding: const EdgeInsets.all(20),
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: AppColors.surfaceVariant,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Complete the live face check: look left, look right, then blink. '
-                'After that, take a selfie. Your face must still be clearly visible in the final photo.',
-                style: AppTypography.body.copyWith(color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 24),
-              GestureDetector(
-                onTap: _startLiveness,
-                child: Container(
-                  width: double.infinity,
-                  height: 280,
-                  decoration: BoxDecoration(
-                    color: _selfieUploaded
-                        ? AppColors.success.withValues(alpha: 0.05)
-                        : AppColors.primaryLight.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _selfieUploaded
-                          ? AppColors.success
-                          : AppColors.primary.withValues(alpha: 0.5),
-                      width: 2,
-                    ),
-                  ),
-                  child: _selfieUploaded
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: AppColors.success.withValues(alpha: 0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.check_circle_outline,
-                                color: AppColors.success,
-                                size: 40,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Face check passed',
-                              style: AppTypography.body.copyWith(
-                                color: AppColors.success,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextButton.icon(
-                              onPressed: _startLiveness,
-                              icon: const Icon(Icons.refresh, size: 16),
-                              label: const Text('Retake face check'),
-                            )
-                          ],
-                        )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.primary.withValues(alpha: 0.1),
-                                    blurRadius: 10,
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.camera_front_outlined,
-                                color: AppColors.primary,
-                                size: 40,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Tap to open camera',
-                              style: AppTypography.body.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                ),
-              ),
+              _bullet('Look directly at the camera'),
+              _bullet('Remove glasses, hats and masks'),
+              _bullet('Make sure your face is well-lit'),
             ],
           ),
         ),
         const SizedBox(height: 24),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.secondary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.lightbulb_outline, color: AppColors.secondary, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Selfie Tips',
-                    style: AppTypography.subheading.copyWith(color: AppColors.secondary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _tipRow(Icons.light_mode_outlined, 'Use good lighting'),
-              _tipRow(Icons.swipe_outlined, 'Look left, then right, when asked'),
-              _tipRow(Icons.visibility_outlined, 'Blink once when the prompt appears'),
-              _tipRow(Icons.face_outlined, 'Stay in the frame when you take the photo'),
-            ],
+        ThriftButton(label: 'Next', onPressed: _startLiveness),
+      ],
+    );
+  }
+
+  Widget _bannedIcon(IconData icon) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(icon, size: 36, color: AppColors.textHint),
+        Positioned(
+          right: -6,
+          bottom: -4,
+          child: Container(
+            width: 16,
+            height: 16,
+            decoration: const BoxDecoration(
+              color: AppColors.error,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.close, size: 12, color: Colors.white),
           ),
         ),
       ],
     );
   }
 
-  Widget _tipRow(IconData icon, String text) {
+  Widget _bullet(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: AppColors.secondary),
-          const SizedBox(width: 10),
+          Text('•  ', style: AppTypography.body),
           Expanded(child: Text(text, style: AppTypography.body)),
         ],
       ),
@@ -617,7 +618,11 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
               if (isPast)
                 const Padding(
                   padding: EdgeInsets.only(right: 4),
-                  child: Icon(Icons.check_circle, size: 12, color: AppColors.primary),
+                  child: Icon(
+                    Icons.check_circle,
+                    size: 12,
+                    color: AppColors.primary,
+                  ),
                 ),
               Text(
                 label,
@@ -688,13 +693,17 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                     const SizedBox(height: 16),
                     Text(
                       'Application Under Review',
-                      style: AppTypography.heading
-                          .copyWith(fontSize: 20, color: AppColors.warning),
+                      style: AppTypography.heading.copyWith(
+                        fontSize: 20,
+                        color: AppColors.warning,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Your seller verification request is currently being reviewed by our trust and safety team. We\'ll notify you once it\'s processed.',
-                      style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -711,7 +720,8 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
               ),
               _buildTimelineStep(
                 title: 'Document Review',
-                subtitle: 'An admin will compare your ID and face photo in the app',
+                subtitle:
+                    'An admin will compare your ID and face photo in the app',
                 isDone: false,
                 isPending: true,
               ),
@@ -736,7 +746,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                   children: [
                     Text(
                       'Submitted Details',
-                      style: AppTypography.body.copyWith(fontWeight: FontWeight.bold),
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     _detailRow('Shop Name', user?.shopName ?? 'Vintage PH'),
@@ -811,13 +823,17 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                     const SizedBox(height: 16),
                     Text(
                       'Application Rejected',
-                      style: AppTypography.heading
-                          .copyWith(fontSize: 20, color: AppColors.error),
+                      style: AppTypography.heading.copyWith(
+                        fontSize: 20,
+                        color: AppColors.error,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Unfortunately, your seller verification application has been rejected.',
-                      style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -837,7 +853,11 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.info_outline, color: AppColors.error, size: 20),
+                        const Icon(
+                          Icons.info_outline,
+                          color: AppColors.error,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Reason for Rejection',
@@ -852,7 +872,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                     Text(
                       user?.verificationRejectionReason ??
                           'The ID submission details could not be verified. Please make sure the name on your store matches the name on your ID.',
-                      style: AppTypography.body.copyWith(color: AppColors.textPrimary),
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ],
                 ),
@@ -896,8 +918,8 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                 color: isDone
                     ? AppColors.success.withValues(alpha: 0.15)
                     : (isPending
-                        ? AppColors.warning.withValues(alpha: 0.15)
-                        : AppColors.surfaceVariant),
+                          ? AppColors.warning.withValues(alpha: 0.15)
+                          : AppColors.surfaceVariant),
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: isDone
@@ -909,22 +931,18 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
               child: isDone
                   ? const Icon(Icons.check, size: 14, color: AppColors.success)
                   : (isPending
-                      ? const Padding(
-                          padding: EdgeInsets.all(4.0),
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(AppColors.warning),
-                          ),
-                        )
-                      : null),
+                        ? const Padding(
+                            padding: EdgeInsets.all(4.0),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.warning,
+                              ),
+                            ),
+                          )
+                        : null),
             ),
-            if (!isLast)
-              Container(
-                width: 2,
-                height: 36,
-                color: lineCol,
-              ),
+            if (!isLast) Container(width: 2, height: 36, color: lineCol),
           ],
         ),
         const SizedBox(width: 12),
@@ -958,7 +976,10 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: AppTypography.caption),
-          Text(value, style: AppTypography.body.copyWith(fontWeight: FontWeight.w600)),
+          Text(
+            value,
+            style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
+          ),
         ],
       ),
     );
@@ -978,53 +999,42 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     setState(() => _currentStep = 1);
   }
 
+  String _idPairStatusMessage(IdCapturePair pair) {
+    if (pair.canProceed) {
+      return 'Both ID photos passed the quality check.';
+    }
+    if (_idFrontBytes == null || _idBackBytes == null) {
+      return 'Both front and back photos are required.';
+    }
+    if (pair.front == null || pair.back == null) {
+      return 'Checking ID photos…';
+    }
+    if (pair.blockingIssue == IdQualityIssue.notId) {
+      return 'No ID detected on one of the photos. Place the ID in the frame and retake.';
+    }
+    return 'Retake the photo that did not pass before continuing.';
+  }
+
   void _continueFromId() {
     final pair = IdCapturePair(front: _frontQuality, back: _backQuality);
     if (!pair.canProceed) {
-      showThriftSnackBar(
-        context,
-        pair.blockingIssue == IdQualityIssue.missing
-            ? 'Both front and back photos are required.'
-            : 'Both ID photos must pass the quality check before you continue.',
-      );
+      showThriftSnackBar(context, _idPairStatusMessage(pair));
       return;
     }
     setState(() => _currentStep = 2);
   }
 
-  Future<void> _captureIdSide(IdCaptureSide side) async {
+  Future<void> _startIdCaptureFlow() async {
     final result = await Navigator.of(context).push<IdCaptureResult>(
-      MaterialPageRoute(
-        builder: (_) => IdCaptureScreen(side: side),
-      ),
+      MaterialPageRoute(builder: (_) => const IdCaptureScreen()),
     );
     if (!mounted || result == null) return;
 
     setState(() {
-      if (result.side == IdCaptureSide.front) {
-        _idFrontBytes = result.bytes;
-        _frontQuality = null;
-        _checkingFront = true;
-      } else {
-        _idBackBytes = result.bytes;
-        _backQuality = null;
-        _checkingBack = true;
-      }
-    });
-
-    final quality = await _qualityAnalyzer.analyze(
-      result.bytes,
-      requireIdPhoto: result.side == IdCaptureSide.front,
-    );
-    if (!mounted) return;
-    setState(() {
-      if (result.side == IdCaptureSide.front) {
-        _frontQuality = quality;
-        _checkingFront = false;
-      } else {
-        _backQuality = quality;
-        _checkingBack = false;
-      }
+      _idFrontBytes = result.frontBytes;
+      _idBackBytes = result.backBytes;
+      _frontQuality = result.frontQuality;
+      _backQuality = result.backQuality;
     });
   }
 
@@ -1060,7 +1070,6 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     final back = _idBackBytes;
     final liveness = _liveness;
     final pair = IdCapturePair(front: _frontQuality, back: _backQuality);
-
     if (front == null || back == null || !pair.canProceed) {
       showThriftSnackBar(
         context,
@@ -1094,8 +1103,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
     setState(() => _submitting = true);
     try {
-      await SellerVerificationService(context.read<SupabaseService>())
-          .submitApplication(
+      await SellerVerificationService(
+        context.read<SupabaseService>(),
+      ).submitApplication(
         address: address,
         idFrontBytes: front,
         idBackBytes: back,

@@ -18,6 +18,8 @@ const _goodFace = SelfieDetectedFace(
   top: 0.18,
   right: 0.78,
   bottom: 0.82,
+  leftEyeY: 0.38,
+  rightEyeY: 0.38,
 );
 
 const _completedChallenges = {
@@ -52,6 +54,54 @@ List<int> _mix(List<int> a, List<int> b, int aWeight, int bWeight) {
     out[i] = (a[i] * aWeight + b[i] * bWeight) ~/ den;
   }
   return out;
+}
+
+/// Black visor across the full upper face, like the baseball-cap test photos.
+List<int> _cappedSelfie() {
+  final luma = _sharpSelfie();
+  const visorTop = 22;
+  const visorBottom = 82;
+  const left = 36;
+  const right = 124;
+  for (var y = visorTop; y <= visorBottom; y++) {
+    for (var x = left; x <= right; x++) {
+      luma[y * _w + x] = 28;
+    }
+  }
+  return luma;
+}
+
+/// Uniform visor without a sharp row edge — a still cap after downsample.
+List<int> _softCapSelfie() {
+  final luma = _sharpSelfie();
+  for (var y = 20; y <= 82; y++) {
+    for (var x = 36; x <= 124; x++) {
+      luma[y * _w + x] = 102;
+    }
+  }
+  return luma;
+}
+
+/// Dark hair on the crown only. Forehead above the eyes stays skin-like.
+List<int> _hairCrownSelfie() {
+  final luma = _sharpSelfie();
+  for (var y = 22; y <= 50; y++) {
+    for (var x = 36; x <= 124; x++) {
+      luma[y * _w + x] = 28;
+    }
+  }
+  return luma;
+}
+
+/// Dark hair only in the center of the forehead, sides still skin-like.
+List<int> _bangsSelfie() {
+  final luma = _sharpSelfie();
+  for (var y = 36; y <= 70; y++) {
+    for (var x = 62; x <= 98; x++) {
+      luma[y * _w + x] = 30;
+    }
+  }
+  return luma;
 }
 
 SelfieQualityResult _eval(
@@ -311,11 +361,7 @@ void main() {
     });
 
     test('low-resolution capture is treated as too far', () {
-      final result = _eval(
-        _sharpSelfie(),
-        sourceWidth: 120,
-        sourceHeight: 160,
-      );
+      final result = _eval(_sharpSelfie(), sourceWidth: 120, sourceHeight: 160);
       expect(result.passed, isFalse);
       expect(result.issue, SelfieQualityIssue.tooSmall);
     });
@@ -325,6 +371,348 @@ void main() {
       final mild = _mix(sharp, IdImageMetrics.boxBlur(sharp, _w, _h, 1), 3, 1);
       final result = _eval(mild);
       expect(result.passed, isTrue, reason: result.debug);
+    });
+
+    test('looking away on the still image is rejected', () {
+      const turned = SelfieDetectedFace(
+        left: 0.22,
+        top: 0.18,
+        right: 0.78,
+        bottom: 0.82,
+        yaw: 28,
+      );
+      final result = _eval(_sharpSelfie(), faces: const [turned]);
+      expect(result.passed, isFalse);
+      expect(result.issue, SelfieQualityIssue.lookingAway);
+    });
+
+    test('missing pose angles do not fail a well-framed still selfie', () {
+      final result = _eval(_sharpSelfie());
+      expect(result.passed, isTrue, reason: result.debug);
+    });
+
+    test('face too close is rejected', () {
+      const huge = SelfieDetectedFace(
+        left: 0.02,
+        top: 0.02,
+        right: 0.98,
+        bottom: 0.98,
+      );
+      final result = _eval(_sharpSelfie(), faces: const [huge]);
+      expect(result.passed, isFalse);
+      expect(result.issue, SelfieQualityIssue.poorlyFramed);
+    });
+
+    test('overexposed face is rejected', () {
+      final result = _eval(_fill(_w, _h, 252));
+      expect(result.passed, isFalse);
+      expect(result.issue, SelfieQualityIssue.overexposed);
+    });
+
+    test('a dark visor across the forehead is rejected as a cap', () {
+      final result = _eval(_cappedSelfie());
+      expect(result.passed, isFalse, reason: result.debug);
+      expect(result.issue, SelfieQualityIssue.headCovering);
+      expect(result.message, 'Please remove your cap or hat.');
+    });
+
+    test('a uniform visor without a sharp edge is still a cap', () {
+      final result = _eval(_softCapSelfie());
+      expect(result.passed, isFalse, reason: result.debug);
+      expect(result.issue, SelfieQualityIssue.headCovering);
+    });
+
+    test('center-only bangs are not treated as a cap', () {
+      final result = _eval(_bangsSelfie());
+      expect(result.passed, isTrue, reason: result.debug);
+    });
+
+    test('dark hair on the crown is not treated as a cap', () {
+      final result = _eval(_hairCrownSelfie());
+      expect(result.passed, isTrue, reason: result.debug);
+    });
+  });
+
+  group('SelfieImageMetrics.assessLive', () {
+    test('no face asks the user to position inside the frame', () {
+      final live = SelfieImageMetrics.assessLive(faces: const []);
+      expect(live.status, LiveSelfieStatus.noFace);
+      expect(live.feedbackMessage, 'Position your face within the frame');
+      expect(live.isAligned, isFalse);
+    });
+
+    test('multiple people are rejected', () {
+      const left = SelfieDetectedFace(
+        left: 0.06,
+        top: 0.22,
+        right: 0.42,
+        bottom: 0.72,
+      );
+      const right = SelfieDetectedFace(
+        left: 0.56,
+        top: 0.22,
+        right: 0.92,
+        bottom: 0.72,
+      );
+      final live = SelfieImageMetrics.assessLive(faces: const [left, right]);
+      expect(live.status, LiveSelfieStatus.multipleFaces);
+    });
+
+    test('looking left or right is not treated as facing the camera', () {
+      const turned = SelfieDetectedFace(
+        left: 0.22,
+        top: 0.18,
+        right: 0.78,
+        bottom: 0.82,
+        yaw: -26,
+      );
+      final live = SelfieImageMetrics.assessLive(
+        faces: const [turned],
+        luma: _sharpSelfie(),
+        lumaWidth: _w,
+        lumaHeight: _h,
+      );
+      expect(live.status, LiveSelfieStatus.lookingAway);
+      expect(live.feedbackMessage, 'Look directly at the camera');
+    });
+
+    test('looking up or down is not treated as facing the camera', () {
+      const turned = SelfieDetectedFace(
+        left: 0.22,
+        top: 0.18,
+        right: 0.78,
+        bottom: 0.82,
+        pitch: 24,
+      );
+      final live = SelfieImageMetrics.assessLive(faces: const [turned]);
+      expect(live.status, LiveSelfieStatus.lookingAway);
+    });
+
+    test('face too far asks the user to move closer', () {
+      const tiny = SelfieDetectedFace(
+        left: 0.40,
+        top: 0.40,
+        right: 0.62,
+        bottom: 0.58,
+      );
+      final live = SelfieImageMetrics.assessLive(faces: const [tiny]);
+      expect(live.status, LiveSelfieStatus.tooFar);
+    });
+
+    test('face too close asks the user to move back', () {
+      const huge = SelfieDetectedFace(
+        left: 0.02,
+        top: 0.02,
+        right: 0.98,
+        bottom: 0.98,
+      );
+      final live = SelfieImageMetrics.assessLive(faces: const [huge]);
+      expect(live.status, LiveSelfieStatus.tooClose);
+    });
+
+    test('face off-center is not aligned', () {
+      const side = SelfieDetectedFace(
+        left: 0.78,
+        top: 0.18,
+        right: 1.08,
+        bottom: 0.72,
+      );
+      final live = SelfieImageMetrics.assessLive(faces: const [side]);
+      expect(live.status, LiveSelfieStatus.offFrame);
+    });
+
+    test('missing nose and mouth is treated as a mask', () {
+      const hidden = SelfieDetectedFace(
+        left: 0.22,
+        top: 0.18,
+        right: 0.78,
+        bottom: 0.82,
+        looksOccluded: true,
+      );
+      final live = SelfieImageMetrics.assessLive(faces: const [hidden]);
+      expect(live.status, LiveSelfieStatus.occluded);
+      expect(live.feedbackMessage, 'Please remove your mask');
+    });
+
+    test('dark face region is not aligned', () {
+      final live = SelfieImageMetrics.assessLive(
+        faces: const [_goodFace],
+        faceMean: 20,
+      );
+      expect(live.status, LiveSelfieStatus.tooDark);
+    });
+
+    test('blurry face region is not aligned', () {
+      final live = SelfieImageMetrics.assessLive(
+        faces: const [_goodFace],
+        blur: 0.80,
+      );
+      expect(live.status, LiveSelfieStatus.blurry);
+    });
+
+    test('one centered front-facing face can become aligned', () {
+      final live = SelfieImageMetrics.assessLive(
+        faces: const [_goodFace],
+        faceMean: 120,
+        blur: 0.20,
+        luma: _sharpSelfie(),
+        lumaWidth: _w,
+        lumaHeight: _h,
+      );
+      expect(live.status, LiveSelfieStatus.aligned);
+      expect(live.isAligned, isTrue);
+      expect(live.feedbackMessage.contains('cap'), isFalse);
+    });
+
+    test('a dark visor is not aligned', () {
+      final live = SelfieImageMetrics.assessLive(
+        faces: const [_goodFace],
+        faceMean: 120,
+        blur: 0.20,
+        luma: _cappedSelfie(),
+        lumaWidth: _w,
+        lumaHeight: _h,
+      );
+      expect(live.status, LiveSelfieStatus.headCovering);
+      expect(live.feedbackMessage, 'Please remove your cap or hat');
+      expect(live.isAligned, isFalse);
+    });
+
+    test(
+      'a slightly turned head with a visor is covering, not looking away',
+      () {
+        const turned = SelfieDetectedFace(
+          left: 0.22,
+          top: 0.18,
+          right: 0.78,
+          bottom: 0.82,
+          yaw: -20,
+        );
+        final live = SelfieImageMetrics.assessLive(
+          faces: const [turned],
+          faceMean: 120,
+          blur: 0.20,
+          luma: _cappedSelfie(),
+          lumaWidth: _w,
+          lumaHeight: _h,
+        );
+        expect(live.status, LiveSelfieStatus.headCovering);
+      },
+    );
+
+    test('a uniform visor without a sharp edge is not aligned', () {
+      final live = SelfieImageMetrics.assessLive(
+        faces: const [_goodFace],
+        faceMean: 120,
+        blur: 0.20,
+        luma: _softCapSelfie(),
+        lumaWidth: _w,
+        lumaHeight: _h,
+      );
+      expect(live.status, LiveSelfieStatus.headCovering);
+    });
+
+    test('dark hair on the crown can still become aligned', () {
+      final live = SelfieImageMetrics.assessLive(
+        faces: const [_goodFace],
+        faceMean: 120,
+        blur: 0.20,
+        luma: _hairCrownSelfie(),
+        lumaWidth: _w,
+        lumaHeight: _h,
+      );
+      expect(live.status, LiveSelfieStatus.aligned);
+    });
+
+    test('an uncovered frame after a capped frame can become aligned', () {
+      final capped = SelfieImageMetrics.assessLive(
+        faces: const [_goodFace],
+        faceMean: 120,
+        blur: 0.20,
+        luma: _cappedSelfie(),
+        lumaWidth: _w,
+        lumaHeight: _h,
+      );
+      expect(capped.status, LiveSelfieStatus.headCovering);
+
+      final clear = SelfieImageMetrics.assessLive(
+        faces: const [_goodFace],
+        faceMean: 120,
+        blur: 0.20,
+        luma: _sharpSelfie(),
+        lumaWidth: _w,
+        lumaHeight: _h,
+      );
+      expect(clear.status, LiveSelfieStatus.aligned);
+      expect(clear.feedbackMessage.contains('cap'), isFalse);
+    });
+
+    test('dark glasses are not aligned', () {
+      const eyed = SelfieDetectedFace(
+        left: 0.22,
+        top: 0.18,
+        right: 0.78,
+        bottom: 0.82,
+        leftEyeY: 0.40,
+        rightEyeY: 0.40,
+      );
+      final luma = _sharpSelfie();
+      for (var y = 82; y <= 98; y++) {
+        for (var x = 42; x <= 118; x++) {
+          luma[y * _w + x] = 20;
+        }
+      }
+      final live = SelfieImageMetrics.assessLive(
+        faces: const [eyed],
+        faceMean: 120,
+        blur: 0.20,
+        luma: luma,
+        lumaWidth: _w,
+        lumaHeight: _h,
+      );
+      expect(live.status, LiveSelfieStatus.eyeCovering);
+      expect(live.feedbackMessage, 'Please remove your glasses');
+    });
+  });
+
+  group('landmark occlusion', () {
+    test('missing nose and mouth looks occluded', () {
+      expect(
+        SelfieImageMetrics.landmarksLookOccluded(
+          hasAnyLandmark: true,
+          hasLeftEye: true,
+          hasRightEye: false,
+          hasNose: false,
+          hasMouth: false,
+        ),
+        isTrue,
+      );
+    });
+
+    test('eyes nose and mouth present is not treated as a mask', () {
+      expect(
+        SelfieImageMetrics.landmarksLookOccluded(
+          hasAnyLandmark: true,
+          hasLeftEye: true,
+          hasRightEye: true,
+          hasNose: true,
+          hasMouth: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('no landmarks is not guessed as a mask', () {
+      expect(
+        SelfieImageMetrics.landmarksLookOccluded(
+          hasAnyLandmark: false,
+          hasLeftEye: false,
+          hasRightEye: false,
+          hasNose: false,
+          hasMouth: false,
+        ),
+        isFalse,
+      );
     });
   });
 
@@ -412,17 +800,36 @@ void main() {
       expect(result.issue, SelfieQualityIssue.tooDark);
     });
 
-    test('each analyze call uses the new image faces, not a previous pass', () async {
-      final reader = _FakeFaceReader(const [_goodFace]);
+    test('analyzer rejects a still image looking away', () async {
+      final reader = _FakeFaceReader(const [
+        SelfieDetectedFace(
+          left: 0.22,
+          top: 0.18,
+          right: 0.78,
+          bottom: 0.82,
+          yaw: 32,
+        ),
+      ]);
       final analyzer = SelfieImageQualityAnalyzer(faceReader: reader);
-      final first = await analyzer.analyze(await _png(gray: 20));
-      expect(first.passed, isFalse);
-
-      reader.faces = const [];
-      final second = await analyzer.analyze(await _png());
-      expect(second.passed, isFalse);
-      expect(second.issue, SelfieQualityIssue.noFace);
-      expect(reader.calls, 2);
+      final result = await analyzer.analyze(await _png());
+      expect(result.passed, isFalse);
+      expect(result.issue, SelfieQualityIssue.lookingAway);
     });
+
+    test(
+      'each analyze call uses the new image faces, not a previous pass',
+      () async {
+        final reader = _FakeFaceReader(const [_goodFace]);
+        final analyzer = SelfieImageQualityAnalyzer(faceReader: reader);
+        final first = await analyzer.analyze(await _png(gray: 20));
+        expect(first.passed, isFalse);
+
+        reader.faces = const [];
+        final second = await analyzer.analyze(await _png());
+        expect(second.passed, isFalse);
+        expect(second.issue, SelfieQualityIssue.noFace);
+        expect(reader.calls, 2);
+      },
+    );
   });
 }

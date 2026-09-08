@@ -4,8 +4,10 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import '../../../core/services/supabase_service.dart';
+import '../domain/auth_error.dart';
 import '../domain/auth_user.dart';
 import '../domain/legal_documents.dart';
+import '../domain/signup_identity.dart';
 import 'auth_result.dart';
 
 /// Handles all authentication operations against Supabase.
@@ -55,14 +57,25 @@ class AuthService {
         );
       }
 
-      // Supabase returns a placeholder user with no identities when the
-      // address already belongs to a confirmed account. Without this check the
-      // user would be told to expect an email that is never sent.
-      if (response.session == null &&
-          (supabaseUser.identities?.isEmpty ?? false)) {
-        return AuthResult.failure(
-          'This email is already registered. Please log in instead.',
-        );
+      // Confirm-email-on: empty identities + no session means the address is
+      // taken. Confirm-email-off (ThriftLine): GoTrue may instead return a
+      // session that already has a Google identity — that is the same account,
+      // not a new registration. Never treat that as a successful signup.
+      final providers =
+          supabaseUser.identities?.map((i) => i.provider) ?? const <String>[];
+      final outcome = classifySignupIdentities(
+        hasSession: response.session != null,
+        providers: providers,
+      );
+      if (outcome != SignupOutcome.proceed) {
+        if (response.session != null) {
+          try {
+            await _auth.signOut();
+          } catch (e) {
+            debugPrint('AuthService.signUpWithEmail signOut after reject: $e');
+          }
+        }
+        return AuthResult.failure(existingAccountSignupMessage(outcome));
       }
 
       if (response.session == null) {
@@ -81,9 +94,14 @@ class AuthService {
       );
     } on AuthException catch (e) {
       debugPrint('AuthService.signUpWithEmail failed: ${_describe(e)}');
-      return AuthResult.failure(_friendlyAuthError(e));
+      return AuthResult.failure(_friendlySignupAuthError(e));
     } catch (e) {
       debugPrint('AuthService.signUpWithEmail unexpected error: $e');
+      if (e.toString().toLowerCase().contains('already exists')) {
+        return AuthResult.failure(
+          existingAccountSignupMessage(SignupOutcome.alreadyRegistered),
+        );
+      }
       return AuthResult.failure('Something went wrong. Please try again.');
     }
   }
@@ -198,9 +216,12 @@ class AuthService {
       return AuthResult.success(authUser);
     } on AuthException catch (e) {
       debugPrint('AuthService.signInWithGoogle failed: ${_describe(e)}');
-      return AuthResult.failure(_friendlyAuthError(e));
+      return AuthResult.failure(_friendlyGoogleAuthError(e));
     } catch (e) {
       debugPrint('AuthService.signInWithGoogle error: $e');
+      if (e.toString().toLowerCase().contains('already exists')) {
+        return AuthResult.failure(existingEmailPasswordAccountMessage);
+      }
       return AuthResult.failure('Something went wrong. Please try again.');
     }
   }
@@ -461,7 +482,8 @@ class AuthService {
   /// Matches on the stable error code first and falls back to message text for
   /// responses that predate codes.
   String _friendlyAuthError(AuthException e) {
-    switch (e.code) {
+    final parsed = parseGoTrueError(code: e.code, message: e.message);
+    switch (parsed.code) {
       case 'invalid_credentials':
         return 'Invalid email or password. Please try again.';
       case 'email_not_confirmed':
@@ -469,6 +491,7 @@ class AuthService {
             'then sign in again.';
       case 'user_already_exists':
       case 'email_exists':
+      case 'identity_already_exists':
         return 'This email is already registered. Please log in instead.';
       case 'over_email_send_rate_limit':
         return 'Too many emails requested. Please wait a minute and '
@@ -479,7 +502,7 @@ class AuthService {
         return 'Password must be at least 6 characters.';
     }
 
-    final msg = e.message.toLowerCase();
+    final msg = parsed.message.toLowerCase();
 
     // Supabase reports a failing SMTP configuration as a generic 500, so it
     // has to be recognised by message text. Without this it is
@@ -499,7 +522,8 @@ class AuthService {
           'then sign in again.';
     }
     if (msg.contains('user already registered') ||
-        msg.contains('already been registered')) {
+        msg.contains('already been registered') ||
+        msg.contains('already exists')) {
       return 'This email is already registered. Please log in instead.';
     }
     if (msg.contains('rate limit') || msg.contains('too many requests')) {
@@ -510,5 +534,27 @@ class AuthService {
     }
 
     return 'Something went wrong. Please try again.';
+  }
+
+  String _friendlySignupAuthError(AuthException e) {
+    if (_isExistingAccountConflict(e)) {
+      return existingAccountSignupMessage(SignupOutcome.alreadyRegistered);
+    }
+    return _friendlyAuthError(e);
+  }
+
+  String _friendlyGoogleAuthError(AuthException e) {
+    if (_isExistingAccountConflict(e)) {
+      return existingEmailPasswordAccountMessage;
+    }
+    return _friendlyAuthError(e);
+  }
+
+  /// GoTrue / trigger failures that mean this email already has an account.
+  /// Does not look up public.users — only Auth error codes and messages.
+  bool _isExistingAccountConflict(AuthException e) {
+    return isExistingAccountAuthError(
+      parseGoTrueError(code: e.code, message: e.message),
+    );
   }
 }

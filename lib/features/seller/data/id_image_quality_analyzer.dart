@@ -1,20 +1,17 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
+
 import '../domain/id_image_quality.dart';
+import 'id_bitmap_luma.dart';
 import 'id_document_evidence_reader.dart';
 
 /// Decodes a captured ID photo and runs document-presence + quality checks.
 class IdImageQualityAnalyzer {
   IdImageQualityAnalyzer({IdDocumentEvidenceReader? evidenceReader})
-      : _evidenceReader = evidenceReader ?? IdDocumentEvidenceReader();
+    : _evidenceReader = evidenceReader ?? IdDocumentEvidenceReader();
 
   final IdDocumentEvidenceReader _evidenceReader;
-
-  /// Decode short-side target. Large enough to keep text-scale blur, small
-  /// enough to stay off the UI thread budget. Must NOT nearest-neighbor
-  /// downsample a 1080p JPEG down to ~160px — that was hiding motion blur.
-  static const int decodeTargetWidth = 720;
 
   Future<IdQualityResult> analyze(
     Uint8List? bytes, {
@@ -24,14 +21,23 @@ class IdImageQualityAnalyzer {
       return IdQualityResult.fail(IdQualityIssue.missing);
     }
 
+    final sampled = await IdBitmapLuma.decode(
+      bytes,
+      maxWidth: IdBitmapLuma.analyzeMaxWidth,
+    );
+    if (sampled == null) {
+      return IdQualityResult.fail(IdQualityIssue.notId);
+    }
+
     try {
-      final sampled = await _decodeLuma(bytes);
-      if (sampled == null) {
-        return IdQualityResult.fail(IdQualityIssue.missing);
+      if (sampled.nativeWidth < IdImageMetrics.minShortSide ||
+          sampled.nativeHeight < IdImageMetrics.minShortSide) {
+        return IdQualityResult.fail(IdQualityIssue.tooSmall);
       }
 
       var evidence = const DocumentEvidence.unknown();
-      final window = IdImageMetrics.centerCardWindow(
+      final window = IdImageMetrics.documentWindow(
+        sampled.luma,
         sampled.width,
         sampled.height,
       );
@@ -42,70 +48,63 @@ class IdImageQualityAnalyzer {
         window,
       );
       final mean = _mean(crop.luma);
-      if (mean >= IdImageMetrics.minBrightness &&
-          sampled.overlayPng.isNotEmpty) {
-        // Run ML Kit on the overlay crop encoded from the same decoded bitmap
-        // used for geometry. Mapping overlay fractions onto the raw JPEG is
-        // wrong when EXIF rotation differs, and was zeroing OCR on real IDs.
-        evidence = await _evidenceReader.inspect(
-          sampled.overlayPng,
-          overlay: OverlayNormRect.full,
-        );
+      if (mean >= IdImageMetrics.minBrightness) {
+        try {
+          final overlayBytes = await _overlayBytes(bytes, sampled, window);
+          if (overlayBytes.isNotEmpty) {
+            evidence = await _evidenceReader.inspect(
+              overlayBytes,
+              overlay: OverlayNormRect.full,
+            );
+          }
+        } catch (_) {
+          evidence = const DocumentEvidence.unknown();
+        }
       }
 
-      return IdImageMetrics.evaluate(
+      final quality = IdImageMetrics.evaluate(
         luma: sampled.luma,
         width: sampled.width,
         height: sampled.height,
-        sourceWidth: sampled.sourceWidth,
-        sourceHeight: sampled.sourceHeight,
+        sourceWidth: sampled.nativeWidth,
+        sourceHeight: sampled.nativeHeight,
         evidence: evidence,
         requireIdPhoto: requireIdPhoto,
       );
+      if (kDebugMode) {
+        debugPrint(
+          'ID_CAPTURE jpeg id=${quality.passed ? 'yes' : 'no'} '
+          'issue=${quality.issue?.name ?? 'none'} '
+          'ocrOn=${evidence.available} '
+          'ocrChars=${evidence.alphanumericChars} '
+          'face=${evidence.faceCoverage.toStringAsFixed(2)} '
+          'debug=${quality.debug ?? ''}',
+        );
+      }
+      return quality;
     } catch (_) {
-      return IdQualityResult.fail(IdQualityIssue.missing);
+      return IdQualityResult.fail(IdQualityIssue.notId);
+    } finally {
+      sampled.image.dispose();
     }
   }
 
-  Future<_SampledLuma?> _decodeLuma(Uint8List bytes) async {
-    final codec = await ui.instantiateImageCodec(
-      bytes,
-      targetWidth: decodeTargetWidth,
-    );
-    final frame = await codec.getNextFrame();
-    final image = frame.image;
-    final width = image.width;
-    final height = image.height;
-    try {
-      final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-      if (data == null) return null;
-
-      final rgba = data.buffer.asUint8List();
-      final luma = List<int>.filled(width * height, 0);
-      for (var i = 0; i < width * height; i++) {
-        final o = i * 4;
-        luma[i] =
-            ((0.299 * rgba[o]) + (0.587 * rgba[o + 1]) + (0.114 * rgba[o + 2]))
-                .round();
-      }
-
-      final window = IdImageMetrics.centerCardWindow(width, height);
-      final overlayPng = await _overlayPng(image, window) ?? Uint8List(0);
-
-      return _SampledLuma(
-        luma: luma,
-        width: width,
-        height: height,
-        sourceWidth: width,
-        sourceHeight: height,
-        overlayPng: overlayPng,
-      );
-    } finally {
-      image.dispose();
+  Future<Uint8List> _overlayBytes(
+    Uint8List original,
+    DecodedIdBitmap sampled,
+    IdCardWindow window,
+  ) async {
+    if (window.x0 == 0 &&
+        window.y0 == 0 &&
+        window.width == sampled.width &&
+        window.height == sampled.height) {
+      return original;
     }
+    return await _overlayPng(sampled.image, window) ?? Uint8List(0);
   }
 
   Future<Uint8List?> _overlayPng(ui.Image image, IdCardWindow window) async {
+    if (window.width < 8 || window.height < 8) return null;
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(recorder);
     canvas.drawImageRect(
@@ -116,12 +115,7 @@ class IdImageQualityAnalyzer {
         window.width.toDouble(),
         window.height.toDouble(),
       ),
-      ui.Rect.fromLTWH(
-        0,
-        0,
-        window.width.toDouble(),
-        window.height.toDouble(),
-      ),
+      ui.Rect.fromLTWH(0, 0, window.width.toDouble(), window.height.toDouble()),
       ui.Paint(),
     );
     final picture = recorder.endRecording();
@@ -129,7 +123,10 @@ class IdImageQualityAnalyzer {
     picture.dispose();
     final png = await cropped.toByteData(format: ui.ImageByteFormat.png);
     cropped.dispose();
-    return png?.buffer.asUint8List();
+    if (png == null) return null;
+    return Uint8List.fromList(
+      png.buffer.asUint8List(png.offsetInBytes, png.lengthInBytes),
+    );
   }
 
   double _mean(List<int> luma) {
@@ -140,22 +137,4 @@ class IdImageQualityAnalyzer {
     }
     return sum / luma.length;
   }
-}
-
-class _SampledLuma {
-  const _SampledLuma({
-    required this.luma,
-    required this.width,
-    required this.height,
-    required this.sourceWidth,
-    required this.sourceHeight,
-    required this.overlayPng,
-  });
-
-  final List<int> luma;
-  final int width;
-  final int height;
-  final int sourceWidth;
-  final int sourceHeight;
-  final Uint8List overlayPng;
 }

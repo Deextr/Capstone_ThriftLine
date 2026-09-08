@@ -1,4 +1,4 @@
-  import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/services/supabase_service.dart';
@@ -14,8 +14,8 @@ class BuyerBidsController extends ChangeNotifier {
   BuyerBidsController({
     required SupabaseService supabase,
     required AuthProvider auth,
-  })  : _supabase = supabase,
-        _auth = auth {
+  }) : _supabase = supabase,
+       _auth = auth {
     _init();
   }
 
@@ -32,10 +32,12 @@ class BuyerBidsController extends ChangeNotifier {
 
   /// Active bids (winning or currently outbid while the auction is ongoing)
   List<UserBid> get activeBids => _allBids
-      .where((b) =>
-          b.status == BidStatus.winning ||
-          b.status == BidStatus.outbid ||
-          b.status == BidStatus.active)
+      .where(
+        (b) =>
+            b.status == BidStatus.winning ||
+            b.status == BidStatus.outbid ||
+            b.status == BidStatus.active,
+      )
       .toList();
 
   /// Won bids (auction ended and current user is winner)
@@ -172,10 +174,7 @@ class BuyerBidsController extends ChangeNotifier {
     try {
       final rpcRes = await _supabase.client.rpc(
         'place_bid',
-        params: {
-          'p_auction_id': auctionId,
-          'p_amount': amount,
-        },
+        params: {'p_auction_id': auctionId, 'p_amount': amount},
       );
 
       if (rpcRes is Map && rpcRes['success'] == true) {
@@ -203,10 +202,10 @@ class BuyerBidsController extends ChangeNotifier {
             .eq('auction_id', auctionId)
             .neq('bidder_id', userId);
 
-        await _supabase.client.from('auctions').update({
-          'current_price': amount,
-          'winner_id': userId,
-        }).eq('auction_id', auctionId);
+        await _supabase.client
+            .from('auctions')
+            .update({'current_price': amount, 'winner_id': userId})
+            .eq('auction_id', auctionId);
       } catch (_) {}
 
       await loadBids();

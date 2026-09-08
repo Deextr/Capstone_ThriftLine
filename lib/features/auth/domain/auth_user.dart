@@ -48,6 +48,10 @@ class AuthUser {
   bool get isSeller => role == UserRole.seller;
   bool get isAdmin => role == UserRole.admin;
 
+  /// Approved to use the seller workspace. The database role stays `seller`
+  /// after admin approval; switching accounts never writes a second user row.
+  bool get hasSellerAccess => isVerified || role == UserRole.seller;
+
   String get trustClassification {
     if (trustScore >= 90) return 'Highly Trusted Seller';
     if (trustScore >= 75) return 'Trusted Seller';
@@ -77,7 +81,8 @@ class AuthUser {
   }) {
     final meta = supabaseUser.userMetadata ?? {};
     final status = verification?['verification_status'] as String? ?? 'none';
-    final shopName = sellerProfile?['shop_name'] as String? ??
+    final shopName =
+        sellerProfile?['shop_name'] as String? ??
         verification?['shop_name'] as String?;
     final approved = sellerProfile?['is_approved'] as bool? ?? false;
 
@@ -90,7 +95,8 @@ class AuthUser {
           meta['name'] as String? ??
           '',
       email: profile?['email'] as String? ?? supabaseUser.email ?? '',
-      phone: profile?['phone_number'] as String? ?? profile?['phone'] as String?,
+      phone:
+          profile?['phone_number'] as String? ?? profile?['phone'] as String?,
       role: UserRole.fromString(profile?['role'] as String? ?? 'buyer'),
       avatarUrl:
           profile?['avatar_url'] as String? ??
@@ -101,7 +107,8 @@ class AuthUser {
           meta['picture'] as String? ??
           meta['avatar'] as String? ??
           '',
-      location: profile?['location'] as String? ??
+      location:
+          profile?['location'] as String? ??
           [
             verification?['barangay'],
             verification?['city'] ?? sellerProfile?['city'],

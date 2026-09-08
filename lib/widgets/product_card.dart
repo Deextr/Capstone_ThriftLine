@@ -6,7 +6,7 @@ import '../core/constants/app_colors.dart';
 import '../core/constants/app_typography.dart';
 import '../core/utils/formatters.dart';
 import '../models/product_model.dart';
-import '../providers/data_provider.dart';
+import '../providers/saved_items_provider.dart';
 import 'countdown_timer.dart';
 import 'thrift_widgets.dart';
 
@@ -66,8 +66,8 @@ class _ProductCardState extends State<ProductCard>
   // ---------------------------------------------------------------------------
 
   Widget _buildGrid(BuildContext context) {
-    final data = context.watch<DataProvider>();
-    final saved = data.isSaved(widget.product.id);
+    final savedItems = context.watch<SavedItemsProvider>();
+    final saved = savedItems.isSaved(widget.product.id);
     final hasBid = widget.product.hasActiveBid;
 
     return AnimatedScale(
@@ -146,7 +146,10 @@ class _ProductCardState extends State<ProductCard>
                           controller: _heartController,
                           onTap: () {
                             _heartController.forward(from: 0);
-                            data.toggleSave(widget.product.id);
+                            savedItems.toggleSave(
+                              widget.product.id,
+                              widget.product,
+                            );
                           },
                         ),
                       ),
@@ -326,9 +329,7 @@ class _ProductCardState extends State<ProductCard>
                 offset: const Offset(0, 2),
               ),
             ],
-            border: Border.all(
-              color: AppColors.border.withValues(alpha: 0.5),
-            ),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
           ),
           padding: const EdgeInsets.all(12),
           child: Row(

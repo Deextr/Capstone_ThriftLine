@@ -40,6 +40,7 @@ class MlKitSelfieFaceReader implements SelfieFaceReader {
       detector = FaceDetector(
         options: FaceDetectorOptions(
           enableLandmarks: true,
+          enableClassification: true,
           performanceMode: FaceDetectorMode.accurate,
           minFaceSize: 0.05,
         ),
@@ -104,36 +105,48 @@ class MlKitSelfieFaceReader implements SelfieFaceReader {
     Face face, {
     required double imageWidth,
     required double imageHeight,
-  }) {
-    final box = face.boundingBox;
-    return SelfieDetectedFace(
-      left: box.left / imageWidth,
-      top: box.top / imageHeight,
-      right: box.right / imageWidth,
-      bottom: box.bottom / imageHeight,
-      looksOccluded: _looksOccluded(face),
-    );
-  }
+  }) => selfieFaceFromMlKit(
+    face,
+    imageWidth: imageWidth,
+    imageHeight: imageHeight,
+  );
+}
 
-  /// Conservative: only reject when landmarks exist but key features are gone.
-  /// Glasses still produce eye landmarks, so they are not treated as occlusion.
-  bool _looksOccluded(Face face) {
-    final landmarks = face.landmarks;
-    final present = landmarks.values.where((mark) => mark != null).length;
-    if (present == 0) return false;
-
-    final hasLeftEye = landmarks[FaceLandmarkType.leftEye] != null;
-    final hasRightEye = landmarks[FaceLandmarkType.rightEye] != null;
-    final hasNose = landmarks[FaceLandmarkType.noseBase] != null;
-    final hasMouth = landmarks[FaceLandmarkType.bottomMouth] != null ||
-        landmarks[FaceLandmarkType.leftMouth] != null ||
-        landmarks[FaceLandmarkType.rightMouth] != null;
-    final keyCount = [
-      hasLeftEye,
-      hasRightEye,
-      hasNose,
-      hasMouth,
-    ].where((found) => found).length;
-    return keyCount <= 1;
-  }
+/// Maps an ML Kit [Face] into the domain model used by live and still checks.
+SelfieDetectedFace selfieFaceFromMlKit(
+  Face face, {
+  required double imageWidth,
+  required double imageHeight,
+}) {
+  final box = face.boundingBox;
+  final landmarks = face.landmarks;
+  final hasMouth =
+      landmarks[FaceLandmarkType.bottomMouth] != null ||
+      landmarks[FaceLandmarkType.leftMouth] != null ||
+      landmarks[FaceLandmarkType.rightMouth] != null;
+  return SelfieDetectedFace(
+    left: box.left / imageWidth,
+    top: box.top / imageHeight,
+    right: box.right / imageWidth,
+    bottom: box.bottom / imageHeight,
+    looksOccluded: SelfieImageMetrics.landmarksLookOccluded(
+      hasAnyLandmark: landmarks.values.any((mark) => mark != null),
+      hasLeftEye: landmarks[FaceLandmarkType.leftEye] != null,
+      hasRightEye: landmarks[FaceLandmarkType.rightEye] != null,
+      hasNose: landmarks[FaceLandmarkType.noseBase] != null,
+      hasMouth: hasMouth,
+    ),
+    hasLeftEye: landmarks[FaceLandmarkType.leftEye] != null,
+    hasRightEye: landmarks[FaceLandmarkType.rightEye] != null,
+    hasNose: landmarks[FaceLandmarkType.noseBase] != null,
+    hasMouth: hasMouth,
+    leftEyeY: landmarks[FaceLandmarkType.leftEye] == null
+        ? null
+        : landmarks[FaceLandmarkType.leftEye]!.position.y / imageHeight,
+    rightEyeY: landmarks[FaceLandmarkType.rightEye] == null
+        ? null
+        : landmarks[FaceLandmarkType.rightEye]!.position.y / imageHeight,
+    yaw: face.headEulerAngleY,
+    pitch: face.headEulerAngleX,
+  );
 }

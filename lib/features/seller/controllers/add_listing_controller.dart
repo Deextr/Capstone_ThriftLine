@@ -52,18 +52,18 @@ enum ListingFormat { fixedPrice, auction }
 
 /// Maps a [ProductCondition] to its corresponding DB string.
 String conditionToDbString(ProductCondition condition) => switch (condition) {
-      ProductCondition.newWithTags => 'new',
-      ProductCondition.likeNew => 'like_new',
-      ProductCondition.good => 'good',
-      ProductCondition.fair => 'fair',
-      ProductCondition.poor => 'poor',
-    };
+  ProductCondition.newWithTags => 'new',
+  ProductCondition.likeNew => 'like_new',
+  ProductCondition.good => 'good',
+  ProductCondition.fair => 'fair',
+  ProductCondition.poor => 'poor',
+};
 
 /// Maps a [ListingFormat] to its corresponding DB string.
 String formatToDbString(ListingFormat format) => switch (format) {
-      ListingFormat.fixedPrice => 'fixed_price',
-      ListingFormat.auction => 'auction',
-    };
+  ListingFormat.fixedPrice => 'fixed_price',
+  ListingFormat.auction => 'auction',
+};
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Controller
@@ -81,9 +81,9 @@ class AddListingController extends ChangeNotifier {
     required SupabaseService supabase,
     required AuthProvider auth,
     ImagePicker? imagePicker,
-  })  : _supabase = supabase,
-        _auth = auth,
-        _imagePicker = imagePicker ?? ImagePicker() {
+  }) : _supabase = supabase,
+       _auth = auth,
+       _imagePicker = imagePicker ?? ImagePicker() {
     loadCategories();
   }
 
@@ -195,10 +195,12 @@ class AddListingController extends ChangeNotifier {
           .eq('is_active', true)
           .order('category_name');
       categories = (rows as List)
-          .map((r) => CategoryItem(
-                id: r['category_id'] as String,
-                name: r['category_name'] as String,
-              ))
+          .map(
+            (r) => CategoryItem(
+              id: r['category_id'] as String,
+              name: r['category_name'] as String,
+            ),
+          )
           .toList();
     } catch (_) {
       // Non-fatal â€” the picker will just show an empty list
@@ -272,7 +274,8 @@ class AddListingController extends ChangeNotifier {
 
     // 3. Set loading state
     isLoading = true;
-    uploadStatusMessage = 'Preparingâ€¦';
+    uploadStatusMessage = 'Preparing listing';
+    debugPrint('AddListingController: $uploadStatusMessage');
     notifyListeners();
 
     // 4. Generate product ID
@@ -337,7 +340,8 @@ class AddListingController extends ChangeNotifier {
       }
 
       // e. Update status message
-      uploadStatusMessage = 'Saving listingâ€¦';
+      uploadStatusMessage = 'Saving listing';
+      debugPrint('AddListingController: $uploadStatusMessage');
       notifyListeners();
 
       // f. Insert product_images rows
@@ -365,7 +369,11 @@ class AddListingController extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
       if (context.mounted) {
-        showThriftSnackBar(context, 'Failed to post listing: $e', isError: true);
+        showThriftSnackBar(
+          context,
+          'Failed to post listing: $e',
+          isError: true,
+        );
       }
     }
   }
@@ -419,7 +427,9 @@ class AddListingController extends ChangeNotifier {
   /// Satisfies Requirements 2.2, 2.3.
   Future<void> pickImage(int slotIndex) async {
     if (images.length >= 3) return; // max 3 photos
-    final XFile? xfile = await _imagePicker.pickImage(source: ImageSource.gallery);
+    final XFile? xfile = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+    );
     if (xfile == null) return;
 
     final bytes = await xfile.readAsBytes();
@@ -439,7 +449,9 @@ class AddListingController extends ChangeNotifier {
   /// If [slotIndex] is out of range, the image is appended instead.
   /// Satisfies Requirements 2.2, 2.3.
   Future<void> replaceImage(int slotIndex) async {
-    final XFile? xfile = await _imagePicker.pickImage(source: ImageSource.gallery);
+    final XFile? xfile = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+    );
     if (xfile == null) return;
 
     final bytes = await xfile.readAsBytes();
@@ -482,7 +494,8 @@ class AddListingController extends ChangeNotifier {
     if (desc.isEmpty) {
       fieldErrors['description'] = 'Description is required.';
     } else if (desc.length > 150) {
-      fieldErrors['description'] = 'Description must be 150 characters or fewer.';
+      fieldErrors['description'] =
+          'Description must be 150 characters or fewer.';
     }
 
     // Category
@@ -530,14 +543,12 @@ class AddListingController extends ChangeNotifier {
   /// Returns an ordered list of public URLs matching the image list.
   ///
   /// Satisfies Requirements 2.6, 8.3.
-  Future<List<String>> _uploadImages(
-    String sellerId,
-    String productId,
-  ) async {
+  Future<List<String>> _uploadImages(String sellerId, String productId) async {
     final urls = <String>[];
 
     for (var i = 0; i < images.length; i++) {
-      uploadStatusMessage = 'Uploading imagesâ€¦ (${i + 1}/${images.length})';
+      uploadStatusMessage = 'Uploading images (${i + 1}/${images.length})';
+      debugPrint('AddListingController: $uploadStatusMessage');
       notifyListeners();
 
       final path = '$sellerId/$productId/$i.jpg';

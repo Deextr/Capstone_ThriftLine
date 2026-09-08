@@ -51,79 +51,82 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     ThriftBottomSheet.show(
       context,
       title: 'Place a Bid',
-      child: StatefulBuilder(builder: (context, setStateSB) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Current Bid: ${formatCurrency(controller.currentBidAmount)}',
-              style: AppTypography.subheading,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Minimum next bid: ${formatCurrency(minBid)}',
-              style: AppTypography.caption
-                  .copyWith(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                IconButton(
-                  onPressed: () {
-                    final v =
-                        (double.tryParse(_bidController.text) ?? minBid) -
-                            controller.minimumIncrement;
-                    if (v >= minBid) {
-                      setStateSB(
-                          () => _bidController.text = v.toStringAsFixed(0));
-                    }
-                  },
-                  icon: const Icon(Icons.remove_circle_outline),
+      child: StatefulBuilder(
+        builder: (context, setStateSB) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Current Bid: ${formatCurrency(controller.currentBidAmount)}',
+                style: AppTypography.subheading,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Minimum next bid: ${formatCurrency(minBid)}',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
                 ),
-                Expanded(
-                  child: ThriftTextField(
-                    controller: _bidController,
-                    keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      final v =
+                          (double.tryParse(_bidController.text) ?? minBid) -
+                          controller.minimumIncrement;
+                      if (v >= minBid) {
+                        setStateSB(
+                          () => _bidController.text = v.toStringAsFixed(0),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.remove_circle_outline),
                   ),
-                ),
-                IconButton(
-                  onPressed: () {
-                    final v =
-                        (double.tryParse(_bidController.text) ?? minBid) +
-                            controller.minimumIncrement;
-                    setStateSB(
-                        () => _bidController.text = v.toStringAsFixed(0));
-                  },
-                  icon: const Icon(Icons.add_circle_outline),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            ThriftButton(
-              label: 'Confirm Bid',
-              variant: ThriftButtonVariant.primary,
-              onPressed: () async {
-                final cleanText =
-                    _bidController.text.replaceAll(RegExp(r'[^\d.]'), '');
-                final amount = double.tryParse(cleanText) ?? minBid;
-                final error = await controller.placeBid(amount);
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  if (error == null) {
-                    showThriftSnackBar(context, 'Bid placed successfully!');
-                  } else {
-                    showThriftSnackBar(
-                      context,
-                      error,
-                      isError: true,
-                    );
+                  Expanded(
+                    child: ThriftTextField(
+                      controller: _bidController,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      final v =
+                          (double.tryParse(_bidController.text) ?? minBid) +
+                          controller.minimumIncrement;
+                      setStateSB(
+                        () => _bidController.text = v.toStringAsFixed(0),
+                      );
+                    },
+                    icon: const Icon(Icons.add_circle_outline),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              ThriftButton(
+                label: 'Confirm Bid',
+                variant: ThriftButtonVariant.primary,
+                onPressed: () async {
+                  final cleanText = _bidController.text.replaceAll(
+                    RegExp(r'[^\d.]'),
+                    '',
+                  );
+                  final amount = double.tryParse(cleanText) ?? minBid;
+                  final error = await controller.placeBid(amount);
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    if (error == null) {
+                      showThriftSnackBar(context, 'Bid placed successfully!');
+                    } else {
+                      showThriftSnackBar(context, error, isError: true);
+                    }
                   }
-                }
-              },
-            ),
-          ],
-        );
-      }),
+                },
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -160,8 +163,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               _buildAppBarRow(context),
               Expanded(
                 child: _ErrorBody(
-                  message:
-                      controller.errorMessage ?? 'Product not found',
+                  message: controller.errorMessage ?? 'Product not found',
                   onRetry: controller.refresh,
                 ),
               ),
@@ -176,8 +178,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      bottomNavigationBar:
-          _buildBottomBar(context, product, controller, minBid),
+      bottomNavigationBar: _buildBottomBar(
+        context,
+        product,
+        controller,
+        minBid,
+      ),
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: controller.refresh,
@@ -228,8 +234,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const SizedBox(height: 4),
                     Text(
                       product.title,
-                      style: AppTypography.heading
-                          .copyWith(fontSize: 22, color: AppColors.textPrimary),
+                      style: AppTypography.heading.copyWith(
+                        fontSize: 22,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                     const SizedBox(height: 16),
 
@@ -239,7 +247,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         _buildAttributeBox('Size', product.size ?? 'N/A'),
                         const SizedBox(width: 8),
                         _buildAttributeBox(
-                            'Condition', product.condition.label),
+                          'Condition',
+                          product.condition.label,
+                        ),
                         const SizedBox(width: 8),
                         _buildAttributeBox('Color', product.color ?? 'N/A'),
                       ],
@@ -257,8 +267,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       'Description',
                       Text(
                         product.description,
-                        style: AppTypography.body
-                            .copyWith(color: AppColors.textSecondary),
+                        style: AppTypography.body.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
 
@@ -329,8 +340,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         errorWidget: (_, _, _) => Container(
                           color: AppColors.surfaceVariant,
                           child: const Center(
-                            child: Icon(Icons.image_not_supported_outlined,
-                                color: AppColors.textHint, size: 40),
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              color: AppColors.textHint,
+                              size: 40,
+                            ),
                           ),
                         ),
                       ),
@@ -379,11 +393,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     builder: (context, savedItems, _) {
                       final isSaved = savedItems.isSaved(product.id);
                       return _CircularButton(
-                        icon: isSaved
-                            ? Icons.favorite
-                            : Icons.favorite_border,
-                        iconColor:
-                            isSaved ? AppColors.error : AppColors.textPrimary,
+                        icon: isSaved ? Icons.favorite : Icons.favorite_border,
+                        iconColor: isSaved
+                            ? AppColors.error
+                            : AppColors.textPrimary,
                         onTap: () => savedItems.toggleSave(product.id, product),
                       );
                     },
@@ -403,8 +416,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 top: MediaQuery.of(context).padding.top + 64,
                 right: 16,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary,
                     borderRadius: BorderRadius.circular(20),
@@ -412,13 +427,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.access_time,
-                          color: Colors.white, size: 14),
+                      const Icon(
+                        Icons.access_time,
+                        color: Colors.white,
+                        size: 14,
+                      ),
                       const SizedBox(width: 4),
                       CountdownTimer(
                         endTime: controller.auctionEndTime!,
                         style: AppTypography.caption.copyWith(
-                            color: Colors.white, fontWeight: FontWeight.bold),
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -503,8 +523,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             if (isAuction) ...[
               Row(
                 children: [
-                  const Icon(Icons.gavel_rounded,
-                      color: AppColors.primary, size: 16),
+                  const Icon(
+                    Icons.gavel_rounded,
+                    color: AppColors.primary,
+                    size: 16,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     'Current Bid',
@@ -518,14 +541,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               const SizedBox(height: 4),
               Text(
                 formatCurrency(controller.currentBidAmount),
-                style: AppTypography.heading
-                    .copyWith(color: AppColors.primary, fontSize: 28),
+                style: AppTypography.heading.copyWith(
+                  color: AppColors.primary,
+                  fontSize: 28,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
                 '${controller.bidCount} bid${controller.bidCount == 1 ? '' : 's'} placed',
-                style: AppTypography.caption
-                    .copyWith(color: AppColors.textSecondary),
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             ] else ...[
               Text(
@@ -538,14 +564,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               const SizedBox(height: 4),
               Text(
                 formatCurrency(product.price),
-                style: AppTypography.heading
-                    .copyWith(color: AppColors.primary, fontSize: 28),
+                style: AppTypography.heading.copyWith(
+                  color: AppColors.primary,
+                  fontSize: 28,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
                 'Fixed Price',
-                style: AppTypography.caption
-                    .copyWith(color: AppColors.textSecondary),
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ],
@@ -556,8 +585,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             if (isAuction) ...[
               Text(
                 'Starting Price',
-                style: AppTypography.caption
-                    .copyWith(color: AppColors.textSecondary),
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
               Text(
                 formatCurrency(product.price),
@@ -569,8 +599,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ] else ...[
               // Listing type badge
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
               ),
             ],
           ],
@@ -589,14 +621,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
         child: Column(
           children: [
-            Text(label,
-                style: AppTypography.caption
-                    .copyWith(color: AppColors.textSecondary)),
+            Text(
+              label,
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(value,
-                style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary)),
+            Text(
+              value,
+              style: AppTypography.body.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
           ],
         ),
       ),
@@ -616,9 +654,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Seller',
-                style: AppTypography.subheading
-                    .copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              'Seller',
+              style: AppTypography.subheading.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -633,16 +674,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           Flexible(
                             child: Text(
                               product.sellerName,
-                              style: AppTypography.subheading
-                                  .copyWith(fontWeight: FontWeight.w600),
+                              style: AppTypography.subheading.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (product.sellerVerified) ...[
                             const SizedBox(width: 4),
-                            const Icon(Icons.verified,
-                                color: AppColors.primary, size: 16),
+                            const Icon(
+                              Icons.verified,
+                              color: AppColors.primary,
+                              size: 16,
+                            ),
                           ],
                         ],
                       ),
@@ -660,21 +705,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           product.location!.isNotEmpty)
                         Row(
                           children: [
-                            const Icon(Icons.location_on_outlined,
-                                color: AppColors.textSecondary, size: 14),
+                            const Icon(
+                              Icons.location_on_outlined,
+                              color: AppColors.textSecondary,
+                              size: 14,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               product.location!,
                               style: AppTypography.caption.copyWith(
-                                  color: AppColors.textSecondary),
+                                color: AppColors.textSecondary,
+                              ),
                             ),
                           ],
                         ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right,
-                    color: AppColors.primary, size: 22),
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
               ],
             ),
           ],
@@ -698,13 +750,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       details.add(MapEntry('Color', product.color!));
     }
     details.add(MapEntry('Condition', product.condition.label));
-    details.add(MapEntry(
-        'Listed',
-        formatRelativeTime(product.createdAt)));
-    details.add(MapEntry(
-        'Views', product.viewCount.toString()));
-    details.add(MapEntry(
-        'Favorites', product.favoriteCount.toString()));
+    details.add(MapEntry('Listed', formatRelativeTime(product.createdAt)));
+    details.add(MapEntry('Views', product.viewCount.toString()));
+    details.add(MapEntry('Favorites', product.favoriteCount.toString()));
 
     if (details.isEmpty) return const SizedBox.shrink();
 
@@ -712,21 +760,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       'Item Details',
       Column(
         children: details
-            .map((e) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(e.key,
-                          style: AppTypography.body.copyWith(
-                              color: AppColors.textSecondary)),
-                      Text(e.value,
-                          style: AppTypography.body.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary)),
-                    ],
-                  ),
-                ))
+            .map(
+              (e) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      e.key,
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    Text(
+                      e.value,
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
             .toList(),
       ),
     );
@@ -744,9 +800,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: AppTypography.subheading
-                  .copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: AppTypography.subheading.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 12),
           child,
         ],
@@ -774,20 +833,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(username,
-                        style: AppTypography.body
-                            .copyWith(fontWeight: FontWeight.w500)),
+                    Text(
+                      username,
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     Text(
                       formatRelativeTime(createdAt),
-                      style: AppTypography.caption
-                          .copyWith(color: AppColors.textHint),
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textHint,
+                      ),
                     ),
                   ],
                 ),
                 Text(
                   formatCurrency(amount),
                   style: AppTypography.subheading.copyWith(
-                      color: AppColors.primary, fontWeight: FontWeight.bold),
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -805,7 +870,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   ) {
     return Container(
       padding: EdgeInsets.fromLTRB(
-          16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+        16,
+        12,
+        16,
+        MediaQuery.of(context).padding.bottom + 12,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: AppColors.border)),
@@ -833,19 +902,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             flex: 1,
             child: OutlinedButton.icon(
               onPressed: () => context.push(RouteNames.chat),
-              icon: const Icon(Icons.chat_bubble_outline,
-                  color: AppColors.textPrimary, size: 20),
-              label: Text('Chat',
-                  style: AppTypography.body.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                      fontSize: 16)),
+              icon: const Icon(
+                Icons.chat_bubble_outline,
+                color: AppColors.textPrimary,
+                size: 20,
+              ),
+              label: Text(
+                'Chat',
+                style: AppTypography.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                  fontSize: 16,
+                ),
+              ),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 18),
-                side: const BorderSide(
-                    color: AppColors.border, width: 1.5),
+                side: const BorderSide(color: AppColors.border, width: 1.5),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),
@@ -880,7 +955,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),
@@ -896,19 +972,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             flex: 1,
             child: OutlinedButton.icon(
               onPressed: () => context.push(RouteNames.chat),
-              icon: const Icon(Icons.chat_bubble_outline,
-                  color: AppColors.textPrimary, size: 20),
-              label: Text('Chat',
-                  style: AppTypography.body.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                      fontSize: 16)),
+              icon: const Icon(
+                Icons.chat_bubble_outline,
+                color: AppColors.textPrimary,
+                size: 20,
+              ),
+              label: Text(
+                'Chat',
+                style: AppTypography.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                  fontSize: 16,
+                ),
+              ),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 18),
-                side: const BorderSide(
-                    color: AppColors.border, width: 1.5),
+                side: const BorderSide(color: AppColors.border, width: 1.5),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),
@@ -919,8 +1001,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               onPressed: controller.isAuctionActive
                   ? () => _showBidBottomSheet(context, controller, minBid)
                   : null,
-              icon: const Icon(Icons.gavel_rounded,
-                  color: Colors.white, size: 20),
+              icon: const Icon(
+                Icons.gavel_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
               label: Text(
                 controller.isAuctionActive ? 'Place Bid' : 'Auction Ended',
                 style: AppTypography.body.copyWith(
@@ -936,7 +1021,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),
@@ -950,19 +1036,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         Expanded(
           child: OutlinedButton.icon(
             onPressed: () => context.push(RouteNames.chat),
-            icon: const Icon(Icons.chat_bubble_outline,
-                color: AppColors.textPrimary, size: 20),
-            label: Text('Chat',
-                style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                    fontSize: 16)),
+            icon: const Icon(
+              Icons.chat_bubble_outline,
+              color: AppColors.textPrimary,
+              size: 20,
+            ),
+            label: Text(
+              'Chat',
+              style: AppTypography.body.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                fontSize: 16,
+              ),
+            ),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 18),
-              side:
-                  const BorderSide(color: AppColors.border, width: 1.5),
+              side: const BorderSide(color: AppColors.border, width: 1.5),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ),
@@ -974,19 +1066,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               showThriftSnackBar(context, 'Added to cart!');
               context.push(RouteNames.checkout);
             },
-            icon: const Icon(Icons.shopping_bag_outlined,
-                color: Colors.white, size: 20),
-            label: Text('Buy Now',
-                style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                    fontSize: 16)),
+            icon: const Icon(
+              Icons.shopping_bag_outlined,
+              color: Colors.white,
+              size: 20,
+            ),
+            label: Text(
+              'Buy Now',
+              style: AppTypography.body.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                fontSize: 16,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(vertical: 18),
               elevation: 0,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ),
@@ -1000,8 +1099,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _CircularButton extends StatelessWidget {
-  const _CircularButton(
-      {required this.icon, required this.onTap, this.iconColor});
+  const _CircularButton({
+    required this.icon,
+    required this.onTap,
+    this.iconColor,
+  });
   final IconData icon;
   final VoidCallback onTap;
   final Color? iconColor;
@@ -1023,8 +1125,7 @@ class _CircularButton extends StatelessWidget {
             ),
           ],
         ),
-        child:
-            Icon(icon, color: iconColor ?? AppColors.textPrimary, size: 22),
+        child: Icon(icon, color: iconColor ?? AppColors.textPrimary, size: 22),
       ),
     );
   }
@@ -1049,14 +1150,19 @@ class _ErrorBody extends StatelessWidget {
               color: AppColors.error.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.error_outline_rounded,
-                size: 40, color: AppColors.error.withValues(alpha: 0.7)),
+            child: Icon(
+              Icons.error_outline_rounded,
+              size: 40,
+              color: AppColors.error.withValues(alpha: 0.7),
+            ),
           ),
           const SizedBox(height: 20),
           Text(
             message,
             style: AppTypography.subheading.copyWith(
-                fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
@@ -1068,9 +1174,9 @@ class _ErrorBody extends StatelessWidget {
               foregroundColor: AppColors.primary,
               side: const BorderSide(color: AppColors.primary),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(
-                  vertical: 12, horizontal: 24),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
             ),
           ),
         ],

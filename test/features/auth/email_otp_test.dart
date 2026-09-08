@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:thriftline/core/constants/app_constants.dart';
+import 'package:thriftline/core/routes/auth_redirect.dart';
+import 'package:thriftline/core/routes/route_names.dart';
 import 'package:thriftline/core/services/shared_preferences_service.dart';
 import 'package:thriftline/core/services/supabase_service.dart';
 import 'package:thriftline/features/auth/data/auth_result.dart';
@@ -72,6 +74,33 @@ void main() {
       expect(auth.isEmailOtpPending, isFalse);
       expect(auth.isAuthenticated, isFalse);
       expect(auth.isFullyAuthenticated, isFalse);
+    });
+
+    test('rejected signup stays on /signup so the error can be shown', () {
+      expect(
+        unauthenticatedEmailOtpRedirect(
+          location: RouteNames.signup,
+          isAuthenticated: false,
+          emailOtpPending: true,
+        ),
+        isNull,
+      );
+      expect(
+        unauthenticatedEmailOtpRedirect(
+          location: RouteNames.login,
+          isAuthenticated: false,
+          emailOtpPending: true,
+        ),
+        isNull,
+      );
+      expect(
+        unauthenticatedEmailOtpRedirect(
+          location: RouteNames.buyerHome,
+          isAuthenticated: false,
+          emailOtpPending: true,
+        ),
+        RouteNames.login,
+      );
     });
 
     test('restored pending flag matches the SharedPreferences key', () async {

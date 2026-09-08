@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../models/enums.dart';
 import '../../../models/product_model.dart';
 import '../../../providers/auth_provider.dart';
+import '../data/catalog_product_query.dart';
 
 /// Controller for the Product Detail screen.
 ///
@@ -15,9 +18,9 @@ class ProductDetailController extends ChangeNotifier {
     required String productId,
     required SupabaseService supabase,
     required AuthProvider auth,
-  })  : _productId = productId,
-        _supabase = supabase,
-        _auth = auth {
+  }) : _productId = productId,
+       _supabase = supabase,
+       _auth = auth {
     _loadProduct();
   }
 
@@ -53,7 +56,10 @@ class ProductDetailController extends ChangeNotifier {
       final starting = (_auction!['starting_price'] as num?)?.toDouble();
       if (starting != null && starting > 0) return starting;
     }
-    return _product?.currentBid ?? _product?.startingBid ?? _product?.price ?? 0;
+    return _product?.currentBid ??
+        _product?.startingBid ??
+        _product?.price ??
+        0;
   }
 
   /// The minimum increment for the next bid.
@@ -99,31 +105,13 @@ class ProductDetailController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. Fetch the product row with joined seller, images, category
-      final response = await _supabase.client
-          .from('products')
-          .select('''
-            *,
-            seller:user_public_profiles (
-              user_id,
-              username,
-              full_name,
-              avatar,
-              rating_average,
-              trust_score,
-              role
-            ),
-            images:product_images (
-              image_url,
-              is_primary,
-              display_order
-            ),
-            category:categories (
-              category_name
-            )
-          ''')
-          .eq('product_id', _productId)
-          .maybeSingle();
+      final response = await runProductCatalogSelect((select) async {
+        return await _supabase.client
+            .from('products')
+            .select(select)
+            .eq('product_id', _productId)
+            .maybeSingle();
+      });
 
       if (response == null) {
         _errorMessage = 'Product not found';
@@ -132,26 +120,20 @@ class ProductDetailController extends ChangeNotifier {
         return;
       }
 
-      final row = response;
-
-      // 2. Fetch seller_profile for shop name / approval status
+      final row = Map<String, dynamic>.from(response as Map);
       Map<String, dynamic>? sellerProfile;
       final sellerId = row['seller_id'] as String?;
       if (sellerId != null) {
-        try {
-          sellerProfile = await _supabase.client
-              .from('seller_profiles')
-              .select('*, user:user_public_profiles(*)')
-              .eq('seller_id', sellerId)
-              .maybeSingle();
-        } catch (e) {
-          debugPrint('ProductDetailController: seller_profile fetch error ($e)');
-        }
+        sellerProfile = await fetchHydratedSellerProfile(
+          _supabase.client,
+          sellerId,
+        );
       }
 
       _product = ProductModel.fromSupabase(row, sellerProfile: sellerProfile);
 
-      // 3. If this is an auction listing, fetch the auction record and bids
+      unawaited(_incrementView());
+
       if (_product!.sellingType == SellingType.auction) {
         await _loadAuctionData();
       }
@@ -163,6 +145,17 @@ class ProductDetailController extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _incrementView() async {
+    try {
+      await _supabase.client.rpc(
+        'increment_product_view',
+        params: {'p_product_id': _productId},
+      );
+    } catch (e) {
+      debugPrint('ProductDetailController.increment_product_view: $e');
     }
   }
 
@@ -211,18 +204,19 @@ class ProductDetailController extends ChangeNotifier {
               : null,
           bidCount: _bids.length,
           bidHistory: _bids
-              .map((b) => BidEntry(
-                    id: b['bid_id'] as String? ?? '',
-                    username:
-                        (b['bidder'] as Map<String, dynamic>?)?['username']
-                                as String? ??
-                            'Anonymous',
-                    amount:
-                        (b['bid_amount'] as num?)?.toDouble() ?? 0,
-                    createdAt: b['created_at'] != null
-                        ? DateTime.parse(b['created_at'] as String)
-                        : DateTime.now(),
-                  ))
+              .map(
+                (b) => BidEntry(
+                  id: b['bid_id'] as String? ?? '',
+                  username:
+                      (b['bidder'] as Map<String, dynamic>?)?['username']
+                          as String? ??
+                      'Anonymous',
+                  amount: (b['bid_amount'] as num?)?.toDouble() ?? 0,
+                  createdAt: b['created_at'] != null
+                      ? DateTime.parse(b['created_at'] as String)
+                      : DateTime.now(),
+                ),
+              )
               .toList(),
         );
       }
@@ -262,23 +256,27 @@ class ProductDetailController extends ChangeNotifier {
 
         if (existingAuction != null) {
           _auction = existingAuction;
-        } else if (_product != null && _product!.sellingType == SellingType.auction) {
+        } else if (_product != null &&
+            _product!.sellingType == SellingType.auction) {
           // Auto-create active auction row if missing
           final now = DateTime.now().toUtc();
-          final endsAt = _product!.bidEndTime?.toUtc() ??
-              now.add(const Duration(days: 3));
-          final startingPrice =
-              _product!.startingBid ?? _product!.price;
+          final endsAt =
+              _product!.bidEndTime?.toUtc() ?? now.add(const Duration(days: 3));
+          final startingPrice = _product!.startingBid ?? _product!.price;
 
-          final created = await _supabase.client.from('auctions').insert({
-            'product_id': _productId,
-            'starting_price': startingPrice,
-            'minimum_increment': _product!.bidIncrement,
-            'current_price': startingPrice,
-            'starts_at': now.toIso8601String(),
-            'ends_at': endsAt.toIso8601String(),
-            'status': 'active',
-          }).select().maybeSingle();
+          final created = await _supabase.client
+              .from('auctions')
+              .insert({
+                'product_id': _productId,
+                'starting_price': startingPrice,
+                'minimum_increment': _product!.bidIncrement,
+                'current_price': startingPrice,
+                'starts_at': now.toIso8601String(),
+                'ends_at': endsAt.toIso8601String(),
+                'status': 'active',
+              })
+              .select()
+              .maybeSingle();
 
           _auction = created;
         }
@@ -294,7 +292,8 @@ class ProductDetailController extends ChangeNotifier {
     final auctionStatus = _auction!['status'] as String? ?? 'active';
     final rawEndsAt = _auction!['ends_at'] as String?;
     final endsAt = rawEndsAt != null ? DateTime.tryParse(rawEndsAt) : null;
-    if (auctionStatus != 'active' || (endsAt != null && endsAt.isBefore(DateTime.now()))) {
+    if (auctionStatus != 'active' ||
+        (endsAt != null && endsAt.isBefore(DateTime.now()))) {
       return 'This auction has already ended.';
     }
 
@@ -304,10 +303,7 @@ class ProductDetailController extends ChangeNotifier {
     try {
       final rpcRes = await _supabase.client.rpc(
         'place_bid',
-        params: {
-          'p_auction_id': auctionId,
-          'p_amount': amount,
-        },
+        params: {'p_auction_id': auctionId, 'p_amount': amount},
       );
 
       if (rpcRes is Map) {
@@ -340,10 +336,10 @@ class ProductDetailController extends ChangeNotifier {
             .eq('auction_id', auctionId)
             .neq('bidder_id', userId);
 
-        await _supabase.client.from('auctions').update({
-          'current_price': amount,
-          'winner_id': userId,
-        }).eq('auction_id', auctionId);
+        await _supabase.client
+            .from('auctions')
+            .update({'current_price': amount, 'winner_id': userId})
+            .eq('auction_id', auctionId);
       } catch (_) {}
 
       // Reload auction data to refresh the UI
