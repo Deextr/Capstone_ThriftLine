@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -12,7 +13,6 @@ import '../../../../models/bid_model.dart';
 import '../../../../models/enums.dart';
 import '../../../../models/product_model.dart';
 import '../../../../providers/auth_provider.dart';
-import '../../../../providers/data_provider.dart';
 import '../../../../widgets/bid_card.dart';
 import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/thrift_widgets.dart';
@@ -44,7 +44,6 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final data = context.watch<DataProvider>();
     final bidsCtrl = context.watch<BuyerBidsController>();
     final username = auth.username ?? 'You';
 
@@ -115,24 +114,11 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                 _bidList(
                   bidsCtrl.activeBids,
                   bidsCtrl,
-                  data,
                   username,
                   BidTab.active,
                 ),
-                _bidList(
-                  bidsCtrl.wonBids,
-                  bidsCtrl,
-                  data,
-                  username,
-                  BidTab.won,
-                ),
-                _bidList(
-                  bidsCtrl.lostBids,
-                  bidsCtrl,
-                  data,
-                  username,
-                  BidTab.lost,
-                ),
+                _bidList(bidsCtrl.wonBids, bidsCtrl, username, BidTab.won),
+                _bidList(bidsCtrl.lostBids, bidsCtrl, username, BidTab.lost),
               ],
             ),
           ),
@@ -174,7 +160,6 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
   Widget _bidList(
     List<UserBid> bids,
     BuyerBidsController bidsCtrl,
-    DataProvider data,
     String username,
     BidTab tab,
   ) {
@@ -244,7 +229,7 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
         itemCount: bids.length,
         itemBuilder: (_, i) {
           final bid = bids[i];
-          final product = bid.product ?? data.productById(bid.productId);
+          final product = bid.product;
           if (product == null) return const SizedBox();
 
           Widget cardContent;
@@ -325,8 +310,31 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                     ),
                     const SizedBox(height: 12),
                     ThriftButton(
-                      label: 'Proceed to Payment',
-                      onPressed: () => context.push('/buy-now/${product.id}'),
+                      label: 'View order',
+                      onPressed: () async {
+                        final auctionId = bid.auctionId;
+                        if (auctionId == null || auctionId.isEmpty) {
+                          showThriftSnackBar(
+                            context,
+                            'This win has no auction yet. Pull to refresh.',
+                            isError: true,
+                          );
+                          return;
+                        }
+                        final orderId = await bidsCtrl.orderIdForWonAuction(
+                          auctionId,
+                        );
+                        if (!mounted) return;
+                        if (orderId == null) {
+                          showThriftSnackBar(
+                            context,
+                            'Your pending order is not ready yet. Pull to refresh.',
+                            isError: true,
+                          );
+                          return;
+                        }
+                        context.push('/order-confirm/$orderId');
+                      },
                     ),
                   ],
                 ),
@@ -562,10 +570,15 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
   }
 
   void _raiseBid(BuildContext context, ProductModel product, UserBid bid) {
+    final controller = context.read<BuyerBidsController>();
     ThriftBottomSheet.show(
       context,
       title: 'Raise Bid',
-      child: _RaiseBidContent(product: product, bid: bid),
+      child: _RaiseBidContent(
+        product: product,
+        bid: bid,
+        controller: controller,
+      ),
     );
   }
 }
@@ -573,8 +586,13 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
 class _RaiseBidContent extends StatefulWidget {
   final ProductModel product;
   final UserBid bid;
+  final BuyerBidsController controller;
 
-  const _RaiseBidContent({required this.product, required this.bid});
+  const _RaiseBidContent({
+    required this.product,
+    required this.bid,
+    required this.controller,
+  });
 
   @override
   State<_RaiseBidContent> createState() => _RaiseBidContentState();
@@ -583,40 +601,152 @@ class _RaiseBidContent extends StatefulWidget {
 class _RaiseBidContentState extends State<_RaiseBidContent> {
   late double minBid;
   late double selectedBid;
+  late double currentHighest;
   final TextEditingController _customAmountController = TextEditingController();
+  final FocusNode _amountFocus = FocusNode();
   bool _submitting = false;
+  bool _loadingQuote = true;
+  bool _auctionEnded = false;
+  String? _quoteWarning;
+  String? _submitError;
 
   @override
   void initState() {
     super.initState();
-    final highest = widget.product.currentBid ?? widget.bid.amount;
-    minBid = highest + widget.product.bidIncrement;
+    currentHighest =
+        widget.bid.auctionCurrentPrice ??
+        widget.product.currentBid ??
+        widget.bid.amount;
+    final increment =
+        widget.bid.auctionIncrement ?? widget.product.bidIncrement;
+    minBid = currentHighest + increment;
     selectedBid = minBid;
     _customAmountController.text = minBid.toStringAsFixed(0);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _refreshQuote();
+    });
   }
 
   @override
   void dispose() {
+    _amountFocus.dispose();
     _customAmountController.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshQuote() async {
+    final auctionId = widget.bid.auctionId;
+    if (auctionId == null || auctionId.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _loadingQuote = false;
+        _auctionEnded = true;
+        _quoteWarning = 'Auction record not found.';
+      });
+      return;
+    }
+
+    try {
+      final quote = await widget.controller.fetchAuctionQuote(auctionId);
+      if (!mounted) return;
+      if (quote == null) {
+        setState(() {
+          _loadingQuote = false;
+          _quoteWarning =
+              'Showing the last known highest bid. Confirm will re-check the live price.';
+        });
+        return;
+      }
+
+      setState(() {
+        _loadingQuote = false;
+        currentHighest = quote.currentPrice;
+        minBid = quote.minimumNextBid;
+        selectedBid = minBid;
+        _customAmountController.text = minBid.toStringAsFixed(0);
+        _auctionEnded = !quote.isAcceptingBids;
+        _quoteWarning = _auctionEnded
+            ? 'This auction has already ended.'
+            : null;
+      });
+    } catch (e) {
+      debugPrint('Raise bid quote error: $e');
+      if (!mounted) return;
+      setState(() {
+        _loadingQuote = false;
+        _quoteWarning =
+            'Showing the last known highest bid. Confirm will re-check the live price.';
+      });
+    }
   }
 
   void _onQuickAmountTap(double amount) {
     setState(() {
       selectedBid = amount;
       _customAmountController.text = amount.toStringAsFixed(0);
+      _submitError = null;
     });
+  }
+
+  Future<void> _submit(double amount) async {
+    final auctionId = widget.bid.auctionId;
+    if (auctionId == null || auctionId.isEmpty) {
+      setState(() => _submitError = 'Auction record not found.');
+      return;
+    }
+    if (amount < minBid) {
+      setState(
+        () => _submitError = 'Bid must be at least ${formatCurrency(minBid)}.',
+      );
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _submitError = null;
+    });
+
+    try {
+      final error = await widget.controller.raiseBid(
+        auctionId: auctionId,
+        amount: amount,
+      );
+      if (!mounted) return;
+      if (error == null) {
+        _submitting = false;
+        final messenger = ScaffoldMessenger.of(context);
+        Navigator.pop(context);
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Bid placed successfully!'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      setState(() => _submitError = error);
+      await _refreshQuote();
+    } catch (e) {
+      debugPrint('Raise bid submit error: $e');
+      if (mounted) {
+        setState(() => _submitError = 'Failed to place bid. Please try again.');
+      }
+    } finally {
+      if (mounted && _submitting) {
+        setState(() => _submitting = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final currentAmount = double.tryParse(_customAmountController.text) ?? 0.0;
     final isError = currentAmount < minBid;
+    final canSubmit = !isError && !_submitting && !_auctionEnded;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Product context
         Row(
           children: [
             ClipRRect(
@@ -639,14 +769,17 @@ class _RaiseBidContentState extends State<_RaiseBidContent> {
           ],
         ),
         const SizedBox(height: 24),
-
-        // Bid info
+        if (_loadingQuote)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 16),
+            child: LinearProgressIndicator(),
+          ),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('Current highest:', style: AppTypography.body),
             Text(
-              formatCurrency(widget.product.currentBid ?? widget.product.price),
+              formatCurrency(currentHighest),
               style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
             ),
           ],
@@ -664,14 +797,33 @@ class _RaiseBidContentState extends State<_RaiseBidContent> {
             ),
           ],
         ),
+        if (_quoteWarning != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            _quoteWarning!,
+            style: AppTypography.caption.copyWith(
+              color: _auctionEnded ? AppColors.error : AppColors.textSecondary,
+            ),
+          ),
+        ],
+        if (_submitError != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            _submitError!,
+            style: AppTypography.caption.copyWith(color: AppColors.error),
+          ),
+        ],
         const SizedBox(height: 24),
-
-        // Input Amount
         Text('Your Bid Amount', style: AppTypography.label),
         const SizedBox(height: 8),
         TextField(
           controller: _customAmountController,
-          keyboardType: TextInputType.number,
+          focusNode: _amountFocus,
+          enabled: !_submitting && !_auctionEnded,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+          ],
           style: AppTypography.subheading,
           decoration: InputDecoration(
             prefixText: '\u20B1 ',
@@ -701,15 +853,15 @@ class _RaiseBidContentState extends State<_RaiseBidContent> {
                 ? 'Bid must be at least ${formatCurrency(minBid)}'
                 : null,
           ),
+          onTap: () => _amountFocus.requestFocus(),
           onChanged: (val) {
             setState(() {
               selectedBid = double.tryParse(val) ?? 0;
+              _submitError = null;
             });
           },
         ),
         const SizedBox(height: 16),
-
-        // Quick selects
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -720,27 +872,10 @@ class _RaiseBidContentState extends State<_RaiseBidContent> {
           ],
         ),
         const SizedBox(height: 32),
-
         ThriftButton(
-          label: _submitting ? 'Placing Bid...' : 'Confirm Bid',
-          onPressed: isError || _submitting
-              ? null
-              : () async {
-                  setState(() => _submitting = true);
-                  final controller = context.read<BuyerBidsController>();
-                  final ok = await controller.raiseBid(
-                    auctionId: widget.bid.auctionId ?? widget.product.id,
-                    amount: currentAmount,
-                  );
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    showThriftSnackBar(
-                      context,
-                      ok ? 'Bid placed successfully!' : 'Failed to place bid',
-                      isError: !ok,
-                    );
-                  }
-                },
+          label: 'Confirm Bid',
+          isLoading: _submitting,
+          onPressed: canSubmit ? () => _submit(currentAmount) : null,
         ),
         const SizedBox(height: 16),
       ],
@@ -752,7 +887,9 @@ class _RaiseBidContentState extends State<_RaiseBidContent> {
     return ChoiceChip(
       label: Text(formatCurrency(amount)),
       selected: isSelected,
-      onSelected: (_) => _onQuickAmountTap(amount),
+      onSelected: _auctionEnded || _submitting
+          ? null
+          : (_) => _onQuickAmountTap(amount),
       selectedColor: AppColors.primaryLight,
       checkmarkColor: AppColors.primary,
       labelStyle: AppTypography.caption.copyWith(

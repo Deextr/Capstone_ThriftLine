@@ -5,8 +5,12 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../providers/cart_provider.dart';
+import '../../../../widgets/thrift_widgets.dart';
+import '../../controllers/checkout_controller.dart';
+import '../../data/checkout_totals.dart';
 
 class CheckoutScreen extends StatelessWidget {
   const CheckoutScreen({super.key});
@@ -14,7 +18,11 @@ class CheckoutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
-    final items = cart.fixedPriceItems;
+    final checkout = context.watch<CheckoutController>();
+    final buyNowId = checkout.scopedProductId;
+    final items = buyNowId == null || buyNowId.isEmpty
+        ? cart.fixedPriceItems
+        : cart.fixedPriceItems.where((i) => i.product.id == buyNowId).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -43,21 +51,83 @@ class CheckoutScreen extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-      body: items.isEmpty
+      body: checkout.isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            )
+          : items.isEmpty
           ? const _EmptyCartState()
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                return _CartItemCard(
-                  item: items[index],
-                  isLast: index == items.length - 1,
-                );
-              },
+          : Column(
+              children: [
+                _CheckoutAddressCard(checkout: checkout),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      return _CartItemCard(
+                        item: items[index],
+                        isLast: index == items.length - 1,
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
       bottomNavigationBar: items.isEmpty
           ? null
           : _CheckoutBottomBar(items: items),
+    );
+  }
+}
+
+class _CheckoutAddressCard extends StatelessWidget {
+  const _CheckoutAddressCard({required this.checkout});
+
+  final CheckoutController checkout;
+
+  @override
+  Widget build(BuildContext context) {
+    final address = checkout.selectedAddress;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.location_on_outlined, color: AppColors.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Delivery address', style: AppTypography.subheading),
+                  const SizedBox(height: 4),
+                  Text(
+                    address == null
+                        ? 'Add a delivery address to place this order.'
+                        : '${address.recipientName}\n${address.formatted}',
+                    style: AppTypography.caption,
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                await context.push(RouteNames.addresses);
+                if (context.mounted) await checkout.load();
+              },
+              child: Text(address == null ? 'Add' : 'Change'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -312,6 +382,18 @@ class _CartItemCard extends StatelessWidget {
                     ),
                   ],
                   const Spacer(),
+                  if (item.maxPurchasableQuantity > 0) ...[
+                    Text(
+                      item.maxPurchasableQuantity == 1
+                          ? '1 left'
+                          : '${item.maxPurchasableQuantity} left',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   // Quantity stepper
                   Container(
                     decoration: BoxDecoration(
@@ -344,10 +426,12 @@ class _CartItemCard extends StatelessWidget {
                         ),
                         _StepperButton(
                           icon: Icons.add_rounded,
-                          onTap: () => cart.updateQuantity(
-                            product.id,
-                            item.quantity + 1,
-                          ),
+                          onTap: item.canIncreaseQuantity
+                              ? () => cart.updateQuantity(
+                                  product.id,
+                                  item.quantity + 1,
+                                )
+                              : null,
                         ),
                       ],
                     ),
@@ -372,7 +456,18 @@ class _CheckoutBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cart = context.watch<CartProvider>();
+    final checkout = context.watch<CheckoutController>();
+    final subtotal = items.fold<double>(0, (sum, item) => sum + item.subtotal);
+    final shipping = checkoutShippingFee(
+      checkoutSellerCount(items.map((i) => i.product.sellerId)),
+    );
+    final platform = checkoutPlatformFee(subtotal);
+    final total = checkoutTotal(
+      subtotal: subtotal,
+      shippingFee: shipping,
+      platformFee: platform,
+    );
+    final canSubmit = checkout.hasAddress && !checkout.isSubmitting;
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -395,69 +490,106 @@ class _CheckoutBottomBar extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Price breakdown
           _SummaryRow(
             label: 'Subtotal (${items.length} items)',
-            value: formatCurrency(cart.subtotal),
+            value: formatCurrency(subtotal),
           ),
           const SizedBox(height: 4),
-          _SummaryRow(
-            label: 'Shipping',
-            value: formatCurrency(cart.shippingFee),
-          ),
+          _SummaryRow(label: 'Shipping', value: formatCurrency(shipping)),
           const SizedBox(height: 4),
           _SummaryRow(
             label: 'Platform fee (2%)',
-            value: formatCurrency(cart.platformFee),
+            value: formatCurrency(platform),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 10),
             child: Divider(height: 1),
           ),
-          _SummaryRow(
-            label: 'Total',
-            value: formatCurrency(cart.total),
-            bold: true,
+          _SummaryRow(label: 'Total', value: formatCurrency(total), bold: true),
+          const SizedBox(height: 8),
+          Text(
+            'Creates a real order. Payment stays pending until a later step.',
+            style: AppTypography.caption.copyWith(fontSize: 11),
+            textAlign: TextAlign.center,
           ),
+          if (checkout.errorMessage != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              checkout.errorMessage!,
+              style: AppTypography.caption.copyWith(color: AppColors.error),
+              textAlign: TextAlign.center,
+            ),
+          ],
           const SizedBox(height: 14),
-
-          // Checkout button
           SizedBox(
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Checkout is coming soon!'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
+              onPressed: canSubmit
+                  ? () async {
+                      final result = await context
+                          .read<CheckoutController>()
+                          .placeOrder();
+                      if (!context.mounted) return;
+                      if (result.error != null) {
+                        showThriftSnackBar(
+                          context,
+                          result.error!,
+                          isError: true,
+                        );
+                        return;
+                      }
+                      if (result.count > 1) {
+                        showThriftSnackBar(
+                          context,
+                          'Placed ${result.count} orders (one per seller). Payment is pending.',
+                        );
+                        context.go(RouteNames.purchaseHistory);
+                        return;
+                      }
+                      context.go('/order-confirm/${result.orderId}');
+                    }
+                  : checkout.hasAddress
+                  ? null
+                  : () => showThriftSnackBar(
+                      context,
+                      'Add a delivery address before checkout.',
+                      isError: true,
+                    ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.textHint,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
                 shadowColor: AppColors.primary.withValues(alpha: 0.3),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.lock_rounded, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Proceed to Payment',
-                    style: AppTypography.subheading.copyWith(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
+              child: checkout.isSubmitting
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.lock_rounded, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Place order',
+                          style: AppTypography.subheading.copyWith(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
             ),
           ),
         ],

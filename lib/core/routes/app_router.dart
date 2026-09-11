@@ -21,11 +21,14 @@ import '../../features/profile/screens/edit_profile_screen.dart';
 import '../../features/profile/screens/seller_public_profile_screen.dart';
 import '../../features/buyer/presentation/screens/order_confirmation_screen.dart';
 import '../../features/buyer/presentation/screens/order_tracking_screen.dart';
-import '../../features/buyer/presentation/screens/payment_delivery_screen.dart';
 import '../../features/buyer/presentation/screens/payment_proof_screen.dart';
+import '../../features/buyer/controllers/buyer_orders_controller.dart';
+import '../../features/buyer/controllers/checkout_controller.dart';
 import '../../features/buyer/controllers/product_detail_controller.dart';
 import '../../features/buyer/controllers/buyer_search_controller.dart';
 import '../../features/seller/controllers/my_shop_controller.dart';
+import '../../features/seller/controllers/seller_orders_controller.dart';
+import '../../providers/cart_provider.dart';
 import '../../features/buyer/presentation/screens/product_detail_screen.dart';
 import '../../features/buyer/presentation/screens/purchase_history_screen.dart';
 import '../../features/buyer/presentation/screens/saved_items_screen.dart';
@@ -136,11 +139,23 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: RouteNames.buyerHome,
-        builder: (_, _) => const BuyerShellScreen(),
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => BuyerOrdersController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+          ),
+          child: const BuyerShellScreen(),
+        ),
       ),
       GoRoute(
         path: RouteNames.sellerHome,
-        builder: (_, _) => const SellerShellScreen(),
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => SellerOrdersController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+          ),
+          child: const SellerShellScreen(),
+        ),
       ),
       GoRoute(
         path: RouteNames.search,
@@ -171,13 +186,24 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: RouteNames.payment,
-        builder: (_, state) =>
-            PaymentDeliveryScreen(productId: state.pathParameters['id']!),
+        redirect: (_, state) {
+          final id = state.pathParameters['id'];
+          if (id == null || id.isEmpty) return RouteNames.checkout;
+          return '${RouteNames.checkout}?product=$id';
+        },
       ),
       GoRoute(
         path: RouteNames.orderConfirm,
-        builder: (_, state) =>
-            OrderConfirmationScreen(orderId: state.pathParameters['orderId']!),
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => BuyerOrdersController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+            orderId: state.pathParameters['orderId'],
+          ),
+          child: OrderConfirmationScreen(
+            orderId: state.pathParameters['orderId']!,
+          ),
+        ),
       ),
       GoRoute(
         path: RouteNames.paymentProof,
@@ -186,8 +212,14 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: RouteNames.trackOrder,
-        builder: (_, state) =>
-            OrderTrackingScreen(orderId: state.pathParameters['orderId']!),
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => BuyerOrdersController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+            orderId: state.pathParameters['orderId'],
+          ),
+          child: OrderTrackingScreen(orderId: state.pathParameters['orderId']!),
+        ),
       ),
       GoRoute(
         path: RouteNames.addListing,
@@ -212,8 +244,14 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: RouteNames.sellerOrder,
-        builder: (_, state) =>
-            SellerOrderDetailScreen(orderId: state.pathParameters['id']!),
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => SellerOrdersController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+            orderId: state.pathParameters['id'],
+          ),
+          child: SellerOrderDetailScreen(orderId: state.pathParameters['id']!),
+        ),
       ),
       GoRoute(
         path: RouteNames.chat,
@@ -261,7 +299,13 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: RouteNames.purchaseHistory,
-        builder: (_, _) => const PurchaseHistoryScreen(),
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => BuyerOrdersController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+          ),
+          child: const PurchaseHistoryScreen(),
+        ),
       ),
       GoRoute(
         path: RouteNames.savedItems,
@@ -286,7 +330,15 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: RouteNames.checkout,
-        builder: (_, _) => const CheckoutScreen(),
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => CheckoutController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+            cart: context.read<CartProvider>(),
+            buyNowProductId: state.uri.queryParameters['product'],
+          ),
+          child: const CheckoutScreen(),
+        ),
       ),
       GoRoute(
         path: RouteNames.reportSeller,

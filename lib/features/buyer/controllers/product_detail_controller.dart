@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/enums.dart';
 import '../../../models/product_model.dart';
 import '../../../providers/auth_provider.dart';
+import '../../chat/data/conversation_service.dart';
 import '../data/catalog_product_query.dart';
 
 /// Controller for the Product Detail screen.
@@ -18,23 +21,28 @@ class ProductDetailController extends ChangeNotifier {
     required String productId,
     required SupabaseService supabase,
     required AuthProvider auth,
+    ConversationService? conversations,
   }) : _productId = productId,
        _supabase = supabase,
-       _auth = auth {
+       _auth = auth,
+       _conversations = conversations ?? ConversationService(supabase) {
     _loadProduct();
   }
 
   final String _productId;
   final SupabaseService _supabase;
   final AuthProvider _auth;
-
-  // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  final ConversationService _conversations;
 
   ProductModel? _product;
   Map<String, dynamic>? _auction;
   List<Map<String, dynamic>> _bids = [];
   bool _isLoading = true;
   String? _errorMessage;
+  RealtimeChannel? _auctionChannel;
+  Timer? _reloadDebounce;
+  String? _subscribedAuctionId;
+  bool _disposed = false;
 
   ProductModel? get product => _product;
   Map<String, dynamic>? get auction => _auction;
@@ -70,6 +78,9 @@ class ProductDetailController extends ChangeNotifier {
         20;
   }
 
+  /// Minimum amount the next bid must meet.
+  double get minimumNextBid => currentBidAmount + minimumIncrement;
+
   /// Number of bids placed on this auction.
   int get bidCount => _bids.length;
 
@@ -97,7 +108,29 @@ class ProductDetailController extends ChangeNotifier {
     return end.isAfter(DateTime.now());
   }
 
-  // â”€â”€ Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  bool get isViewerLeading {
+    final uid = _auth.user?.id;
+    if (uid == null || !isAuction) return false;
+    final winnerId = _auction?['winner_id'] as String?;
+    if (winnerId == uid) return true;
+    if (_bids.isEmpty) return false;
+    return _bids.first['bidder_id'] == uid;
+  }
+
+  String? get viewerAuctionStatus {
+    if (!isAuction) return null;
+    final uid = _auth.user?.id;
+    if (uid == null) return null;
+    final hasBid = _bids.any((b) => b['bidder_id'] == uid);
+    if (!isAuctionActive) {
+      if (_auction?['winner_id'] == uid) return 'You won this auction';
+      if (hasBid) return 'You did not win this auction';
+      return 'Auction ended';
+    }
+    if (!hasBid) return null;
+    if (isViewerLeading) return "You're leading";
+    return "You've been outbid";
+  }
 
   Future<void> _loadProduct() async {
     _isLoading = true;
@@ -135,7 +168,11 @@ class ProductDetailController extends ChangeNotifier {
       unawaited(_incrementView());
 
       if (_product!.sellingType == SellingType.auction) {
+        await _closeExpiredAuctions();
         await _loadAuctionData();
+        _subscribeAuctionRealtime();
+      } else {
+        await _unsubscribeAuctionRealtime();
       }
 
       _errorMessage = null;
@@ -159,9 +196,16 @@ class ProductDetailController extends ChangeNotifier {
     }
   }
 
+  Future<void> _closeExpiredAuctions() async {
+    try {
+      await _supabase.client.rpc('close_auctions');
+    } catch (e) {
+      debugPrint('ProductDetailController.close_auctions: $e');
+    }
+  }
+
   Future<void> _loadAuctionData() async {
     try {
-      // Get the auction record for this product
       final auctionResponse = await _supabase.client
           .from('auctions')
           .select()
@@ -172,10 +216,9 @@ class ProductDetailController extends ChangeNotifier {
 
       _auction = auctionResponse;
 
-      if (_auction != null) {
+      if (_auction != null && _product != null) {
         final auctionId = _auction!['auction_id'] as String;
 
-        // Get bids for this auction, ordered newest first
         final bidsResponse = await _supabase.client
             .from('bids')
             .select('''
@@ -193,7 +236,6 @@ class ProductDetailController extends ChangeNotifier {
           (bidsResponse as List).map((e) => e as Map<String, dynamic>),
         );
 
-        // Update the product model with auction-specific data
         _product = _product!.copyWith(
           currentBid: (_auction!['current_price'] as num?)?.toDouble(),
           startingBid: (_auction!['starting_price'] as num?)?.toDouble(),
@@ -222,7 +264,67 @@ class ProductDetailController extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('ProductDetailController._loadAuctionData error: $e');
-      // Non-fatal â€” auction data is optional
+    }
+  }
+
+  void _subscribeAuctionRealtime() {
+    final auctionId = _auction?['auction_id'] as String?;
+    if (auctionId == null || auctionId.isEmpty) return;
+    if (_subscribedAuctionId == auctionId && _auctionChannel != null) return;
+
+    unawaited(_unsubscribeAuctionRealtime());
+    _subscribedAuctionId = auctionId;
+
+    try {
+      _auctionChannel = _supabase.client
+          .channel('auction-detail-$auctionId')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'auctions',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'auction_id',
+              value: auctionId,
+            ),
+            callback: (_) => _scheduleAuctionReload(),
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'bids',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'auction_id',
+              value: auctionId,
+            ),
+            callback: (_) => _scheduleAuctionReload(),
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('ProductDetailController realtime error: $e');
+    }
+  }
+
+  void _scheduleAuctionReload() {
+    _reloadDebounce?.cancel();
+    _reloadDebounce = Timer(const Duration(milliseconds: 250), () async {
+      if (_disposed) return;
+      await _loadAuctionData();
+      if (!_disposed) notifyListeners();
+    });
+  }
+
+  Future<void> _unsubscribeAuctionRealtime() async {
+    final channel = _auctionChannel;
+    _auctionChannel = null;
+    _subscribedAuctionId = null;
+    if (channel != null) {
+      try {
+        await _supabase.client.removeChannel(channel);
+      } catch (e) {
+        debugPrint('ProductDetailController unsubscribe error: $e');
+      }
     }
   }
 
@@ -238,12 +340,11 @@ class ProductDetailController extends ChangeNotifier {
       return 'Sellers cannot bid on their own listings.';
     }
 
-    final minBid = currentBidAmount + minimumIncrement;
+    final minBid = minimumNextBid;
     if (amount < minBid) {
       return 'Bid must be at least ₱${minBid.toStringAsFixed(0)}.';
     }
 
-    // Ensure we have an active auction record
     if (_auction == null) {
       try {
         final existingAuction = await _supabase.client
@@ -253,35 +354,9 @@ class ProductDetailController extends ChangeNotifier {
             .order('created_at', ascending: false)
             .limit(1)
             .maybeSingle();
-
-        if (existingAuction != null) {
-          _auction = existingAuction;
-        } else if (_product != null &&
-            _product!.sellingType == SellingType.auction) {
-          // Auto-create active auction row if missing
-          final now = DateTime.now().toUtc();
-          final endsAt =
-              _product!.bidEndTime?.toUtc() ?? now.add(const Duration(days: 3));
-          final startingPrice = _product!.startingBid ?? _product!.price;
-
-          final created = await _supabase.client
-              .from('auctions')
-              .insert({
-                'product_id': _productId,
-                'starting_price': startingPrice,
-                'minimum_increment': _product!.bidIncrement,
-                'current_price': startingPrice,
-                'starts_at': now.toIso8601String(),
-                'ends_at': endsAt.toIso8601String(),
-                'status': 'active',
-              })
-              .select()
-              .maybeSingle();
-
-          _auction = created;
-        }
+        _auction = existingAuction;
       } catch (e) {
-        debugPrint('Failed to resolve or create auction row: $e');
+        debugPrint('Failed to resolve auction row: $e');
       }
     }
 
@@ -289,69 +364,74 @@ class ProductDetailController extends ChangeNotifier {
       return 'Auction record not found for this product.';
     }
 
-    final auctionStatus = _auction!['status'] as String? ?? 'active';
-    final rawEndsAt = _auction!['ends_at'] as String?;
-    final endsAt = rawEndsAt != null ? DateTime.tryParse(rawEndsAt) : null;
-    if (auctionStatus != 'active' ||
-        (endsAt != null && endsAt.isBefore(DateTime.now()))) {
-      return 'This auction has already ended.';
-    }
-
     final auctionId = _auction!['auction_id'] as String;
 
-    // 1. Try atomic place_bid RPC
     try {
       final rpcRes = await _supabase.client.rpc(
         'place_bid',
         params: {'p_auction_id': auctionId, 'p_amount': amount},
       );
 
-      if (rpcRes is Map) {
-        if (rpcRes['success'] == true) {
-          await _loadAuctionData();
-          notifyListeners();
-          return null;
-        } else if (rpcRes['error'] != null) {
-          return rpcRes['error'].toString();
-        }
+      if (supabaseRpcSuccess(rpcRes)) {
+        await _loadAuctionData();
+        _subscribeAuctionRealtime();
+        notifyListeners();
+        return null;
       }
-    } catch (e) {
-      debugPrint('place_bid RPC error or missing: $e');
-    }
-
-    // 2. Fallback: direct insert into bids table
-    try {
-      await _supabase.client.from('bids').insert({
-        'bidder_id': userId,
-        'auction_id': auctionId,
-        'bid_amount': amount,
-        'is_highest_bid': true,
-      });
-
-      // Best effort update
-      try {
-        await _supabase.client
-            .from('bids')
-            .update({'is_highest_bid': false})
-            .eq('auction_id', auctionId)
-            .neq('bidder_id', userId);
-
-        await _supabase.client
-            .from('auctions')
-            .update({'current_price': amount, 'winner_id': userId})
-            .eq('auction_id', auctionId);
-      } catch (_) {}
-
-      // Reload auction data to refresh the UI
-      await _loadAuctionData();
-      notifyListeners();
-      return null;
+      return supabaseRpcError(rpcRes, fallback: 'Failed to place bid.');
     } catch (e) {
       debugPrint('ProductDetailController.placeBid error: $e');
-      return 'Failed to place bid: $e';
+      return 'Failed to place bid. Please try again.';
     }
   }
 
-  /// Pull-to-refresh â€” re-fetches everything from Supabase.
+  /// Opens or creates the product-linked thread with this listing's seller.
+  Future<({String? conversationId, String? error})>
+  openSellerConversation() async {
+    final myId = _auth.user?.id;
+    final product = _product;
+    final sellerId = product?.sellerId;
+    if (myId == null) {
+      return (
+        conversationId: null,
+        error: 'Please sign in to message the seller.',
+      );
+    }
+    if (product == null || sellerId == null || sellerId.isEmpty) {
+      return (conversationId: null, error: 'Unable to start this chat.');
+    }
+    if (myId == sellerId) {
+      return (conversationId: null, error: 'This is your listing.');
+    }
+    try {
+      final id = await _conversations.openOrCreate(
+        myId: myId,
+        otherId: sellerId,
+        productId: product.id,
+      );
+      return (conversationId: id, error: null);
+    } catch (e) {
+      debugPrint('ProductDetailController.openSellerConversation error: $e');
+      return (conversationId: null, error: 'Could not open this conversation.');
+    }
+  }
+
+  /// Pull-to-refresh — re-fetches everything from Supabase.
   Future<void> refresh() => _loadProduct();
+
+  Future<void> reconcileOnResume() async {
+    if (!isAuction) return;
+    await _closeExpiredAuctions();
+    await _loadAuctionData();
+    _subscribeAuctionRealtime();
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _reloadDebounce?.cancel();
+    unawaited(_unsubscribeAuctionRealtime());
+    super.dispose();
+  }
 }

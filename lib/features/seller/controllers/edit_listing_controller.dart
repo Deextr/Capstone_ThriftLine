@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/enums.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../widgets/thrift_widgets.dart';
@@ -13,7 +14,9 @@ import 'add_listing_controller.dart'
         ListingFormat,
         SelectedImage,
         conditionToDbString,
-        formatToDbString;
+        formatToDbString,
+        listingQuantityAvailable,
+        listingStockIsValid;
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Existing image (already on Supabase Storage)
@@ -85,6 +88,7 @@ class EditListingController extends ChangeNotifier {
   final TextEditingController sizeCtrl = TextEditingController();
   final TextEditingController colorCtrl = TextEditingController();
   final TextEditingController locationCtrl = TextEditingController();
+  final TextEditingController stockCtrl = TextEditingController(text: '1');
 
   // â”€â”€ Selection state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   List<CategoryItem> categories = [];
@@ -140,7 +144,8 @@ class EditListingController extends ChangeNotifier {
           .from('products')
           .select(
             'product_id, name, description, price, condition, listing_type, '
-            'brand, size, color, location, category_id, categories(category_name), '
+            'quantity_available, brand, size, color, location, category_id, '
+            'categories(category_name), '
             'product_images(image_id, image_url, is_primary, display_order)',
           )
           .eq('product_id', productId)
@@ -173,6 +178,41 @@ class EditListingController extends ChangeNotifier {
         startBidCtrl.text = price.toString();
       } else {
         priceCtrl.text = price.toString();
+      }
+
+      final qty = (row['quantity_available'] as num?)?.toInt() ?? 1;
+      stockCtrl.text = qty.toString();
+
+      if (selectedFormat == ListingFormat.auction) {
+        try {
+          final auctionRow = await _supabase.client
+              .from('auctions')
+              .select('minimum_increment, duration_days, starts_at, ends_at')
+              .eq('product_id', productId)
+              .maybeSingle();
+          if (auctionRow != null) {
+            bidIncrement =
+                (auctionRow['minimum_increment'] as num?)?.toDouble() ??
+                bidIncrement;
+            final storedDays = (auctionRow['duration_days'] as num?)?.toInt();
+            if (storedDays != null && [1, 3, 5, 7].contains(storedDays)) {
+              auctionDurationDays = storedDays;
+            } else {
+              final startsAt = DateTime.tryParse(
+                auctionRow['starts_at'] as String? ?? '',
+              );
+              final endsAt = DateTime.tryParse(
+                auctionRow['ends_at'] as String? ?? '',
+              );
+              if (startsAt != null && endsAt != null) {
+                final days = endsAt.difference(startsAt).inDays;
+                if ([1, 3, 5, 7].contains(days)) {
+                  auctionDurationDays = days;
+                }
+              }
+            }
+          }
+        } catch (_) {}
       }
 
       // Images â€” sort by display_order
@@ -226,6 +266,11 @@ class EditListingController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void onStockChanged(String _) {
+    fieldErrors.remove('stock');
+    notifyListeners();
+  }
+
   void selectCategory(String categoryId, String categoryName) {
     selectedCategoryId = categoryId;
     selectedCategoryName = categoryName;
@@ -241,6 +286,8 @@ class EditListingController extends ChangeNotifier {
 
   void selectFormat(ListingFormat format) {
     selectedFormat = format;
+    fieldErrors.remove('price');
+    fieldErrors.remove('stock');
     notifyListeners();
   }
 
@@ -343,7 +390,21 @@ class EditListingController extends ChangeNotifier {
         : priceCtrl.text;
     final price = double.tryParse(priceText);
     if (price == null || price <= 0) {
-      fieldErrors['price'] = 'Please enter a valid price.';
+      fieldErrors['price'] = selectedFormat == ListingFormat.auction
+          ? 'Please enter a valid starting price.'
+          : 'Please enter a valid price.';
+    }
+    if (!listingStockIsValid(selectedFormat, stockCtrl.text, min: 0)) {
+      fieldErrors['stock'] = 'Enter how many units you have (0 or more).';
+    }
+    if (selectedFormat == ListingFormat.auction) {
+      if (bidIncrement <= 0) {
+        fieldErrors['increment'] = 'Please choose a valid bid increment.';
+      }
+      if (![1, 3, 5, 7].contains(auctionDurationDays)) {
+        fieldErrors['duration'] =
+            'Auction duration must be 1, 3, 5, or 7 days.';
+      }
     }
 
     notifyListeners();
@@ -379,6 +440,10 @@ class EditListingController extends ChangeNotifier {
             'price': priceValue,
             'condition': conditionToDbString(selectedCondition!),
             'listing_type': formatToDbString(selectedFormat),
+            'quantity_available': listingQuantityAvailable(
+              selectedFormat,
+              stockCtrl.text,
+            ),
             'category_id': selectedCategoryId,
             if (sizeCtrl.text.isNotEmpty)
               'size': sizeCtrl.text
@@ -399,36 +464,24 @@ class EditListingController extends ChangeNotifier {
           })
           .eq('product_id', productId);
 
-      // 1b. If auction format, update or create row in auctions table
+      // 1b. Auction params go through ensure_product_auction (no client writes).
       if (selectedFormat == ListingFormat.auction) {
-        final now = DateTime.now().toUtc();
-        final endsAt = now.add(Duration(days: auctionDurationDays));
-
-        final existingAuction = await _supabase.client
-            .from('auctions')
-            .select('auction_id')
-            .eq('product_id', productId)
-            .maybeSingle();
-
-        if (existingAuction != null) {
-          await _supabase.client
-              .from('auctions')
-              .update({
-                'starting_price': priceValue,
-                'minimum_increment': bidIncrement,
-                'ends_at': endsAt.toIso8601String(),
-              })
-              .eq('auction_id', existingAuction['auction_id']);
-        } else {
-          await _supabase.client.from('auctions').insert({
-            'product_id': productId,
-            'starting_price': priceValue,
-            'minimum_increment': bidIncrement,
-            'current_price': priceValue,
-            'starts_at': now.toIso8601String(),
-            'ends_at': endsAt.toIso8601String(),
-            'status': 'active',
-          });
+        final rpcRes = await _supabase.client.rpc(
+          'ensure_product_auction',
+          params: {
+            'p_product_id': productId,
+            'p_starting_price': priceValue,
+            'p_minimum_increment': bidIncrement,
+            'p_duration_days': auctionDurationDays,
+          },
+        );
+        if (!supabaseRpcSuccess(rpcRes)) {
+          throw Exception(
+            supabaseRpcError(
+              rpcRes,
+              fallback: 'Failed to save the auction record.',
+            ),
+          );
         }
       }
 
@@ -516,6 +569,7 @@ class EditListingController extends ChangeNotifier {
     sizeCtrl.dispose();
     colorCtrl.dispose();
     locationCtrl.dispose();
+    stockCtrl.dispose();
     super.dispose();
   }
 

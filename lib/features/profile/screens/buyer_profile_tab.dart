@@ -10,6 +10,7 @@ import '../../../../models/enums.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/data_provider.dart';
 import '../../../../providers/saved_items_provider.dart';
+import '../../buyer/controllers/buyer_orders_controller.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../presentation/widgets/switch_account_sheet.dart';
 import '../presentation/widgets/switchable_avatar.dart';
@@ -22,10 +23,11 @@ class BuyerProfileTab extends StatelessWidget {
     final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
     final savedItems = context.watch<SavedItemsProvider>();
+    final buyerOrders = context.watch<BuyerOrdersController>();
     final user = auth.user;
     final buyerId = auth.user?.id ?? 'buyer_maya';
     final activeBids = data.bidsForBuyer(buyerId, BidTab.active).length;
-    final purchases = data.ordersForBuyer(buyerId).length;
+    final purchases = buyerOrders.orders.length;
 
     return SafeArea(
       child: ListView(

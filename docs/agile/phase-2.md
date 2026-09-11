@@ -1,6 +1,6 @@
 # Phase 2 — Catalog and Discovery
 
-**Status:** Code complete — apply `20260908010000_phase2_catalog.sql`, then test  
+**Status:** Complete (2026-09-09) — SQL applied, `phase2_verify.sql` all PASS, device checklist signed off  
 **Goal:** Real buyer home, search, product detail, saved items, seller public profile, and My Shop, backed by Supabase. Bidding, chat, cart checkout, and payments stay later phases.
 
 ---

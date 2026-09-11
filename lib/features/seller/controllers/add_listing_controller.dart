@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/routes/route_names.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/enums.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../widgets/thrift_widgets.dart';
@@ -65,6 +66,23 @@ String formatToDbString(ListingFormat format) => switch (format) {
   ListingFormat.auction => 'auction',
 };
 
+/// Auction listings are always 1 unit. Fixed-price uses the seller's stock.
+int listingQuantityAvailable(ListingFormat format, String stockText) {
+  if (format == ListingFormat.auction) return 1;
+  return int.tryParse(stockText.trim()) ?? 0;
+}
+
+/// Auctions skip the stock field. Fixed-price requires an integer in range.
+bool listingStockIsValid(
+  ListingFormat format,
+  String stockText, {
+  int min = 1,
+}) {
+  if (format == ListingFormat.auction) return true;
+  final n = int.tryParse(stockText.trim());
+  return n != null && n >= min && n <= 9999;
+}
+
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Controller
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -109,6 +127,7 @@ class AddListingController extends ChangeNotifier {
   final TextEditingController sizeCtrl = TextEditingController();
   final TextEditingController colorCtrl = TextEditingController();
   final TextEditingController locationCtrl = TextEditingController();
+  final TextEditingController stockCtrl = TextEditingController(text: '1');
 
   // â”€â”€ Selection state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -143,16 +162,18 @@ class AddListingController extends ChangeNotifier {
   /// Whether a post-listing operation is in progress.
   bool isLoading = false;
 
-  /// Human-readable status shown while [isLoading] is true
-  /// (e.g. `"Uploading imagesâ€¦ (2/5)"`, `"Saving listingâ€¦"`).
+  /// Human-readable status shown on the posting overlay while [isLoading]
+  /// is true (e.g. `"Uploading images (2/5)"`, `"Saving listing"`).
   String uploadStatusMessage = '';
+
+  bool _disposed = false;
 
   // â”€â”€ Validation state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Field-level validation errors keyed by field name.
   ///
   /// Keys used: `'images'`, `'name'`, `'description'`, `'category'`,
-  /// `'condition'`, `'price'`.
+  /// `'condition'`, `'price'`, `'stock'`.
   Map<String, String> fieldErrors = {};
 
   // â”€â”€ Field change handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -178,6 +199,12 @@ class AddListingController extends ChangeNotifier {
   /// Clears the `'price'` field error when the user edits the starting bid field.
   void onStartBidChanged(String value) {
     fieldErrors.remove('price');
+    notifyListeners();
+  }
+
+  /// Clears the `'stock'` field error when the user edits available quantity.
+  void onStockChanged(String value) {
+    fieldErrors.remove('stock');
     notifyListeners();
   }
 
@@ -229,6 +256,7 @@ class AddListingController extends ChangeNotifier {
   void selectFormat(ListingFormat format) {
     selectedFormat = format;
     fieldErrors.remove('price');
+    fieldErrors.remove('stock');
     notifyListeners();
   }
 
@@ -259,6 +287,8 @@ class AddListingController extends ChangeNotifier {
   ///
   /// Satisfies Requirements 4.1â€“4.4, 8.1â€“8.4.
   Future<void> postListing(BuildContext context) async {
+    if (isLoading) return;
+
     // 1. Auth guard
     if (_auth.user?.id == null) {
       showThriftSnackBar(
@@ -274,9 +304,8 @@ class AddListingController extends ChangeNotifier {
 
     // 3. Set loading state
     isLoading = true;
-    uploadStatusMessage = 'Preparing listing';
-    debugPrint('AddListingController: $uploadStatusMessage');
-    notifyListeners();
+    uploadStatusMessage = 'Preparing listing…';
+    _safeNotify();
 
     // 4. Generate product ID
     final productId = const Uuid().v4();
@@ -301,6 +330,10 @@ class AddListingController extends ChangeNotifier {
         'condition': _conditionToDb(selectedCondition!),
         'status': 'active',
         'listing_type': _formatToDb(selectedFormat),
+        'quantity_available': listingQuantityAvailable(
+          selectedFormat,
+          stockCtrl.text,
+        ),
         'category_id': categoryId,
         if (sizeCtrl.text.isNotEmpty) 'size': sizeCtrl.text,
         if (brandCtrl.text.isNotEmpty) 'brand': brandCtrl.text,
@@ -309,20 +342,35 @@ class AddListingController extends ChangeNotifier {
         'boosted': false,
       });
 
-      // c2. If auction, also create the auctions row
+      // c2. Auction row must be created in the same listing flow.
+      //     ensure_product_auction is SECURITY DEFINER so clients cannot
+      //     insert auctions directly after Phase 3 RLS.
       if (selectedFormat == ListingFormat.auction) {
-        final now = DateTime.now().toUtc();
-        final endsAt = now.add(Duration(days: auctionDurationDays));
-
-        await _supabase.client.from('auctions').insert({
-          'product_id': productId,
-          'starting_price': priceValue,
-          'minimum_increment': bidIncrement,
-          'current_price': priceValue,
-          'starts_at': now.toIso8601String(),
-          'ends_at': endsAt.toIso8601String(),
-          'status': 'active',
-        });
+        try {
+          final rpcRes = await _supabase.client.rpc(
+            'ensure_product_auction',
+            params: {
+              'p_product_id': productId,
+              'p_starting_price': priceValue,
+              'p_minimum_increment': bidIncrement,
+              'p_duration_days': auctionDurationDays,
+            },
+          );
+          if (!supabaseRpcSuccess(rpcRes)) {
+            throw Exception(
+              supabaseRpcError(
+                rpcRes,
+                fallback: 'Failed to create the auction record.',
+              ),
+            );
+          }
+        } catch (e) {
+          await _supabase.client
+              .from('products')
+              .delete()
+              .eq('product_id', productId);
+          rethrow;
+        }
       }
 
       // d. Upload images (with cleanup on failure)
@@ -331,18 +379,19 @@ class AddListingController extends ChangeNotifier {
         imageUrls = await _uploadImages(sellerId, productId);
       } catch (e) {
         await _cleanupImages(sellerId, productId, images.length);
-        isLoading = false;
-        notifyListeners();
         if (context.mounted) {
-          showThriftSnackBar(context, 'Image upload failed: $e', isError: true);
+          showThriftSnackBar(
+            context,
+            'Image upload failed. Please try again.',
+            isError: true,
+          );
         }
         return;
       }
 
       // e. Update status message
-      uploadStatusMessage = 'Saving listing';
-      debugPrint('AddListingController: $uploadStatusMessage');
-      notifyListeners();
+      uploadStatusMessage = 'Saving listing…';
+      _safeNotify();
 
       // f. Insert product_images rows
       await _supabase.client.from('product_images').insert([
@@ -355,33 +404,38 @@ class AddListingController extends ChangeNotifier {
           },
       ]);
 
-      // g. Clear loading state
-      isLoading = false;
-      notifyListeners();
-
-      // h. Navigate to seller home
-      if (context.mounted) context.go(RouteNames.sellerHome);
-
-      // i. Show success snackbar
-      if (context.mounted) showThriftSnackBar(context, 'Listing published!');
+      uploadStatusMessage = '';
+      if (context.mounted) {
+        context.go(RouteNames.sellerHome);
+        showThriftSnackBar(context, 'Listing published!');
+      }
     } catch (e) {
-      // j. Catch-all error handler
-      isLoading = false;
-      notifyListeners();
+      debugPrint('AddListingController.postListing error: $e');
       if (context.mounted) {
         showThriftSnackBar(
           context,
-          'Failed to post listing: $e',
+          'Failed to post listing. Please try again.',
           isError: true,
         );
       }
+    } finally {
+      if (isLoading) {
+        isLoading = false;
+        uploadStatusMessage = '';
+        _safeNotify();
+      }
     }
+  }
+
+  void _safeNotify() {
+    if (!_disposed) notifyListeners();
   }
 
   // â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   @override
   void dispose() {
+    _disposed = true;
     nameCtrl.dispose();
     descCtrl.dispose();
     priceCtrl.dispose();
@@ -390,6 +444,7 @@ class AddListingController extends ChangeNotifier {
     sizeCtrl.dispose();
     colorCtrl.dispose();
     locationCtrl.dispose();
+    stockCtrl.dispose();
     super.dispose();
   }
 
@@ -508,16 +563,26 @@ class AddListingController extends ChangeNotifier {
       fieldErrors['condition'] = 'Please select a condition.';
     }
 
-    // Price
+    // Price + stock
     if (selectedFormat == ListingFormat.fixedPrice) {
       final price = double.tryParse(priceCtrl.text);
       if (price == null || price <= 0) {
         fieldErrors['price'] = 'Please enter a valid price.';
       }
+      if (!listingStockIsValid(selectedFormat, stockCtrl.text)) {
+        fieldErrors['stock'] = 'Enter how many units you have (1 or more).';
+      }
     } else if (selectedFormat == ListingFormat.auction) {
       final startBid = double.tryParse(startBidCtrl.text);
       if (startBid == null || startBid <= 0) {
-        fieldErrors['price'] = 'Please enter a valid price.';
+        fieldErrors['price'] = 'Please enter a valid starting price.';
+      }
+      if (bidIncrement <= 0) {
+        fieldErrors['increment'] = 'Please choose a valid bid increment.';
+      }
+      if (![1, 3, 5, 7].contains(auctionDurationDays)) {
+        fieldErrors['duration'] =
+            'Auction duration must be 1, 3, 5, or 7 days.';
       }
     }
 
@@ -548,8 +613,7 @@ class AddListingController extends ChangeNotifier {
 
     for (var i = 0; i < images.length; i++) {
       uploadStatusMessage = 'Uploading images (${i + 1}/${images.length})';
-      debugPrint('AddListingController: $uploadStatusMessage');
-      notifyListeners();
+      _safeNotify();
 
       final path = '$sellerId/$productId/$i.jpg';
       await _supabase.client.storage

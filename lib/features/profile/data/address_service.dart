@@ -1,5 +1,6 @@
 import '../../../core/services/supabase_service.dart';
 import '../../../models/address_model.dart';
+import 'buyer_address_validation.dart';
 
 class AddressService {
   AddressService(this._supabase);
@@ -15,7 +16,9 @@ class AddressService {
         .order('is_default', ascending: false)
         .order('created_at', ascending: false);
     return (rows as List)
-        .map((row) => AddressModel.fromJson(Map<String, dynamic>.from(row as Map)))
+        .map(
+          (row) => AddressModel.fromJson(Map<String, dynamic>.from(row as Map)),
+        )
         .toList();
   }
 
@@ -38,21 +41,30 @@ class AddressService {
   }) async {
     final userId = _supabase.currentUser?.id;
     if (userId == null) throw StateError('Sign in first.');
+    final barangayName = barangay.trim();
+    if (barangayName.isEmpty) {
+      throw StateError('Please select a Davao City barangay.');
+    }
     final payload = {
       'user_id': userId,
       'recipient_name': recipientName.trim(),
       'phone_number': phoneNumber.trim(),
       'street_address': streetAddress.trim(),
-      'barangay': barangay.trim(),
-      'city': city.trim().isEmpty ? 'Davao City' : city.trim(),
-      'postal_code': postalCode?.trim().isEmpty == true ? null : postalCode?.trim(),
+      'barangay': barangayName,
+      'city': buyerAddressCity(city),
+      'postal_code': postalCode?.trim().isEmpty == true
+          ? null
+          : postalCode?.trim(),
       'landmark': landmark?.trim().isEmpty == true ? null : landmark?.trim(),
       'is_default': isDefault,
     };
     if (id == null) {
       await _supabase.client.from('addresses').insert(payload);
     } else {
-      await _supabase.client.from('addresses').update(payload).eq('address_id', id);
+      await _supabase.client
+          .from('addresses')
+          .update(payload)
+          .eq('address_id', id);
     }
   }
 

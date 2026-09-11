@@ -13,6 +13,7 @@ class MessageModel {
     this.lookingForPostId,
     this.lookingForTitle,
     this.lookingForImageUrl,
+    this.attachmentPath,
   });
 
   final String id;
@@ -26,6 +27,7 @@ class MessageModel {
   final String? lookingForPostId;
   final String? lookingForTitle;
   final String? lookingForImageUrl;
+  final String? attachmentPath;
 
   bool isSentBy(String userId) => senderId == userId;
 
@@ -45,6 +47,13 @@ class MessageModel {
           row['looking_for_post_id'] as String? ?? post?['post_id'] as String?,
       lookingForTitle: post?['title'] as String?,
       lookingForImageUrl: post?['reference_image_url'] as String?,
+      attachmentPath:
+          (row['attachment_path'] as String?)?.trim().isNotEmpty == true
+          ? row['attachment_path'] as String
+          : (row['message_type'] == 'image' &&
+                    (row['content'] as String?)?.contains('/') == true
+                ? row['content'] as String
+                : null),
     );
   }
 }

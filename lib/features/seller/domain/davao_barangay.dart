@@ -91,9 +91,22 @@ class DavaoBarangay {
     List<DavaoBarangay> loaded,
   ) {
     if (selected == null || !selected.isDavaoCity) return false;
-    return loaded.any(
-      (item) => item.code == selected.code && item.isDavaoCity,
-    );
+    return loaded.any((item) => item.code == selected.code && item.isDavaoCity);
+  }
+
+  /// Matches a saved barangay name against the loaded Davao City list.
+  static DavaoBarangay? findAllowedByName(
+    String name,
+    List<DavaoBarangay> loaded,
+  ) {
+    final key = name.trim().toLowerCase();
+    if (key.isEmpty) return null;
+    for (final item in loaded) {
+      if (item.isDavaoCity && item.name.toLowerCase() == key) {
+        return item;
+      }
+    }
+    return null;
   }
 }
 
@@ -104,15 +117,15 @@ class DavaoBarangayException implements Exception {
   final String? message;
 
   String get userMessage => switch (kind) {
-        DavaoBarangayErrorKind.timeout =>
-          'The barangay list took too long to load. Check your connection and try again.',
-        DavaoBarangayErrorKind.network =>
-          'Could not load Davao City barangays. Check your connection and try again.',
-        DavaoBarangayErrorKind.invalid =>
-          'The barangay list came back in an unexpected format. Please try again.',
-        DavaoBarangayErrorKind.empty =>
-          'No Davao City barangays were returned. Please try again.',
-      };
+    DavaoBarangayErrorKind.timeout =>
+      'The barangay list took too long to load. Check your connection and try again.',
+    DavaoBarangayErrorKind.network =>
+      'Could not load Davao City barangays. Check your connection and try again.',
+    DavaoBarangayErrorKind.invalid =>
+      'The barangay list came back in an unexpected format. Please try again.',
+    DavaoBarangayErrorKind.empty =>
+      'No Davao City barangays were returned. Please try again.',
+  };
 
   @override
   String toString() => message ?? userMessage;

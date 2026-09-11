@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/utils/supabase_rpc.dart';
 import '../../../../models/bid_model.dart';
 import '../../../../models/enums.dart';
 import '../../../../models/product_model.dart';
 import '../../../../providers/auth_provider.dart';
+import '../data/catalog_product_query.dart';
 
 /// Controller for managing the buyer's active, won, and lost auction bids.
 ///
@@ -26,6 +30,8 @@ class BuyerBidsController extends ChangeNotifier {
   String? _error;
   List<UserBid> _allBids = [];
   RealtimeChannel? _bidsSubscription;
+  Timer? _reloadDebounce;
+  bool _disposed = false;
 
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -68,25 +74,88 @@ class BuyerBidsController extends ChangeNotifier {
     _setupRealtimeSubscription();
   }
 
-  /// Fetches all bids placed by the authenticated buyer from Supabase,
-  /// joining corresponding auctions and products.
-  Future<void> loadBids() async {
+  Future<void> _closeExpiredAuctions() async {
+    try {
+      await _supabase.client.rpc('close_auctions');
+    } catch (e) {
+      debugPrint('BuyerBidsController.close_auctions: $e');
+    }
+  }
+
+  /// Fetches this buyer's bids from `v_user_bids` (authoritative status),
+  /// falling back to a nested `bids` select if the view is not applied yet.
+  ///
+  /// [showLoading] is only used for the first load / pull-to-refresh so a
+  /// Realtime or post-bid refresh does not replace the list with a skeleton
+  /// while a Raise Bid sheet is still open.
+  Future<void> loadBids({
+    bool showLoading = true,
+    bool settleExpired = true,
+  }) async {
     final userId = _auth.user?.id;
     if (userId == null) {
       _isLoading = false;
       _allBids = [];
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return;
     }
 
     try {
-      _isLoading = true;
-      _error = null;
-      notifyListeners();
+      final shouldShowLoading = showLoading && _allBids.isEmpty;
+      if (shouldShowLoading) {
+        _isLoading = true;
+        _error = null;
+        notifyListeners();
+      }
 
-      final response = await _supabase.client
-          .from('bids')
-          .select('''
+      if (settleExpired) {
+        await _closeExpiredAuctions();
+      }
+
+      try {
+        _allBids = await _loadFromUserBidsView(userId);
+      } catch (e) {
+        debugPrint('BuyerBidsController v_user_bids fallback: $e');
+        _allBids = await _loadFromNestedBids(userId);
+      }
+
+      _isLoading = false;
+      if (!_disposed) notifyListeners();
+    } catch (e) {
+      debugPrint('BuyerBidsController.loadBids error: $e');
+      _error = 'Failed to load your bids. Please try again.';
+      _isLoading = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<List<UserBid>> _loadFromUserBidsView(String userId) async {
+    final response = await _supabase.client
+        .from('v_user_bids')
+        .select()
+        .eq('bidder_id', userId)
+        .order('created_at', ascending: false);
+
+    final rows = List<Map<String, dynamic>>.from(
+      (response as List).map((e) => e as Map<String, dynamic>),
+    );
+    final products = await _hydrateProducts(
+      rows
+          .map((row) => row['product_id'] as String?)
+          .whereType<String>()
+          .where((id) => id.isNotEmpty),
+    );
+
+    return rows.map((row) {
+      final productId = row['product_id'] as String? ?? '';
+      return UserBid.fromSupabase(row, product: products[productId]);
+    }).toList();
+  }
+
+  Future<List<UserBid>> _loadFromNestedBids(String userId) async {
+    final response = await _supabase.client
+        .from('bids')
+        .select('''
             bid_id,
             auction_id,
             bidder_id,
@@ -126,93 +195,111 @@ class BuyerBidsController extends ChangeNotifier {
               )
             )
           ''')
-          .eq('bidder_id', userId)
-          .order('created_at', ascending: false);
+        .eq('bidder_id', userId)
+        .order('created_at', ascending: false);
 
-      final Map<String, UserBid> auctionBidsMap = {};
+    final Map<String, UserBid> auctionBidsMap = {};
 
-      for (final row in response as List) {
-        final map = row as Map<String, dynamic>;
-        final auctionMap = map['auction'] as Map<String, dynamic>?;
-        if (auctionMap == null) continue;
-        final auctionId = auctionMap['auction_id'] as String? ?? '';
-        if (auctionId.isEmpty) continue;
+    for (final row in response as List) {
+      final map = row as Map<String, dynamic>;
+      final auctionMap = map['auction'] as Map<String, dynamic>?;
+      if (auctionMap == null) continue;
+      final auctionId = auctionMap['auction_id'] as String? ?? '';
+      if (auctionId.isEmpty) continue;
 
-        final parsedBid = UserBid.fromSupabase(map);
-        if (auctionBidsMap.containsKey(auctionId)) {
-          if (parsedBid.amount > auctionBidsMap[auctionId]!.amount) {
-            auctionBidsMap[auctionId] = parsedBid;
-          }
-        } else {
+      final parsedBid = UserBid.fromSupabase(map);
+      if (auctionBidsMap.containsKey(auctionId)) {
+        if (parsedBid.amount > auctionBidsMap[auctionId]!.amount) {
           auctionBidsMap[auctionId] = parsedBid;
         }
+      } else {
+        auctionBidsMap[auctionId] = parsedBid;
       }
+    }
 
-      _allBids = auctionBidsMap.values.toList();
-      _isLoading = false;
-      notifyListeners();
+    return auctionBidsMap.values.toList();
+  }
+
+  Future<Map<String, ProductModel>> _hydrateProducts(
+    Iterable<String> productIds,
+  ) async {
+    final ids = productIds.toSet().toList();
+    if (ids.isEmpty) return {};
+
+    final rows = await runProductCatalogSelect((select) async {
+      return await _supabase.client
+          .from('products')
+          .select(select)
+          .inFilter('product_id', ids);
+    });
+
+    final list = rows as List;
+    final sellerIds = list
+        .map((row) => (row as Map)['seller_id'] as String?)
+        .whereType<String>();
+    final sellerProfiles = await fetchSellerProfilesMap(
+      _supabase.client,
+      extraSellerIds: sellerIds,
+      includeApproved: false,
+    );
+    final products = hydrateCatalogProducts(list, sellerProfiles);
+    return {for (final product in products) product.id: product};
+  }
+
+  /// Latest server price/increment for an auction. Used by Raise Bid so the
+  /// sheet is not validated against a stale My Bids snapshot.
+  Future<AuctionBidQuote?> fetchAuctionQuote(String auctionId) async {
+    if (auctionId.isEmpty) return null;
+    try {
+      final row = await _supabase.client
+          .from('auctions')
+          .select('current_price, minimum_increment, status, ends_at')
+          .eq('auction_id', auctionId)
+          .maybeSingle();
+      if (row == null) return null;
+      return AuctionBidQuote(
+        currentPrice: (row['current_price'] as num?)?.toDouble() ?? 0,
+        minimumIncrement: (row['minimum_increment'] as num?)?.toDouble() ?? 0,
+        status: row['status'] as String? ?? 'active',
+        endsAt: row['ends_at'] != null
+            ? DateTime.tryParse(row['ends_at'] as String)
+            : null,
+      );
     } catch (e) {
-      debugPrint('BuyerBidsController.loadBids error: $e');
-      _error = 'Failed to load your bids. Please try again.';
-      _isLoading = false;
-      notifyListeners();
+      debugPrint('BuyerBidsController.fetchAuctionQuote error: $e');
+      return null;
     }
   }
 
-  /// Places or raises a bid on an auction.
+  /// Places or raises a bid on an auction through `place_bid` only.
   ///
-  /// Uses the atomic `place_bid` RPC function if available, with a resilient
-  /// fallback to direct table insertion.
-  Future<bool> raiseBid({
+  /// Returns `null` on success, or an error message. Does not wait for the
+  /// bids list to reload — that refresh is quiet and happens after return.
+  Future<String?> raiseBid({
     required String auctionId,
     required double amount,
   }) async {
-    final userId = _auth.user?.id;
-    if (userId == null) return false;
+    if (_auth.user?.id == null) {
+      return 'Please sign in to place a bid.';
+    }
+    if (auctionId.isEmpty) {
+      return 'Auction record not found.';
+    }
 
-    // 1. Try atomic place_bid RPC
     try {
       final rpcRes = await _supabase.client.rpc(
         'place_bid',
         params: {'p_auction_id': auctionId, 'p_amount': amount},
       );
 
-      if (rpcRes is Map && rpcRes['success'] == true) {
-        await loadBids();
-        return true;
+      if (supabaseRpcSuccess(rpcRes)) {
+        unawaited(loadBids(showLoading: false, settleExpired: false));
+        return null;
       }
+      return supabaseRpcError(rpcRes, fallback: 'Failed to place bid.');
     } catch (e) {
-      debugPrint('place_bid RPC error or missing: $e');
-    }
-
-    // 2. Fallback: direct insert into bids
-    try {
-      await _supabase.client.from('bids').insert({
-        'auction_id': auctionId,
-        'bidder_id': userId,
-        'bid_amount': amount,
-        'is_highest_bid': true,
-      });
-
-      // Best effort update on other bids & auction
-      try {
-        await _supabase.client
-            .from('bids')
-            .update({'is_highest_bid': false})
-            .eq('auction_id', auctionId)
-            .neq('bidder_id', userId);
-
-        await _supabase.client
-            .from('auctions')
-            .update({'current_price': amount, 'winner_id': userId})
-            .eq('auction_id', auctionId);
-      } catch (_) {}
-
-      await loadBids();
-      return true;
-    } catch (e) {
-      debugPrint('Fallback raiseBid failed: $e');
-      return false;
+      debugPrint('place_bid RPC error: $e');
+      return 'Failed to place bid. Please try again.';
     }
   }
 
@@ -251,8 +338,6 @@ class BuyerBidsController extends ChangeNotifier {
     }
   }
 
-  /// Sets up real-time listener on the `bids` table so any outbid or new bid
-  /// automatically refreshes the buyer's bids list.
   void _setupRealtimeSubscription() {
     try {
       _bidsSubscription = _supabase.client
@@ -261,7 +346,13 @@ class BuyerBidsController extends ChangeNotifier {
             event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'bids',
-            callback: (_) => loadBids(),
+            callback: (_) => _scheduleReload(),
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'auctions',
+            callback: (_) => _scheduleReload(),
           )
           .subscribe();
     } catch (e) {
@@ -269,11 +360,43 @@ class BuyerBidsController extends ChangeNotifier {
     }
   }
 
+  void _scheduleReload() {
+    _reloadDebounce?.cancel();
+    _reloadDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!_disposed) {
+        loadBids(showLoading: false, settleExpired: false);
+      }
+    });
+  }
+
   /// Pull-to-refresh helper.
   Future<void> refresh() => loadBids();
 
+  /// Pending order created by close_auctions / ensure_auction_order.
+  Future<String?> orderIdForWonAuction(String auctionId) async {
+    if (auctionId.isEmpty) return null;
+    try {
+      await _supabase.client.rpc('close_auctions');
+    } catch (e) {
+      debugPrint('orderIdForWonAuction close_auctions: $e');
+    }
+    try {
+      final row = await _supabase.client
+          .from('orders')
+          .select('order_id')
+          .eq('auction_id', auctionId)
+          .maybeSingle();
+      return row?['order_id'] as String?;
+    } catch (e) {
+      debugPrint('orderIdForWonAuction error: $e');
+      return null;
+    }
+  }
+
   @override
   void dispose() {
+    _disposed = true;
+    _reloadDebounce?.cancel();
     _bidsSubscription?.unsubscribe();
     super.dispose();
   }

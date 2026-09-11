@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -23,7 +24,9 @@ class EditListingScreen extends StatelessWidget {
 
     if (c.initialLoading) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
       );
     }
 
@@ -121,8 +124,7 @@ class EditListingScreen extends StatelessWidget {
               ),
               child: ThriftButton(
                 label: 'Save Changes',
-                onPressed:
-                    c.isSaving ? null : () => c.saveChanges(context),
+                onPressed: c.isSaving ? null : () => c.saveChanges(context),
               ),
             ),
           ),
@@ -152,8 +154,9 @@ class EditListingScreen extends StatelessWidget {
                       ),
                       child: Text(
                         c.saveStatusMessage,
-                        style: AppTypography.caption
-                            .copyWith(color: Colors.white),
+                        style: AppTypography.caption.copyWith(
+                          color: Colors.white,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -181,11 +184,15 @@ class _PhotosSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Photos',
-            style: AppTypography.label.copyWith(color: AppColors.textPrimary)),
+        Text(
+          'Photos',
+          style: AppTypography.label.copyWith(color: AppColors.textPrimary),
+        ),
         const SizedBox(height: AppConstants.spacingXs),
-        Text('Up to 3 photos. First is the cover.',
-            style: AppTypography.caption),
+        Text(
+          'Up to 3 photos. First is the cover.',
+          style: AppTypography.caption,
+        ),
         const SizedBox(height: AppConstants.spacingSm),
         SizedBox(
           height: 90,
@@ -239,10 +246,11 @@ class _PhotosSection extends StatelessWidget {
             },
           ),
           ListTile(
-            leading:
-                const Icon(Icons.delete_outline, color: AppColors.error),
-            title: const Text('Remove',
-                style: TextStyle(color: AppColors.error)),
+            leading: const Icon(Icons.delete_outline, color: AppColors.error),
+            title: const Text(
+              'Remove',
+              style: TextStyle(color: AppColors.error),
+            ),
             onTap: () {
               Navigator.pop(context);
               c.removeImage(index);
@@ -293,10 +301,7 @@ class _SlotWidget extends StatelessWidget {
         errorBuilder: (_, __, ___) => _placeholder(),
       );
     } else {
-      img = Image.memory(
-        (slot as NewSlot).image.bytes,
-        fit: BoxFit.cover,
-      );
+      img = Image.memory((slot as NewSlot).image.bytes, fit: BoxFit.cover);
     }
 
     return Stack(
@@ -346,12 +351,11 @@ class _SlotWidget extends StatelessWidget {
   }
 
   Widget _placeholder() => Container(
-        color: AppColors.primaryLight,
-        child: const Center(
-          child:
-              Icon(Icons.image_outlined, color: AppColors.textHint, size: 22),
-        ),
-      );
+    color: AppColors.primaryLight,
+    child: const Center(
+      child: Icon(Icons.image_outlined, color: AppColors.textHint, size: 22),
+    ),
+  );
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -402,16 +406,16 @@ class _CategoryField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Category',
-            style:
-                AppTypography.label.copyWith(color: AppColors.textPrimary)),
+        Text(
+          'Category',
+          style: AppTypography.label.copyWith(color: AppColors.textPrimary),
+        ),
         const SizedBox(height: AppConstants.spacingXs),
         InkWell(
           onTap: () => _showSheet(context),
           borderRadius: BorderRadius.circular(AppConstants.radiusMd),
           child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(AppConstants.radiusMd),
@@ -421,8 +425,11 @@ class _CategoryField extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.category_outlined,
-                    color: AppColors.textHint, size: 20),
+                const Icon(
+                  Icons.category_outlined,
+                  color: AppColors.textHint,
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: c.categoriesLoading
@@ -443,8 +450,10 @@ class _CategoryField extends StatelessWidget {
                           ),
                         ),
                 ),
-                const Icon(Icons.arrow_drop_down,
-                    color: AppColors.textSecondary),
+                const Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textSecondary,
+                ),
               ],
             ),
           ),
@@ -472,8 +481,9 @@ class _CategoryField extends StatelessWidget {
               child: Center(
                 child: Text(
                   'No categories available.',
-                  style: AppTypography.body
-                      .copyWith(color: AppColors.textSecondary),
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
             )
@@ -524,9 +534,10 @@ class _ConditionField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Condition',
-            style:
-                AppTypography.label.copyWith(color: AppColors.textPrimary)),
+        Text(
+          'Condition',
+          style: AppTypography.label.copyWith(color: AppColors.textPrimary),
+        ),
         const SizedBox(height: AppConstants.spacingSm),
         Wrap(
           spacing: 8,
@@ -541,12 +552,10 @@ class _ConditionField extends StatelessWidget {
                 color: isSelected
                     ? AppColors.primaryDark
                     : AppColors.textSecondary,
-                fontWeight:
-                    isSelected ? FontWeight.bold : FontWeight.normal,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
               shape: RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.circular(AppConstants.radiusSm),
+                borderRadius: BorderRadius.circular(AppConstants.radiusSm),
                 side: BorderSide(
                   color: isSelected ? AppColors.primary : AppColors.border,
                 ),
@@ -581,44 +590,57 @@ class _SellingFormatSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Selling Format',
-            style:
-                AppTypography.label.copyWith(color: AppColors.textPrimary)),
+        Text(
+          'Selling Format',
+          style: AppTypography.label.copyWith(color: AppColors.textPrimary),
+        ),
         const SizedBox(height: AppConstants.spacingSm),
         Row(
           children: [
             _FmtCard(
-                label: 'Fixed Price',
-                icon: Icons.tag,
-                format: ListingFormat.fixedPrice,
-                c: c),
+              label: 'Fixed Price',
+              icon: Icons.tag,
+              format: ListingFormat.fixedPrice,
+              c: c,
+            ),
             const SizedBox(width: 8),
             _FmtCard(
-                label: 'Auction',
-                icon: Icons.gavel,
-                format: ListingFormat.auction,
-                c: c),
+              label: 'Auction',
+              icon: Icons.gavel,
+              format: ListingFormat.auction,
+              c: c,
+            ),
           ],
         ),
         const SizedBox(height: AppConstants.spacingMd),
-        if (c.selectedFormat != ListingFormat.auction)
+        if (c.selectedFormat != ListingFormat.auction) ...[
           ThriftTextField(
             label: 'Price (₱)',
             controller: c.priceCtrl,
             onChanged: c.onPriceChanged,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             error: c.fieldErrors['price'],
-          )
-        else ...[
+          ),
+          const SizedBox(height: AppConstants.spacingMd),
+          ThriftTextField(
+            label: 'Stock quantity',
+            hint: 'How many units are available',
+            controller: c.stockCtrl,
+            onChanged: c.onStockChanged,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            error: c.fieldErrors['stock'],
+          ),
+        ] else ...[
           ThriftTextField(
             label: 'Starting Bid (₱)',
             controller: c.startBidCtrl,
             onChanged: c.onStartBidChanged,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             error: c.fieldErrors['price'],
           ),
+          const SizedBox(height: AppConstants.spacingMd),
+          const _AuctionQuantityNote(),
           const SizedBox(height: AppConstants.spacingMd),
           _SelectorField(
             label: 'Auction Duration',
@@ -646,15 +668,16 @@ class _SellingFormatSection extends StatelessWidget {
         children: [1, 3, 5, 7].map((d) {
           final isSelected = c.auctionDurationDays == d;
           return ListTile(
-            leading: Icon(Icons.today,
-                color: isSelected
-                    ? AppColors.primary
-                    : AppColors.textSecondary),
-            title: Text('$d days',
-                style: TextStyle(
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal)),
+            leading: Icon(
+              Icons.today,
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            ),
+            title: Text(
+              '$d days',
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
             trailing: isSelected
                 ? const Icon(Icons.check, color: AppColors.primary)
                 : null,
@@ -676,15 +699,16 @@ class _SellingFormatSection extends StatelessWidget {
         children: [10.0, 20.0, 50.0, 100.0].map((v) {
           final isSelected = c.bidIncrement == v;
           return ListTile(
-            leading: Icon(Icons.add_circle_outline,
-                color: isSelected
-                    ? AppColors.primary
-                    : AppColors.textSecondary),
-            title: Text('₱${v.toInt()}',
-                style: TextStyle(
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal)),
+            leading: Icon(
+              Icons.add_circle_outline,
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            ),
+            title: Text(
+              '₱${v.toInt()}',
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
             trailing: isSelected
                 ? const Icon(Icons.check, color: AppColors.primary)
                 : null,
@@ -699,12 +723,48 @@ class _SellingFormatSection extends StatelessWidget {
   }
 }
 
+class _AuctionQuantityNote extends StatelessWidget {
+  const _AuctionQuantityNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.inventory_2_outlined,
+            size: 20,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Quantity is 1. Auction listings are a single unique item.',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _FmtCard extends StatelessWidget {
-  const _FmtCard(
-      {required this.label,
-      required this.icon,
-      required this.format,
-      required this.c});
+  const _FmtCard({
+    required this.label,
+    required this.icon,
+    required this.format,
+    required this.c,
+  });
 
   final String label;
   final IconData icon;
@@ -730,17 +790,16 @@ class _FmtCard extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Icon(icon,
-                  color: isSelected
-                      ? AppColors.primary
-                      : AppColors.textSecondary,
-                  size: 22),
+              Icon(
+                icon,
+                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                size: 22,
+              ),
               const SizedBox(height: 6),
               Text(
                 label,
                 style: AppTypography.caption.copyWith(
-                  fontWeight:
-                      isSelected ? FontWeight.bold : FontWeight.normal,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   color: isSelected
                       ? AppColors.primaryDark
                       : AppColors.textPrimary,
@@ -773,16 +832,16 @@ class _SelectorField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style:
-                AppTypography.label.copyWith(color: AppColors.textPrimary)),
+        Text(
+          label,
+          style: AppTypography.label.copyWith(color: AppColors.textPrimary),
+        ),
         const SizedBox(height: AppConstants.spacingXs),
         InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppConstants.radiusMd),
           child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(AppConstants.radiusMd),
@@ -793,12 +852,17 @@ class _SelectorField extends StatelessWidget {
                 Icon(icon, color: AppColors.textHint, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(value,
-                      style: AppTypography.body
-                          .copyWith(color: AppColors.textPrimary)),
+                  child: Text(
+                    value,
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                 ),
-                const Icon(Icons.arrow_drop_down,
-                    color: AppColors.textSecondary),
+                const Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textSecondary,
+                ),
               ],
             ),
           ),

@@ -7,21 +7,9 @@ void main() {
   group('DavaoBarangay.fromApiList', () {
     test('keeps only Davao City barangays and drops other cities', () {
       final list = DavaoBarangay.fromApiList([
-        {
-          'code': '112402002',
-          'name': 'Agdao',
-          'cityCode': '112402000',
-        },
-        {
-          'code': '137404001',
-          'name': 'Ermita',
-          'cityCode': '137404000',
-        },
-        {
-          'code': '112403001',
-          'name': 'Aplaya',
-          'cityCode': '112403000',
-        },
+        {'code': '112402002', 'name': 'Agdao', 'cityCode': '112402000'},
+        {'code': '137404001', 'name': 'Ermita', 'cityCode': '137404000'},
+        {'code': '112403001', 'name': 'Aplaya', 'cityCode': '112403000'},
       ]);
 
       expect(list, hasLength(1));
@@ -52,6 +40,18 @@ void main() {
         ]),
         isEmpty,
       );
+    });
+
+    test('findAllowedByName matches a loaded Davao City barangay', () {
+      final list = [
+        DavaoBarangay(
+          code: '112402002',
+          name: 'Agdao',
+          cityCode: DavaoBarangay.cityCodePsgc9,
+        ),
+      ];
+      expect(DavaoBarangay.findAllowedByName('agdao', list)?.code, '112402002');
+      expect(DavaoBarangay.findAllowedByName('Ermita', list), isNull);
     });
   });
 

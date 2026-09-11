@@ -24,7 +24,8 @@ class ProductDetailScreen extends StatefulWidget {
   State<ProductDetailScreen> createState() => _ProductDetailScreenState();
 }
 
-class _ProductDetailScreenState extends State<ProductDetailScreen> {
+class _ProductDetailScreenState extends State<ProductDetailScreen>
+    with WidgetsBindingObserver {
   final _bidController = TextEditingController();
   late final PageController _pageController;
   int _imageIndex = 0;
@@ -33,13 +34,36 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void initState() {
     super.initState();
     _pageController = PageController();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      context.read<ProductDetailController>().reconcileOnResume();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     _bidController.dispose();
     super.dispose();
+  }
+
+  Future<void> _openSellerChat() async {
+    final result = await context
+        .read<ProductDetailController>()
+        .openSellerConversation();
+    if (!mounted) return;
+    if (result.error != null) {
+      showThriftSnackBar(context, result.error!, isError: true);
+      return;
+    }
+    final id = result.conversationId;
+    if (id == null) return;
+    context.push(RouteNames.chatThread(id));
   }
 
   void _showBidBottomSheet(
@@ -174,7 +198,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
 
     final product = controller.product!;
-    final minBid = controller.currentBidAmount + controller.minimumIncrement;
+    final minBid = controller.minimumNextBid;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -410,8 +434,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ),
 
-            // Timer Pill (auction)
-            if (controller.isAuctionActive && controller.auctionEndTime != null)
+            // Timer pill (auction) — stays visible after expiry as "Ended"
+            if (controller.isAuction && controller.auctionEndTime != null)
               Positioned(
                 top: MediaQuery.of(context).padding.top + 64,
                 right: 16,
@@ -421,7 +445,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.primary,
+                    color: controller.isAuctionActive
+                        ? AppColors.primary
+                        : AppColors.textHint,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -439,6 +465,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
+                        onExpired: () {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (!context.mounted) return;
+                            context
+                                .read<ProductDetailController>()
+                                .reconcileOnResume();
+                          });
+                        },
                       ),
                     ],
                   ),
@@ -553,6 +587,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   color: AppColors.textSecondary,
                 ),
               ),
+              if (controller.viewerAuctionStatus != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  controller.viewerAuctionStatus!,
+                  style: AppTypography.caption.copyWith(
+                    color: controller.isViewerLeading
+                        ? AppColors.success
+                        : AppColors.secondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ] else ...[
               Text(
                 'Price',
@@ -901,7 +947,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Expanded(
             flex: 1,
             child: OutlinedButton.icon(
-              onPressed: () => context.push(RouteNames.chat),
+              onPressed: _openSellerChat,
               icon: const Icon(
                 Icons.chat_bubble_outline,
                 color: AppColors.textPrimary,
@@ -928,10 +974,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Expanded(
             flex: 1,
             child: ElevatedButton.icon(
-              onPressed: () {
+              onPressed: () async {
+                if (product.maxPurchasableQuantity <= 0) {
+                  showThriftSnackBar(
+                    context,
+                    '${product.title} is no longer available.',
+                    isError: true,
+                  );
+                  return;
+                }
                 if (!inCart) {
-                  cart.addToCart(product);
+                  await cart.addToCart(product);
+                  if (!context.mounted) return;
                   showThriftSnackBar(context, 'Added to cart!');
+                  context.push('${RouteNames.checkout}?product=${product.id}');
+                  return;
                 }
                 context.push(RouteNames.checkout);
               },
@@ -971,7 +1028,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Expanded(
             flex: 1,
             child: OutlinedButton.icon(
-              onPressed: () => context.push(RouteNames.chat),
+              onPressed: _openSellerChat,
               icon: const Icon(
                 Icons.chat_bubble_outline,
                 color: AppColors.textPrimary,
@@ -1035,7 +1092,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       children: [
         Expanded(
           child: OutlinedButton.icon(
-            onPressed: () => context.push(RouteNames.chat),
+            onPressed: _openSellerChat,
             icon: const Icon(
               Icons.chat_bubble_outline,
               color: AppColors.textPrimary,
@@ -1061,10 +1118,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         const SizedBox(width: 12),
         Expanded(
           child: ElevatedButton.icon(
-            onPressed: () {
-              cart.addToCart(product);
+            onPressed: () async {
+              if (product.maxPurchasableQuantity <= 0) {
+                showThriftSnackBar(
+                  context,
+                  '${product.title} is no longer available.',
+                  isError: true,
+                );
+                return;
+              }
+              await cart.addToCart(product);
+              if (!context.mounted) return;
               showThriftSnackBar(context, 'Added to cart!');
-              context.push(RouteNames.checkout);
+              context.push('${RouteNames.checkout}?product=${product.id}');
             },
             icon: const Icon(
               Icons.shopping_bag_outlined,

@@ -3,11 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/routes/route_names.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/formatters.dart';
-import '../../../../providers/data_provider.dart';
+import '../../../../core/utils/stock_limits.dart';
+import '../../../../models/enums.dart';
+import '../../../../models/product_model.dart';
+import '../../../../providers/cart_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../data/catalog_product_query.dart';
+import '../../data/checkout_totals.dart';
 
 class BuyNowScreen extends StatefulWidget {
   const BuyNowScreen({super.key, required this.productId});
@@ -20,21 +28,138 @@ class BuyNowScreen extends StatefulWidget {
 
 class _BuyNowScreenState extends State<BuyNowScreen> {
   int _quantity = 1;
+  ProductModel? _product;
+  String? _error;
+  bool _loading = true;
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
+  }
+
+  Future<void> _load() async {
+    try {
+      final client = context.read<SupabaseService>().client;
+      final rows = await runProductCatalogSelect((select) {
+        return client
+            .from('products')
+            .select(select)
+            .eq('product_id', widget.productId)
+            .limit(1);
+      });
+      final list = rows as List;
+      if (list.isEmpty) {
+        setState(() {
+          _loading = false;
+          _error = 'Listing not found.';
+        });
+        return;
+      }
+      final row = list.first as Map<String, dynamic>;
+      final sellerId = row['seller_id'] as String?;
+      final profiles = await fetchSellerProfilesMap(
+        client,
+        extraSellerIds: [?sellerId],
+        includeApproved: false,
+      );
+      final products = hydrateCatalogProducts(list, profiles);
+      final product = products.isEmpty ? null : products.first;
+      var quantity = 1;
+      if (product != null) {
+        final max = product.maxPurchasableQuantity;
+        quantity = max <= 0 ? 1 : clampCartQuantity(1, max);
+      }
+      setState(() {
+        _product = product;
+        _quantity = quantity < 1 ? 1 : quantity;
+        _loading = false;
+        _error = product == null ? 'Listing not found.' : null;
+      });
+    } catch (e) {
+      setState(() {
+        _loading = false;
+        _error = 'Could not load this listing.';
+      });
+    }
+  }
+
+  Future<void> _continue() async {
+    final product = _product;
+    if (product == null || _submitting) return;
+    if (product.sellingType == SellingType.auction) {
+      showThriftSnackBar(
+        context,
+        'Auction wins appear as pending orders on the Bids tab.',
+        isError: true,
+      );
+      return;
+    }
+    final max = product.maxPurchasableQuantity;
+    if (max <= 0) {
+      showThriftSnackBar(
+        context,
+        '${product.title} is no longer available.',
+        isError: true,
+      );
+      return;
+    }
+    final requested = _quantity;
+    final quantity = clampCartQuantity(requested, max);
+    if (quantity <= 0 || requested > max) {
+      setState(() => _quantity = quantity <= 0 ? 1 : quantity);
+      showThriftSnackBar(
+        context,
+        stockShortageMessage(
+              title: product.title,
+              requested: requested,
+              available: max,
+            ) ??
+            'Only $max left of ${product.title}.',
+        isError: true,
+      );
+      return;
+    }
+    setState(() => _submitting = true);
+    final cart = context.read<CartProvider>();
+    if (cart.isInCart(product.id)) {
+      await cart.updateQuantity(product.id, quantity);
+    } else {
+      await cart.addToCart(product, quantity: quantity);
+    }
+    if (!mounted) return;
+    setState(() => _submitting = false);
+    context.push('${RouteNames.checkout}?product=${product.id}');
+  }
 
   @override
   Widget build(BuildContext context) {
-    final data = context.watch<DataProvider>();
-    final product = data.productById(widget.productId);
-    if (product == null)
+    if (_loading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+    final product = _product;
+    if (product == null) {
       return Scaffold(
         appBar: AppBar(),
-        body: const Center(child: Text('Not found')),
+        body: Center(child: Text(_error ?? 'Not found')),
       );
+    }
 
     final subtotal = product.price * _quantity;
-    const shipping = 80.0;
-    final platform = subtotal * 0.02;
-    final total = subtotal + shipping + platform;
+    final shipping = checkoutShippingFee(1);
+    final platform = checkoutPlatformFee(subtotal);
+    final total = checkoutTotal(
+      subtotal: subtotal,
+      shippingFee: shipping,
+      platformFee: platform,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -80,7 +205,7 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
                           Text(
                             formatCurrency(product.price),
                             style: AppTypography.subheading.copyWith(
-                              color: const Color(0xFF0D9488),
+                              color: AppColors.primary,
                             ),
                           ),
                         ],
@@ -93,7 +218,19 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Quantity', style: AppTypography.body),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Quantity', style: AppTypography.body),
+                      if (product.maxPurchasableQuantity > 0)
+                        Text(
+                          product.maxPurchasableQuantity == 1
+                              ? '1 left'
+                              : '${product.maxPurchasableQuantity} left',
+                          style: AppTypography.caption,
+                        ),
+                    ],
+                  ),
                   Row(
                     children: [
                       IconButton(
@@ -104,24 +241,15 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
                       ),
                       Text('$_quantity', style: AppTypography.subheading),
                       IconButton(
-                        onPressed: () => setState(() => _quantity++),
+                        onPressed: _quantity < product.maxPurchasableQuantity
+                            ? () => setState(() => _quantity++)
+                            : null,
                         icon: const Icon(Icons.add),
                       ),
                     ],
                   ),
                 ],
               ),
-              if (product.size != null)
-                ListTile(
-                  title: Text(
-                    'Size: ${product.size}',
-                    style: AppTypography.body,
-                  ),
-                  trailing: const Icon(
-                    Icons.check_circle,
-                    color: Color(0xFF0D9488),
-                  ),
-                ),
               const Divider(),
               _row('Subtotal', formatCurrency(subtotal)),
               _row('Shipping fee', formatCurrency(shipping)),
@@ -130,15 +258,13 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
               _row('Total', formatCurrency(total), bold: true),
               const Spacer(),
               ThriftButton(
-                label: 'Continue to Payment',
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Checkout is coming soon!'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
+                label: product.maxPurchasableQuantity <= 0
+                    ? 'Sold out'
+                    : 'Continue to checkout',
+                isLoading: _submitting,
+                onPressed: _submitting || product.maxPurchasableQuantity <= 0
+                    ? null
+                    : _continue,
               ),
             ],
           ),
@@ -159,9 +285,7 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
         Text(
           value,
           style: bold
-              ? AppTypography.subheading.copyWith(
-                  color: const Color(0xFF0D9488),
-                )
+              ? AppTypography.subheading.copyWith(color: AppColors.primary)
               : AppTypography.body,
         ),
       ],

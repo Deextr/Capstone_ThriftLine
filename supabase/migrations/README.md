@@ -96,6 +96,47 @@ there break at login. Passwords are never stored in this file.
 
 Run `../introspection/phase2_verify.sql` afterwards. Saved-items RLS was already added in `20260902010000_saved_items_rls.sql`. Cart and bidding migrations dated `20260907` are later-phase coworker work, not Phase 2. Apply `20260909010000` as well if buyers will attach reference photos or sellers will read comments on open requests.
 
+## Phase 3 — auctions and bidding
+
+Coworker files (keep in history, do not re-run as the source of truth):
+
+| File | Purpose |
+| --- | --- |
+| `20260907030000_bidding_system.sql` | Original `place_bid`, `settle_ended_auctions`, client `bids_insert_own`, Realtime publication |
+| `20260907040000_ensure_auctions.sql` | Trigger that auto-created auctions with a hardcoded ₱20 increment and 3-day duration |
+
+Corrective file (apply this):
+
+| File | Purpose |
+| --- | --- |
+| `20260909030000_phase3_auctions.sql` | RPC-only bids, `close_auctions()`, `ensure_product_auction()`, `v_user_bids`, RLS privilege revoke, unique `product_id` |
+
+Run `../introspection/phase3_verify.sql` afterwards; every row should say `PASS`.
+
+Deploy `../functions/close-auctions` and schedule it about once a minute (Dashboard → Edge Functions → Schedules, or pg_cron calling `SELECT public.close_auctions()`). The Flutter app also calls `close_auctions` when opening an auction or the Bids tab, so expiry still settles if the cron job is late. Phase 5 `20260911010000_phase5_orders.sql` extends `close_auctions` so a winner also gets an idempotent pending order.
+
+## Phase 4 — messaging
+
+| File | Purpose |
+| --- | --- |
+| `20260909020000_conversations.sql` | Phase 2 `conversations` / `messages` (already applied; do not rewrite) |
+| `20260910010000_phase4_messaging.sql` | Product-linked threads, last-read columns, sender trigger, private `message-attachments`, Realtime publication |
+
+Run `../introspection/phase4_verify.sql` afterwards; every row should say `PASS`. Looking For share and I Have This keep using `product_id IS NULL`. Offers remain chat messages (no orders).
+
+## Phase 5 — cart, checkout, real orders
+
+Do **not** rewrite `20260907020000_cart_items.sql`. Apply this after Phase 4:
+
+| File | Purpose |
+| --- | --- |
+| `20260911010000_phase5_orders.sql` | Extends existing `orders` / `order_items` (adds `order_number`, snapshots), `checkout_cart`, `ensure_auction_order`, `set_order_address`, winner orders from `close_auctions` |
+| `20260911020000_listing_stock.sql` | Auction stock clamped to 0–1, cart qty cannot exceed live stock, `add_to_cart` caps quantity, `checkout_cart` returns remaining-stock errors |
+
+Run `../introspection/phase5_verify.sql` then `../introspection/phase5_stock_verify.sql`. Checkout and auction-win orders stay **payment pending**. PayMongo / GCash / webhooks are Phase 6.
+
+Buyer delivery addresses are Davao City only. Apply `20260911030000_addresses_davao_city.sql` and run `../introspection/addresses_davao_verify.sql`.
+
 ## Conventions
 
 - Authorization lives in RLS policies and `SECURITY DEFINER` helpers, never in

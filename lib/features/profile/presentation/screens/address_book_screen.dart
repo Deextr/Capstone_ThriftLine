@@ -3,11 +3,16 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../models/address_model.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../seller/data/davao_barangay_service.dart';
+import '../../../seller/domain/davao_barangay.dart';
+import '../../../seller/presentation/widgets/davao_barangay_field.dart';
 import '../../data/address_service.dart';
+import '../../data/buyer_address_validation.dart';
 
 class AddressBookScreen extends StatefulWidget {
   const AddressBookScreen({super.key});
@@ -74,60 +79,62 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _addresses.isEmpty
-                ? const Center(child: Text('Add a delivery address to use at checkout.'))
-                : ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _addresses.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) {
-                      final address = _addresses[i];
-                      return ThriftCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+            ? const Center(
+                child: Text('Add a delivery address to use at checkout.'),
+              )
+            : ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: _addresses.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                itemBuilder: (_, i) {
+                  final address = _addresses[i];
+                  return ThriftCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    address.recipientName,
-                                    style: AppTypography.subheading,
-                                  ),
-                                ),
-                                if (address.isDefault)
-                                  Text(
-                                    'Default',
-                                    style: AppTypography.caption.copyWith(
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(address.phoneNumber, style: AppTypography.caption),
-                            Text(address.formatted, style: AppTypography.body),
-                            if (address.landmark != null &&
-                                address.landmark!.trim().isNotEmpty)
-                              Text(
-                                'Landmark: ${address.landmark}',
-                                style: AppTypography.caption,
+                            Expanded(
+                              child: Text(
+                                address.recipientName,
+                                style: AppTypography.subheading,
                               ),
-                            Row(
-                              children: [
-                                TextButton(
-                                  onPressed: () => _edit(address),
-                                  child: const Text('Edit'),
+                            ),
+                            if (address.isDefault)
+                              Text(
+                                'Default',
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.primary,
                                 ),
-                                TextButton(
-                                  onPressed: () => _delete(address),
-                                  child: const Text('Delete'),
-                                ),
-                              ],
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(address.phoneNumber, style: AppTypography.caption),
+                        Text(address.formatted, style: AppTypography.body),
+                        if (address.landmark != null &&
+                            address.landmark!.trim().isNotEmpty)
+                          Text(
+                            'Landmark: ${address.landmark}',
+                            style: AppTypography.caption,
+                          ),
+                        Row(
+                          children: [
+                            TextButton(
+                              onPressed: () => _edit(address),
+                              child: const Text('Edit'),
+                            ),
+                            TextButton(
+                              onPressed: () => _delete(address),
+                              child: const Text('Delete'),
                             ),
                           ],
                         ),
-                      );
-                    },
-                  ),
+                      ],
+                    ),
+                  );
+                },
+              ),
       ),
     );
   }
@@ -143,14 +150,18 @@ class _AddressForm extends StatefulWidget {
 }
 
 class _AddressFormState extends State<_AddressForm> {
+  final _barangayService = DavaoBarangayService();
   late final TextEditingController _name;
   late final TextEditingController _phone;
   late final TextEditingController _street;
-  late final TextEditingController _barangay;
   late final TextEditingController _city;
   late final TextEditingController _postal;
   late final TextEditingController _landmark;
   late bool _isDefault;
+  List<DavaoBarangay> _barangays = const [];
+  DavaoBarangay? _selectedBarangay;
+  bool _barangaysLoading = true;
+  String? _barangayError;
   bool _saving = false;
 
   @override
@@ -160,11 +171,11 @@ class _AddressFormState extends State<_AddressForm> {
     _name = TextEditingController(text: existing?.recipientName ?? '');
     _phone = TextEditingController(text: existing?.phoneNumber ?? '');
     _street = TextEditingController(text: existing?.streetAddress ?? '');
-    _barangay = TextEditingController(text: existing?.barangay ?? '');
-    _city = TextEditingController(text: existing?.city ?? 'Davao City');
+    _city = TextEditingController(text: DavaoBarangay.cityName);
     _postal = TextEditingController(text: existing?.postalCode ?? '');
     _landmark = TextEditingController(text: existing?.landmark ?? '');
     _isDefault = existing?.isDefault ?? true;
+    _loadBarangays();
   }
 
   @override
@@ -172,19 +183,61 @@ class _AddressFormState extends State<_AddressForm> {
     _name.dispose();
     _phone.dispose();
     _street.dispose();
-    _barangay.dispose();
     _city.dispose();
     _postal.dispose();
     _landmark.dispose();
     super.dispose();
   }
 
+  Future<void> _loadBarangays({bool forceRefresh = false}) async {
+    setState(() {
+      _barangaysLoading = true;
+      _barangayError = null;
+    });
+    try {
+      final list = await _barangayService.load(forceRefresh: forceRefresh);
+      if (!mounted) return;
+      final existingName = widget.existing?.barangay ?? '';
+      setState(() {
+        _barangays = list;
+        _barangaysLoading = false;
+        if (_selectedBarangay != null &&
+            !DavaoBarangay.isAllowedSelection(_selectedBarangay, list)) {
+          _selectedBarangay = null;
+        }
+        _selectedBarangay ??= DavaoBarangay.findAllowedByName(
+          existingName,
+          list,
+        );
+      });
+    } on DavaoBarangayException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _barangays = const [];
+        _barangaysLoading = false;
+        _barangayError = e.userMessage;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _barangays = const [];
+        _barangaysLoading = false;
+        _barangayError =
+            'Could not load Davao City barangays. Check your connection and try again.';
+      });
+    }
+  }
+
   Future<void> _save() async {
-    if (_name.text.trim().isEmpty ||
-        _phone.text.trim().isEmpty ||
-        _street.text.trim().isEmpty ||
-        _barangay.text.trim().isEmpty) {
-      showThriftSnackBar(context, 'Name, phone, street, and barangay are required.', isError: true);
+    final error = buyerAddressFormError(
+      recipientName: _name.text,
+      phoneNumber: _phone.text,
+      streetAddress: _street.text,
+      barangay: _selectedBarangay,
+      allowedBarangays: _barangays,
+    );
+    if (error != null) {
+      showThriftSnackBar(context, error, isError: true);
       return;
     }
     setState(() => _saving = true);
@@ -194,8 +247,8 @@ class _AddressFormState extends State<_AddressForm> {
         recipientName: _name.text,
         phoneNumber: _phone.text,
         streetAddress: _street.text,
-        barangay: _barangay.text,
-        city: _city.text,
+        barangay: _selectedBarangay!.name,
+        city: DavaoBarangay.cityName,
         postalCode: _postal.text,
         landmark: _landmark.text,
         isDefault: _isDefault,
@@ -204,7 +257,11 @@ class _AddressFormState extends State<_AddressForm> {
     } catch (_) {
       if (mounted) {
         setState(() => _saving = false);
-        showThriftSnackBar(context, 'Could not save that address.', isError: true);
+        showThriftSnackBar(
+          context,
+          'Could not save that address.',
+          isError: true,
+        );
       }
     }
   }
@@ -231,16 +288,39 @@ class _AddressFormState extends State<_AddressForm> {
             const SizedBox(height: 12),
             ThriftTextField(
               label: 'Phone',
+              hint: '09XXXXXXXXX',
               controller: _phone,
               keyboardType: TextInputType.phone,
             ),
             const SizedBox(height: 12),
             ThriftTextField(label: 'Street', controller: _street, maxLines: 2),
             const SizedBox(height: 12),
-            ThriftTextField(label: 'Barangay', controller: _barangay),
+            DavaoBarangayField(
+              barangays: _barangays,
+              selected: _selectedBarangay,
+              loading: _barangaysLoading,
+              error: _barangayError,
+              onRetry: () => _loadBarangays(forceRefresh: true),
+              onSelected: (barangay) {
+                if (!barangay.isDavaoCity) return;
+                setState(() => _selectedBarangay = barangay);
+              },
+            ),
             const SizedBox(height: 12),
-            ThriftTextField(label: 'City', controller: _city),
-            const SizedBox(height: 12),
+            ThriftTextField(
+              label: 'City',
+              controller: _city,
+              readOnly: true,
+              icon: Icons.lock_outline,
+              labelSuffix: Text(
+                'Davao City only',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textHint,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: AppConstants.spacingSm),
             ThriftTextField(label: 'Postal code', controller: _postal),
             const SizedBox(height: 12),
             ThriftTextField(label: 'Landmark', controller: _landmark),

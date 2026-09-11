@@ -1,3 +1,4 @@
+import '../core/utils/stock_limits.dart';
 import 'enums.dart';
 
 class BidEntry {
@@ -38,6 +39,7 @@ class ProductModel {
     required this.createdAt,
     this.viewCount = 0,
     this.favoriteCount = 0,
+    this.quantityAvailable = 1,
     this.sellingType = SellingType.fixedPrice,
     this.currentBid,
     this.startingBid,
@@ -188,6 +190,7 @@ class ProductModel {
           : DateTime.now(),
       viewCount: (row['views'] as num?)?.toInt() ?? 0,
       favoriteCount: (row['favorite_count'] as num?)?.toInt() ?? 0,
+      quantityAvailable: (row['quantity_available'] as num?)?.toInt() ?? 1,
       sellingType: sellingType,
       startingBid: startingBid,
       currentBid: currentBid,
@@ -219,6 +222,7 @@ class ProductModel {
   final DateTime createdAt;
   final int viewCount;
   final int favoriteCount;
+  final int quantityAvailable;
   final SellingType sellingType;
   final double? currentBid;
   final double? startingBid;
@@ -241,6 +245,12 @@ class ProductModel {
 
   double get displayPrice =>
       hasActiveBid ? (currentBid ?? startingBid ?? price) : price;
+
+  /// Units a buyer may purchase right now. Auctions are always 0 or 1.
+  int get maxPurchasableQuantity => maxPurchasableQuantityFor(
+    sellingType: sellingType,
+    quantityAvailable: quantityAvailable,
+  );
 
   ProductModel copyWith({
     String? id,
@@ -265,6 +275,7 @@ class ProductModel {
     DateTime? createdAt,
     int? viewCount,
     int? favoriteCount,
+    int? quantityAvailable,
     SellingType? sellingType,
     double? currentBid,
     double? startingBid,
@@ -298,6 +309,7 @@ class ProductModel {
     createdAt: createdAt ?? this.createdAt,
     viewCount: viewCount ?? this.viewCount,
     favoriteCount: favoriteCount ?? this.favoriteCount,
+    quantityAvailable: quantityAvailable ?? this.quantityAvailable,
     sellingType: sellingType ?? this.sellingType,
     currentBid: currentBid ?? this.currentBid,
     startingBid: startingBid ?? this.startingBid,

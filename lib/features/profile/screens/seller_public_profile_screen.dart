@@ -551,7 +551,23 @@ class SellerPublicProfileScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => context.push('/chat'),
+                    onPressed: () async {
+                      final result = await context
+                          .read<SellerPublicProfileController>()
+                          .openConversation();
+                      if (!context.mounted) return;
+                      if (result.error != null) {
+                        showThriftSnackBar(
+                          context,
+                          result.error!,
+                          isError: true,
+                        );
+                        return;
+                      }
+                      final id = result.conversationId;
+                      if (id == null) return;
+                      context.push(RouteNames.chatThread(id));
+                    },
                     icon: const Icon(Icons.chat_bubble_outline, size: 18),
                     label: Text(
                       'Message',

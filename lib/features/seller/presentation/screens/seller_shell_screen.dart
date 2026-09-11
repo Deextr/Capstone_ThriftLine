@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/routes/route_names.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../providers/auth_provider.dart';
-import '../../../../providers/data_provider.dart';
 import '../../../../widgets/curved_navigation_bar.dart';
-import '../../../../widgets/thrift_widgets.dart';
 import '../../../buyer/controllers/looking_for_controller.dart';
 import '../../../buyer/presentation/screens/buyer_looking_for_tab.dart';
+import '../../../chat/controllers/chat_list_controller.dart';
+import '../../../chat/presentation/widgets/chat_inbox_view.dart';
 import '../../../profile/screens/seller_profile_tab.dart';
+import '../../controllers/seller_orders_controller.dart';
 import 'seller_dashboard_tab.dart';
 import 'seller_listings_tab.dart';
 import 'seller_orders_tab.dart';
@@ -35,7 +34,13 @@ class _SellerShellScreenState extends State<SellerShellScreen> {
       const SellerListingsTab(),
       const BuyerLookingForTab(sellerWorkspace: true),
       const SellerOrdersTab(),
-      const _MessagesTab(),
+      ChangeNotifierProvider(
+        create: (context) => ChatListController(
+          supabase: context.read<SupabaseService>(),
+          auth: context.read<AuthProvider>(),
+        ),
+        child: const ChatInboxView(showHeader: true),
+      ),
       const SellerProfileTab(),
     ];
   }
@@ -47,10 +52,7 @@ class _SellerShellScreenState extends State<SellerShellScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    final data = context.watch<DataProvider>();
-    final sellerId = auth.user?.id ?? '';
-    final pending = data.pendingOrdersForSeller(sellerId);
+    final pending = context.watch<SellerOrdersController>().pendingCount;
 
     // Build nav items with dynamic badge for orders
     final navItems = [
@@ -125,23 +127,6 @@ class _SellerShellScreenState extends State<SellerShellScreen> {
           selectedIndex: _index,
           onTap: _onTabChanged,
           items: navItems,
-        ),
-      ),
-    );
-  }
-}
-
-class _MessagesTab extends StatelessWidget {
-  const _MessagesTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Center(
-        child: ThriftButton(
-          label: 'Open Messages',
-          expand: false,
-          onPressed: () => context.push(RouteNames.chat),
         ),
       ),
     );

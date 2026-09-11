@@ -10,11 +10,13 @@ import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../models/enums.dart';
 import '../../../../models/looking_for_model.dart';
+import '../../../../models/order_model.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/data_provider.dart';
 import '../../../../providers/notifications_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../buyer/controllers/looking_for_controller.dart';
+import '../../controllers/seller_orders_controller.dart';
 
 class SellerDashboardTab extends StatelessWidget {
   const SellerDashboardTab({super.key});
@@ -24,11 +26,11 @@ class SellerDashboardTab extends StatelessWidget {
     final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
     final looking = context.watch<LookingForController>();
+    final ordersCtrl = context.watch<SellerOrdersController>();
     final user = auth.user;
-    final sellerId = auth.user?.id ?? '';
     final listings = data.productsForSeller(auth.username ?? '');
-    final pending = data.pendingOrdersForSeller(sellerId);
-    final recentOrders = data.ordersForSeller(sellerId).take(3).toList();
+    final pending = ordersCtrl.pendingCount;
+    final recentOrders = ordersCtrl.orders.take(3).toList();
     final lookingForPosts = looking.posts.take(3).toList();
 
     return ColoredBox(
@@ -37,7 +39,12 @@ class SellerDashboardTab extends StatelessWidget {
         child: RefreshIndicator(
           color: AppColors.primary,
           strokeWidth: 2.5,
-          onRefresh: () => context.read<LookingForController>().refresh(),
+          onRefresh: () async {
+            await Future.wait([
+              context.read<LookingForController>().refresh(),
+              context.read<SellerOrdersController>().load(),
+            ]);
+          },
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
@@ -726,13 +733,11 @@ class _SectionLabel extends StatelessWidget {
 
 class _OrderTile extends StatelessWidget {
   const _OrderTile({required this.order});
-  final dynamic order;
+  final OrderModel order;
 
   @override
   Widget build(BuildContext context) {
-    final isNew =
-        order.status == OrderStatus.placed ||
-        order.status == OrderStatus.paymentPending;
+    final isNew = order.isPaymentPending;
 
     return Container(
       decoration: BoxDecoration(
@@ -752,7 +757,7 @@ class _OrderTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppConstants.radiusLg),
         child: InkWell(
           borderRadius: BorderRadius.circular(AppConstants.radiusLg),
-          onTap: () {},
+          onTap: () => context.push('/seller-order/${order.id}'),
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Row(

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -34,12 +35,25 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final chat = context.watch<ChatDetailController>();
     final userId = chat.myId ?? '';
     final messages = chat.messages;
+    final productTitle = chat.chat?.productTitle;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         appBar: AppBar(
-          title: Text(chat.chat?.titleFor(userId) ?? 'Chat'),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(chat.chat?.titleFor(userId) ?? 'Chat'),
+              if (productTitle != null && productTitle.trim().isNotEmpty)
+                Text(
+                  productTitle,
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+            ],
+          ),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.pop(),
@@ -60,10 +74,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   children: [
                     Expanded(
                       child: ListView.builder(
+                        reverse: true,
                         padding: const EdgeInsets.all(16),
                         itemCount: messages.length,
                         itemBuilder: (_, i) {
-                          final msg = messages[i];
+                          final msg = messages[messages.length - 1 - i];
                           final isSent = msg.isSentBy(userId);
                           return Align(
                             alignment: isSent
@@ -97,10 +112,21 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         children: [
                           IconButton(
                             icon: const Icon(Icons.image_outlined),
-                            onPressed: () => showThriftSnackBar(
-                              context,
-                              'Image attachment coming soon',
-                            ),
+                            onPressed: chat.isSending
+                                ? null
+                                : () async {
+                                    final error = await context
+                                        .read<ChatDetailController>()
+                                        .pickAndSendImage();
+                                    if (!context.mounted || error == null) {
+                                      return;
+                                    }
+                                    showThriftSnackBar(
+                                      context,
+                                      error,
+                                      isError: true,
+                                    );
+                                  },
                           ),
                           Expanded(
                             child: TextField(
@@ -203,10 +229,13 @@ class _MessageBody extends StatelessWidget {
               color: isSent ? Colors.white : AppColors.secondary,
             ),
           ),
-        Text(
-          message.content,
-          style: AppTypography.body.copyWith(color: textColor),
-        ),
+        if (message.type == MessageType.image)
+          _ChatImage(message: message, isSent: isSent),
+        if (message.content.trim().isNotEmpty)
+          Text(
+            message.content,
+            style: AppTypography.body.copyWith(color: textColor),
+          ),
         if (message.type == MessageType.lookingFor &&
             message.lookingForPostId != null) ...[
           const SizedBox(height: 8),
@@ -235,6 +264,62 @@ class _MessageBody extends StatelessWidget {
           style: AppTypography.caption.copyWith(color: hintColor, fontSize: 10),
         ),
       ],
+    );
+  }
+}
+
+class _ChatImage extends StatelessWidget {
+  const _ChatImage({required this.message, required this.isSent});
+
+  final MessageModel message;
+  final bool isSent;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String?>(
+      future: context.read<ChatDetailController>().signedUrlFor(message),
+      builder: (context, snapshot) {
+        final url = snapshot.data;
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const SizedBox(
+            height: 140,
+            child: Center(
+              child: CircularProgressIndicator(color: Colors.white70),
+            ),
+          );
+        }
+        if (url == null || url.isEmpty) {
+          return Text(
+            'Photo unavailable',
+            style: AppTypography.caption.copyWith(
+              color: isSent ? Colors.white70 : AppColors.textHint,
+            ),
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: CachedNetworkImage(
+              imageUrl: url,
+              width: 220,
+              fit: BoxFit.cover,
+              placeholder: (_, _) => const SizedBox(
+                height: 140,
+                child: Center(
+                  child: CircularProgressIndicator(color: Colors.white70),
+                ),
+              ),
+              errorWidget: (_, _, _) => Text(
+                'Photo unavailable',
+                style: AppTypography.caption.copyWith(
+                  color: isSent ? Colors.white70 : AppColors.textHint,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

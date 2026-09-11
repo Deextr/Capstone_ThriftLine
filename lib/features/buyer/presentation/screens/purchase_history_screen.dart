@@ -2,20 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
-import '../../../../providers/auth_provider.dart';
-import '../../../../providers/data_provider.dart';
+import '../../../../models/enums.dart';
+import '../../controllers/buyer_orders_controller.dart';
 
 class PurchaseHistoryScreen extends StatelessWidget {
   const PurchaseHistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    final orders = context.watch<DataProvider>().ordersForBuyer(
-      auth.user?.id ?? '',
-    );
+    final controller = context.watch<BuyerOrdersController>();
+    final orders = controller.orders;
 
     return Scaffold(
       appBar: AppBar(
@@ -26,25 +25,40 @@ class PurchaseHistoryScreen extends StatelessWidget {
         ),
       ),
       body: SafeArea(
-        child: orders.isEmpty
-            ? const Center(child: Text('No purchases yet'))
-            : ListView.builder(
-                itemCount: orders.length,
-                itemBuilder: (_, i) {
-                  final o = orders[i];
-                  return ListTile(
-                    title: Text(o.productTitle, style: AppTypography.body),
-                    subtitle: Text('#${o.orderNumber} â€¢ ${o.status.name}'),
-                    trailing: Text(
-                      formatCurrency(o.total),
-                      style: AppTypography.subheading.copyWith(
-                        color: const Color(0xFF0D9488),
-                        fontSize: 14,
+        child: controller.isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              )
+            : orders.isEmpty
+            ? Center(
+                child: Text(
+                  controller.errorMessage ?? 'No purchases yet',
+                  style: AppTypography.body,
+                ),
+              )
+            : RefreshIndicator(
+                color: AppColors.primary,
+                onRefresh: controller.load,
+                child: ListView.builder(
+                  itemCount: orders.length,
+                  itemBuilder: (_, i) {
+                    final o = orders[i];
+                    return ListTile(
+                      title: Text(o.productTitle, style: AppTypography.body),
+                      subtitle: Text(
+                        '#${o.orderNumber} · ${orderStatusLabel(o.status)}',
                       ),
-                    ),
-                    onTap: () => context.push('/track-order/${o.id}'),
-                  );
-                },
+                      trailing: Text(
+                        formatCurrency(o.total),
+                        style: AppTypography.subheading.copyWith(
+                          color: AppColors.primary,
+                          fontSize: 14,
+                        ),
+                      ),
+                      onTap: () => context.push('/track-order/${o.id}'),
+                    );
+                  },
+                ),
               ),
       ),
     );

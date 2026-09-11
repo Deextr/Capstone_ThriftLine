@@ -110,5 +110,43 @@ void main() {
 
       expect(bid.status, equals(BidStatus.lost));
     });
+
+    test('uses authoritative bid_status from v_user_bids', () {
+      final json = {
+        'bid_id': 'bid-view',
+        'auction_id': 'auc-view',
+        'product_id': 'prod-view',
+        'bidder_id': 'user-1',
+        'bid_amount': 180.0,
+        'is_highest_bid': true,
+        'created_at': '2026-09-07T12:00:00Z',
+        'auction_status': 'active',
+        'current_price': 220.0,
+        'bid_status': 'outbid',
+      };
+
+      final bid = UserBid.fromSupabase(json);
+
+      expect(bid.status, equals(BidStatus.outbid));
+      expect(bid.auctionId, equals('auc-view'));
+      expect(bid.productId, equals('prod-view'));
+      expect(bid.auctionCurrentPrice, equals(220.0));
+    });
+
+    test('maps leading as winning', () {
+      expect(bidStatusFromView('leading'), BidStatus.winning);
+      expect(bidStatusFromView('winning'), BidStatus.winning);
+      expect(bidStatusFromView('won'), BidStatus.won);
+    });
+
+    test('AuctionBidQuote uses live current price plus increment', () {
+      const quote = AuctionBidQuote(
+        currentPrice: 600,
+        minimumIncrement: 50,
+        status: 'active',
+      );
+      expect(quote.minimumNextBid, equals(650));
+      expect(quote.isAcceptingBids, isTrue);
+    });
   });
 }

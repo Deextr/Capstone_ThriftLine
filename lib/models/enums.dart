@@ -133,12 +133,35 @@ enum OrderStatus {
 }
 
 String orderStatusLabel(Object? status) {
-  if (status is OrderStatus) return status.name;
+  if (status is OrderStatus) {
+    return switch (status) {
+      OrderStatus.paymentPending || OrderStatus.placed => 'Pending payment',
+      OrderStatus.paymentConfirmed || OrderStatus.preparing => 'To ship',
+      OrderStatus.shipped => 'Shipped',
+      OrderStatus.outForDelivery => 'Out for delivery',
+      OrderStatus.delivered => 'Delivered',
+      OrderStatus.cancelled => 'Cancelled',
+    };
+  }
   if (status is String) return status;
   return 'unknown';
 }
 
+OrderStatus orderStatusFromDb(String? value) => switch (value) {
+  'pending' || 'payment_pending' || 'placed' => OrderStatus.paymentPending,
+  'to_ship' ||
+  'preparing' ||
+  'payment_confirmed' ||
+  'paid' => OrderStatus.preparing,
+  'shipped' => OrderStatus.shipped,
+  'out_for_delivery' => OrderStatus.outForDelivery,
+  'delivered' || 'completed' => OrderStatus.delivered,
+  'cancelled' || 'disputed' => OrderStatus.cancelled,
+  _ => OrderStatus.paymentPending,
+};
+
 enum PaymentMethod {
+  unpaid('Payment pending'),
   gcash('GCash'),
   maya('Maya'),
   bankTransfer('Bank Transfer'),

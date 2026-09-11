@@ -10,7 +10,6 @@ import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../models/address_model.dart';
 import '../../../../models/enums.dart';
-import '../../../../providers/auth_provider.dart';
 import '../../../../providers/data_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../profile/data/address_service.dart';
@@ -175,22 +174,9 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
                       );
                       return;
                     }
-                    final auth = context.read<AuthProvider>();
-                    final user = auth.user;
-                    final order = data.createOrder(
-                      product: product,
-                      buyerId: auth.user?.id ?? '',
-                      buyerName: user?.name ?? 'Buyer',
-                      buyerAvatar: user?.avatarUrl ?? '',
-                      quantity: qty,
-                      delivery: _delivery,
-                      payment: _payment,
-                      address: _delivery == DeliveryMethod.meetup
-                          ? _meetupLocation.text
-                          : _address!.formatted,
-                      size: product.size,
+                    context.go(
+                      '${RouteNames.checkout}?product=${widget.productId}',
                     );
-                    context.go('/order-confirm/${order.id}');
                   },
                 ),
               ],

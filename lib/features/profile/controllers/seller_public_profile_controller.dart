@@ -8,6 +8,7 @@ import '../../../models/seller_profile.dart';
 import '../../../providers/auth_provider.dart';
 import '../../auth/domain/account_mode.dart';
 import '../../buyer/data/catalog_product_query.dart';
+import '../../chat/data/conversation_service.dart';
 
 /// Owns the state and database query logic for a public seller profile.
 ///
@@ -18,15 +19,18 @@ class SellerPublicProfileController extends ChangeNotifier {
     required String username,
     required SupabaseService supabase,
     AuthProvider? auth,
+    ConversationService? conversations,
   }) : _username = username,
        _supabase = supabase,
-       _auth = auth {
+       _auth = auth,
+       _conversations = conversations ?? ConversationService(supabase) {
     loadSellerProfile();
   }
 
   final String _username;
   final SupabaseService _supabase;
   final AuthProvider? _auth;
+  final ConversationService _conversations;
 
   // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -357,6 +361,34 @@ class SellerPublicProfileController extends ChangeNotifier {
         _sellerProfile = _sellerProfile!.copyWith(followerCount: newFollowers);
       }
       notifyListeners();
+    }
+  }
+
+  /// Opens the general (no product) thread with this shop owner.
+  Future<({String? conversationId, String? error})> openConversation() async {
+    final myId = _auth?.user?.id;
+    final sellerId = _sellerProfile?.sellerId;
+    if (myId == null) {
+      return (
+        conversationId: null,
+        error: 'Please sign in to message this seller.',
+      );
+    }
+    if (sellerId == null || sellerId.isEmpty) {
+      return (conversationId: null, error: 'Unable to start this chat.');
+    }
+    if (myId == sellerId) {
+      return (conversationId: null, error: 'This is your shop.');
+    }
+    try {
+      final id = await _conversations.openOrCreate(
+        myId: myId,
+        otherId: sellerId,
+      );
+      return (conversationId: id, error: null);
+    } catch (e) {
+      debugPrint('SellerPublicProfileController.openConversation error: $e');
+      return (conversationId: null, error: 'Could not open this conversation.');
     }
   }
 

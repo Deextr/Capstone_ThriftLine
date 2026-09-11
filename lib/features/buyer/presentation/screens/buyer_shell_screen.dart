@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../core/routes/route_names.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/curved_navigation_bar.dart';
-import '../../../../widgets/thrift_widgets.dart';
+import '../../../chat/controllers/chat_list_controller.dart';
+import '../../../chat/presentation/widgets/chat_inbox_view.dart';
 import '../../../profile/screens/buyer_profile_tab.dart';
 import '../../controllers/buyer_bids_controller.dart';
 import '../../controllers/home_controller.dart';
@@ -46,7 +45,13 @@ class _BuyerShellScreenState extends State<BuyerShellScreen> {
         child: const BuyerBidsTab(),
       ),
       const BuyerLookingForTab(),
-      const _MessagesTab(),
+      ChangeNotifierProvider(
+        create: (context) => ChatListController(
+          supabase: context.read<SupabaseService>(),
+          auth: context.read<AuthProvider>(),
+        ),
+        child: const ChatInboxView(showHeader: true),
+      ),
       const BuyerProfileTab(),
     ];
   }
@@ -106,23 +111,6 @@ class _BuyerShellScreenState extends State<BuyerShellScreen> {
           selectedIndex: _index,
           onTap: _onTabChanged,
           items: _navItems,
-        ),
-      ),
-    );
-  }
-}
-
-class _MessagesTab extends StatelessWidget {
-  const _MessagesTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Center(
-        child: ThriftButton(
-          label: 'Open Messages',
-          expand: false,
-          onPressed: () => context.push(RouteNames.chat),
         ),
       ),
     );

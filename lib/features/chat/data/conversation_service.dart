@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
+import 'package:uuid/uuid.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../models/chat_model.dart';
@@ -20,6 +22,9 @@ class FollowedSeller {
   final String? shopName;
 }
 
+const int kMessageAttachmentMaxBytes = 5 * 1024 * 1024;
+const String kMessageAttachmentBucket = 'message-attachments';
+
 /// Sorts a pair so `participant_a < participant_b` matches the DB constraint.
 @visibleForTesting
 ({String a, String b}) orderedParticipantPair(String userId, String otherId) {
@@ -40,10 +45,57 @@ String lookingForShareBody(LookingForModel post) {
 String lookingForIHaveThisBody() =>
     'I have an item that matches your Looking For request.';
 
+@visibleForTesting
+bool isMessageAttachmentPathFor({
+  required String conversationId,
+  required String userId,
+  required String path,
+}) {
+  final parts = path.split('/');
+  return parts.length >= 3 && parts[0] == conversationId && parts[1] == userId;
+}
+
+/// Inserts or replaces [incoming] by `message_id`, then sorts by created_at.
+List<MessageModel> upsertMessages(
+  List<MessageModel> current,
+  MessageModel incoming,
+) {
+  if (incoming.id.isEmpty) return current;
+  final byId = <String, MessageModel>{for (final m in current) m.id: m};
+  byId[incoming.id] = incoming;
+  final list = byId.values.toList()
+    ..sort((a, b) {
+      final byTime = a.createdAt.compareTo(b.createdAt);
+      if (byTime != 0) return byTime;
+      return a.id.compareTo(b.id);
+    });
+  return list;
+}
+
+String? _messageImageExtension(String filename, String contentType) {
+  final lowerType = contentType.toLowerCase();
+  if (lowerType.contains('png')) return 'png';
+  if (lowerType.contains('webp')) return 'webp';
+  if (lowerType.contains('jpeg') || lowerType.contains('jpg')) return 'jpg';
+  final lowerName = filename.toLowerCase();
+  if (lowerName.endsWith('.png')) return 'png';
+  if (lowerName.endsWith('.webp')) return 'webp';
+  if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) return 'jpg';
+  return null;
+}
+
+bool _isUniqueViolation(Object error) {
+  final text = error.toString().toLowerCase();
+  return text.contains('23505') ||
+      text.contains('duplicate') ||
+      text.contains('unique');
+}
+
 class ConversationService {
   ConversationService(this._supabase);
 
   final SupabaseService _supabase;
+  static const _uuid = Uuid();
 
   Future<List<ChatModel>> loadConversations(String myId) async {
     final rows = await _supabase.client
@@ -64,16 +116,24 @@ class ConversationService {
         .whereType<String>()
         .toSet()
         .toList();
+    final productIds = list
+        .map((r) => r['product_id'] as String?)
+        .whereType<String>()
+        .toSet()
+        .toList();
 
     final others = await _profilesById(otherIds);
+    final products = await _productsById(productIds);
     return list.map((r) {
       final a = r['participant_a'] as String?;
       final b = r['participant_b'] as String?;
       final otherId = a == myId ? b : a;
+      final productId = r['product_id'] as String?;
       return ChatModel.fromSupabase(
         r,
         myId: myId,
         other: otherId != null ? others[otherId] : null,
+        product: productId != null ? products[productId] : null,
       );
     }).toList();
   }
@@ -91,13 +151,18 @@ class ConversationService {
     final a = row['participant_a'] as String?;
     final b = row['participant_b'] as String?;
     final otherId = a == myId ? b : a;
+    final productId = row['product_id'] as String?;
     final others = otherId != null
         ? await _profilesById([otherId])
+        : <String, Map<String, dynamic>>{};
+    final products = productId != null
+        ? await _productsById([productId])
         : <String, Map<String, dynamic>>{};
     return ChatModel.fromSupabase(
       row,
       myId: myId,
       other: otherId != null ? others[otherId] : null,
+      product: productId != null ? products[productId] : null,
     );
   }
 
@@ -131,48 +196,149 @@ class ConversationService {
     }
   }
 
+  /// Opens the existing thread for this pair (+ optional product) or creates it.
+  ///
+  /// `productId == null` is the general thread used by Looking For / I Have This.
+  /// A non-null product id is a separate listing-linked thread.
   Future<String> openOrCreate({
     required String myId,
     required String otherId,
+    String? productId,
   }) async {
     if (myId == otherId) {
       throw StateError('Cannot open a conversation with yourself.');
     }
     final pair = orderedParticipantPair(myId, otherId);
-    final row = await _supabase.client
-        .from('conversations')
-        .upsert({
-          'participant_a': pair.a,
-          'participant_b': pair.b,
-        }, onConflict: 'participant_a,participant_b')
-        .select('conversation_id')
-        .single();
-    return row['conversation_id'] as String;
+    final existing = await _findConversation(
+      participantA: pair.a,
+      participantB: pair.b,
+      productId: productId,
+    );
+    if (existing != null) return existing;
+
+    try {
+      final insert = <String, dynamic>{
+        'participant_a': pair.a,
+        'participant_b': pair.b,
+        'product_id': ?productId,
+      };
+      final row = await _supabase.client
+          .from('conversations')
+          .insert(insert)
+          .select('conversation_id')
+          .single();
+      return row['conversation_id'] as String;
+    } catch (e) {
+      if (!_isUniqueViolation(e)) rethrow;
+      final retry = await _findConversation(
+        participantA: pair.a,
+        participantB: pair.b,
+        productId: productId,
+      );
+      if (retry != null) return retry;
+      rethrow;
+    }
   }
 
-  Future<void> sendMessage({
+  Future<String?> _findConversation({
+    required String participantA,
+    required String participantB,
+    String? productId,
+  }) async {
+    var query = _supabase.client
+        .from('conversations')
+        .select('conversation_id')
+        .eq('participant_a', participantA)
+        .eq('participant_b', participantB);
+    query = productId == null
+        ? query.isFilter('product_id', null)
+        : query.eq('product_id', productId);
+    final row = await query.maybeSingle();
+    return row?['conversation_id'] as String?;
+  }
+
+  Future<MessageModel> sendMessage({
     required String conversationId,
     required String senderId,
     required String content,
     MessageType type = MessageType.text,
     String? lookingForPostId,
     double? offerAmount,
+    String? attachmentPath,
   }) async {
-    await _supabase.client.from('messages').insert({
+    final sessionId = _supabase.currentUser?.id;
+    if (sessionId != null && sessionId != senderId) {
+      throw StateError('Cannot send as another user.');
+    }
+    final payload = <String, dynamic>{
       'conversation_id': conversationId,
-      'sender_id': senderId,
+      'sender_id': sessionId ?? senderId,
       'content': content,
       'message_type': type.dbValue,
       'looking_for_post_id': ?lookingForPostId,
       'offer_amount': ?offerAmount,
-    });
-    await _supabase.client
-        .from('conversations')
-        .update({
-          'last_message': content,
-          'last_message_at': DateTime.now().toUtc().toIso8601String(),
-        })
-        .eq('conversation_id', conversationId);
+      'attachment_path': ?attachmentPath,
+    };
+    // sender_id is also overwritten by the BEFORE INSERT trigger to auth.uid().
+    final row = await _supabase.client
+        .from('messages')
+        .insert(payload)
+        .select()
+        .single();
+    return MessageModel.fromSupabase(row);
+  }
+
+  Future<void> markRead(String conversationId) async {
+    await _supabase.client.rpc(
+      'mark_conversation_read',
+      params: {'p_conversation_id': conversationId},
+    );
+  }
+
+  Future<String> uploadImageAttachment({
+    required String conversationId,
+    required String userId,
+    required Uint8List bytes,
+    required String filename,
+    required String contentType,
+  }) async {
+    if (bytes.length > kMessageAttachmentMaxBytes) {
+      throw StateError('Image must be 5 MB or smaller.');
+    }
+    final ext = _messageImageExtension(filename, contentType);
+    if (ext == null) {
+      throw StateError('Please choose a JPEG, PNG, or WebP image.');
+    }
+    final objectPath = '$conversationId/$userId/${_uuid.v4()}.$ext';
+    await _supabase.client.storage
+        .from(kMessageAttachmentBucket)
+        .uploadBinary(
+          objectPath,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: false),
+        );
+    return objectPath;
+  }
+
+  Future<void> deleteAttachment(String path) async {
+    try {
+      await _supabase.client.storage.from(kMessageAttachmentBucket).remove([
+        path,
+      ]);
+    } catch (e) {
+      debugPrint('ConversationService.deleteAttachment error ($e)');
+    }
+  }
+
+  Future<String?> signedAttachmentUrl(String path) async {
+    try {
+      return await _supabase.client.storage
+          .from(kMessageAttachmentBucket)
+          .createSignedUrl(path, 3600);
+    } catch (e) {
+      debugPrint('ConversationService.signedAttachmentUrl error ($e)');
+      return null;
+    }
   }
 
   Future<String?> shareLookingFor({
@@ -285,6 +451,46 @@ class ConversationService {
       }
     } catch (e) {
       debugPrint('ConversationService profiles error ($e)');
+    }
+    return out;
+  }
+
+  Future<Map<String, Map<String, dynamic>>> _productsById(
+    List<String> ids,
+  ) async {
+    if (ids.isEmpty) return {};
+    final out = <String, Map<String, dynamic>>{};
+    try {
+      final rows = await _supabase.client
+          .from('products')
+          .select('product_id, name')
+          .inFilter('product_id', ids);
+      for (final p in rows as List<dynamic>) {
+        final map = p as Map<String, dynamic>;
+        final id = map['product_id'] as String?;
+        if (id != null) out[id] = map;
+      }
+    } catch (e) {
+      debugPrint('ConversationService products error ($e)');
+    }
+    try {
+      final imageRows = await _supabase.client
+          .from('product_images')
+          .select('product_id, image_url, is_primary, display_order')
+          .inFilter('product_id', ids)
+          .order('display_order', ascending: true);
+      for (final raw in imageRows as List<dynamic>) {
+        final map = raw as Map<String, dynamic>;
+        final id = map['product_id'] as String?;
+        if (id == null || !out.containsKey(id)) continue;
+        final current = out[id]!;
+        final isPrimary = map['is_primary'] == true;
+        if (isPrimary || current['image_url'] == null) {
+          current['image_url'] = map['image_url'];
+        }
+      }
+    } catch (e) {
+      debugPrint('ConversationService product_images error ($e)');
     }
     return out;
   }

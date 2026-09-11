@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -128,6 +129,7 @@ class AddListingScreen extends StatelessWidget {
               ),
               child: ThriftButton(
                 label: 'Post Listing',
+                isLoading: controller.isLoading,
                 onPressed: controller.isLoading
                     ? null
                     : () => controller.postListing(context),
@@ -136,26 +138,37 @@ class AddListingScreen extends StatelessWidget {
           ),
         ),
 
-        // â”€â”€ Upload progress overlay (shown while isLoading) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (controller.isLoading)
           Positioned.fill(
-            child: ColoredBox(
-              color: Colors.black.withValues(alpha: 0.35),
-              child: const SafeArea(
+            child: AbsorbPointer(
+              child: ColoredBox(
+                color: Colors.black.withValues(alpha: 0.45),
                 child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(color: AppColors.primary),
-                      SizedBox(height: 16),
-                      Text(
-                        'Posting your listing…',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
+                  child: Material(
+                    color: AppColors.surface,
+                    elevation: 4,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            controller.uploadStatusMessage.isEmpty
+                                ? 'Publishing listing…'
+                                : controller.uploadStatusMessage,
+                            textAlign: TextAlign.center,
+                            style: AppTypography.body.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -614,6 +627,16 @@ class _SellingFormatSection extends StatelessWidget {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             error: controller.fieldErrors['price'],
           ),
+          const SizedBox(height: AppConstants.spacingMd),
+          ThriftTextField(
+            label: 'Stock quantity',
+            hint: 'How many units are available',
+            controller: controller.stockCtrl,
+            onChanged: controller.onStockChanged,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            error: controller.fieldErrors['stock'],
+          ),
         ] else ...[
           ThriftTextField(
             label: 'Starting Bid (₱)',
@@ -622,6 +645,8 @@ class _SellingFormatSection extends StatelessWidget {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             error: controller.fieldErrors['price'],
           ),
+          const SizedBox(height: AppConstants.spacingMd),
+          const _AuctionQuantityNote(),
           const SizedBox(height: AppConstants.spacingMd),
           _SelectorField(
             label: 'Auction Duration',
@@ -705,6 +730,41 @@ class _SellingFormatSection extends StatelessWidget {
             },
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+class _AuctionQuantityNote extends StatelessWidget {
+  const _AuctionQuantityNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.inventory_2_outlined,
+            size: 20,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Quantity is 1. Auction listings are a single unique item.',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

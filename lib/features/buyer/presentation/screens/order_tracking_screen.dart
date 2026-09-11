@@ -6,8 +6,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../models/enums.dart';
-import '../../../../providers/data_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../controllers/buyer_orders_controller.dart';
 
 class OrderTrackingScreen extends StatelessWidget {
   const OrderTrackingScreen({super.key, required this.orderId});
@@ -16,32 +16,28 @@ class OrderTrackingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final order = context.watch<DataProvider>().orderById(orderId);
-    if (order == null)
+    final controller = context.watch<BuyerOrdersController>();
+    if (controller.isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+    final order = controller.order;
+    if (order == null) {
       return Scaffold(
         appBar: AppBar(),
-        body: const Center(child: Text('Not found')),
+        body: Center(child: Text(controller.errorMessage ?? 'Order not found')),
       );
+    }
 
     final steps = [
-      _Step('Order Placed', OrderStatus.placed, 'Your order has been placed'),
-      _Step(
-        'Payment Confirmed',
-        OrderStatus.paymentConfirmed,
-        'Payment verified',
-      ),
-      _Step(
-        'Seller Preparing',
-        OrderStatus.preparing,
-        'Seller is packing your item',
-      ),
-      _Step('Shipped', OrderStatus.shipped, 'Package handed to courier'),
-      _Step(
-        'Out for Delivery',
-        OrderStatus.outForDelivery,
-        'Courier is on the way',
-      ),
-      _Step('Delivered', OrderStatus.delivered, 'Package delivered'),
+      _Step('Order placed', 'Your order exists and is waiting for payment.'),
+      _Step('Payment', 'Payment is not collected yet. That comes later.'),
+      _Step('To ship', 'The seller can ship after payment is confirmed.'),
+      _Step('Shipped', 'The package has been handed to a courier.'),
+      _Step('Delivered', 'The package was delivered.'),
     ];
 
     final statusIndex = _statusIndex(order.status);
@@ -58,6 +54,21 @@ class OrderTrackingScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(AppConstants.spacingMd),
           children: [
+            ThriftCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(order.productTitle, style: AppTypography.subheading),
+                  Text(
+                    'Payment pending · ${orderStatusLabel(order.status)}',
+                    style: AppTypography.caption,
+                  ),
+                  if (order.shippingAddress.isNotEmpty)
+                    Text(order.shippingAddress, style: AppTypography.caption),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             ...steps.asMap().entries.map((e) {
               final done = e.key <= statusIndex;
               final current = e.key == statusIndex;
@@ -104,13 +115,6 @@ class OrderTrackingScreen extends StatelessWidget {
                             e.value.description,
                             style: AppTypography.caption,
                           ),
-                          if (done)
-                            Text(
-                              order.createdAt.toString().split('.').first,
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.textHint,
-                              ),
-                            ),
                         ],
                       ),
                     ),
@@ -123,21 +127,16 @@ class OrderTrackingScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Delivery Details', style: AppTypography.subheading),
+                    Text('Delivery details', style: AppTypography.subheading),
                     const SizedBox(height: 8),
                     Text(
-                      'Courier: ${order.courier ?? "J&T Express"}',
+                      'Courier: ${order.courier ?? 'Not set'}',
                       style: AppTypography.body,
                     ),
                     Text(
                       'Tracking: ${order.trackingNumber}',
                       style: AppTypography.body,
                     ),
-                    if (order.estimatedDelivery != null)
-                      Text(
-                        'Est. delivery: ${order.estimatedDelivery!.toString().split(' ').first}',
-                        style: AppTypography.caption,
-                      ),
                   ],
                 ),
               ),
@@ -157,11 +156,10 @@ class OrderTrackingScreen extends StatelessWidget {
       case OrderStatus.preparing:
         return 2;
       case OrderStatus.shipped:
-        return 3;
       case OrderStatus.outForDelivery:
-        return 4;
+        return 3;
       case OrderStatus.delivered:
-        return 5;
+        return 4;
       case OrderStatus.cancelled:
         return 0;
     }
@@ -169,8 +167,7 @@ class OrderTrackingScreen extends StatelessWidget {
 }
 
 class _Step {
-  const _Step(this.title, this.status, this.description);
+  const _Step(this.title, this.description);
   final String title;
-  final OrderStatus status;
   final String description;
 }
