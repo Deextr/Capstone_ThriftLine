@@ -1,4 +1,5 @@
 import 'enums.dart';
+import 'shipment_model.dart';
 
 class OrderLineItem {
   const OrderLineItem({
@@ -67,6 +68,7 @@ class OrderModel {
     this.paymentStatus = 'pending',
     this.items = const [],
     this.addressMissing = false,
+    this.shipment,
   });
 
   final String id;
@@ -99,9 +101,78 @@ class OrderModel {
   final String paymentStatus;
   final List<OrderLineItem> items;
   final bool addressMissing;
+  final ShipmentModel? shipment;
 
   bool get isPaymentPending =>
       status == OrderStatus.paymentPending || status == OrderStatus.placed;
+
+  bool get isPaymentUnsuccessful =>
+      paymentStatus == 'failed' || paymentStatus == 'expired';
+
+  /// Failed unpaid checkout — not a completed purchase or seller sale.
+  bool get isFailedCheckout =>
+      isPaymentUnsuccessful ||
+      (status == OrderStatus.cancelled &&
+          (auctionId == null || auctionId!.isEmpty));
+
+  bool get isExpiredCheckout => paymentStatus == 'expired';
+
+  bool get showsInPurchaseHistory => !isPaymentPending && !isFailedCheckout;
+
+  bool get isToShip {
+    if (isFailedCheckout || isPaymentPending) return false;
+    if (status == OrderStatus.cancelled ||
+        status == OrderStatus.completed ||
+        status == OrderStatus.disputed) {
+      return false;
+    }
+    final delivery = shipment?.deliveryStatus;
+    if (delivery == null) {
+      return status == OrderStatus.paymentConfirmed ||
+          status == OrderStatus.preparing;
+    }
+    return delivery.isPreparing;
+  }
+
+  bool get isInTransit => shipment?.deliveryStatus.isInTransit ?? false;
+
+  bool get isInspecting =>
+      shipment?.isInspecting == true || status == OrderStatus.delivered;
+
+  bool get isDeliveryFailed => shipment?.isFailed == true;
+
+  bool get isDisputed =>
+      status == OrderStatus.disputed || shipment?.isDisputed == true;
+
+  bool get isCompleted =>
+      status == OrderStatus.completed || shipment?.isCompleted == true;
+
+  bool get isShippedTab =>
+      isInTransit || isInspecting || isDeliveryFailed || isDisputed;
+
+  bool get canArrangeDelivery =>
+      !isFailedCheckout &&
+      !isPaymentPending &&
+      !isCompleted &&
+      !isDisputed &&
+      (shipment == null || shipment!.canEditRider);
+
+  bool get isSellerVisible => !isPaymentPending && !isFailedCheckout;
+
+  /// Paid orders still in fulfillment. Unpaid checkouts and completed
+  /// purchases stay out of Track Order; history covers those.
+  bool get isTrackable =>
+      showsInPurchaseHistory &&
+      !isCompleted &&
+      status != OrderStatus.cancelled &&
+      (isToShip ||
+          isInTransit ||
+          isInspecting ||
+          isDeliveryFailed ||
+          isDisputed);
+
+  String get trackingStatusLabel =>
+      shipment?.deliveryStatus.label ?? orderStatusLabel(status);
 
   factory OrderModel.fromSupabase(
     Map<String, dynamic> row, {
@@ -171,7 +242,13 @@ class OrderModel {
       status: orderStatusFromDb(
         row['order_status'] as String? ?? row['status'] as String?,
       ),
-      paymentMethod: PaymentMethod.unpaid,
+      paymentMethod:
+          orderStatusFromDb(
+                row['order_status'] as String? ?? row['status'] as String?,
+              ) ==
+              OrderStatus.paymentPending
+          ? PaymentMethod.unpaid
+          : PaymentMethod.paymongo,
       deliveryMethod: DeliveryMethod.standard,
       shippingAddress: formatted,
       createdAt: row['created_at'] != null
@@ -184,14 +261,10 @@ class OrderModel {
       auctionId: row['auction_id'] as String?,
       source:
           row['order_type'] as String? ?? row['source'] as String? ?? 'cart',
-      paymentStatus:
-          row['payment_status'] as String? ??
-          ((row['order_status'] as String? ?? row['status'] as String?) ==
-                  'pending'
-              ? 'pending'
-              : 'unpaid'),
+      paymentStatus: paymentStatusFromOrderRow(row),
       items: items,
       addressMissing: addressMissing,
+      shipment: shipmentFromOrderRow(row),
     );
   }
 
@@ -226,6 +299,7 @@ class OrderModel {
     String? paymentStatus,
     List<OrderLineItem>? items,
     bool? addressMissing,
+    ShipmentModel? shipment,
   }) => OrderModel(
     id: id ?? this.id,
     orderNumber: orderNumber ?? this.orderNumber,
@@ -257,5 +331,31 @@ class OrderModel {
     paymentStatus: paymentStatus ?? this.paymentStatus,
     items: items ?? this.items,
     addressMissing: addressMissing ?? this.addressMissing,
+    shipment: shipment ?? this.shipment,
   );
+}
+
+String paymentStatusFromOrderRow(Map<String, dynamic> row) {
+  final statuses = <String>[];
+  final nested = row['payments'];
+  if (nested is List) {
+    for (final raw in nested) {
+      if (raw is Map) {
+        final status = raw['payment_status']?.toString().trim();
+        if (status != null && status.isNotEmpty) statuses.add(status);
+      }
+    }
+  } else if (nested is Map) {
+    final status = nested['payment_status']?.toString().trim();
+    if (status != null && status.isNotEmpty) statuses.add(status);
+  }
+  final top = row['payment_status']?.toString().trim();
+  if (top != null && top.isNotEmpty) statuses.add(top);
+  if (statuses.contains('paid')) return 'paid';
+  if (statuses.contains('expired')) return 'expired';
+  if (statuses.contains('failed')) return 'failed';
+  if (statuses.contains('pending')) return 'pending';
+  final orderStatus =
+      row['order_status'] as String? ?? row['status'] as String?;
+  return orderStatus == 'pending' ? 'pending' : 'unpaid';
 }

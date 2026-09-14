@@ -32,11 +32,12 @@ class NotificationModel {
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
       isRead: json['is_read'] as bool? ?? false,
-      data: const {},
+      data: notificationPayload(json['data']),
     );
   }
 
-  NotificationModel copyWith({bool? isRead}) => NotificationModel(
+  NotificationModel copyWith({bool? isRead, Map<String, String>? data}) =>
+      NotificationModel(
         id: id,
         userId: userId,
         type: type,
@@ -44,6 +45,27 @@ class NotificationModel {
         body: body,
         createdAt: createdAt,
         isRead: isRead ?? this.isRead,
-        data: data,
+        data: data ?? this.data,
       );
+}
+
+Map<String, String> notificationPayload(dynamic raw) {
+  if (raw is! Map) return const {};
+  return {
+    for (final entry in raw.entries)
+      entry.key.toString(): '${entry.value ?? ''}',
+  };
+}
+
+final _uuidPattern = RegExp(
+  r'^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+  caseSensitive: false,
+);
+
+/// Reported-user notices set `can_appeal`. Reporter notices must not open this.
+String? notificationAppealReportId(Map<String, String> data) {
+  if (data['can_appeal'] != 'true') return null;
+  final id = data['report_id']?.trim() ?? '';
+  if (!_uuidPattern.hasMatch(id)) return null;
+  return id;
 }

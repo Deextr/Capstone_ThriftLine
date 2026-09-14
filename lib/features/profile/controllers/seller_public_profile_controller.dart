@@ -9,6 +9,7 @@ import '../../../providers/auth_provider.dart';
 import '../../auth/domain/account_mode.dart';
 import '../../buyer/data/catalog_product_query.dart';
 import '../../chat/data/conversation_service.dart';
+import '../../trust_safety/data/review_query.dart';
 
 /// Owns the state and database query logic for a public seller profile.
 ///
@@ -74,20 +75,14 @@ class SellerPublicProfileController extends ChangeNotifier {
       _products.where((p) => p.status == ProductStatus.active).length;
 
   double get averageRating {
-    if (_reviews.isNotEmpty) {
-      final total = _reviews.fold<double>(0, (sum, r) => sum + r.rating);
-      return total / _reviews.length;
-    }
     final stored = _sellerProfile?.rating ?? 0;
-    if (stored > 0 && totalReviewCount > 0) return stored;
+    if (totalReviewCount > 0) return stored;
     return 0;
   }
 
-  bool get hasReviews => totalReviewCount > 0 || _reviews.isNotEmpty;
+  bool get hasReviews => totalReviewCount > 0;
 
-  int get totalReviewCount => _reviews.isNotEmpty
-      ? _reviews.length
-      : (_sellerProfile?.ratingCount ?? 0);
+  int get totalReviewCount => _sellerProfile?.ratingCount ?? 0;
 
   // â”€â”€ Database Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -234,30 +229,7 @@ class SellerPublicProfileController extends ChangeNotifier {
         _products = [];
       }
 
-      // 5. Query reviews for this seller
-      try {
-        final reviewsResponse = await _supabase.client
-            .from('reviews')
-            .select('''
-              *,
-              reviewer:user_public_profiles (
-                user_id,
-                username,
-                full_name,
-                avatar
-              )
-            ''')
-            .eq('reviewed_user_id', sellerUserId)
-            .order('created_at', ascending: false);
-
-        final rawReviews = reviewsResponse as List<dynamic>;
-        _reviews = rawReviews
-            .map((r) => ReviewModel.fromSupabase(r as Map<String, dynamic>))
-            .toList();
-      } catch (e) {
-        debugPrint('reviews fetch for seller error: $e');
-        _reviews = [];
-      }
+      _reviews = await fetchReviewsForUser(_supabase, sellerUserId);
 
       // 6. Build the unified SellerProfile
       _sellerProfile = SellerProfile.fromSupabase(

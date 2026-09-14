@@ -45,9 +45,27 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tel</string>
+		<string>sms</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>ThriftLine uses the camera to capture your government ID and for seller face verification.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>ThriftLine uses your photos so you can add listing pictures.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.example.thriftline.paymongo</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>thriftline</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

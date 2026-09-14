@@ -35,6 +35,32 @@ class OrderConfirmationScreen extends StatelessWidget {
       );
     }
 
+    if (order.isFailedCheckout) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.go(RouteNames.checkout);
+        }
+      });
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
+    if (order.isPaymentPending) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.go(RouteNames.paymentForOrder(orderId));
+        }
+      });
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -56,7 +82,7 @@ class OrderConfirmationScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                Text('Order placed', style: AppTypography.display),
+                Text('Payment Successful', style: AppTypography.display),
                 Text(
                   'Order #${order.orderNumber}',
                   style: AppTypography.body.copyWith(
@@ -65,7 +91,7 @@ class OrderConfirmationScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Payment is pending. No funds have been collected yet.',
+                  'Your payment has been received. Order #${order.orderNumber} has been paid successfully. The seller can now prepare your order.',
                   style: AppTypography.caption,
                   textAlign: TextAlign.center,
                 ),
@@ -94,7 +120,7 @@ class OrderConfirmationScreen extends StatelessWidget {
                       _row('Shipping', formatCurrency(order.shippingFee)),
                       _row('Platform fee', formatCurrency(order.platformFee)),
                       _row('Total', formatCurrency(order.total), bold: true),
-                      _row('Payment', 'Pending'),
+                      _row('Payment', 'Paid'),
                       _row(
                         'Delivery',
                         order.addressMissing

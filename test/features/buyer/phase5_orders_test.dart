@@ -32,13 +32,14 @@ void main() {
       expect(orderStatusFromDb('paid'), OrderStatus.preparing);
       expect(orderStatusFromDb('shipped'), OrderStatus.shipped);
       expect(orderStatusFromDb('delivered'), OrderStatus.delivered);
-      expect(orderStatusFromDb('completed'), OrderStatus.delivered);
+      expect(orderStatusFromDb('completed'), OrderStatus.completed);
+      expect(orderStatusFromDb('disputed'), OrderStatus.disputed);
       expect(orderStatusFromDb('cancelled'), OrderStatus.cancelled);
     });
 
     test('maps paid to to-ship and does not treat it as payment pending', () {
       expect(orderStatusFromDb('paid'), OrderStatus.preparing);
-      expect(orderStatusFromDb('completed'), OrderStatus.delivered);
+      expect(orderStatusFromDb('completed'), OrderStatus.completed);
       final order = OrderModel.fromSupabase({
         'order_id': 'order-paid',
         'order_number': 'TL-3',
@@ -55,7 +56,8 @@ void main() {
     });
 
     test('labels pending payment instead of a fake paid state', () {
-      expect(orderStatusLabel(OrderStatus.paymentPending), 'Pending payment');
+      expect(orderStatusLabel(OrderStatus.paymentPending), 'Awaiting payment');
+      expect(orderStatusLabel(OrderStatus.preparing), 'Paid / To ship');
     });
   });
 

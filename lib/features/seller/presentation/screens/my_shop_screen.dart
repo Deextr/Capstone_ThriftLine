@@ -9,6 +9,7 @@ import '../../../../core/routes/route_names.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/product_card.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../trust_safety/data/review_rules.dart';
 import '../../controllers/my_shop_controller.dart';
 
 class MyShopScreen extends StatelessWidget {
@@ -21,7 +22,10 @@ class MyShopScreen extends StatelessWidget {
     final user = auth.user;
     final username = auth.username ?? '';
     final products = shop.previewProducts;
-    final rating = user?.rating ?? 0;
+    final ratingLabel = formatRatingAverage(
+      average: user?.rating,
+      count: user?.ratingCount ?? 0,
+    );
     final sold = shop.soldCount;
     final followers = shop.followerCount;
     final following = shop.followingCount;
@@ -120,7 +124,9 @@ class MyShopScreen extends StatelessWidget {
                     const SizedBox(height: 4),
 
                     Text(
-                      '★ ${rating.toStringAsFixed(1)}  •  $sold sales',
+                      user?.ratingCount == 0
+                          ? '$ratingLabel  •  $sold sales'
+                          : '★ $ratingLabel  •  $sold sales',
                       style: AppTypography.caption.copyWith(
                         color: AppColors.textSecondary,
                       ),
@@ -142,10 +148,7 @@ class MyShopScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _StatColumn(
-                          value: '${rating.toStringAsFixed(1)} ★',
-                          label: 'Rating',
-                        ),
+                        _StatColumn(value: ratingLabel, label: 'Rating'),
                         const _Divider(),
                         _StatColumn(value: '$sold', label: 'Sold'),
                         const _Divider(),

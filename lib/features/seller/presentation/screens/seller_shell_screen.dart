@@ -10,6 +10,7 @@ import '../../../buyer/presentation/screens/buyer_looking_for_tab.dart';
 import '../../../chat/controllers/chat_list_controller.dart';
 import '../../../chat/presentation/widgets/chat_inbox_view.dart';
 import '../../../profile/screens/seller_profile_tab.dart';
+import '../../controllers/seller_earnings_controller.dart';
 import '../../controllers/seller_orders_controller.dart';
 import 'seller_dashboard_tab.dart';
 import 'seller_listings_tab.dart';
@@ -107,11 +108,20 @@ class _SellerShellScreenState extends State<SellerShellScreen> {
       ),
     ];
 
-    return ChangeNotifierProvider(
-      create: (context) => LookingForController(
-        supabase: context.read<SupabaseService>(),
-        auth: context.read<AuthProvider>(),
-      ),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (context) => LookingForController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => SellerEarningsController(
+            supabase: context.read<SupabaseService>(),
+          ),
+        ),
+      ],
       child: Scaffold(
         extendBody: true,
         body: AnimatedSwitcher(

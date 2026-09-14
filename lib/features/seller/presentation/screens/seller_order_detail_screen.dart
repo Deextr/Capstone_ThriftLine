@@ -5,10 +5,15 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../models/enums.dart';
+import '../../../../models/order_model.dart';
+import '../../../../widgets/delivery_timeline.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../trust_safety/presentation/widgets/order_review_cta.dart';
 import '../../controllers/seller_orders_controller.dart';
+import '../widgets/delivery_pin_entry.dart';
 
 class SellerOrderDetailScreen extends StatelessWidget {
   const SellerOrderDetailScreen({super.key, required this.orderId});
@@ -110,23 +115,196 @@ class SellerOrderDetailScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   ThriftBadge(
                     label: order.isPaymentPending
-                        ? 'Awaiting payment'
+                        ? 'Checkout in progress'
+                        : order.isFailedCheckout
+                        ? 'Checkout not completed'
                         : orderStatusLabel(order.status),
-                    variant: order.isPaymentPending
-                        ? BadgeVariant.warning
+                    variant: order.isToShip
+                        ? BadgeVariant.success
                         : BadgeVariant.neutral,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Payment collection is a later step. Do not mark this order as paid here.',
+                    order.isPaymentPending
+                        ? 'This is not a sale yet. Fulfillment starts only after PayMongo confirms payment.'
+                        : order.isFailedCheckout
+                        ? 'The buyer did not complete payment. This is not a sale.'
+                        : order.isCompleted
+                        ? 'This transaction has been completed.'
+                        : order.isDisputed
+                        ? 'A delivery problem was reported. Automatic completion is paused.'
+                        : order.isDeliveryFailed
+                        ? 'Delivery was not completed. The parcel should not have been left with the buyer.'
+                        : 'PayMongo confirmed this payment. Arrange a freelance rider when you are ready.',
                     style: AppTypography.caption,
                   ),
                 ],
               ),
             ),
+            if (order.isCompleted) ...[
+              const SizedBox(height: 16),
+              OrderReviewCta(
+                order: order,
+                existing: controller.reviewFor(order.id),
+                ratingBuyer: true,
+                onReturned: () => context.read<SellerOrdersController>().load(
+                  showSpinner: false,
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: () => context.push(
+                    RouteNames.reportUser(
+                      userId: order.buyerId,
+                      orderId: order.id,
+                    ),
+                  ),
+                  child: const Text('Report this buyer'),
+                ),
+              ),
+            ],
+            if (!order.isPaymentPending && !order.isFailedCheckout) ...[
+              const SizedBox(height: 16),
+              ThriftCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (order.shipment != null)
+                      RiderInfoCard(shipment: order.shipment!, buyerView: false)
+                    else ...[
+                      Text('Delivery', style: AppTypography.subheading),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Freelance / Local Rider · Seller Arranged',
+                        style: AppTypography.caption,
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    DeliveryTimeline(order: order),
+                    if (order.shipment?.isOutForDelivery == true) ...[
+                      Text(
+                        'Do not instruct your rider to leave the parcel without obtaining the buyer\'s Delivery PIN.',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.secondary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DeliveryPinEntry(
+                        isLoading: controller.isUpdatingDelivery,
+                        onSubmit: (pin) async {
+                          if (pin.length != 6) {
+                            showThriftSnackBar(
+                              context,
+                              'Enter the 6-digit Delivery PIN.',
+                              isError: true,
+                            );
+                            return;
+                          }
+                          final error = await context
+                              .read<SellerOrdersController>()
+                              .verifyDeliveryPin(pin);
+                          if (!context.mounted) return;
+                          showThriftSnackBar(
+                            context,
+                            error ?? 'Delivery verified.',
+                            isError: error != null,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      ThriftButton(
+                        label: 'Record delivery problem',
+                        variant: ThriftButtonVariant.outline,
+                        onPressed: controller.isUpdatingDelivery
+                            ? null
+                            : () => _recordFailure(context),
+                      ),
+                    ],
+                    if (order.canArrangeDelivery) ...[
+                      const SizedBox(height: 8),
+                      ThriftButton(
+                        label: order.shipment?.hasRider == true
+                            ? 'Update rider'
+                            : 'Arrange Delivery',
+                        onPressed: () => context.push(
+                          RouteNames.arrangeDeliveryFor(order.id),
+                        ),
+                      ),
+                    ],
+                    ..._milestoneButtons(context, order, controller),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
+    );
+  }
+
+  List<Widget> _milestoneButtons(
+    BuildContext context,
+    OrderModel order,
+    SellerOrdersController controller,
+  ) {
+    final status = order.shipment?.deliveryStatus;
+    final actions = <(String, String)>[];
+    if (status == DeliveryStatus.riderAssigned) {
+      actions.add(('ready_for_pickup', 'Mark Ready for Pickup'));
+    }
+    if (status == DeliveryStatus.readyForPickup) {
+      actions.add(('picked_up', 'Mark Picked Up'));
+    }
+    if (status == DeliveryStatus.pickedUp) {
+      actions.add(('out_for_delivery', 'Mark Out for Delivery'));
+    }
+    return [
+      for (final action in actions) ...[
+        const SizedBox(height: 12),
+        ThriftButton(
+          label: action.$2,
+          onPressed: controller.isUpdatingDelivery
+              ? null
+              : () async {
+                  final error = await context
+                      .read<SellerOrdersController>()
+                      .advanceDelivery(action.$1);
+                  if (!context.mounted) return;
+                  if (error != null) {
+                    showThriftSnackBar(context, error, isError: true);
+                  }
+                },
+        ),
+      ],
+    ];
+  }
+
+  Future<void> _recordFailure(BuildContext context) async {
+    final reason = await showModalBottomSheet<DeliveryFailureReason>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final reason in DeliveryFailureReason.values)
+              ListTile(
+                title: Text(reason.label),
+                onTap: () => Navigator.pop(context, reason),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (reason == null || !context.mounted) return;
+    final error = await context
+        .read<SellerOrdersController>()
+        .markDeliveryFailed(reason.dbValue);
+    if (!context.mounted) return;
+    showThriftSnackBar(
+      context,
+      error ?? 'Delivery marked as not completed.',
+      isError: error != null,
     );
   }
 

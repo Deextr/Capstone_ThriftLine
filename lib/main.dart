@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'app/app.dart';
 import 'core/config/supabase_config.dart';
 import 'core/routes/app_router.dart';
+import 'core/routes/paymongo_return_coordinator.dart';
 import 'core/services/shared_preferences_service.dart';
 import 'core/services/supabase_service.dart';
 import 'features/auth/data/auth_service.dart';
@@ -43,9 +44,13 @@ Future<void> main() async {
 
   await authProvider.init();
 
+  final paymongoReturn = PaymongoReturnCoordinator();
+  await attachPaymongoReturnLinks(paymongoReturn);
+
   final router = createAppRouter(
     authProvider: authProvider,
     appProvider: appProvider,
+    paymongoReturn: paymongoReturn,
   );
 
   runApp(

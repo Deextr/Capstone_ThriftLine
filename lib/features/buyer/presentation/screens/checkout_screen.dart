@@ -17,12 +17,9 @@ class CheckoutScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cart = context.watch<CartProvider>();
+    context.watch<CartProvider>();
     final checkout = context.watch<CheckoutController>();
-    final buyNowId = checkout.scopedProductId;
-    final items = buyNowId == null || buyNowId.isEmpty
-        ? cart.fixedPriceItems
-        : cart.fixedPriceItems.where((i) => i.product.id == buyNowId).toList();
+    final items = checkout.checkoutItems;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -508,7 +505,9 @@ class _CheckoutBottomBar extends StatelessWidget {
           _SummaryRow(label: 'Total', value: formatCurrency(total), bold: true),
           const SizedBox(height: 8),
           Text(
-            'Creates a real order. Payment stays pending until a later step.',
+            checkout.remainingOtherSellerCount > 0
+                ? 'This checkout is for one seller. Items from other sellers stay in your cart. Payment is required next.'
+                : 'Next you will choose Card or GCash and pay through PayMongo. The purchase completes only after payment is confirmed.',
             style: AppTypography.caption.copyWith(fontSize: 11),
             textAlign: TextAlign.center,
           ),
@@ -527,6 +526,9 @@ class _CheckoutBottomBar extends StatelessWidget {
             child: ElevatedButton(
               onPressed: canSubmit
                   ? () async {
+                      final leftover = context
+                          .read<CheckoutController>()
+                          .remainingOtherSellerCount;
                       final result = await context
                           .read<CheckoutController>()
                           .placeOrder();
@@ -539,15 +541,13 @@ class _CheckoutBottomBar extends StatelessWidget {
                         );
                         return;
                       }
-                      if (result.count > 1) {
+                      if (leftover > 0) {
                         showThriftSnackBar(
                           context,
-                          'Placed ${result.count} orders (one per seller). Payment is pending.',
+                          'Pay this seller first. Items from other sellers are still in your cart.',
                         );
-                        context.go(RouteNames.purchaseHistory);
-                        return;
                       }
-                      context.go('/order-confirm/${result.orderId}');
+                      context.go(RouteNames.paymentForOrder(result.orderId!));
                     }
                   : checkout.hasAddress
                   ? null
@@ -581,7 +581,7 @@ class _CheckoutBottomBar extends StatelessWidget {
                         const Icon(Icons.lock_rounded, size: 18),
                         const SizedBox(width: 8),
                         Text(
-                          'Place order',
+                          'Continue to payment',
                           style: AppTypography.subheading.copyWith(
                             color: Colors.white,
                             fontSize: 15,

@@ -10,6 +10,18 @@ int checkoutSellerCount(Iterable<String?> sellerIds) {
       .length;
 }
 
+/// Stable first seller for a one-payment checkout (matches SQL ORDER BY seller_id).
+String? firstCheckoutSellerId(Iterable<String?> sellerIds) {
+  final ids =
+      sellerIds
+          .whereType<String>()
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+  return ids.isEmpty ? null : ids.first;
+}
+
 double checkoutShippingFee(int sellerCount) {
   if (sellerCount <= 0) return 0;
   return sellerCount * kCheckoutShippingPerSeller;

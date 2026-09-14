@@ -1,4 +1,3 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -12,11 +11,13 @@ import '../../../../models/enums.dart';
 import '../../../../models/looking_for_model.dart';
 import '../../../../models/order_model.dart';
 import '../../../../providers/auth_provider.dart';
-import '../../../../providers/data_provider.dart';
 import '../../../../providers/notifications_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../buyer/controllers/looking_for_controller.dart';
+import '../../../trust_safety/data/review_rules.dart';
+import '../../controllers/seller_earnings_controller.dart';
 import '../../controllers/seller_orders_controller.dart';
+import '../widgets/seller_earnings_panel.dart';
 
 class SellerDashboardTab extends StatelessWidget {
   const SellerDashboardTab({super.key});
@@ -24,13 +25,14 @@ class SellerDashboardTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final data = context.watch<DataProvider>();
     final looking = context.watch<LookingForController>();
     final ordersCtrl = context.watch<SellerOrdersController>();
     final user = auth.user;
-    final listings = data.productsForSeller(auth.username ?? '');
     final pending = ordersCtrl.pendingCount;
-    final recentOrders = ordersCtrl.orders.take(3).toList();
+    final recentOrders = ordersCtrl.orders
+        .where((order) => order.isSellerVisible)
+        .take(3)
+        .toList();
     final lookingForPosts = looking.posts.take(3).toList();
 
     return ColoredBox(
@@ -43,6 +45,7 @@ class SellerDashboardTab extends StatelessWidget {
             await Future.wait([
               context.read<LookingForController>().refresh(),
               context.read<SellerOrdersController>().load(),
+              context.read<SellerEarningsController>().load(),
             ]);
           },
           child: CustomScrollView(
@@ -51,22 +54,21 @@ class SellerDashboardTab extends StatelessWidget {
               // â”€â”€ Sticky top bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverToBoxAdapter(child: _TopBar(user: user)),
 
-              // â”€â”€ Hero banner: earnings + mini stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverToBoxAdapter(
-                child: _EarningsBanner(
-                  listings: listings.length,
-                  pending: pending,
-                  rating: user?.rating ?? 4.8,
+                child: SellerEarningsPanel(
+                  pendingCount: pending,
+                  ratingLabel: formatRatingAverage(
+                    average: user?.rating,
+                    count: user?.ratingCount ?? 0,
+                    compact: true,
+                  ),
                 ),
               ),
 
-              // â”€â”€ Quick actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              // Quick actions
               SliverToBoxAdapter(child: _QuickActionBar()),
 
-              // â”€â”€ Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-              SliverToBoxAdapter(child: _ChartSection()),
-
-              // â”€â”€ Recent Orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              // Recent Orders
               SliverToBoxAdapter(
                 child: _SectionLabel(title: 'Recent Orders', onTap: () {}),
               ),
@@ -182,210 +184,6 @@ class _IconBtn extends StatelessWidget {
 }
 
 // =============================================================================
-// Earnings Banner  (full-width gradient card)
-// =============================================================================
-
-class _EarningsBanner extends StatelessWidget {
-  const _EarningsBanner({
-    required this.listings,
-    required this.pending,
-    required this.rating,
-  });
-  final int listings;
-  final int pending;
-  final double rating;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(AppConstants.radiusXl),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.35),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            // Decorative circle top-right
-            Positioned(
-              top: -28,
-              right: -28,
-              child: Container(
-                width: 130,
-                height: 130,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.06),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -18,
-              right: 60,
-              child: Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.05),
-                ),
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.all(22),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Label
-                  Text(
-                    'Total Earnings',
-                    style: AppTypography.caption.copyWith(
-                      color: Colors.white.withValues(alpha: 0.75),
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  // Big value
-                  Text(
-                    formatCurrency(45200),
-                    style: AppTypography.display.copyWith(
-                      color: Colors.white,
-                      fontSize: 34,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  // Trend chip
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.arrow_upward_rounded,
-                          color: Colors.white,
-                          size: 13,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '12.4% vs last month',
-                          style: AppTypography.caption.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  // Divider line
-                  Container(
-                    height: 1,
-                    color: Colors.white.withValues(alpha: 0.15),
-                  ),
-                  const SizedBox(height: 18),
-                  // Mini stats row
-                  Row(
-                    children: [
-                      _MiniStat(
-                        label: 'Listings',
-                        value: '$listings',
-                        icon: Icons.storefront_outlined,
-                      ),
-                      _VertDivider(),
-                      _MiniStat(
-                        label: 'Pending',
-                        value: '$pending',
-                        icon: Icons.hourglass_top_rounded,
-                      ),
-                      _VertDivider(),
-                      _MiniStat(
-                        label: 'Rating',
-                        value: '$rating â˜…',
-                        icon: Icons.star_rounded,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniStat extends StatelessWidget {
-  const _MiniStat({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
-  final String label;
-  final String value;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          Icon(icon, color: Colors.white.withValues(alpha: 0.80), size: 18),
-          const SizedBox(height: 5),
-          Text(
-            value,
-            style: AppTypography.subheading.copyWith(
-              color: Colors.white,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: AppTypography.caption.copyWith(
-              color: Colors.white.withValues(alpha: 0.65),
-              fontSize: 11,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VertDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 44,
-      color: Colors.white.withValues(alpha: 0.18),
-    );
-  }
-}
-
-// =============================================================================
 // Quick Action Bar
 // =============================================================================
 
@@ -495,186 +293,6 @@ class _ActionTile extends StatelessWidget {
 }
 
 // =============================================================================
-// Chart Section
-// =============================================================================
-
-class _ChartSection extends StatelessWidget {
-  const _ChartSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppConstants.radiusXl),
-          border: Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header row
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Sales Overview', style: AppTypography.subheading),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Weekly performance',
-                          style: AppTypography.caption,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      'This Week',
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.primaryDark,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Chart
-            SizedBox(
-              height: 180,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 16, left: 8, bottom: 8),
-                child: LineChart(
-                  LineChartData(
-                    gridData: FlGridData(
-                      show: true,
-                      drawVerticalLine: false,
-                      horizontalInterval: 100,
-                      getDrawingHorizontalLine: (_) => FlLine(
-                        color: AppColors.border,
-                        strokeWidth: 1,
-                        dashArray: [4, 4],
-                      ),
-                    ),
-                    titlesData: FlTitlesData(
-                      rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 22,
-                          getTitlesWidget: (value, _) {
-                            const days = [
-                              'Mon',
-                              'Tue',
-                              'Wed',
-                              'Thu',
-                              'Fri',
-                              'Sat',
-                              'Sun',
-                            ];
-                            final i = value.toInt();
-                            if (i >= 0 && i < days.length) {
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  days[i],
-                                  style: AppTypography.caption.copyWith(
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              );
-                            }
-                            return const SizedBox.shrink();
-                          },
-                        ),
-                      ),
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 30,
-                          getTitlesWidget: (value, _) => Text(
-                            '${value.toInt()}',
-                            style: AppTypography.caption.copyWith(fontSize: 9),
-                          ),
-                        ),
-                      ),
-                    ),
-                    borderData: FlBorderData(show: false),
-                    lineBarsData: [
-                      LineChartBarData(
-                        spots: const [
-                          FlSpot(0, 0),
-                          FlSpot(1, 0),
-                          FlSpot(2, 0),
-                          FlSpot(3, 0),
-                          FlSpot(4, 0),
-                          FlSpot(5, 0),
-                          FlSpot(6, 0),
-                        ],
-                        isCurved: true,
-                        color: AppColors.primary,
-                        barWidth: 2.5,
-                        isStrokeCapRound: true,
-                        dotData: FlDotData(
-                          show: true,
-                          getDotPainter: (spot, _, _, _) => FlDotCirclePainter(
-                            radius: 3,
-                            color: AppColors.primary,
-                            strokeWidth: 2,
-                            strokeColor: Colors.white,
-                          ),
-                        ),
-                        belowBarData: BarAreaData(
-                          show: true,
-                          gradient: LinearGradient(
-                            colors: [
-                              AppColors.primary.withValues(alpha: 0.18),
-                              AppColors.primary.withValues(alpha: 0.0),
-                            ],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// =============================================================================
 // Section Label
 // =============================================================================
 
@@ -737,7 +355,7 @@ class _OrderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isNew = order.isPaymentPending;
+    final isNew = order.isToShip;
 
     return Container(
       decoration: BoxDecoration(

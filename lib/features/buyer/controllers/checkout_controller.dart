@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/stock_limits.dart';
+import '../data/checkout_totals.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/address_model.dart';
 import '../../../providers/auth_provider.dart';
@@ -49,8 +50,22 @@ class CheckoutController extends ChangeNotifier {
 
   List<CartItem> get checkoutItems {
     final id = scopedProductId;
-    if (id == null) return _cart.fixedPriceItems;
-    return _cart.fixedPriceItems.where((i) => i.product.id == id).toList();
+    final source = id == null
+        ? _cart.fixedPriceItems
+        : _cart.fixedPriceItems.where((i) => i.product.id == id).toList();
+    final sellerId = firstCheckoutSellerId(
+      source.map((item) => item.product.sellerId),
+    );
+    if (sellerId == null) return source;
+    return source.where((item) => item.product.sellerId == sellerId).toList();
+  }
+
+  int get remainingOtherSellerCount {
+    final id = scopedProductId;
+    final source = id == null
+        ? _cart.fixedPriceItems
+        : _cart.fixedPriceItems.where((i) => i.product.id == id).toList();
+    return source.length - checkoutItems.length;
   }
 
   Future<void> load() async {

@@ -8,6 +8,32 @@ final _currencyFormat = NumberFormat.currency(
 
 String formatCurrency(double amount) => _currencyFormat.format(amount);
 
+String formatCentavos(int centavos) => formatCurrency(centavos / 100);
+
+/// First name plus last initial for list views. Full names stay on details.
+String shortPersonName(String? name, {String fallback = 'Buyer'}) {
+  final parts = (name ?? '')
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) return fallback;
+  if (parts.length == 1) return parts.first;
+  final last = parts.last;
+  return '${parts.first} ${last[0].toUpperCase()}.';
+}
+
+String formatCompactDate(DateTime dateTime, {DateTime? now}) {
+  final local = dateTime.toLocal();
+  final today = (now ?? DateTime.now()).toLocal();
+  if (local.year == today.year &&
+      local.month == today.month &&
+      local.day == today.day) {
+    return 'today';
+  }
+  return DateFormat('MMM d').format(local);
+}
+
 String formatRelativeTime(DateTime dateTime) {
   final diff = DateTime.now().difference(dateTime);
   if (diff.inMinutes < 1) return 'Just now';

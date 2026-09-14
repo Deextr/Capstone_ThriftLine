@@ -137,6 +137,68 @@ Run `../introspection/phase5_verify.sql` then `../introspection/phase5_stock_ver
 
 Buyer delivery addresses are Davao City only. Apply `20260911030000_addresses_davao_city.sql` and run `../introspection/addresses_davao_verify.sql`.
 
+## Phase 6 — PayMongo payment collection
+
+Do **not** rewrite Phase 5 order/checkout migrations. Apply these after `20260911030000`:
+
+| File | Purpose |
+| --- | --- |
+| `20260911040000_phase6_paymongo_enum.sql` | Adds `paymongo` to `payment_method_enum`. Run this file **by itself** and wait for success before the next file. |
+| `20260911040100_phase6_paymongo.sql` | PayMongo columns, unique pending/paid payment indexes, webhook event log, checkout/webhook RPCs, Realtime on `orders` |
+
+Run `../introspection/phase6_verify.sql` afterwards; all 16 checks should report `PASS`.
+
+Edge Functions live in `../functions/create-paymongo-checkout`, `../functions/paymongo-webhook`, and `../functions/paymongo-return`. Deploy them and set **only** server-side secrets:
+
+```text
+PAYMONGO_SECRET_KEY=sk_test_...
+PAYMONGO_WEBHOOK_SECRET=whsk_test_...
+```
+
+Never put those values in Flutter `.env`. Disable JWT verification on `paymongo-webhook` and `paymongo-return`. See `../../docs/agile/phase-6.md`.
+
+## Phase 7 — freelance rider delivery
+
+Do **not** rewrite Phase 6 payment files or create a `couriers` table. Apply after mandatory payment:
+
+| File | Purpose |
+| --- | --- |
+| `20260912030000_phase7_delivery.sql` | `shipments`, PIN secrets, delivery events/disputes, paid-order trigger, delivery RPCs |
+
+Run `../introspection/phase7_verify.sql` afterwards; all 20 checks should report `PASS`.
+
+Deploy `../functions/complete-expired-inspections` and schedule it about once a minute, the same way as `close-auctions`. Opening Track Order or seller order detail also calls `complete_expired_inspections()`. See `../../docs/agile/phase-7.md`.
+
+If checkout fails with `DELETE requires a WHERE clause` (code `21000`), apply `20260912010000_checkout_temp_delete.sql` and run `../introspection/checkout_temp_delete_verify.sql`. That is a hosted `pg-safeupdate` guard on `DELETE FROM tmp_checkout_lines`, not a PayMongo problem.
+
+## Phase 8 — reviews and community reports
+
+| File | Purpose |
+| --- | --- |
+| `20260913020000_phase8_reviews_reports.sql` | Reviews, `reports`, `report_evidence`, `submit_report`, `decide_report` later in Phase 9 |
+
+Run `../introspection/phase8_verify.sql` afterwards.
+
+## Phase 9 — Admin Review Center
+
+| File | Purpose |
+| --- | --- |
+| `20260913030000_phase9_admin_review.sql` | Admin `decide_report` and `close_delivery_dispute` (no money movement) |
+
+Run `../introspection/phase9_verify.sql` afterwards; all 16 checks should report `PASS`.
+
+## Phase 10 — held payments, refund/release, seller earnings, payouts, appeals
+
+Do **not** edit earlier migrations. `escrow` is an internal ledger, not a regulated third-party escrow product.
+
+| File | Purpose |
+| --- | --- |
+| `20260914010000_phase10_settlement.sql` | `escrow`, `seller_payouts`, `report_appeals`, hold/release triggers, admin money RPCs, seller snapshot/payout, reported-user notice + appeal |
+
+Run `../introspection/phase10_verify.sql` afterwards; all 22 checks should report `PASS`.
+
+Deploy `../functions/resolve-delivery-payment` with the same `PAYMONGO_SECRET_KEY` used by checkout. Flutter must never receive that key. Seller payouts are **recorded requests only** — they do not send GCash.
+
 ## Conventions
 
 - Authorization lives in RLS policies and `SECURITY DEFINER` helpers, never in

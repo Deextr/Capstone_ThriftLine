@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../models/enums.dart';
+import '../../../trust_safety/data/review_rules.dart';
 import '../../controllers/buyer_orders_controller.dart';
 
 class PurchaseHistoryScreen extends StatelessWidget {
@@ -14,7 +16,9 @@ class PurchaseHistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<BuyerOrdersController>();
-    final orders = controller.orders;
+    final orders = controller.orders
+        .where((order) => order.showsInPurchaseHistory)
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -43,19 +47,39 @@ class PurchaseHistoryScreen extends StatelessWidget {
                   itemCount: orders.length,
                   itemBuilder: (_, i) {
                     final o = orders[i];
-                    return ListTile(
-                      title: Text(o.productTitle, style: AppTypography.body),
-                      subtitle: Text(
-                        '#${o.orderNumber} · ${orderStatusLabel(o.status)}',
-                      ),
-                      trailing: Text(
-                        formatCurrency(o.total),
-                        style: AppTypography.subheading.copyWith(
-                          color: AppColors.primary,
-                          fontSize: 14,
+                    return Column(
+                      children: [
+                        ListTile(
+                          title: Text(
+                            o.productTitle,
+                            style: AppTypography.body,
+                          ),
+                          subtitle: Text(
+                            o.isCompleted
+                                ? '#${o.orderNumber} · ${reviewActionLabel(reviewActionKind(controller.reviewFor(o.id)), ratingBuyer: false)}'
+                                : '#${o.orderNumber} · ${orderStatusLabel(o.status)}',
+                          ),
+                          trailing: Text(
+                            formatCurrency(o.total),
+                            style: AppTypography.subheading.copyWith(
+                              color: AppColors.primary,
+                              fontSize: 14,
+                            ),
+                          ),
+                          onTap: () async {
+                            if (o.isCompleted) {
+                              await context.push(
+                                RouteNames.leaveReviewFor(o.id),
+                              );
+                              if (context.mounted) {
+                                await controller.load(showSpinner: false);
+                              }
+                              return;
+                            }
+                            context.push(RouteNames.trackOrderFor(o.id));
+                          },
                         ),
-                      ),
-                      onTap: () => context.push('/track-order/${o.id}'),
+                      ],
                     );
                   },
                 ),

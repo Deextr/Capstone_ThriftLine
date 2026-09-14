@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../models/enums.dart';
 import '../../../../models/notification_model.dart';
@@ -96,7 +97,10 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         return ListTile(
           leading: CircleAvatar(
             backgroundColor: _colorFor(n.type).withValues(alpha: 0.15),
-            child: Text(_emojiFor(n.type), style: const TextStyle(fontSize: 18)),
+            child: Text(
+              _emojiFor(n.type),
+              style: const TextStyle(fontSize: 18),
+            ),
           ),
           title: Text(
             n.title,
@@ -108,7 +112,10 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           trailing: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(formatRelativeTime(n.createdAt), style: AppTypography.caption),
+              Text(
+                formatRelativeTime(n.createdAt),
+                style: AppTypography.caption,
+              ),
               if (!n.isRead)
                 Container(
                   width: 8,
@@ -121,35 +128,41 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                 ),
             ],
           ),
-          onTap: () => context.read<NotificationsProvider>().markRead(n.id),
+          onTap: () {
+            context.read<NotificationsProvider>().markRead(n.id);
+            final reportId = notificationAppealReportId(n.data);
+            if (reportId != null) {
+              context.push(RouteNames.accountReviewFor(reportId));
+            }
+          },
         );
       },
     );
   }
 
   String _emojiFor(NotificationType type) => switch (type) {
-        NotificationType.outbid => '🎯',
-        NotificationType.wonBid => '🏆',
-        NotificationType.shipped => '📦',
-        NotificationType.message => '💬',
-        NotificationType.saved => '❤️',
-        NotificationType.orderConfirmed => '✅',
-        NotificationType.verificationSubmitted => '📄',
-        NotificationType.verificationApproved => '✅',
-        NotificationType.verificationRejected => '⚠️',
-        NotificationType.system => 'ℹ️',
-      };
+    NotificationType.outbid => '🎯',
+    NotificationType.wonBid => '🏆',
+    NotificationType.shipped => '📦',
+    NotificationType.message => '💬',
+    NotificationType.saved => '❤️',
+    NotificationType.orderConfirmed => '✅',
+    NotificationType.verificationSubmitted => '📄',
+    NotificationType.verificationApproved => '✅',
+    NotificationType.verificationRejected => '⚠️',
+    NotificationType.system => 'ℹ️',
+  };
 
   Color _colorFor(NotificationType type) => switch (type) {
-        NotificationType.outbid => AppColors.secondary,
-        NotificationType.wonBid => AppColors.primary,
-        NotificationType.shipped => AppColors.info,
-        NotificationType.message => AppColors.textSecondary,
-        NotificationType.saved => const Color(0xFFEC4899),
-        NotificationType.orderConfirmed => AppColors.success,
-        NotificationType.verificationSubmitted => AppColors.warning,
-        NotificationType.verificationApproved => AppColors.success,
-        NotificationType.verificationRejected => AppColors.error,
-        NotificationType.system => AppColors.textHint,
-      };
+    NotificationType.outbid => AppColors.secondary,
+    NotificationType.wonBid => AppColors.primary,
+    NotificationType.shipped => AppColors.info,
+    NotificationType.message => AppColors.textSecondary,
+    NotificationType.saved => const Color(0xFFEC4899),
+    NotificationType.orderConfirmed => AppColors.success,
+    NotificationType.verificationSubmitted => AppColors.warning,
+    NotificationType.verificationApproved => AppColors.success,
+    NotificationType.verificationRejected => AppColors.error,
+    NotificationType.system => AppColors.textHint,
+  };
 }

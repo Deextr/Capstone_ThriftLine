@@ -50,27 +50,37 @@ class DataProvider extends ChangeNotifier {
   List<String> get popularSearches => _defaultPopularSearches;
   bool get notificationsEnabled => _notificationsEnabled;
 
-  List<ProductModel> get endingSoonBids => _products
-      .where((p) => p.hasActiveBid)
-      .toList()
-    ..sort((a, b) => (a.bidEndTime ?? DateTime.now())
-        .compareTo(b.bidEndTime ?? DateTime.now()));
+  List<ProductModel> get endingSoonBids =>
+      _products.where((p) => p.hasActiveBid).toList()..sort(
+        (a, b) => (a.bidEndTime ?? DateTime.now()).compareTo(
+          b.bidEndTime ?? DateTime.now(),
+        ),
+      );
 
   List<ProductModel> get trendingProducts => _products.take(8).toList();
 
   int activeBidCountFor(String buyerId) => _userBids
-      .where((b) =>
-          b.buyerId == buyerId &&
-          (b.status == BidStatus.active ||
-              b.status == BidStatus.winning ||
-              b.status == BidStatus.outbid))
+      .where(
+        (b) =>
+            b.buyerId == buyerId &&
+            (b.status == BidStatus.active ||
+                b.status == BidStatus.winning ||
+                b.status == BidStatus.outbid),
+      )
       .length;
 
   List<UserBid> bidsForBuyer(String buyerId, BidTab tab) {
     final bids = _userBids.where((b) => b.buyerId == buyerId);
     switch (tab) {
       case BidTab.active:
-        return bids.where((b) => b.status == BidStatus.winning || b.status == BidStatus.outbid || b.status == BidStatus.active).toList();
+        return bids
+            .where(
+              (b) =>
+                  b.status == BidStatus.winning ||
+                  b.status == BidStatus.outbid ||
+                  b.status == BidStatus.active,
+            )
+            .toList();
       case BidTab.won:
         return bids.where((b) => b.status == BidStatus.won).toList();
       case BidTab.lost:
@@ -102,15 +112,25 @@ class DataProvider extends ChangeNotifier {
   List<ProductModel> get savedProducts =>
       _products.where((p) => _savedProductIds.contains(p.id)).toList();
 
-  List<ProductModel> searchProducts(String query, {String? category, String sort = 'Relevance'}) {
-    var results = _products.where((p) => p.status == ProductStatus.active).toList();
+  List<ProductModel> searchProducts(
+    String query, {
+    String? category,
+    String sort = 'Relevance',
+  }) {
+    var results = _products
+        .where((p) => p.status == ProductStatus.active)
+        .toList();
     if (query.isNotEmpty) {
       final q = query.toLowerCase();
-      results = results.where((p) =>
-          p.title.toLowerCase().contains(q) ||
-          (p.brand?.toLowerCase().contains(q) ?? false) ||
-          p.category.label.toLowerCase().contains(q) ||
-          (p.size?.toLowerCase().contains(q) ?? false)).toList();
+      results = results
+          .where(
+            (p) =>
+                p.title.toLowerCase().contains(q) ||
+                (p.brand?.toLowerCase().contains(q) ?? false) ||
+                p.category.label.toLowerCase().contains(q) ||
+                (p.size?.toLowerCase().contains(q) ?? false),
+          )
+          .toList();
     }
     if (category != null && category != 'All') {
       results = results.where((p) => p.category.label == category).toList();
@@ -127,7 +147,9 @@ class DataProvider extends ChangeNotifier {
           if (!a.hasActiveBid && !b.hasActiveBid) return 0;
           if (!a.hasActiveBid) return 1;
           if (!b.hasActiveBid) return -1;
-          return (a.bidEndTime ?? DateTime.now()).compareTo(b.bidEndTime ?? DateTime.now());
+          return (a.bidEndTime ?? DateTime.now()).compareTo(
+            b.bidEndTime ?? DateTime.now(),
+          );
         });
     }
     return results;
@@ -137,7 +159,8 @@ class DataProvider extends ChangeNotifier {
     if (query.trim().isEmpty) return;
     _recentSearches.remove(query);
     _recentSearches.insert(0, query);
-    if (_recentSearches.length > 5) _recentSearches = _recentSearches.take(5).toList();
+    if (_recentSearches.length > 5)
+      _recentSearches = _recentSearches.take(5).toList();
     notifyListeners();
   }
 
@@ -154,7 +177,9 @@ class DataProvider extends ChangeNotifier {
     final index = _products.indexWhere((p) => p.id == productId);
     if (index == -1) return false;
     final product = _products[index];
-    final minBid = (product.currentBid ?? product.startingBid ?? product.price) + product.bidIncrement;
+    final minBid =
+        (product.currentBid ?? product.startingBid ?? product.price) +
+        product.bidIncrement;
     if (amount < minBid) return false;
 
     final newHistory = [
@@ -173,25 +198,30 @@ class DataProvider extends ChangeNotifier {
       bidHistory: newHistory,
     );
 
-    final bidIndex = _userBids.indexWhere((b) => b.productId == productId && b.buyerId == buyerId);
+    final bidIndex = _userBids.indexWhere(
+      (b) => b.productId == productId && b.buyerId == buyerId,
+    );
     if (bidIndex >= 0) {
       _userBids[bidIndex] = _userBids[bidIndex].copyWith(
         amount: amount,
         status: BidStatus.winning,
       );
     } else {
-      _userBids.add(UserBid(
-        id: _uuid.v4(),
-        productId: productId,
-        buyerId: buyerId,
-        amount: amount,
-        status: BidStatus.winning,
-        createdAt: DateTime.now(),
-      ));
+      _userBids.add(
+        UserBid(
+          id: _uuid.v4(),
+          productId: productId,
+          buyerId: buyerId,
+          amount: amount,
+          status: BidStatus.winning,
+          createdAt: DateTime.now(),
+        ),
+      );
     }
 
     for (var i = 0; i < _userBids.length; i++) {
-      if (_userBids[i].productId == productId && _userBids[i].buyerId != buyerId) {
+      if (_userBids[i].productId == productId &&
+          _userBids[i].buyerId != buyerId) {
         _userBids[i] = _userBids[i].copyWith(status: BidStatus.outbid);
       }
     }
@@ -222,7 +252,8 @@ class DataProvider extends ChangeNotifier {
     final total = subtotal + shipping + platform;
     final order = OrderModel(
       id: _uuid.v4(),
-      orderNumber: 'TL-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
+      orderNumber:
+          'TL-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
       productId: product.id,
       buyerId: buyerId,
       sellerId: _sellerIdFor(product.sellerUsername),
@@ -235,7 +266,9 @@ class DataProvider extends ChangeNotifier {
       shippingFee: shipping,
       platformFee: platform,
       total: total,
-      status: payment == PaymentMethod.cod ? OrderStatus.placed : OrderStatus.paymentPending,
+      status: payment == PaymentMethod.cod
+          ? OrderStatus.placed
+          : OrderStatus.paymentPending,
       paymentMethod: payment,
       deliveryMethod: delivery,
       shippingAddress: address,
@@ -267,7 +300,11 @@ class DataProvider extends ChangeNotifier {
     }
   }
 
-  void updateOrderStatus(String orderId, OrderStatus status, {String? tracking}) {
+  void updateOrderStatus(
+    String orderId,
+    OrderStatus status, {
+    String? tracking,
+  }) {
     final index = _orders.indexWhere((o) => o.id == orderId);
     if (index == -1) return;
     _orders[index] = _orders[index].copyWith(
@@ -279,13 +316,7 @@ class DataProvider extends ChangeNotifier {
   }
 
   void submitPaymentProof(String orderId) {
-    final index = _orders.indexWhere((o) => o.id == orderId);
-    if (index == -1) return;
-    _orders[index] = _orders[index].copyWith(
-      paymentProofSubmitted: true,
-      status: OrderStatus.paymentConfirmed,
-    );
-    notifyListeners();
+    // Phase 6: only a verified PayMongo webhook may mark an order paid.
   }
 
   List<NotificationModel> notificationsFor(String userId) =>
@@ -326,15 +357,17 @@ class DataProvider extends ChangeNotifier {
     MessageType type = MessageType.text,
     double? offerAmount,
   }) {
-    _messages.add(MessageModel(
-      id: _uuid.v4(),
-      chatId: chatId,
-      senderId: senderId,
-      content: content,
-      createdAt: DateTime.now(),
-      type: type,
-      offerAmount: offerAmount,
-    ));
+    _messages.add(
+      MessageModel(
+        id: _uuid.v4(),
+        chatId: chatId,
+        senderId: senderId,
+        content: content,
+        createdAt: DateTime.now(),
+        type: type,
+        offerAmount: offerAmount,
+      ),
+    );
     final chatIndex = _chats.indexWhere((c) => c.id == chatId);
     if (chatIndex >= 0) {
       final chat = _chats[chatIndex];
@@ -358,12 +391,15 @@ class DataProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  int pendingOrdersForSeller(String sellerId) =>
-      _orders.where((o) =>
-          o.sellerId == sellerId &&
-          (o.status == OrderStatus.placed ||
-              o.status == OrderStatus.paymentPending ||
-              o.status == OrderStatus.paymentConfirmed)).length;
+  int pendingOrdersForSeller(String sellerId) => _orders
+      .where(
+        (o) =>
+            o.sellerId == sellerId &&
+            (o.status == OrderStatus.placed ||
+                o.status == OrderStatus.paymentPending ||
+                o.status == OrderStatus.paymentConfirmed),
+      )
+      .length;
 
   List<ProductModel> productsForSeller(String username) =>
       _products.where((p) => p.sellerUsername == username).toList();
@@ -452,18 +488,21 @@ class DataProvider extends ChangeNotifier {
       id: 'rpt_demo_1',
       category: 'Item Not as Described',
       sellerUsername: 'thrift_trendy',
-      details: 'Received a faded shirt instead of the vibrant one in the listing photo.',
+      details:
+          'Received a faded shirt instead of the vibrant one in the listing photo.',
       evidenceCount: 2,
       orderId: 'TL-82901738',
       status: 'action_taken',
-      adminResponse: 'We have verified the discrepancy. A refund has been issued and the seller has received a warning.',
+      adminResponse:
+          'We have verified the discrepancy. A refund has been issued and the seller has received a warning.',
       createdAt: DateTime.now().subtract(const Duration(days: 3)),
     ),
     ReportModel(
       id: 'rpt_demo_2',
       category: 'Failure to Ship',
       sellerUsername: 'vintagevibes_ph',
-      details: 'Paid 5 days ago but the seller has not shipped the item and is not responding to messages.',
+      details:
+          'Paid 5 days ago but the seller has not shipped the item and is not responding to messages.',
       evidenceCount: 3,
       orderId: 'TL-77204512',
       status: 'under_review',
@@ -473,11 +512,13 @@ class DataProvider extends ChangeNotifier {
       id: 'rpt_demo_3',
       category: 'Fake Product',
       sellerUsername: 'preloved_gems',
-      details: 'The branded bag I received is clearly a replica, not the authentic item listed.',
+      details:
+          'The branded bag I received is clearly a replica, not the authentic item listed.',
       evidenceCount: 4,
       orderId: '',
       status: 'dismissed',
-      adminResponse: 'After review, the item listing clearly states "inspired" in the description. No policy violation found.',
+      adminResponse:
+          'After review, the item listing clearly states "inspired" in the description. No policy violation found.',
       createdAt: DateTime.now().subtract(const Duration(days: 7)),
     ),
   ];
@@ -569,7 +610,8 @@ class ReportModel {
   final String details;
   final int evidenceCount;
   final String orderId;
-  final String status; // 'under_review', 'action_taken', 'resolved', 'dismissed'
+  final String
+  status; // 'under_review', 'action_taken', 'resolved', 'dismissed'
   final DateTime createdAt;
   final String? adminResponse;
   final bool hasAppealed;

@@ -6,7 +6,9 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../data/admin_review_rules.dart';
 import '../../data/admin_verification_service.dart';
+import '../widgets/admin_review_widgets.dart';
 
 class AdminReviewScreen extends StatefulWidget {
   const AdminReviewScreen({super.key, required this.verificationId});
@@ -25,6 +27,7 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
   String? _selfieUrl;
   bool _loading = true;
   bool _busy = false;
+  String? _error;
 
   @override
   void initState() {
@@ -34,10 +37,19 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
   }
 
   Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final match = await _service.getById(widget.verificationId);
       if (match == null) {
-        if (mounted) setState(() => _loading = false);
+        if (mounted) {
+          setState(() {
+            _application = null;
+            _loading = false;
+          });
+        }
         return;
       }
       final idUrl = await _service.signedUrl(match.idPath);
@@ -52,7 +64,12 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
         _loading = false;
       });
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _error = 'Unable to load this application.';
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -76,13 +93,37 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
       if (mounted) {
         showThriftSnackBar(
           context,
-          'Could not save that decision. Try again.',
+          adminFriendlyError(e, 'Could not save that decision. Try again.'),
           isError: true,
         );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _approve() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Approve this seller?'),
+        content: const Text(
+          'They will be able to list items. This does not change payments or trust score.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Approve'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _review('approved');
   }
 
   Future<void> _reject() async {
@@ -104,17 +145,25 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
             onPressed: () => Navigator.pop(dialogCtx, false),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          TextButton(
             onPressed: () => Navigator.pop(dialogCtx, true),
             child: const Text('Reject'),
           ),
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted) {
+      reasonCtrl.dispose();
+      return;
+    }
     final reason = reasonCtrl.text.trim();
+    reasonCtrl.dispose();
     if (reason.isEmpty) {
-      showThriftSnackBar(context, 'A rejection reason is required.', isError: true);
+      showThriftSnackBar(
+        context,
+        'A rejection reason is required.',
+        isError: true,
+      );
       return;
     }
     await _review('rejected', reason: reason);
@@ -124,9 +173,11 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
   Widget build(BuildContext context) {
     final app = _application;
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Review application'),
+        title: const Text('Seller application'),
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
@@ -134,26 +185,43 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
+            : _error != null
+            ? AdminErrorState(message: _error!, onRetry: _load)
             : app == null
-                ? const Center(child: Text('This application is no longer pending.'))
-                : ListView(
-                    padding: const EdgeInsets.all(16),
+            ? const AdminEmptyState(
+                title: 'This application is no longer pending.',
+                message: 'It may already have been approved or rejected.',
+              )
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+                children: [
+                  AdminStatusChip(
+                    status: app.status,
+                    label: verificationStatusLabel(app.status),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(app.shopName, style: AppTypography.heading),
+                  const SizedBox(height: 4),
+                  Text(
+                    app.applicantName ?? 'Applicant',
+                    style: AppTypography.body,
+                  ),
+                  Text(
+                    [
+                      app.shopAddress,
+                      app.barangay,
+                      app.city,
+                    ].where((part) => part.trim().isNotEmpty).join(', '),
+                    style: AppTypography.caption,
+                  ),
+                  const SizedBox(height: 24),
+                  AdminDetailBlock(
+                    label: 'Liveness checks',
+                    children: [_LivenessChips(result: app.livenessResult)],
+                  ),
+                  AdminDetailBlock(
+                    label: 'Government ID',
                     children: [
-                      Text(app.shopName, style: AppTypography.heading),
-                      const SizedBox(height: 4),
-                      Text(
-                        app.applicantName ?? 'Applicant',
-                        style: AppTypography.body,
-                      ),
-                      Text(
-                        '${app.shopAddress}, ${app.barangay}, ${app.city}',
-                        style: AppTypography.caption,
-                      ),
-                      const SizedBox(height: 16),
-                      _LivenessChips(result: app.livenessResult),
-                      const SizedBox(height: 20),
-                      Text('Government ID', style: AppTypography.subheading),
-                      const SizedBox(height: 8),
                       Text('Front', style: AppTypography.caption),
                       const SizedBox(height: 6),
                       _DocImage(url: _idUrl),
@@ -161,25 +229,26 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
                       Text('Back', style: AppTypography.caption),
                       const SizedBox(height: 6),
                       _DocImage(url: _idBackUrl),
-                      const SizedBox(height: 20),
-                      Text('Liveness face photo', style: AppTypography.subheading),
-                      const SizedBox(height: 8),
-                      _DocImage(url: _selfieUrl),
-                      const SizedBox(height: 24),
-                      ThriftButton(
-                        label: 'Approve seller',
-                        isLoading: _busy,
-                        onPressed: _busy ? null : () => _review('approved'),
-                      ),
-                      const SizedBox(height: 12),
-                      ThriftButton(
-                        label: 'Reject',
-                        variant: ThriftButtonVariant.outline,
-                        color: AppColors.error,
-                        onPressed: _busy ? null : _reject,
-                      ),
                     ],
                   ),
+                  AdminDetailBlock(
+                    label: 'Liveness face photo',
+                    children: [_DocImage(url: _selfieUrl)],
+                  ),
+                  ThriftButton(
+                    label: 'Approve seller',
+                    isLoading: _busy,
+                    onPressed: _busy ? null : _approve,
+                  ),
+                  const SizedBox(height: 12),
+                  ThriftButton(
+                    label: 'Reject',
+                    variant: ThriftButtonVariant.outline,
+                    color: AppColors.error,
+                    onPressed: _busy ? null : _reject,
+                  ),
+                ],
+              ),
       ),
     );
   }
@@ -202,13 +271,9 @@ class _LivenessChips extends StatelessWidget {
       runSpacing: 8,
       children: items.entries
           .map(
-            (entry) => Chip(
-              label: Text(entry.key),
-              avatar: Icon(
-                entry.value ? Icons.check_circle : Icons.cancel,
-                size: 16,
-                color: entry.value ? AppColors.success : AppColors.error,
-              ),
+            (entry) => ThriftBadge(
+              label: entry.key,
+              variant: entry.value ? BadgeVariant.success : BadgeVariant.error,
             ),
           )
           .toList(),
@@ -230,16 +295,23 @@ class _DocImage extends StatelessWidget {
           color: AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Text('No image uploaded'),
+        child: Text('No image uploaded', style: AppTypography.caption),
       );
     }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Image.network(
-        url!,
-        height: 220,
-        width: double.infinity,
-        fit: BoxFit.cover,
+    return Semantics(
+      button: true,
+      label: 'Open identity document',
+      child: GestureDetector(
+        onTap: () => showAdminImagePreview(context, url!),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.network(
+            url!,
+            height: 220,
+            width: double.infinity,
+            fit: BoxFit.cover,
+          ),
+        ),
       ),
     );
   }

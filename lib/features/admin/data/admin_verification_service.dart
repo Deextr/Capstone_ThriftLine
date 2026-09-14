@@ -106,7 +106,9 @@ class AdminVerificationService {
           .select('full_name')
           .eq('user_id', application.userId)
           .maybeSingle();
-      application = application.withApplicantName(profile?['full_name'] as String?);
+      application = application.withApplicantName(
+        profile?['full_name'] as String?,
+      );
     } catch (_) {}
     return application;
   }
@@ -118,8 +120,10 @@ class AdminVerificationService {
         .eq('verification_status', 'pending')
         .order('submitted_at', ascending: false);
     final applications = (rows as List)
-        .map((row) =>
-            SellerApplication.fromJson(Map<String, dynamic>.from(row as Map)))
+        .map(
+          (row) =>
+              SellerApplication.fromJson(Map<String, dynamic>.from(row as Map)),
+        )
         .toList();
     if (applications.isEmpty) return applications;
 

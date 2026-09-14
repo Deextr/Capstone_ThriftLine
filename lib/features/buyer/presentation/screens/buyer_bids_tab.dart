@@ -333,7 +333,7 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                           );
                           return;
                         }
-                        context.push('/order-confirm/$orderId');
+                        context.push(RouteNames.paymentForOrder(orderId));
                       },
                     ),
                   ],

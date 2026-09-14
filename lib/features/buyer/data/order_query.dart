@@ -3,7 +3,21 @@ import 'package:flutter/foundation.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../models/order_model.dart';
 
-const String kOrderSelect = '*, items:order_items(*)';
+const String kShipmentSelect =
+    'shipment_id, order_id, delivery_method, rider_name, rider_phone, '
+    'vehicle_type, plate_number, delivery_notes, delivery_status, '
+    'estimated_delivery_at, rider_assigned_at, ready_for_pickup_at, '
+    'picked_up_at, out_for_delivery_at, delivery_pin_expires_at, '
+    'delivery_pin_attempts, delivery_pin_locked_until, delivery_pin_used_at, '
+    'delivery_verified_at, delivery_verification_method, '
+    'buyer_confirmed_received, buyer_confirmed_received_at, '
+    'inspection_started_at, inspection_expires_at, delivery_failed_at, '
+    'delivery_failure_reason, auto_completed, completion_reason, completed_at, '
+    'created_at, updated_at';
+
+const String kOrderSelect =
+    '*, items:order_items(*), payments(payment_status, paymongo_channel), '
+    'shipment:shipments($kShipmentSelect)';
 
 Future<Map<String, Map<String, dynamic>>> loadPublicProfiles(
   SupabaseService supabase,
@@ -99,13 +113,23 @@ Future<List<OrderModel>> fetchOrdersForSeller(
 
 Future<OrderModel?> fetchOrderById(
   SupabaseService supabase,
-  String orderId,
-) async {
-  final row = await supabase.client
+  String orderId, {
+  String? buyerId,
+  String? sellerId,
+}) async {
+  var query = supabase.client
       .from('orders')
       .select(kOrderSelect)
-      .eq('order_id', orderId)
-      .maybeSingle();
+      .eq('order_id', orderId);
+  // Keep the role-specific boundary in the query as well as in RLS. This
+  // prevents a buyer who guesses another order id from receiving a seller's
+  // participant-visible shipment row (including rider contact data).
+  if (buyerId != null && buyerId.isNotEmpty) {
+    query = query.eq('buyer_id', buyerId);
+  } else if (sellerId != null && sellerId.isNotEmpty) {
+    query = query.eq('seller_id', sellerId);
+  }
+  final row = await query.maybeSingle();
   if (row == null) return null;
   final list = await hydrateOrders(supabase, [row]);
   return list.isEmpty ? null : list.first;

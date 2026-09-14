@@ -124,6 +124,8 @@ enum OrderStatus {
   shipped,
   outForDelivery,
   delivered,
+  completed,
+  disputed,
   cancelled;
 
   static OrderStatus fromString(String value) => OrderStatus.values.firstWhere(
@@ -135,11 +137,13 @@ enum OrderStatus {
 String orderStatusLabel(Object? status) {
   if (status is OrderStatus) {
     return switch (status) {
-      OrderStatus.paymentPending || OrderStatus.placed => 'Pending payment',
-      OrderStatus.paymentConfirmed || OrderStatus.preparing => 'To ship',
+      OrderStatus.paymentPending || OrderStatus.placed => 'Awaiting payment',
+      OrderStatus.paymentConfirmed || OrderStatus.preparing => 'Paid / To ship',
       OrderStatus.shipped => 'Shipped',
       OrderStatus.outForDelivery => 'Out for delivery',
-      OrderStatus.delivered => 'Delivered',
+      OrderStatus.delivered => 'Inspecting',
+      OrderStatus.completed => 'Completed',
+      OrderStatus.disputed => 'Disputed',
       OrderStatus.cancelled => 'Cancelled',
     };
   }
@@ -155,13 +159,137 @@ OrderStatus orderStatusFromDb(String? value) => switch (value) {
   'paid' => OrderStatus.preparing,
   'shipped' => OrderStatus.shipped,
   'out_for_delivery' => OrderStatus.outForDelivery,
-  'delivered' || 'completed' => OrderStatus.delivered,
-  'cancelled' || 'disputed' => OrderStatus.cancelled,
+  'delivered' => OrderStatus.delivered,
+  'completed' => OrderStatus.completed,
+  'disputed' => OrderStatus.disputed,
+  'cancelled' => OrderStatus.cancelled,
   _ => OrderStatus.paymentPending,
 };
 
+enum DeliveryStatus {
+  sellerPreparing('seller_preparing', 'Seller preparing'),
+  riderAssigned('rider_assigned', 'Rider assigned'),
+  readyForPickup('ready_for_pickup', 'Ready for pickup'),
+  pickedUp('picked_up', 'Parcel picked up'),
+  outForDelivery('out_for_delivery', 'Out for delivery'),
+  awaitingDeliveryVerification(
+    'awaiting_delivery_verification',
+    'Awaiting verification',
+  ),
+  deliveryVerified('delivery_verified', 'Delivery verified'),
+  inspectionPeriod('inspection_period', 'Inspection period'),
+  deliveryFailed('delivery_failed', 'Delivery failed'),
+  disputed('disputed', 'Disputed'),
+  completed('completed', 'Completed'),
+  cancelled('cancelled', 'Cancelled');
+
+  const DeliveryStatus(this.dbValue, this.label);
+  final String dbValue;
+  final String label;
+
+  static DeliveryStatus fromDb(String? value) => switch (value) {
+    'seller_preparing' => DeliveryStatus.sellerPreparing,
+    'rider_assigned' => DeliveryStatus.riderAssigned,
+    'ready_for_pickup' => DeliveryStatus.readyForPickup,
+    'picked_up' => DeliveryStatus.pickedUp,
+    'out_for_delivery' => DeliveryStatus.outForDelivery,
+    'awaiting_delivery_verification' =>
+      DeliveryStatus.awaitingDeliveryVerification,
+    'delivery_verified' => DeliveryStatus.deliveryVerified,
+    'inspection_period' => DeliveryStatus.inspectionPeriod,
+    'delivery_failed' => DeliveryStatus.deliveryFailed,
+    'disputed' => DeliveryStatus.disputed,
+    'completed' => DeliveryStatus.completed,
+    'cancelled' => DeliveryStatus.cancelled,
+    _ => DeliveryStatus.sellerPreparing,
+  };
+
+  bool get isPreparing =>
+      this == DeliveryStatus.sellerPreparing ||
+      this == DeliveryStatus.riderAssigned ||
+      this == DeliveryStatus.readyForPickup;
+
+  bool get isInTransit =>
+      this == DeliveryStatus.pickedUp ||
+      this == DeliveryStatus.outForDelivery ||
+      this == DeliveryStatus.awaitingDeliveryVerification;
+
+  bool get isInspecting =>
+      this == DeliveryStatus.deliveryVerified ||
+      this == DeliveryStatus.inspectionPeriod;
+}
+
+enum DeliveryVehicleType {
+  motorcycle('motorcycle', 'Motorcycle'),
+  car('car', 'Car'),
+  van('van', 'Van'),
+  bicycle('bicycle', 'Bicycle'),
+  other('other', 'Other');
+
+  const DeliveryVehicleType(this.dbValue, this.label);
+  final String dbValue;
+  final String label;
+
+  static DeliveryVehicleType fromDb(String? value) =>
+      DeliveryVehicleType.values.firstWhere(
+        (e) => e.dbValue == value,
+        orElse: () => DeliveryVehicleType.motorcycle,
+      );
+}
+
+enum DeliveryFailureReason {
+  buyerUnavailable('buyer_unavailable', 'Buyer unavailable'),
+  buyerRefusedDelivery('buyer_refused_delivery', 'Buyer refused delivery'),
+  buyerRefusedVerification(
+    'buyer_refused_verification',
+    'Buyer refused verification',
+  ),
+  unableToContactBuyer('unable_to_contact_buyer', 'Unable to contact buyer'),
+  incorrectAddress('incorrect_address', 'Incorrect address'),
+  other('other', 'Other');
+
+  const DeliveryFailureReason(this.dbValue, this.label);
+  final String dbValue;
+  final String label;
+
+  static DeliveryFailureReason? fromDb(String? value) {
+    if (value == null || value.isEmpty) return null;
+    for (final reason in DeliveryFailureReason.values) {
+      if (reason.dbValue == value) return reason;
+    }
+    return DeliveryFailureReason.other;
+  }
+}
+
+enum DeliveryDisputeReason {
+  parcelNotReceived('parcel_not_received', 'Parcel not received'),
+  wrongItem('wrong_item', 'Wrong item'),
+  damagedItem('damaged_item', 'Damaged item'),
+  significantlyDifferent(
+    'significantly_different',
+    'Item significantly different from listing',
+  ),
+  missingItem('missing_item', 'Missing item'),
+  missingQuantity('missing_quantity', 'Missing quantity'),
+  emptyParcel('empty_parcel', 'Empty parcel'),
+  other('other', 'Other');
+
+  const DeliveryDisputeReason(this.dbValue, this.label);
+  final String dbValue;
+  final String label;
+
+  static DeliveryDisputeReason fromDb(String? value) {
+    if (value == null || value.isEmpty) return DeliveryDisputeReason.other;
+    for (final reason in DeliveryDisputeReason.values) {
+      if (reason.dbValue == value) return reason;
+    }
+    return DeliveryDisputeReason.other;
+  }
+}
+
 enum PaymentMethod {
   unpaid('Payment pending'),
+  paymongo('GCash'),
   gcash('GCash'),
   maya('Maya'),
   bankTransfer('Bank Transfer'),

@@ -81,6 +81,12 @@ class BuyerProfileTab extends StatelessWidget {
             child: _section('My Activity', [
               _menuItem(
                 context,
+                'Track Order',
+                Icons.local_shipping_outlined,
+                () => context.push(RouteNames.trackOrders),
+              ),
+              _menuItem(
+                context,
                 'Purchase History',
                 Icons.history_outlined,
                 () => context.push(RouteNames.purchaseHistory),
@@ -215,7 +221,7 @@ class BuyerProfileTab extends StatelessWidget {
                   ),
                 ),
                 subtitle: Text(
-                  'Track complaints & appeal decisions',
+                  'Track reports you submitted',
                   style: AppTypography.caption,
                 ),
                 trailing: const Icon(

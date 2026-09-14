@@ -88,10 +88,10 @@ Payment stays **`order_status = pending`**. Do not write `paid`. There is no Pay
 ## How To Test
 
 1. Paste `20260911010000_phase5_orders.sql` into the SQL Editor. Run `phase5_verify.sql` (15 checks).
-2. Buyer: add a **fixed-price** listing to cart → Checkout → saved address → Place order. Confirmation shows a real `TL-…` number. Cart line is gone. Seller Orders shows the same order as **Awaiting payment**.
+2. Buyer: add a **fixed-price** listing to cart → Checkout → saved address → Continue to payment. The purchase is not complete until PayMongo confirms payment (Phase 6). The seller does not see a fulfillment order until it is paid.
 3. Buy Now on product detail: only that product is purchased; other cart lines remain.
 4. Checkout with no address: blocked with a clear message.
-5. Two sellers in one cart: two orders, ₱80 shipping each.
+5. Two sellers in one cart: checkout reserves **one seller** per payment. Other sellers stay in the cart.
 6. Tap Place order twice quickly: one purchase, not two.
 7. Change the listing price in Studio, then checkout: order uses the **database** price.
 8. Last unit: two buyers should not both succeed.

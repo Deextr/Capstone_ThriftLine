@@ -108,7 +108,6 @@ class SellerPublicProfileScreen extends StatelessWidget {
 
     final seller = controller.sellerProfile!;
     final products = controller.products;
-    final reviews = controller.reviews;
 
     return DefaultTabController(
       length: 2,
@@ -161,7 +160,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
                             children: [
                               const Icon(Icons.star_rounded, size: 18),
                               const SizedBox(width: 8),
-                              Text('Reviews (${reviews.length})'),
+                              Text('Reviews (${controller.totalReviewCount})'),
                             ],
                           ),
                         ),
@@ -177,7 +176,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
                 _buildProductGrid(context, products),
 
                 // â”€â”€ Reviews tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                _buildReviewsList(context, reviews, seller),
+                _buildReviewsList(context, controller),
               ],
             ),
           ),
@@ -697,10 +696,10 @@ class SellerPublicProfileScreen extends StatelessWidget {
 
   Widget _buildReviewsList(
     BuildContext context,
-    List<ReviewModel> reviews,
-    SellerProfile seller,
+    SellerPublicProfileController controller,
   ) {
-    if (reviews.isEmpty) {
+    final reviews = controller.reviews;
+    if (!controller.hasReviews && reviews.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32.0),
@@ -740,8 +739,8 @@ class SellerPublicProfileScreen extends StatelessWidget {
       );
     }
 
-    final avgRating =
-        reviews.fold<double>(0, (s, r) => s + r.rating) / reviews.length;
+    final avgRating = controller.averageRating;
+    final reviewCount = controller.totalReviewCount;
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -794,7 +793,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Based on ${reviews.length} review${reviews.length == 1 ? '' : 's'}',
+                    'Based on $reviewCount review${reviewCount == 1 ? '' : 's'}',
                     style: AppTypography.caption.copyWith(
                       color: AppColors.textSecondary,
                     ),

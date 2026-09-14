@@ -14,6 +14,7 @@ class AuthUser {
     required this.location,
     this.shopName,
     this.rating,
+    this.ratingCount = 0,
     this.sales,
     this.isVerified = false,
     this.bio,
@@ -34,6 +35,7 @@ class AuthUser {
   final String location;
   final String? shopName;
   final double? rating;
+  final int ratingCount;
   final int? sales;
   final bool isVerified;
   final String? bio;
@@ -115,6 +117,7 @@ class AuthUser {
           ].whereType<String>().where((s) => s.trim().isNotEmpty).join(', '),
       shopName: shopName,
       rating: (profile?['rating_average'] as num?)?.toDouble(),
+      ratingCount: (profile?['rating_count'] as num?)?.toInt() ?? 0,
       sales: sellerProfile?['total_sales'] as int?,
       isVerified: approved,
       bio: profile?['bio'] as String? ?? sellerProfile?['shop_bio'] as String?,
@@ -136,6 +139,7 @@ class AuthUser {
     String? location,
     String? shopName,
     double? rating,
+    int? ratingCount,
     int? sales,
     bool? isVerified,
     String? bio,
@@ -156,6 +160,7 @@ class AuthUser {
       location: location ?? this.location,
       shopName: shopName ?? this.shopName,
       rating: rating ?? this.rating,
+      ratingCount: ratingCount ?? this.ratingCount,
       sales: sales ?? this.sales,
       isVerified: isVerified ?? this.isVerified,
       bio: bio ?? this.bio,
