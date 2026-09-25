@@ -2,176 +2,68 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/seller_earnings_controller.dart';
 import '../../data/seller_earnings.dart';
+import 'seller_available_earnings_card.dart';
 
 class SellerEarningsPanel extends StatelessWidget {
   const SellerEarningsPanel({
     super.key,
-    required this.pendingCount,
+    required this.pendingLabel,
     required this.ratingLabel,
+    this.onListings,
+    this.onPending,
   });
 
-  final int pendingCount;
+  final String pendingLabel;
   final String ratingLabel;
+  final VoidCallback? onListings;
+  final VoidCallback? onPending;
 
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<SellerEarningsController>();
     final snapshot = controller.snapshot;
+    final showSkeleton = controller.isLoading && snapshot == null;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Earnings', style: AppTypography.subheading),
-          const SizedBox(height: 4),
-          Text(
-            'Paid orders stay held until the sale completes or an admin decides.',
-            style: AppTypography.caption,
-          ),
-          const SizedBox(height: 16),
-          if (controller.isLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              ),
-            )
-          else if (controller.errorMessage != null)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(controller.errorMessage!, style: AppTypography.body),
-                const SizedBox(height: 12),
-                ThriftButton(
-                  label: 'Try again',
-                  onPressed: context.read<SellerEarningsController>().load,
-                ),
-              ],
-            )
-          else if (snapshot != null)
-            _LoadedPanel(
-              snapshot: snapshot,
-              pendingCount: pendingCount,
-              ratingLabel: ratingLabel,
-              isRequesting: controller.isRequesting,
-              canRequest: controller.canRequestPayout,
-            ),
-        ],
-      ),
+    return SellerAvailableEarningsCard(
+      isLoading: showSkeleton,
+      errorMessage: snapshot == null ? controller.errorMessage : null,
+      amountLabel: snapshot == null
+          ? null
+          : formatCentavos(snapshot.availableCentavos),
+      statusLine: snapshot == null ? null : _availableStatus(snapshot),
+      listingsLabel: snapshot == null ? '–' : '${snapshot.listingCount}',
+      pendingLabel: pendingLabel,
+      ratingLabel: ratingLabel,
+      showPayout: snapshot?.canRequestPayout == true,
+      isRequesting: controller.isRequesting,
+      onRequestPayout: snapshot == null
+          ? null
+          : () => _confirmPayout(context, snapshot.availableCentavos),
+      onRetry: context.read<SellerEarningsController>().load,
+      onListings: onListings,
+      onPending: onPending,
     );
   }
-}
 
-class _LoadedPanel extends StatelessWidget {
-  const _LoadedPanel({
-    required this.snapshot,
-    required this.pendingCount,
-    required this.ratingLabel,
-    required this.isRequesting,
-    required this.canRequest,
-  });
-
-  final SellerEarningsSnapshot snapshot;
-  final int pendingCount;
-  final String ratingLabel;
-  final bool isRequesting;
-  final bool canRequest;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _AmountBlock(
-          label: 'Available earnings',
-          amountCentavos: snapshot.availableCentavos,
-          hint: snapshot.availableCentavos > 0
-              ? 'Ready for payout'
-              : 'Released earnings appear here',
-          emphasize: true,
-        ),
-        const SizedBox(height: 12),
-        ThriftButton(
-          label: snapshot.availableCentavos > 0
-              ? 'Request ${formatCentavos(snapshot.availableCentavos)} payout'
-              : 'No payout available',
-          isLoading: isRequesting,
-          onPressed: canRequest
-              ? () => _confirmPayout(context, snapshot.availableCentavos)
-              : null,
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'This records a payout request. It does not send GCash automatically.',
-          style: AppTypography.caption,
-        ),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            Expanded(
-              child: _AmountBlock(
-                label: 'Held',
-                amountCentavos: snapshot.heldCentavos,
-                hint: 'Waiting for order completion',
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _AmountBlock(
-                label: 'Refunded',
-                amountCentavos: snapshot.refundedCentavos,
-                hint: 'Returned to buyers',
-              ),
-            ),
-          ],
-        ),
-        if (snapshot.payoutRequestedCentavos > 0) ...[
-          const SizedBox(height: 12),
-          _AmountBlock(
-            label: 'Payout requested',
-            amountCentavos: snapshot.payoutRequestedCentavos,
-            hint: 'Recorded. Not sent to GCash yet.',
-          ),
-        ],
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            _ShopStat(label: 'To ship', value: '$pendingCount'),
-            _ShopStat(label: 'Listings', value: '${snapshot.listingCount}'),
-            _ShopStat(label: 'Rating', value: ratingLabel),
-          ],
-        ),
-        if (snapshot.activity.isNotEmpty) ...[
-          const SizedBox(height: 28),
-          Text('Recent payments', style: AppTypography.subheading),
-          const SizedBox(height: 12),
-          for (final item in snapshot.activity.take(8))
-            _ActivityRow(item: item),
-        ],
-        if (snapshot.payouts.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          Text('Payout requests', style: AppTypography.subheading),
-          const SizedBox(height: 12),
-          for (final payout in snapshot.payouts.take(5))
-            _PayoutRow(payout: payout),
-        ],
-      ],
-    );
+  String _availableStatus(SellerEarningsSnapshot snapshot) {
+    if (snapshot.availableCentavos > 0) return 'Ready for payout';
+    if (snapshot.payoutRequestedCentavos > 0) return 'Payout pending';
+    return 'No earnings available yet';
   }
 
   Future<void> _confirmPayout(BuildContext context, int amountCentavos) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Request ${formatCentavos(amountCentavos)} payout?'),
-        content: const Text(
-          'This records a payout request for your available earnings. It does not send GCash.',
+        title: const Text('Request payout?'),
+        content: Text(
+          'Record a payout of ${formatCentavos(amountCentavos)}. This does not send GCash.',
         ),
         actions: [
           TextButton(
@@ -180,7 +72,7 @@ class _LoadedPanel extends StatelessWidget {
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text('Request ${formatCentavos(amountCentavos)} payout'),
+            child: const Text('Request payout'),
           ),
         ],
       ),
@@ -198,69 +90,75 @@ class _LoadedPanel extends StatelessWidget {
   }
 }
 
-class _AmountBlock extends StatelessWidget {
-  const _AmountBlock({
-    required this.label,
-    required this.amountCentavos,
-    required this.hint,
-    this.emphasize = false,
-  });
-
-  final String label;
-  final int amountCentavos;
-  final String hint;
-  final bool emphasize;
+class SellerEarningsFollowup extends StatelessWidget {
+  const SellerEarningsFollowup({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final snapshot = context.watch<SellerEarningsController>().snapshot;
+    if (snapshot == null) return const SizedBox.shrink();
+
+    final hasRefunded = snapshot.refundedCentavos > 0;
+    final hasPayoutPending = snapshot.payoutRequestedCentavos > 0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTypography.caption),
-        const SizedBox(height: 4),
-        Text(
-          formatCentavos(amountCentavos),
-          style: (emphasize ? AppTypography.heading : AppTypography.subheading)
-              .copyWith(letterSpacing: -0.2),
+        Text('Money in progress', style: AppTypography.subheading),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppConstants.radiusLg),
+            border: Border.all(color: AppColors.border),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          child: Column(
+            children: [
+              _MoneyLine(
+                label: 'Held',
+                hint: 'Waiting for delivery & completion',
+                amount: formatCentavos(snapshot.heldCentavos),
+              ),
+              if (hasPayoutPending) ...[
+                const Divider(height: 1, color: AppColors.border),
+                _MoneyLine(
+                  label: 'Payout pending',
+                  hint: 'Awaiting GCash disbursement',
+                  amount: formatCentavos(snapshot.payoutRequestedCentavos),
+                ),
+              ],
+              if (hasRefunded) ...[
+                const Divider(height: 1, color: AppColors.border),
+                _MoneyLine(
+                  label: 'Refunded',
+                  hint: 'Returned to buyers',
+                  amount: formatCentavos(snapshot.refundedCentavos),
+                ),
+              ],
+            ],
+          ),
         ),
-        const SizedBox(height: 2),
-        Text(hint, style: AppTypography.caption),
       ],
     );
   }
 }
 
-class _ShopStat extends StatelessWidget {
-  const _ShopStat({required this.label, required this.value});
+class _MoneyLine extends StatelessWidget {
+  const _MoneyLine({
+    required this.label,
+    required this.hint,
+    required this.amount,
+  });
 
   final String label;
-  final String value;
+  final String hint;
+  final String amount;
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(value, style: AppTypography.subheading),
-          const SizedBox(height: 2),
-          Text(label, style: AppTypography.caption),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActivityRow extends StatelessWidget {
-  const _ActivityRow({required this.item});
-
-  final SellerEarningsActivity item;
-
-  @override
-  Widget build(BuildContext context) {
-    final prefix = item.status == 'refunded' ? '' : '+';
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -269,63 +167,17 @@ class _ActivityRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.title,
-                  style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  label,
+                  style: AppTypography.body.copyWith(fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  [
-                    if (item.orderNumber.isNotEmpty)
-                      'Order #${item.orderNumber}',
-                    sellerEscrowStatusLabel(item.status),
-                    if (item.sortAt != null) formatCompactDate(item.sortAt!),
-                  ].join(' · '),
-                  style: AppTypography.caption,
-                ),
+                Text(hint, style: AppTypography.caption),
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Text(
-            '$prefix${formatCentavos(item.sellerAmountCentavos)}',
-            style: AppTypography.body.copyWith(
-              fontWeight: FontWeight.w600,
-              color: item.status == 'refunded'
-                  ? AppColors.textSecondary
-                  : AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PayoutRow extends StatelessWidget {
-  const _PayoutRow({required this.payout});
-
-  final SellerPayoutRecord payout;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              payout.requestedAt == null
-                  ? 'Payout requested'
-                  : 'Requested ${formatCompactDate(payout.requestedAt!)}',
-              style: AppTypography.body,
-            ),
-          ),
-          Text(
-            formatCentavos(payout.amountCentavos),
+            amount,
             style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
           ),
         ],

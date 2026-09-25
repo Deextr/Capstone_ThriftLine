@@ -158,12 +158,64 @@ class AdminDisputesController extends ChangeNotifier {
     );
   }
 
-  Future<DeliveryPaymentResult> refundPayment() {
+  Future<DeliveryPaymentResult> refundPayment({required bool returnRequired}) {
+    final hold = _dispute?.paymentHold;
+    if (hold?.isRefunded == true) {
+      return _recordReturnChoice(returnRequired);
+    }
     return _runPaymentDecision(
       () => _service.refundDeliveryPayment(
         disputeId: _dispute!.id,
         adminNote: note,
+        returnRequired: returnRequired,
       ),
     );
+  }
+
+  Future<DeliveryPaymentResult> _recordReturnChoice(bool returnRequired) async {
+    final current = _dispute;
+    if (current == null) {
+      return const DeliveryPaymentResult(
+        success: false,
+        error: 'Delivery problem not found.',
+      );
+    }
+    if (_isSaving) {
+      return const DeliveryPaymentResult(
+        success: false,
+        error: 'This payment cannot be updated.',
+      );
+    }
+    _isSaving = true;
+    notifyListeners();
+    try {
+      final result = await _service.refundDeliveryPayment(
+        disputeId: current.id,
+        adminNote: note,
+        returnRequired: returnRequired,
+      );
+      if (result.success) await load();
+      return result;
+    } finally {
+      _isSaving = false;
+      notifyListeners();
+    }
+  }
+
+  Future<String?> stopReturn() async {
+    final current = _dispute;
+    if (current == null) return 'Delivery problem not found.';
+    if (_isSaving) return null;
+    _isSaving = true;
+    notifyListeners();
+    try {
+      final error = await _service.cancelItemReturn(current.id);
+      if (error != null) return error;
+      await load();
+      return null;
+    } finally {
+      _isSaving = false;
+      notifyListeners();
+    }
   }
 }

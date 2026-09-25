@@ -1130,7 +1130,7 @@ BEGIN
   WHERE seller_id = v_uid
     AND status IS DISTINCT FROM 'removed'::public.product_status_enum;
 
-  SELECT COALESCE(jsonb_agg(item ORDER BY item.sort_at DESC), '[]'::jsonb)
+  SELECT COALESCE(jsonb_agg(listed.item ORDER BY listed.sort_at DESC), '[]'::jsonb)
   INTO v_activity
   FROM (
     SELECT jsonb_build_object(
@@ -1157,7 +1157,7 @@ BEGIN
     LIMIT 20
   ) listed;
 
-  SELECT COALESCE(jsonb_agg(item ORDER BY item.sort_at DESC), '[]'::jsonb)
+  SELECT COALESCE(jsonb_agg(listed.item ORDER BY listed.sort_at DESC), '[]'::jsonb)
   INTO v_payouts
   FROM (
     SELECT jsonb_build_object(

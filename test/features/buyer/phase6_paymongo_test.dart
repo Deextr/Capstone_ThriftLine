@@ -148,6 +148,18 @@ void main() {
       expect(link?.cancelled, isTrue);
       expect(link?.appLocation, contains('status=cancel'));
     });
+
+    test('parses the hosted https return URL without trusting it as paid', () {
+      final link = PaymongoReturnLink.tryParse(
+        Uri.parse(
+          'https://example.supabase.co/functions/v1/paymongo-return?status=success&order_id=11111111-1111-4111-8111-111111111111',
+        ),
+      );
+      expect(link, isNotNull);
+      expect(link!.cancelled, isFalse);
+      expect(link.expired, isFalse);
+      expect(link.appLocation, contains('returned=1'));
+    });
   });
 
   group('one-seller checkout', () {
@@ -173,7 +185,9 @@ void main() {
         'created_at': '2026-09-11T02:00:00Z',
       });
       expect(order.isPaymentPending, isTrue);
+      expect(order.needsBuyerPayment, isTrue);
       expect(order.showsInPurchaseHistory, isFalse);
+      expect(order.isTrackable, isFalse);
       expect(order.isSellerVisible, isFalse);
       expect(order.isFailedCheckout, isFalse);
       expect(orderStatusLabel(order.status), 'Awaiting payment');
@@ -199,6 +213,7 @@ void main() {
         });
         expect(order.isPaymentUnsuccessful, isTrue);
         expect(order.isFailedCheckout, isTrue);
+        expect(order.needsBuyerPayment, isFalse);
         expect(order.showsInPurchaseHistory, isFalse);
       },
     );
@@ -219,6 +234,7 @@ void main() {
       });
       expect(order.isFailedCheckout, isTrue);
       expect(order.isPaymentPending, isFalse);
+      expect(order.needsBuyerPayment, isFalse);
       expect(order.showsInPurchaseHistory, isFalse);
       expect(order.isSellerVisible, isFalse);
       expect(order.isToShip, isFalse);
@@ -238,6 +254,7 @@ void main() {
         'created_at': '2026-09-11T02:00:00Z',
       });
       expect(order.isPaymentPending, isFalse);
+      expect(order.needsBuyerPayment, isFalse);
       expect(order.isFailedCheckout, isFalse);
       expect(order.isToShip, isTrue);
       expect(order.showsInPurchaseHistory, isTrue);

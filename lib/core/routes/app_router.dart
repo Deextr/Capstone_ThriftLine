@@ -58,6 +58,7 @@ import '../../features/seller/presentation/screens/edit_listing_screen.dart';
 import '../services/shared_preferences_service.dart';
 import '../services/supabase_service.dart';
 import '../../features/seller/presentation/screens/arrange_delivery_screen.dart';
+import '../../features/seller/presentation/screens/arrange_return_screen.dart';
 import '../../features/seller/presentation/screens/seller_order_detail_screen.dart';
 import '../../features/seller/presentation/screens/seller_shell_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
@@ -279,6 +280,17 @@ GoRouter createAppRouter({
             auth: context.read<AuthProvider>(),
           ),
           child: const EditListingScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.arrangeReturn,
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => SellerOrdersController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+            orderId: state.pathParameters['id'],
+          ),
+          child: ArrangeReturnScreen(orderId: state.pathParameters['id']!),
         ),
       ),
       GoRoute(

@@ -9,6 +9,7 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../models/enums.dart';
 import '../../../trust_safety/data/review_rules.dart';
 import '../../controllers/buyer_orders_controller.dart';
+import '../widgets/awaiting_payment_tile.dart';
 
 class PurchaseHistoryScreen extends StatelessWidget {
   const PurchaseHistoryScreen({super.key});
@@ -16,6 +17,7 @@ class PurchaseHistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<BuyerOrdersController>();
+    final awaiting = controller.awaitingPayment;
     final orders = controller.orders
         .where((order) => order.showsInPurchaseHistory)
         .toList();
@@ -33,7 +35,7 @@ class PurchaseHistoryScreen extends StatelessWidget {
             ? const Center(
                 child: CircularProgressIndicator(color: AppColors.primary),
               )
-            : orders.isEmpty
+            : awaiting.isEmpty && orders.isEmpty
             ? Center(
                 child: Text(
                   controller.errorMessage ?? 'No purchases yet',
@@ -43,12 +45,36 @@ class PurchaseHistoryScreen extends StatelessWidget {
             : RefreshIndicator(
                 color: AppColors.primary,
                 onRefresh: controller.load,
-                child: ListView.builder(
-                  itemCount: orders.length,
-                  itemBuilder: (_, i) {
-                    final o = orders[i];
-                    return Column(
-                      children: [
+                child: ListView(
+                  children: [
+                    if (awaiting.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                        child: Text(
+                          'Payment needed',
+                          style: AppTypography.subheading,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: Text(
+                          'These checkouts are still unpaid. Continue payment or cancel from the payment screen.',
+                          style: AppTypography.caption,
+                        ),
+                      ),
+                      for (final order in awaiting)
+                        AwaitingPaymentTile(order: order),
+                    ],
+                    if (orders.isNotEmpty) ...[
+                      if (awaiting.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                          child: Text(
+                            'Purchases',
+                            style: AppTypography.subheading,
+                          ),
+                        ),
+                      for (final o in orders)
                         ListTile(
                           title: Text(
                             o.productTitle,
@@ -79,9 +105,8 @@ class PurchaseHistoryScreen extends StatelessWidget {
                             context.push(RouteNames.trackOrderFor(o.id));
                           },
                         ),
-                      ],
-                    );
-                  },
+                    ],
+                  ],
                 ),
               ),
       ),

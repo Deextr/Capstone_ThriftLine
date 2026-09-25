@@ -89,6 +89,16 @@ class SellerOrderCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (order.itemReturn?.needsRider == true) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Arrange return',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.primaryDark,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             Row(
               children: [

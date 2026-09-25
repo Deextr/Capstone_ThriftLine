@@ -61,25 +61,22 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
         .toLowerCase();
     final cancelledReturn =
         returnStatus == 'cancel' || returnStatus == 'cancelled';
-    final expiredReturn = returnStatus == 'expired';
-    final failed =
-        order.isFailedCheckout || controller.isExpiredPayment || expiredReturn;
+    final failed = order.isFailedCheckout || controller.isExpiredPayment;
     _scheduleReturnHandling(returned, cancelledReturn);
-    final confirming =
-        pending && !failed && controller.isConfirmingPayment && !expiredReturn;
+    final confirming = pending && !failed && controller.isConfirmingPayment;
     _schedulePaidConfirmation(pending, failed);
 
     return PopScope(
-      canPop: !pending || confirming,
+      canPop: !pending,
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop || !pending || confirming) return;
-        unawaited(_returnToCart(controller));
+        if (didPop || !pending) return;
+        _leavePendingCheckout();
       },
       child: Scaffold(
         appBar: AppBar(
           title: Text(
             failed
-                ? (controller.isExpiredPayment || expiredReturn
+                ? (controller.isExpiredPayment
                       ? 'Payment Expired'
                       : 'Payment Failed')
                 : pending
@@ -89,9 +86,8 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
-              if (pending && confirming) return;
               if (pending) {
-                unawaited(_returnToCart(controller));
+                _leavePendingCheckout();
                 return;
               }
               if (failed) {
@@ -108,7 +104,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
             child: failed
                 ? _FailedPaymentBody(
                     channel: _selectedChannel,
-                    expired: controller.isExpiredPayment || expiredReturn,
+                    expired: controller.isExpiredPayment,
                     onReturnToCart: () => context.go(RouteNames.checkout),
                     onTryAgain: () => context.go(RouteNames.checkout),
                   )
@@ -146,6 +142,10 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
         ),
       ),
     );
+  }
+
+  void _leavePendingCheckout() {
+    context.go(RouteNames.buyerHome);
   }
 
   Future<void> _returnToCart(BuyerOrdersController controller) async {

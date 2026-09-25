@@ -52,6 +52,7 @@ class BuyerOrdersController extends ChangeNotifier {
   bool _disposed = false;
 
   List<OrderModel> get orders => _orders;
+  List<OrderModel> get awaitingPayment => buyerAwaitingPayment(_orders);
   OrderModel? get order => _order;
   ReviewModel? reviewFor(String orderId) => _myReviews[orderId];
   bool get isLoading => _isLoading;
@@ -82,11 +83,15 @@ class BuyerOrdersController extends ChangeNotifier {
     }
     try {
       unawaited(_completeExpiredInspections());
+      await syncMyUnpaidCheckouts(_supabase);
       if (orderId != null) {
         _order = await fetchOrderById(_supabase, orderId!, buyerId: myId);
+        if (_order != null && _order!.needsBuyerPayment) {
+          await _reconcileOpenCheckout(orderId!);
+        }
         if (_order == null) {
           _errorMessage = 'Order not found.';
-        } else if (!_order!.isPaymentPending || _order!.isFailedCheckout) {
+        } else if (!_order!.needsBuyerPayment) {
           _isConfirmingPayment = false;
           if (_order!.isFailedCheckout) {
             _unsuccessfulOutcome = _order!.isExpiredCheckout
@@ -97,7 +102,7 @@ class BuyerOrdersController extends ChangeNotifier {
         await _maybeLoadDeliveryPin();
       } else {
         _orders = await fetchOrdersForBuyer(_supabase, myId);
-        if (_orders.every((o) => !o.isPaymentPending)) {
+        if (_orders.every((o) => !o.needsBuyerPayment)) {
           _isConfirmingPayment = false;
         }
       }
@@ -176,6 +181,38 @@ class BuyerOrdersController extends ChangeNotifier {
     final id = orderId ?? _order?.id;
     if (id == null || id.isEmpty) return;
 
+    _isConfirmingPayment = true;
+    _unsuccessfulOutcome = null;
+    _notify();
+
+    final reconciled = await reconcilePaymongoCheckout(_supabase, orderId: id);
+    await load(showSpinner: false);
+    if (_disposed) return;
+
+    if (reconciled.isPaid) {
+      _isConfirmingPayment = false;
+      _unsuccessfulOutcome = null;
+      _notify();
+      return;
+    }
+    if (reconciled.isUnsuccessful || _order?.isFailedCheckout == true) {
+      _isConfirmingPayment = false;
+      _unsuccessfulOutcome =
+          reconciled.isExpired || (_order?.isExpiredCheckout ?? false)
+          ? 'expired'
+          : 'failed';
+      _notify();
+      return;
+    }
+    if (_order != null &&
+        !_order!.isPaymentPending &&
+        !_order!.isFailedCheckout) {
+      _isConfirmingPayment = false;
+      _unsuccessfulOutcome = null;
+      _notify();
+      return;
+    }
+
     if (cancelled) {
       _isConfirmingPayment = false;
       _unsuccessfulOutcome = 'failed';
@@ -184,29 +221,18 @@ class BuyerOrdersController extends ChangeNotifier {
       return;
     }
 
-    final reconciled = await reconcilePaymongoCheckout(_supabase, orderId: id);
-    await load(showSpinner: false);
-    if (_disposed) return;
-
-    if (reconciled.isPaid || _order?.isPaymentPending == false) {
-      _isConfirmingPayment = false;
-      _unsuccessfulOutcome = null;
-      _notify();
-      return;
-    }
-    if (reconciled.isUnsuccessful || _order?.isFailedCheckout == true) {
-      _isConfirmingPayment = false;
-      _unsuccessfulOutcome = reconciled.isExpired ? 'expired' : 'failed';
-      _notify();
-      return;
-    }
-
     _isConfirmingPayment = true;
     _notify();
     var attempts = 0;
     _returnPoll = Timer.periodic(const Duration(seconds: 2), (timer) {
-      if (_disposed || attempts >= 10) {
+      if (_disposed) {
         timer.cancel();
+        return;
+      }
+      if (attempts >= 10) {
+        timer.cancel();
+        _isConfirmingPayment = false;
+        _notify();
         return;
       }
       attempts += 1;
@@ -217,11 +243,18 @@ class BuyerOrdersController extends ChangeNotifier {
   Future<void> _refreshAfterResume() async {
     await load(showSpinner: false);
     if (_disposed || orderId == null) return;
-    if (_isConfirmingPayment &&
-        (_order?.isPaymentPending ?? false) &&
-        !(_order?.isFailedCheckout ?? false)) {
+    if (_isConfirmingPayment && _order?.needsBuyerPayment == true) {
       await handlePaymongoAppReturn(cancelled: false);
     }
+  }
+
+  Future<void> _reconcileOpenCheckout(String id) async {
+    final reconciled = await reconcilePaymongoCheckout(_supabase, orderId: id);
+    if (_disposed) return;
+    if (reconciled.isPending && _order?.needsBuyerPayment == true) {
+      return;
+    }
+    _order = await fetchOrderById(_supabase, id, buyerId: _auth.user?.id);
   }
 
   Future<void> _pollReconcile(String id, Timer timer) async {
@@ -324,6 +357,34 @@ class BuyerOrdersController extends ChangeNotifier {
     } catch (e) {
       debugPrint('confirm_delivery error: $e');
       return 'Could not confirm this delivery.';
+    } finally {
+      _isUpdatingDelivery = false;
+      _notify();
+    }
+  }
+
+  Future<String?> confirmReturnHandedOff() async {
+    final id = orderId ?? _order?.id;
+    if (id == null) return 'Order not found.';
+    if (_isUpdatingDelivery) return null;
+    _isUpdatingDelivery = true;
+    _notify();
+    try {
+      final rpcRes = await _supabase.client.rpc(
+        'confirm_return_handed_off',
+        params: {'p_order_id': id},
+      );
+      if (!supabaseRpcSuccess(rpcRes)) {
+        return supabaseRpcError(
+          rpcRes,
+          fallback: 'Could not record the handoff.',
+        );
+      }
+      await load(showSpinner: false);
+      return null;
+    } catch (e) {
+      debugPrint('confirm_return_handed_off error: $e');
+      return 'Could not record the handoff.';
     } finally {
       _isUpdatingDelivery = false;
       _notify();

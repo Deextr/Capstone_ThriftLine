@@ -16,6 +16,7 @@ import '../../../../widgets/delivery_timeline.dart';
 import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/rider_contact_card.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../widgets/item_return_panel.dart';
 import '../../../trust_safety/presentation/widgets/order_review_cta.dart';
 import '../../controllers/buyer_orders_controller.dart';
 import '../buyer_delivery_status.dart';
@@ -154,6 +155,27 @@ class OrderTrackingScreen extends StatelessWidget {
                       );
                     },
                     onReport: () => _reportProblem(context),
+                  ),
+                ),
+              ],
+              if (order.itemReturn != null) ...[
+                const SizedBox(height: 16),
+                ThriftCard(
+                  child: ItemReturnPanel(
+                    itemReturn: order.itemReturn!,
+                    buyerView: true,
+                    isBusy: controller.isUpdatingDelivery,
+                    onHandOff: () async {
+                      final error = await context
+                          .read<BuyerOrdersController>()
+                          .confirmReturnHandedOff();
+                      if (!context.mounted) return;
+                      showThriftSnackBar(
+                        context,
+                        error ?? 'Handoff recorded.',
+                        isError: error != null,
+                      );
+                    },
                   ),
                 ),
               ],

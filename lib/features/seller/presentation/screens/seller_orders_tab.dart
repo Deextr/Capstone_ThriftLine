@@ -12,7 +12,12 @@ import '../../data/seller_order_buckets.dart';
 import '../widgets/seller_order_card.dart';
 
 class SellerOrdersTab extends StatefulWidget {
-  const SellerOrdersTab({super.key});
+  const SellerOrdersTab({
+    super.key,
+    this.initialBucket = SellerOrderBucket.toShip,
+  });
+
+  final SellerOrderBucket initialBucket;
 
   @override
   State<SellerOrdersTab> createState() => _SellerOrdersTabState();
@@ -28,11 +33,20 @@ class _SellerOrdersTabState extends State<SellerOrdersTab>
     _tab = TabController(
       length: SellerOrderBucket.values.length,
       vsync: this,
-      initialIndex: SellerOrderBucket.toShip.index,
+      initialIndex: widget.initialBucket.index,
     );
     _tab.addListener(() {
       if (mounted) setState(() {});
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant SellerOrdersTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialBucket != widget.initialBucket &&
+        _tab.index != widget.initialBucket.index) {
+      _tab.animateTo(widget.initialBucket.index);
+    }
   }
 
   @override

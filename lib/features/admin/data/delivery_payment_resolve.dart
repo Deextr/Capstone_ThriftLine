@@ -76,12 +76,14 @@ Future<DeliveryPaymentResult> resolveDeliveryRefund(
   SupabaseService supabase, {
   required String disputeId,
   String? adminNote,
+  required bool returnRequired,
 }) async {
   try {
     final response = await supabase.client.functions.invoke(
       'resolve-delivery-payment',
       body: {
         'dispute_id': disputeId,
+        'return_required': returnRequired,
         if (adminNote != null && adminNote.trim().isNotEmpty)
           'admin_note': adminNote.trim(),
       },

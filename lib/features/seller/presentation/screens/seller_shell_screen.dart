@@ -12,9 +12,39 @@ import '../../../chat/presentation/widgets/chat_inbox_view.dart';
 import '../../../profile/screens/seller_profile_tab.dart';
 import '../../controllers/seller_earnings_controller.dart';
 import '../../controllers/seller_orders_controller.dart';
+import '../../data/seller_order_buckets.dart';
 import 'seller_dashboard_tab.dart';
 import 'seller_listings_tab.dart';
 import 'seller_orders_tab.dart';
+
+class SellerTabScope extends InheritedWidget {
+  const SellerTabScope({
+    required this.openTab,
+    required super.child,
+    super.key,
+  });
+
+  final void Function(int index, {SellerOrderBucket? ordersBucket}) openTab;
+
+  static const int listings = 1;
+  static const int looking = 2;
+  static const int orders = 3;
+  static const int messages = 4;
+
+  static void open(
+    BuildContext context,
+    int index, {
+    SellerOrderBucket? ordersBucket,
+  }) {
+    context.findAncestorWidgetOfExactType<SellerTabScope>()?.openTab(
+      index,
+      ordersBucket: ordersBucket,
+    );
+  }
+
+  @override
+  bool updateShouldNotify(SellerTabScope oldWidget) => false;
+}
 
 class SellerShellScreen extends StatefulWidget {
   const SellerShellScreen({super.key});
@@ -25,30 +55,51 @@ class SellerShellScreen extends StatefulWidget {
 
 class _SellerShellScreenState extends State<SellerShellScreen> {
   int _index = 0;
-  late final List<Widget> _tabs;
+  SellerOrderBucket _ordersBucket = SellerOrderBucket.toShip;
+  late final Widget _messagesTab;
 
   @override
   void initState() {
     super.initState();
-    _tabs = [
-      const SellerDashboardTab(),
-      const SellerListingsTab(),
-      const BuyerLookingForTab(sellerWorkspace: true),
-      const SellerOrdersTab(),
-      ChangeNotifierProvider(
-        create: (context) => ChatListController(
-          supabase: context.read<SupabaseService>(),
-          auth: context.read<AuthProvider>(),
-        ),
-        child: const ChatInboxView(showHeader: true),
+    _messagesTab = ChangeNotifierProvider(
+      create: (context) => ChatListController(
+        supabase: context.read<SupabaseService>(),
+        auth: context.read<AuthProvider>(),
       ),
-      const SellerProfileTab(),
-    ];
+      child: const ChatInboxView(showHeader: true),
+    );
+  }
+
+  void _openTab(int index, {SellerOrderBucket? ordersBucket}) {
+    final nextBucket = index == SellerTabScope.orders
+        ? (ordersBucket ?? SellerOrderBucket.toShip)
+        : _ordersBucket;
+    if (index == _index && nextBucket == _ordersBucket) return;
+    setState(() {
+      _index = index;
+      _ordersBucket = nextBucket;
+    });
   }
 
   void _onTabChanged(int newIndex) {
     if (newIndex == _index) return;
-    setState(() => _index = newIndex);
+    _openTab(
+      newIndex,
+      ordersBucket: newIndex == SellerTabScope.orders
+          ? SellerOrderBucket.toShip
+          : null,
+    );
+  }
+
+  Widget _page(int index) {
+    return switch (index) {
+      0 => const SellerDashboardTab(),
+      1 => const SellerListingsTab(),
+      2 => const BuyerLookingForTab(sellerWorkspace: true),
+      3 => SellerOrdersTab(initialBucket: _ordersBucket),
+      4 => _messagesTab,
+      _ => const SellerProfileTab(),
+    };
   }
 
   @override
@@ -108,35 +159,41 @@ class _SellerShellScreenState extends State<SellerShellScreen> {
       ),
     ];
 
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(
-          create: (context) => LookingForController(
-            supabase: context.read<SupabaseService>(),
-            auth: context.read<AuthProvider>(),
+    return SellerTabScope(
+      openTab: _openTab,
+      child: MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (context) => LookingForController(
+              supabase: context.read<SupabaseService>(),
+              auth: context.read<AuthProvider>(),
+            ),
           ),
-        ),
-        ChangeNotifierProvider(
-          create: (context) => SellerEarningsController(
-            supabase: context.read<SupabaseService>(),
+          ChangeNotifierProvider(
+            create: (context) => SellerEarningsController(
+              supabase: context.read<SupabaseService>(),
+            ),
           ),
-        ),
-      ],
-      child: Scaffold(
-        extendBody: true,
-        body: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          switchInCurve: Curves.easeOut,
-          switchOutCurve: Curves.easeIn,
-          transitionBuilder: (child, animation) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-          child: KeyedSubtree(key: ValueKey<int>(_index), child: _tabs[_index]),
-        ),
-        bottomNavigationBar: CurvedNavigationBar(
-          selectedIndex: _index,
-          onTap: _onTabChanged,
-          items: navItems,
+        ],
+        child: Scaffold(
+          extendBody: true,
+          body: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, animation) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+            child: KeyedSubtree(
+              key: ValueKey<int>(_index),
+              child: _page(_index),
+            ),
+          ),
+          bottomNavigationBar: CurvedNavigationBar(
+            selectedIndex: _index,
+            onTap: _onTabChanged,
+            items: navItems,
+          ),
         ),
       ),
     );

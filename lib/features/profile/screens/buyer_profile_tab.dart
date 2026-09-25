@@ -27,7 +27,10 @@ class BuyerProfileTab extends StatelessWidget {
     final user = auth.user;
     final buyerId = auth.user?.id ?? 'buyer_maya';
     final activeBids = data.bidsForBuyer(buyerId, BidTab.active).length;
-    final purchases = buyerOrders.orders.length;
+    final purchases = buyerOrders.orders
+        .where((order) => order.showsInPurchaseHistory)
+        .length;
+    final toPay = buyerOrders.awaitingPayment.length;
 
     return SafeArea(
       child: ListView(
@@ -79,6 +82,13 @@ class BuyerProfileTab extends StatelessWidget {
               horizontal: AppConstants.spacingMd,
             ),
             child: _section('My Activity', [
+              if (toPay > 0)
+                _menuItem(
+                  context,
+                  'To Pay ($toPay)',
+                  Icons.payments_outlined,
+                  () => context.push(RouteNames.purchaseHistory),
+                ),
               _menuItem(
                 context,
                 'Track Order',

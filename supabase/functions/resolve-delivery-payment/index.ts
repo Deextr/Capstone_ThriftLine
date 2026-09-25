@@ -65,10 +65,12 @@ Deno.serve(async (req) => {
 
   let disputeId = "";
   let adminNote = "";
+  let returnRequired = false;
   try {
     const body = await req.json();
     disputeId = typeof body?.dispute_id === "string" ? body.dispute_id.trim() : "";
     adminNote = typeof body?.admin_note === "string" ? body.admin_note : "";
+    returnRequired = body?.return_required === true;
   } catch {
     return json(400, { success: false, error: "Delivery problem not found." });
   }
@@ -106,6 +108,10 @@ Deno.serve(async (req) => {
     });
   }
   if (prep.already_decided === true) {
+    const recorded = await recordRefundReturn(supabase, disputeId, returnRequired);
+    if (recorded.error) {
+      return json(400, recorded.body);
+    }
     return json(200, {
       success: true,
       already_decided: true,
@@ -113,6 +119,7 @@ Deno.serve(async (req) => {
       status: "refunded",
       refund_provider: String(prep.refund_provider ?? "internal"),
       amount_centavos: prep.amount_centavos,
+      ...recorded.fields,
     });
   }
 
@@ -247,6 +254,15 @@ Deno.serve(async (req) => {
     });
   }
 
+  const recorded = await recordRefundReturn(supabase, disputeId, returnRequired);
+  if (recorded.error) {
+    return json(400, {
+      success: false,
+      refund_recorded: true,
+      error: recorded.body.error,
+    });
+  }
+
   return json(200, {
     success: true,
     already_decided: fin.already_decided === true,
@@ -254,5 +270,51 @@ Deno.serve(async (req) => {
     status: "refunded",
     refund_provider: String(fin.refund_provider ?? provider),
     amount_centavos: fin.amount_centavos ?? amountCentavos,
+    ...recorded.fields,
   });
 });
+
+async function recordRefundReturn(
+  supabase: ReturnType<typeof createClient>,
+  disputeId: string,
+  returnRequired: boolean,
+): Promise<{ error: boolean; body: RpcMap; fields: RpcMap }> {
+  const recorded = await supabase.rpc("record_refund_return", {
+    p_dispute_id: disputeId,
+    p_return_required: returnRequired,
+  });
+  if (recorded.error) {
+    console.error("record_refund_return", recorded.error.message);
+    return {
+      error: true,
+      body: {
+        success: false,
+        error: "The refund was recorded, but the return choice could not be saved. Try again.",
+      },
+      fields: {},
+    };
+  }
+  const map = asMap(recorded.data);
+  if (map.success === false) {
+    return {
+      error: true,
+      body: {
+        success: false,
+        error: String(
+          map.error ??
+            "The refund was recorded, but the return choice could not be saved. Try again.",
+        ),
+      },
+      fields: {},
+    };
+  }
+  return {
+    error: false,
+    body: {},
+    fields: {
+      return_required: map.return_required === true,
+      return_status: map.return_status ?? null,
+      return_already_recorded: map.already_recorded === true,
+    },
+  };
+}

@@ -81,7 +81,7 @@ supabase functions deploy paymongo-return --no-verify-jwt
 
 `create-paymongo-checkout` now requires `payment_method` = `card` or `gcash` (Flutter cannot send the amount). PayMongo `payment_method_types` is that one channel. Gateway is always PayMongo — there is no direct GCash API.
 
-PayMongo `success_url` / `cancel_url` stay HTTPS (`paymongo-return`) because PayMongo requires a fully qualified https URL. That function immediately opens `thriftline://paymongo-return?status=&order_id=`. Flutter then reloads the order from Postgres. The return URL never marks the order paid.
+PayMongo `success_url` / `cancel_url` stay HTTPS (`paymongo-return`) because PayMongo requires a fully qualified https URL. Shared `*.supabase.co` functions rewrite GET `text/html` to `text/plain`, so that function returns a 302/`intent://` redirect instead of a bounce HTML page. Flutter then reconciles the real PayMongo status. The return URL never marks the order paid.
 
 ### PayMongo Dashboard (test mode)
 

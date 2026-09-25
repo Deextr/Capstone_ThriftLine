@@ -13,6 +13,7 @@ import '../../../../widgets/delivery_timeline.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../trust_safety/presentation/widgets/order_review_cta.dart';
 import '../../controllers/seller_orders_controller.dart';
+import '../../../buyer/presentation/widgets/item_return_panel.dart';
 import '../widgets/delivery_pin_entry.dart';
 
 class SellerOrderDetailScreen extends StatelessWidget {
@@ -135,6 +136,8 @@ class SellerOrderDetailScreen extends StatelessWidget {
                         ? 'A delivery problem was reported. Automatic completion is paused.'
                         : order.isDeliveryFailed
                         ? 'Delivery was not completed. The parcel should not have been left with the buyer.'
+                        : order.isRefundedSale
+                        ? 'The buyer was refunded. This amount is not available as earnings.'
                         : 'PayMongo confirmed this payment. Arrange a freelance rider when you are ready.',
                     style: AppTypography.caption,
                   ),
@@ -161,6 +164,29 @@ class SellerOrderDetailScreen extends StatelessWidget {
                     ),
                   ),
                   child: const Text('Report this buyer'),
+                ),
+              ),
+            ],
+            if (order.itemReturn != null) ...[
+              const SizedBox(height: 16),
+              ThriftCard(
+                child: ItemReturnPanel(
+                  itemReturn: order.itemReturn!,
+                  buyerView: false,
+                  isBusy: controller.isUpdatingDelivery,
+                  onArrange: () =>
+                      context.push(RouteNames.arrangeReturnFor(order.id)),
+                  onConfirmReceived: () async {
+                    final error = await context
+                        .read<SellerOrdersController>()
+                        .confirmReturnReceived();
+                    if (!context.mounted) return;
+                    showThriftSnackBar(
+                      context,
+                      error ?? 'Item return confirmed.',
+                      isError: error != null,
+                    );
+                  },
                 ),
               ),
             ],

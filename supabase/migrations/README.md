@@ -199,6 +199,30 @@ Run `../introspection/phase10_verify.sql` afterwards; all 22 checks should repor
 
 Deploy `../functions/resolve-delivery-payment` with the same `PAYMONGO_SECRET_KEY` used by checkout. Flutter must never receive that key. Seller payouts are **recorded requests only** — they do not send GCash.
 
+## Item return after a delivery-problem refund
+
+| File | Purpose |
+| --- | --- |
+| `20260924010000_return_shipments.sql` | `return_shipments` plus rider/handoff RPCs. Created only after the payment is already refunded. |
+
+Redeploy `resolve-delivery-payment` after this SQL. The buyer refund does not wait for the seller to assign a rider. Community reports still do not move money or start a return.
+
+## Unpaid checkout sync after leaving payment
+
+| File | Purpose |
+| --- | --- |
+| `20260924130000_sync_my_unpaid_checkouts.sql` | Lets the signed-in buyer run `expire_unpaid_checkouts()` after leaving payment or reopening the app |
+
+Apply this after the Phase 6 mandatory-payment file. It does not move money.
+
+## Seller earnings snapshot query
+
+| File | Purpose |
+| --- | --- |
+| `20260924140000_fix_seller_earnings_snapshot.sql` | Fixes `seller_earnings_snapshot` so activity and payout lists aggregate without treating `item` as a table |
+
+Apply this after Phase 10. The dashboard card stays the same; only the RPC query changes.
+
 ## Conventions
 
 - Authorization lives in RLS policies and `SECURITY DEFINER` helpers, never in

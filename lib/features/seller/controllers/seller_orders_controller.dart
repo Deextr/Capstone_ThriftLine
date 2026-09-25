@@ -117,6 +117,31 @@ class SellerOrdersController extends ChangeNotifier {
     }, fallback: 'Could not save rider details.');
   }
 
+  Future<String?> arrangeReturnRider({
+    required String riderName,
+    required String riderPhone,
+    required String vehicleType,
+    String? plateNumber,
+    DateTime? pickupScheduledAt,
+    String? returnNotes,
+  }) {
+    return _runDeliveryRpc('arrange_return_rider', {
+      'p_order_id': orderId ?? _order?.id,
+      'p_rider_name': riderName,
+      'p_rider_phone': riderPhone,
+      'p_vehicle_type': vehicleType,
+      'p_plate_number': plateNumber,
+      'p_pickup_scheduled_at': pickupScheduledAt?.toUtc().toIso8601String(),
+      'p_return_notes': returnNotes,
+    }, fallback: 'Could not save the return rider.');
+  }
+
+  Future<String?> confirmReturnReceived() {
+    return _runDeliveryRpc('confirm_return_received', {
+      'p_order_id': orderId ?? _order?.id,
+    }, fallback: 'Could not confirm this return.');
+  }
+
   Future<String?> advanceDelivery(String action) {
     return _runDeliveryRpc('advance_delivery', {
       'p_order_id': orderId ?? _order?.id,

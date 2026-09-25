@@ -5,9 +5,11 @@ import '../../../core/utils/stock_limits.dart';
 import '../data/checkout_totals.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/address_model.dart';
+import '../../../models/order_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/cart_provider.dart';
 import '../../profile/data/address_service.dart';
+import '../data/order_query.dart';
 
 class CheckoutController extends ChangeNotifier {
   CheckoutController({
@@ -31,12 +33,14 @@ class CheckoutController extends ChangeNotifier {
 
   List<AddressModel> _addressBook = [];
   AddressModel? _selectedAddress;
+  List<OrderModel> _awaitingPayment = [];
   bool _isLoading = true;
   bool _isSubmitting = false;
   String? _errorMessage;
 
   List<AddressModel> get addressBook => _addressBook;
   AddressModel? get selectedAddress => _selectedAddress;
+  List<OrderModel> get awaitingPayment => _awaitingPayment;
   bool get isLoading => _isLoading;
   bool get isSubmitting => _isSubmitting;
   String? get errorMessage => _errorMessage;
@@ -73,7 +77,9 @@ class CheckoutController extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
+      await syncMyUnpaidCheckouts(_supabase);
       await _cart.refresh();
+      await _loadAwaitingPayment();
       _addressBook = await _addresses.listMine();
       _selectedAddress = _addressBook.isEmpty
           ? null
@@ -87,6 +93,21 @@ class CheckoutController extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _loadAwaitingPayment() async {
+    final buyerId = _auth.user?.id;
+    if (buyerId == null) {
+      _awaitingPayment = [];
+      return;
+    }
+    try {
+      final orders = await fetchOrdersForBuyer(_supabase, buyerId);
+      _awaitingPayment = buyerAwaitingPayment(orders);
+    } catch (e) {
+      debugPrint('CheckoutController awaiting payment error: $e');
+      _awaitingPayment = [];
     }
   }
 

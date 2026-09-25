@@ -15,9 +15,15 @@ const String kShipmentSelect =
     'delivery_failure_reason, auto_completed, completion_reason, completed_at, '
     'created_at, updated_at';
 
+const String kReturnShipmentSelect =
+    'return_id, dispute_id, order_id, buyer_id, seller_id, return_required, '
+    'seller_pays_return, status, rider_name, rider_phone, vehicle_type, '
+    'plate_number, return_notes, pickup_scheduled_at, picked_up_at, returned_at';
+
 const String kOrderSelect =
     '*, items:order_items(*), payments(payment_status, paymongo_channel), '
-    'shipment:shipments($kShipmentSelect)';
+    'shipment:shipments($kShipmentSelect), '
+    'item_return:return_shipments($kReturnShipmentSelect)';
 
 Future<Map<String, Map<String, dynamic>>> loadPublicProfiles(
   SupabaseService supabase,
@@ -79,6 +85,18 @@ Future<List<OrderModel>> hydrateOrders(
         ),
       )
       .toList();
+}
+
+Future<void> syncMyUnpaidCheckouts(SupabaseService supabase) async {
+  try {
+    await supabase.client.rpc('sync_my_unpaid_checkouts');
+  } catch (e) {
+    debugPrint('sync_my_unpaid_checkouts error: $e');
+  }
+}
+
+List<OrderModel> buyerAwaitingPayment(Iterable<OrderModel> orders) {
+  return orders.where((order) => order.needsBuyerPayment).toList();
 }
 
 Future<List<OrderModel>> fetchOrdersForBuyer(

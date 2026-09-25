@@ -47,8 +47,11 @@ abstract final class RouteNames {
   static const String editListing = '/edit-listing/:id';
   static const String sellerOrder = '/seller-order/:id';
   static const String arrangeDelivery = '/seller-order/:id/arrange-delivery';
+  static const String arrangeReturn = '/seller-order/:id/arrange-return';
   static String arrangeDeliveryFor(String id) =>
       '/seller-order/$id/arrange-delivery';
+  static String arrangeReturnFor(String id) =>
+      '/seller-order/$id/arrange-return';
   static const String chat = '/chat';
   static const String chatDetail = '/chat/:id';
   static String chatThread(String id) => '/chat/$id';

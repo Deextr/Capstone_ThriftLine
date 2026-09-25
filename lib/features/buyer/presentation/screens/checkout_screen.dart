@@ -5,12 +5,14 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../models/order_model.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../providers/cart_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/checkout_controller.dart';
 import '../../data/checkout_totals.dart';
+import '../widgets/awaiting_payment_tile.dart';
 
 class CheckoutScreen extends StatelessWidget {
   const CheckoutScreen({super.key});
@@ -20,6 +22,7 @@ class CheckoutScreen extends StatelessWidget {
     context.watch<CartProvider>();
     final checkout = context.watch<CheckoutController>();
     final items = checkout.checkoutItems;
+    final awaiting = checkout.awaitingPayment;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -53,9 +56,11 @@ class CheckoutScreen extends StatelessWidget {
               child: CircularProgressIndicator(color: AppColors.primary),
             )
           : items.isEmpty
-          ? const _EmptyCartState()
+          ? _EmptyCartState(awaiting: awaiting)
           : Column(
               children: [
+                if (awaiting.isNotEmpty)
+                  _AwaitingPaymentBanner(awaiting: awaiting),
                 _CheckoutAddressCard(checkout: checkout),
                 Expanded(
                   child: ListView.builder(
@@ -134,10 +139,31 @@ class _CheckoutAddressCard extends StatelessWidget {
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _EmptyCartState extends StatelessWidget {
-  const _EmptyCartState();
+  const _EmptyCartState({required this.awaiting});
+
+  final List<OrderModel> awaiting;
 
   @override
   Widget build(BuildContext context) {
+    if (awaiting.isNotEmpty) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: Text('Payment needed', style: AppTypography.subheading),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              'This checkout is still unpaid. Continue payment here instead of creating a new order.',
+              style: AppTypography.caption,
+            ),
+          ),
+          for (final order in awaiting) AwaitingPaymentTile(order: order),
+        ],
+      );
+    }
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -169,6 +195,36 @@ class _EmptyCartState extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AwaitingPaymentBanner extends StatelessWidget {
+  const _AwaitingPaymentBanner({required this.awaiting});
+
+  final List<OrderModel> awaiting;
+
+  @override
+  Widget build(BuildContext context) {
+    final order = awaiting.first;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: ThriftCard(
+        onTap: () => context.push(RouteNames.paymentForOrder(order.id)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Payment needed', style: AppTypography.subheading),
+            const SizedBox(height: 4),
+            Text(
+              awaiting.length == 1
+                  ? 'Finish payment for ${order.productTitle} before starting another checkout.'
+                  : 'You have ${awaiting.length} unpaid checkouts. Finish or cancel them first.',
+              style: AppTypography.caption,
+            ),
+          ],
+        ),
       ),
     );
   }

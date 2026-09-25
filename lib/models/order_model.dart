@@ -1,4 +1,5 @@
 import 'enums.dart';
+import 'return_shipment.dart';
 import 'shipment_model.dart';
 
 class OrderLineItem {
@@ -69,6 +70,7 @@ class OrderModel {
     this.items = const [],
     this.addressMissing = false,
     this.shipment,
+    this.itemReturn,
   });
 
   final String id;
@@ -102,6 +104,9 @@ class OrderModel {
   final List<OrderLineItem> items;
   final bool addressMissing;
   final ShipmentModel? shipment;
+  final ReturnShipment? itemReturn;
+
+  bool get isRefundedSale => paymentStatus == 'refunded';
 
   bool get isPaymentPending =>
       status == OrderStatus.paymentPending || status == OrderStatus.placed;
@@ -111,11 +116,15 @@ class OrderModel {
 
   /// Failed unpaid checkout — not a completed purchase or seller sale.
   bool get isFailedCheckout =>
-      isPaymentUnsuccessful ||
-      (status == OrderStatus.cancelled &&
-          (auctionId == null || auctionId!.isEmpty));
+      !isRefundedSale &&
+      (isPaymentUnsuccessful ||
+          (status == OrderStatus.cancelled &&
+              (auctionId == null || auctionId!.isEmpty)));
 
   bool get isExpiredCheckout => paymentStatus == 'expired';
+
+  /// Unpaid checkout the buyer can still finish. Not a completed purchase.
+  bool get needsBuyerPayment => isPaymentPending && !isFailedCheckout;
 
   bool get showsInPurchaseHistory => !isPaymentPending && !isFailedCheckout;
 
@@ -159,17 +168,18 @@ class OrderModel {
 
   bool get isSellerVisible => !isPaymentPending && !isFailedCheckout;
 
-  /// Paid orders still in fulfillment. Unpaid checkouts and completed
-  /// purchases stay out of Track Order; history covers those.
+  /// Paid orders still in fulfillment. Unpaid checkouts stay on To Pay;
+  /// completed purchases stay in Purchase History.
   bool get isTrackable =>
-      showsInPurchaseHistory &&
-      !isCompleted &&
-      status != OrderStatus.cancelled &&
-      (isToShip ||
-          isInTransit ||
-          isInspecting ||
-          isDeliveryFailed ||
-          isDisputed);
+      itemReturn?.isOpen == true ||
+      (showsInPurchaseHistory &&
+          !isCompleted &&
+          status != OrderStatus.cancelled &&
+          (isToShip ||
+              isInTransit ||
+              isInspecting ||
+              isDeliveryFailed ||
+              isDisputed));
 
   String get trackingStatusLabel =>
       shipment?.deliveryStatus.label ?? orderStatusLabel(status);
@@ -265,6 +275,7 @@ class OrderModel {
       items: items,
       addressMissing: addressMissing,
       shipment: shipmentFromOrderRow(row),
+      itemReturn: returnShipmentFromOrderRow(row),
     );
   }
 
@@ -300,6 +311,7 @@ class OrderModel {
     List<OrderLineItem>? items,
     bool? addressMissing,
     ShipmentModel? shipment,
+    ReturnShipment? itemReturn,
   }) => OrderModel(
     id: id ?? this.id,
     orderNumber: orderNumber ?? this.orderNumber,
@@ -332,6 +344,7 @@ class OrderModel {
     items: items ?? this.items,
     addressMissing: addressMissing ?? this.addressMissing,
     shipment: shipment ?? this.shipment,
+    itemReturn: itemReturn ?? this.itemReturn,
   );
 }
 
@@ -351,6 +364,7 @@ String paymentStatusFromOrderRow(Map<String, dynamic> row) {
   }
   final top = row['payment_status']?.toString().trim();
   if (top != null && top.isNotEmpty) statuses.add(top);
+  if (statuses.contains('refunded')) return 'refunded';
   if (statuses.contains('paid')) return 'paid';
   if (statuses.contains('expired')) return 'expired';
   if (statuses.contains('failed')) return 'failed';

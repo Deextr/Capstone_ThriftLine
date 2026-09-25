@@ -210,12 +210,33 @@ class AdminReviewService {
   Future<DeliveryPaymentResult> refundDeliveryPayment({
     required String disputeId,
     String? adminNote,
+    required bool returnRequired,
   }) {
     return resolveDeliveryRefund(
       _supabase,
       disputeId: disputeId,
       adminNote: adminNote,
+      returnRequired: returnRequired,
     );
+  }
+
+  Future<String?> cancelItemReturn(String disputeId) async {
+    try {
+      final rpcRes = await _supabase.client.rpc(
+        'cancel_return_shipment',
+        params: {'p_dispute_id': disputeId},
+      );
+      if (!supabaseRpcSuccess(rpcRes)) {
+        return supabaseRpcError(
+          rpcRes,
+          fallback: 'Could not stop this return.',
+        );
+      }
+      return null;
+    } catch (e) {
+      debugPrint('cancel_return_shipment error: $e');
+      return 'Could not stop this return.';
+    }
   }
 
   Future<List<CommunityReportModel>> _mapReports(

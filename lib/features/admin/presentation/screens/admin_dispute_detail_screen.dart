@@ -6,6 +6,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../models/enums.dart';
+import '../../../../models/return_shipment.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/admin_disputes_controller.dart';
 import '../../data/admin_review_rules.dart';
@@ -269,6 +270,8 @@ class _PaymentResolution extends StatelessWidget {
             refundProviderMessage(hold.refundProvider),
             style: AppTypography.body,
           ),
+          const SizedBox(height: 12),
+          _ReturnOutcome(controller: controller),
         ],
         if (hold.canDecide) ...[
           const SizedBox(height: 16),
@@ -302,31 +305,18 @@ class _PaymentResolution extends StatelessWidget {
     BuildContext context,
     DeliveryPaymentHold hold,
   ) async {
-    final confirmed = await showDialog<bool>(
+    final choice = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(refundBuyerCtaLabel(hold.amountCentavos)),
-        content: const Text(
-          'The buyer is refunded. This amount will not become seller earnings.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep held'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(refundBuyerCtaLabel(hold.amountCentavos)),
-          ),
-        ],
+      builder: (dialogContext) => _RefundChoiceDialog(
+        amountLabel: refundBuyerCtaLabel(hold.amountCentavos),
       ),
     );
-    if (confirmed != true || !context.mounted) return;
-    final result = await context
-        .read<AdminDisputesController>()
-        .refundPayment();
+    if (choice == null || !context.mounted) return;
+    final result = await context.read<AdminDisputesController>().refundPayment(
+      returnRequired: choice,
+    );
     if (!context.mounted) return;
-    _showPaymentResult(context, result, refunded: true);
+    _showPaymentResult(context, result, refunded: true, returnRequired: choice);
   }
 
   Future<void> _confirmRelease(
@@ -364,6 +354,7 @@ class _PaymentResolution extends StatelessWidget {
     BuildContext context,
     DeliveryPaymentResult result, {
     required bool refunded,
+    bool returnRequired = false,
   }) {
     if (!result.success) {
       showThriftSnackBar(
@@ -374,12 +365,194 @@ class _PaymentResolution extends StatelessWidget {
       return;
     }
     if (refunded) {
-      showThriftSnackBar(
-        context,
-        refundProviderMessage(result.refundProvider ?? 'internal'),
-      );
+      final money = refundProviderMessage(result.refundProvider ?? 'internal');
+      final item = returnRequired
+          ? ' The seller must arrange the return. The refund does not wait for that.'
+          : ' No return is needed.';
+      showThriftSnackBar(context, '$money$item');
       return;
     }
     showThriftSnackBar(context, 'Amount released as seller earnings.');
+  }
+}
+
+class _RefundChoiceDialog extends StatefulWidget {
+  const _RefundChoiceDialog({required this.amountLabel});
+
+  final String amountLabel;
+
+  @override
+  State<_RefundChoiceDialog> createState() => _RefundChoiceDialogState();
+}
+
+class _RefundChoiceDialogState extends State<_RefundChoiceDialog> {
+  bool? _returnRequired;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.amountLabel),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'The buyer is refunded now. This amount will not become seller earnings. The refund does not wait for the seller.',
+          ),
+          const SizedBox(height: 16),
+          Text('Physical item', style: AppTypography.subheading),
+          const SizedBox(height: 8),
+          RadioGroup<bool>(
+            groupValue: _returnRequired,
+            onChanged: (value) => setState(() => _returnRequired = value),
+            child: Column(
+              children: [
+                RadioListTile<bool>(
+                  contentPadding: EdgeInsets.zero,
+                  value: true,
+                  title: const Text('Return required'),
+                  subtitle: const Text(
+                    'The seller arranges and pays for pickup.',
+                  ),
+                ),
+                RadioListTile<bool>(
+                  contentPadding: EdgeInsets.zero,
+                  value: false,
+                  title: const Text('No return needed'),
+                  subtitle: const Text('The buyer keeps or discards the item.'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Keep held'),
+        ),
+        TextButton(
+          onPressed: _returnRequired == null
+              ? null
+              : () => Navigator.pop(context, _returnRequired),
+          child: Text(widget.amountLabel),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReturnOutcome extends StatelessWidget {
+  const _ReturnOutcome({required this.controller});
+
+  final AdminDisputesController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final itemReturn = controller.dispute?.order?.itemReturn;
+    if (itemReturn == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Choose what should happen to the physical item. The refund is already recorded.',
+            style: AppTypography.caption,
+          ),
+          const SizedBox(height: 8),
+          ThriftButton(
+            label: 'Return required',
+            isLoading: controller.isSaving,
+            onPressed: controller.isSaving
+                ? null
+                : () => _choose(context, requiredReturn: true),
+          ),
+          const SizedBox(height: 8),
+          ThriftButton(
+            label: 'No return needed',
+            variant: ThriftButtonVariant.outline,
+            isLoading: controller.isSaving,
+            onPressed: controller.isSaving
+                ? null
+                : () => _choose(context, requiredReturn: false),
+          ),
+        ],
+      );
+    }
+
+    final canStop = itemReturn.isOpen;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          returnStatusLabel(itemReturn.status),
+          style: AppTypography.subheading,
+        ),
+        const SizedBox(height: 4),
+        Text(returnStatusHint(itemReturn.status), style: AppTypography.caption),
+        if (canStop) ...[
+          const SizedBox(height: 12),
+          ThriftButton(
+            label: 'Stop this return',
+            variant: ThriftButtonVariant.outline,
+            isLoading: controller.isSaving,
+            onPressed: controller.isSaving ? null : () => _stop(context),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _choose(
+    BuildContext context, {
+    required bool requiredReturn,
+  }) async {
+    final result = await context.read<AdminDisputesController>().refundPayment(
+      returnRequired: requiredReturn,
+    );
+    if (!context.mounted) return;
+    if (!result.success) {
+      showThriftSnackBar(
+        context,
+        result.error ?? 'Could not save the return choice.',
+        isError: true,
+      );
+      return;
+    }
+    showThriftSnackBar(
+      context,
+      requiredReturn
+          ? 'Return required. The refund is unchanged.'
+          : 'No return needed. The refund is unchanged.',
+    );
+  }
+
+  Future<void> _stop(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Stop this return?'),
+        content: const Text(
+          'The buyer stays refunded. The seller will not be asked to pick the item up.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep return'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Stop this return'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final error = await context.read<AdminDisputesController>().stopReturn();
+    if (!context.mounted) return;
+    if (error != null) {
+      showThriftSnackBar(context, error, isError: true);
+      return;
+    }
+    showThriftSnackBar(context, 'Return stopped. The refund is unchanged.');
   }
 }
