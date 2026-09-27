@@ -298,7 +298,7 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'You won this auction! ðŸŽ‰',
+                                'You won this auction!',
                                 style: AppTypography.caption.copyWith(
                                   color: AppColors.success,
                                 ),

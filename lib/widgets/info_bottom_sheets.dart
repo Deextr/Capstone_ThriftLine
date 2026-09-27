@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/constants/app_colors.dart';
 import '../core/constants/app_typography.dart';
+import '../core/routes/route_names.dart';
+import '../features/auth/domain/legal_documents.dart';
 import 'thrift_widgets.dart';
 
 // =============================================================================
@@ -12,12 +15,7 @@ class HelpSupportSheet extends StatefulWidget {
   const HelpSupportSheet({super.key});
 
   static void show(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const HelpSupportSheet(),
-    );
+    context.push(RouteNames.legalDocument(LegalDocumentType.faq));
   }
 
   @override
@@ -25,28 +23,7 @@ class HelpSupportSheet extends StatefulWidget {
 }
 
 class _HelpSupportSheetState extends State<HelpSupportSheet> {
-  final List<Map<String, String>> _faqs = [
-    {
-      'q': 'How does bidding & buying work on ThriftLine?',
-      'a':
-          'You can buy items directly via "Buy Now" or place real-time bids on auction listings. Winning bidders receive payment instructions directly from verified sellers.'
-    },
-    {
-      'q': 'Is my payment protected?',
-      'a':
-          'Yes! ThriftLine holds funds safely until buyer confirmation or trackable delivery validation. Trust & Safety measures protect all genuine transactions.'
-    },
-    {
-      'q': 'How do I become a verified seller?',
-      'a':
-          'Head to the Seller Dashboard in the side drawer, upload your valid ID proof & GCash payout details, and submit for instant verification.'
-    },
-    {
-      'q': 'What should I do if an item is fake or not as described?',
-      'a':
-          'Go to My Activity -> Select Order -> Tap "Report Item". Our Trust & Safety team will review and resolve issues within 24 hours.'
-    },
-  ];
+  final List<LegalSection> _faqs = LegalDocuments.faq.sections;
 
   @override
   Widget build(BuildContext context) {
@@ -158,7 +135,7 @@ class _HelpSupportSheetState extends State<HelpSupportSheet> {
                         vertical: 4,
                       ),
                       title: Text(
-                        faq['q']!,
+                        faq.heading,
                         style: AppTypography.body.copyWith(
                           fontWeight: FontWeight.w600,
                           fontSize: 13.5,
@@ -168,7 +145,7 @@ class _HelpSupportSheetState extends State<HelpSupportSheet> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
                           child: Text(
-                            faq['a']!,
+                            faq.body,
                             style: AppTypography.caption.copyWith(
                               fontSize: 13,
                               color: AppColors.textSecondary,
@@ -212,12 +189,7 @@ class TermsPrivacySheet extends StatelessWidget {
   const TermsPrivacySheet({super.key});
 
   static void show(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const TermsPrivacySheet(),
-    );
+    context.push(RouteNames.legalDocument(LegalDocumentType.terms));
   }
 
   @override
@@ -321,12 +293,7 @@ class AboutThriftLineSheet extends StatelessWidget {
   const AboutThriftLineSheet({super.key});
 
   static void show(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const AboutThriftLineSheet(),
-    );
+    context.push(RouteNames.legalDocument(LegalDocumentType.about));
   }
 
   @override
@@ -430,13 +397,13 @@ class AboutThriftLineSheet extends StatelessWidget {
                       children: [
                         _StatItem(label: 'Verified Sellers', value: '1,200+'),
                         _StatItem(label: 'Items Saved', value: '15,000+'),
-                        _StatItem(label: 'User Rating', value: '4.9 â˜…'),
+                        _StatItem(label: 'User Rating', value: '4.9 \u2605'),
                       ],
                     ),
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'Â© 2026 ThriftLine Capstone Project. All rights reserved.',
+                    '\u00A9 2026 ThriftLine Capstone Project. All rights reserved.',
                     style: AppTypography.caption.copyWith(
                       color: AppColors.textHint,
                     ),

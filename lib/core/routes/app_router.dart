@@ -166,9 +166,12 @@ GoRouter createAppRouter({
       GoRoute(
         path: RouteNames.legal,
         builder: (_, state) => LegalDocumentScreen(
-          type: state.pathParameters['doc'] == 'privacy'
-              ? LegalDocumentType.privacy
-              : LegalDocumentType.terms,
+          type: switch (state.pathParameters['doc']) {
+            'privacy' => LegalDocumentType.privacy,
+            'about' => LegalDocumentType.about,
+            'faq' => LegalDocumentType.faq,
+            _ => LegalDocumentType.terms,
+          },
         ),
       ),
       GoRoute(

@@ -89,6 +89,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                 itemBuilder: (_, i) {
                   final address = _addresses[i];
                   return ThriftCard(
+                    onTap: () => context.pop(address),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -120,6 +121,12 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                           ),
                         Row(
                           children: [
+                            TextButton.icon(
+                              onPressed: () => context.pop(address),
+                              icon: const Icon(Icons.check_circle_outline, size: 16),
+                              label: const Text('Use this address'),
+                            ),
+                            const Spacer(),
                             TextButton(
                               onPressed: () => _edit(address),
                               child: const Text('Edit'),

@@ -22,6 +22,7 @@ class CheckoutController extends ChangeNotifier {
        _auth = auth,
        _cart = cart,
        _addresses = addresses ?? AddressService(supabase) {
+    _initSelection();
     load();
   }
 
@@ -34,8 +35,10 @@ class CheckoutController extends ChangeNotifier {
   List<AddressModel> _addressBook = [];
   AddressModel? _selectedAddress;
   List<OrderModel> _awaitingPayment = [];
+  final Set<String> _selectedProductIds = {};
   bool _isLoading = true;
   bool _isSubmitting = false;
+  bool _isCancellingCheckout = false;
   String? _errorMessage;
 
   List<AddressModel> get addressBook => _addressBook;
@@ -43,8 +46,10 @@ class CheckoutController extends ChangeNotifier {
   List<OrderModel> get awaitingPayment => _awaitingPayment;
   bool get isLoading => _isLoading;
   bool get isSubmitting => _isSubmitting;
+  bool get isCancellingCheckout => _isCancellingCheckout;
   String? get errorMessage => _errorMessage;
   bool get hasAddress => _selectedAddress != null;
+  Set<String> get selectedProductIds => Set.unmodifiable(_selectedProductIds);
 
   String? get scopedProductId {
     final id = buyNowProductId?.trim();
@@ -52,24 +57,150 @@ class CheckoutController extends ChangeNotifier {
     return id;
   }
 
-  List<CartItem> get checkoutItems {
+  /// All available fixed-price items in the cart (or scoped product if Buy Now).
+  List<CartItem> get allCartItems {
     final id = scopedProductId;
-    final source = id == null
-        ? _cart.fixedPriceItems
-        : _cart.fixedPriceItems.where((i) => i.product.id == id).toList();
-    final sellerId = firstCheckoutSellerId(
-      source.map((item) => item.product.sellerId),
-    );
-    if (sellerId == null) return source;
-    return source.where((item) => item.product.sellerId == sellerId).toList();
+    if (id != null) {
+      return _cart.fixedPriceItems.where((i) => i.product.id == id).toList();
+    }
+    return _cart.fixedPriceItems;
   }
 
-  int get remainingOtherSellerCount {
-    final id = scopedProductId;
-    final source = id == null
-        ? _cart.fixedPriceItems
-        : _cart.fixedPriceItems.where((i) => i.product.id == id).toList();
-    return source.length - checkoutItems.length;
+  /// Kept for compatibility — returns all cart items available for checkout.
+  List<CartItem> get checkoutItems => allCartItems;
+
+  /// Cart items grouped by seller ID.
+  Map<String, List<CartItem>> get itemsBySeller {
+    final map = <String, List<CartItem>>{};
+    for (final item in allCartItems) {
+      final sId = item.product.sellerId ?? 'unknown';
+      map.putIfAbsent(sId, () => []).add(item);
+    }
+    return map;
+  }
+
+  /// Whether a specific product is checked/selected.
+  bool isSelected(String productId) => _selectedProductIds.contains(productId);
+
+  /// Currently selected seller ID, if any.
+  String? get selectedSellerId {
+    for (final item in allCartItems) {
+      if (_selectedProductIds.contains(item.product.id)) {
+        return item.product.sellerId;
+      }
+    }
+    return null;
+  }
+
+  /// The list of items currently checked for payment.
+  List<CartItem> get selectedItems =>
+      allCartItems.where((i) => _selectedProductIds.contains(i.product.id)).toList();
+
+  int get selectedCount => selectedItems.length;
+
+  int get remainingOtherSellerCount =>
+      allCartItems.length - selectedItems.length;
+
+  double get subtotal =>
+      selectedItems.fold(0.0, (sum, item) => sum + item.subtotal);
+
+  double get shippingFee =>
+      selectedItems.isEmpty ? 0 : kCheckoutShippingPerSeller;
+
+  double get platformFee => checkoutPlatformFee(subtotal);
+
+  double get total => checkoutTotal(
+        subtotal: subtotal,
+        shippingFee: shippingFee,
+        platformFee: platformFee,
+      );
+
+  bool get hasUnpaidCheckouts => _awaitingPayment.isNotEmpty;
+
+  bool get canSubmit =>
+      selectedItems.isNotEmpty &&
+      hasAddress &&
+      !_isSubmitting &&
+      !hasUnpaidCheckouts;
+
+  /// Toggles selection of an item.
+  /// If selecting an item from a different seller, switches active seller.
+  void toggleItemSelection(String productId) {
+    CartItem? item;
+    for (final i in allCartItems) {
+      if (i.product.id == productId) {
+        item = i;
+        break;
+      }
+    }
+    if (item == null) return;
+
+    if (_selectedProductIds.contains(productId)) {
+      _selectedProductIds.remove(productId);
+    } else {
+      final currentSeller = selectedSellerId;
+      if (currentSeller != null && currentSeller != item.product.sellerId) {
+        // Orders are placed per seller — switch selection to this seller
+        _selectedProductIds.clear();
+      }
+      _selectedProductIds.add(productId);
+    }
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  /// Selects or deselects all items for a given seller.
+  void toggleSellerSelection(String sellerId) {
+    final sellerItems =
+        allCartItems.where((i) => i.product.sellerId == sellerId).toList();
+    if (sellerItems.isEmpty) return;
+
+    final allSelected =
+        sellerItems.every((i) => _selectedProductIds.contains(i.product.id));
+
+    if (allSelected) {
+      for (final i in sellerItems) {
+        _selectedProductIds.remove(i.product.id);
+      }
+    } else {
+      _selectedProductIds.clear();
+      for (final i in sellerItems) {
+        _selectedProductIds.add(i.product.id);
+      }
+    }
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  void _initSelection() {
+    final scopedId = scopedProductId;
+    if (scopedId != null) {
+      _selectedProductIds.clear();
+      if (allCartItems.any((i) => i.product.id == scopedId)) {
+        _selectedProductIds.add(scopedId);
+      }
+      return;
+    }
+
+    // Retain only IDs that are still in the cart
+    final availableIds = allCartItems.map((i) => i.product.id).toSet();
+    _selectedProductIds.removeWhere((id) => !availableIds.contains(id));
+
+    // If nothing currently selected and cart has items:
+    if (_selectedProductIds.isEmpty && allCartItems.isNotEmpty) {
+      final firstSeller = firstCheckoutSellerId(
+        allCartItems.map((i) => i.product.sellerId),
+      );
+      if (firstSeller != null) {
+        for (final item in allCartItems) {
+          if (item.product.sellerId == firstSeller) {
+            _selectedProductIds.add(item.product.id);
+          }
+        }
+      } else {
+        _selectedProductIds.add(allCartItems.first.product.id);
+      }
+    }
   }
 
   Future<void> load() async {
@@ -91,6 +222,7 @@ class CheckoutController extends ChangeNotifier {
       debugPrint('CheckoutController.load error: $e');
       _errorMessage = 'Could not load your delivery addresses.';
     } finally {
+      _initSelection();
       _isLoading = false;
       notifyListeners();
     }
@@ -116,6 +248,61 @@ class CheckoutController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Cancels an unpaid pending checkout, restoring its items to the cart.
+  Future<String?> cancelUnpaidCheckout(String orderId) async {
+    if (_isCancellingCheckout) return null;
+    _isCancellingCheckout = true;
+    notifyListeners();
+    try {
+      final rpcRes = await _supabase.client.rpc(
+        'abandon_unpaid_checkout',
+        params: {'p_order_id': orderId},
+      );
+      if (!supabaseRpcSuccess(rpcRes)) {
+        return supabaseRpcError(
+          rpcRes,
+          fallback: 'Could not cancel unpaid checkout.',
+        );
+      }
+      await _cart.refresh();
+      await _loadAwaitingPayment();
+      _initSelection();
+      return null;
+    } catch (e) {
+      debugPrint('CheckoutController.cancelUnpaidCheckout error: $e');
+      return 'Could not cancel unpaid checkout.';
+    } finally {
+      _isCancellingCheckout = false;
+      notifyListeners();
+    }
+  }
+
+  /// Cancels all unpaid pending checkouts, restoring all items to the cart.
+  Future<String?> cancelAllUnpaidCheckouts() async {
+    if (_isCancellingCheckout || _awaitingPayment.isEmpty) return null;
+    _isCancellingCheckout = true;
+    notifyListeners();
+    try {
+      final ordersToCancel = List<OrderModel>.from(_awaitingPayment);
+      for (final order in ordersToCancel) {
+        await _supabase.client.rpc(
+          'abandon_unpaid_checkout',
+          params: {'p_order_id': order.id},
+        );
+      }
+      await _cart.refresh();
+      await _loadAwaitingPayment();
+      _initSelection();
+      return null;
+    } catch (e) {
+      debugPrint('CheckoutController.cancelAllUnpaidCheckouts error: $e');
+      return 'Could not cancel unpaid checkouts.';
+    } finally {
+      _isCancellingCheckout = false;
+      notifyListeners();
+    }
+  }
+
   /// Returns the first created order id, or an error string.
   Future<({String? orderId, int count, String? error})> placeOrder() async {
     if (_auth.user?.id == null) {
@@ -137,20 +324,35 @@ class CheckoutController extends ChangeNotifier {
       );
     }
 
+    final items = selectedItems;
+    if (items.isEmpty) {
+      const error = 'Please check at least one item to check out.';
+      _errorMessage = error;
+      return (orderId: null, count: 0, error: error);
+    }
+
     _isSubmitting = true;
     _errorMessage = null;
     notifyListeners();
     try {
-      await _cart.refresh();
-      final items = checkoutItems;
-      if (items.isEmpty) {
-        final error = scopedProductId != null
-            ? 'This item is no longer available.'
-            : 'Your cart has no items that can be checked out.';
+      await _loadAwaitingPayment();
+      if (_awaitingPayment.isNotEmpty) {
+        const error =
+            'You have an unpaid checkout. Pay or cancel it before placing a new order.';
         _errorMessage = error;
         return (orderId: null, count: 0, error: error);
       }
-      for (final item in items) {
+      await _cart.refresh();
+      _initSelection();
+      final currentSelected = selectedItems;
+      if (currentSelected.isEmpty) {
+        final error = scopedProductId != null
+            ? 'This item is no longer available.'
+            : 'Selected items are no longer available in your cart.';
+        _errorMessage = error;
+        return (orderId: null, count: 0, error: error);
+      }
+      for (final item in currentSelected) {
         final shortage = stockShortageMessage(
           title: item.product.title,
           requested: item.quantity,
@@ -163,9 +365,8 @@ class CheckoutController extends ChangeNotifier {
       }
 
       final params = <String, dynamic>{'p_address_id': address.id};
-      final productId = scopedProductId;
-      if (productId != null) {
-        params['p_product_id'] = productId;
+      if (currentSelected.length == 1) {
+        params['p_product_id'] = currentSelected.first.product.id;
       }
       final rpcRes = await _supabase.client.rpc(
         'checkout_cart',
@@ -190,6 +391,7 @@ class CheckoutController extends ChangeNotifier {
         );
       }
       await _cart.refresh();
+      _selectedProductIds.clear();
       return (orderId: orderId, count: count, error: null);
     } catch (e) {
       debugPrint('CheckoutController.placeOrder error: $e');

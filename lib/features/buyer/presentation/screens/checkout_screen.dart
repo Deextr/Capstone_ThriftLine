@@ -11,7 +11,6 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../providers/cart_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/checkout_controller.dart';
-import '../../data/checkout_totals.dart';
 import '../widgets/awaiting_payment_tile.dart';
 
 class CheckoutScreen extends StatelessWidget {
@@ -21,8 +20,9 @@ class CheckoutScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     context.watch<CartProvider>();
     final checkout = context.watch<CheckoutController>();
-    final items = checkout.checkoutItems;
+    final allItems = checkout.allCartItems;
     final awaiting = checkout.awaitingPayment;
+    final itemsBySeller = checkout.itemsBySeller;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -44,7 +44,7 @@ class CheckoutScreen extends StatelessWidget {
               style: AppTypography.heading.copyWith(fontSize: 18),
             ),
             Text(
-              '${items.length} ${items.length == 1 ? 'item' : 'items'}',
+              '${allItems.length} ${allItems.length == 1 ? 'item' : 'items'} in cart',
               style: AppTypography.caption.copyWith(fontSize: 11),
             ),
           ],
@@ -55,88 +55,47 @@ class CheckoutScreen extends StatelessWidget {
           ? const Center(
               child: CircularProgressIndicator(color: AppColors.primary),
             )
-          : items.isEmpty
+          : allItems.isEmpty
           ? _EmptyCartState(awaiting: awaiting)
           : Column(
               children: [
                 if (awaiting.isNotEmpty)
                   _AwaitingPaymentBanner(awaiting: awaiting),
-                _CheckoutAddressCard(checkout: checkout),
+                if (itemsBySeller.keys.length > 1)
+                  _MultiSellerNotice(sellerCount: itemsBySeller.keys.length),
                 Expanded(
-                  child: ListView.builder(
+                  child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    itemCount: items.length,
-                    itemBuilder: (context, index) {
-                      return _CartItemCard(
-                        item: items[index],
-                        isLast: index == items.length - 1,
-                      );
-                    },
+                    children: [
+                      for (final entry in itemsBySeller.entries) ...[
+                        _SellerGroupHeader(
+                          sellerId: entry.key,
+                          items: entry.value,
+                          checkout: checkout,
+                        ),
+                        for (int i = 0; i < entry.value.length; i++)
+                          _CartItemCard(
+                            item: entry.value[i],
+                            isSelected: checkout.isSelected(entry.value[i].product.id),
+                            onToggleSelect: () => checkout.toggleItemSelection(entry.value[i].product.id),
+                            isLast: i == entry.value.length - 1,
+                          ),
+                      ],
+                    ],
                   ),
                 ),
               ],
             ),
-      bottomNavigationBar: items.isEmpty
+      bottomNavigationBar: allItems.isEmpty
           ? null
-          : _CheckoutBottomBar(items: items),
+          : const _CheckoutBottomBar(),
     );
   }
 }
 
-class _CheckoutAddressCard extends StatelessWidget {
-  const _CheckoutAddressCard({required this.checkout});
-
-  final CheckoutController checkout;
-
-  @override
-  Widget build(BuildContext context) {
-    final address = checkout.selectedAddress;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.location_on_outlined, color: AppColors.primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Delivery address', style: AppTypography.subheading),
-                  const SizedBox(height: 4),
-                  Text(
-                    address == null
-                        ? 'Add a delivery address to place this order.'
-                        : '${address.recipientName}\n${address.formatted}',
-                    style: AppTypography.caption,
-                  ),
-                ],
-              ),
-            ),
-            TextButton(
-              onPressed: () async {
-                await context.push(RouteNames.addresses);
-                if (context.mounted) await checkout.load();
-              },
-              child: Text(address == null ? 'Add' : 'Change'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═════════════════════════════════════════════════════════════════════════════
 // Empty State
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═════════════════════════════════════════════════════════════════════════════
 
 class _EmptyCartState extends StatelessWidget {
   const _EmptyCartState({required this.awaiting});
@@ -147,19 +106,49 @@ class _EmptyCartState extends StatelessWidget {
   Widget build(BuildContext context) {
     if (awaiting.isNotEmpty) {
       return ListView(
-        padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: Text('Payment needed', style: AppTypography.subheading),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text(
-              'This checkout is still unpaid. Continue payment here instead of creating a new order.',
-              style: AppTypography.caption,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.error.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 18,
+                      color: AppColors.error,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        awaiting.length == 1
+                            ? 'You have an unpaid checkout'
+                            : 'You have ${awaiting.length} unpaid checkouts',
+                        style: AppTypography.subheading.copyWith(
+                          fontSize: 13,
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Pay or cancel to continue shopping.',
+                  style: AppTypography.caption.copyWith(fontSize: 12),
+                ),
+              ],
             ),
           ),
+          const SizedBox(height: 12),
           for (final order in awaiting) AwaitingPaymentTile(order: order),
         ],
       );
@@ -207,21 +196,192 @@ class _AwaitingPaymentBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final order = awaiting.first;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: ThriftCard(
-        onTap: () => context.push(RouteNames.paymentForOrder(order.id)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.error.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 18,
+                      color: AppColors.error,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        awaiting.length == 1
+                            ? 'You have an unpaid checkout'
+                            : 'You have ${awaiting.length} unpaid checkouts',
+                        style: AppTypography.subheading.copyWith(
+                          fontSize: 13,
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Pay or cancel before starting a new checkout.',
+                  style: AppTypography.caption.copyWith(fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final order in awaiting)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: ThriftCard(
+                onTap: () => context.push(RouteNames.paymentForOrder(order.id)),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            order.productTitle,
+                            style: AppTypography.body.copyWith(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Order #${order.orderNumber} · ${formatCurrency(order.total)}',
+                            style: AppTypography.caption.copyWith(fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Pay now',
+                        style: AppTypography.caption.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Multi-Seller Notice & Header & Selection Circle
+// ═════════════════════════════════════════════════════════════════════════════
+
+class _SelectionCircle extends StatelessWidget {
+  const _SelectionCircle({
+    required this.isSelected,
+    this.isPartial = false,
+    required this.onTap,
+  });
+
+  final bool isSelected;
+  final bool isPartial;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 22,
+        height: 22,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isSelected
+              ? AppColors.primary
+              : isPartial
+              ? AppColors.primary.withValues(alpha: 0.15)
+              : Colors.transparent,
+          border: Border.all(
+            color: (isSelected || isPartial) ? AppColors.primary : AppColors.border,
+            width: 2,
+          ),
+        ),
+        child: isSelected
+            ? const Icon(Icons.check, size: 14, color: Colors.white)
+            : isPartial
+            ? Center(
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primary,
+                  ),
+                ),
+              )
+            : null,
+      ),
+    );
+  }
+}
+
+class _MultiSellerNotice extends StatelessWidget {
+  const _MultiSellerNotice({required this.sellerCount});
+  final int sellerCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+        ),
+        child: Row(
           children: [
-            Text('Payment needed', style: AppTypography.subheading),
-            const SizedBox(height: 4),
-            Text(
-              awaiting.length == 1
-                  ? 'Finish payment for ${order.productTitle} before starting another checkout.'
-                  : 'You have ${awaiting.length} unpaid checkouts. Finish or cancel them first.',
-              style: AppTypography.caption,
+            const Icon(Icons.storefront_outlined, size: 18, color: AppColors.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Items from $sellerCount different shops in cart. Check the item you want to pay for now.',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ],
         ),
@@ -230,13 +390,124 @@ class _AwaitingPaymentBanner extends StatelessWidget {
   }
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+class _SellerGroupHeader extends StatelessWidget {
+  const _SellerGroupHeader({
+    required this.sellerId,
+    required this.items,
+    required this.checkout,
+  });
+
+  final String sellerId;
+  final List<CartItem> items;
+  final CheckoutController checkout;
+
+  @override
+  Widget build(BuildContext context) {
+    final firstProduct = items.first.product;
+    final sellerName = firstProduct.sellerName;
+    final isVerified = firstProduct.sellerVerified;
+    final isSelectedSeller = checkout.selectedSellerId == sellerId;
+    final allItemsSelected =
+        items.every((i) => checkout.isSelected(i.product.id));
+    final hasAnySelected =
+        items.any((i) => checkout.isSelected(i.product.id));
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 8),
+      child: InkWell(
+        onTap: () => checkout.toggleSellerSelection(sellerId),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelectedSeller
+                ? AppColors.primary.withValues(alpha: 0.07)
+                : AppColors.surfaceVariant.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelectedSeller
+                  ? AppColors.primary.withValues(alpha: 0.35)
+                  : AppColors.border.withValues(alpha: 0.6),
+            ),
+          ),
+          child: Row(
+            children: [
+              _SelectionCircle(
+                isSelected: allItemsSelected,
+                isPartial: !allItemsSelected && hasAnySelected,
+                onTap: () => checkout.toggleSellerSelection(sellerId),
+              ),
+              const SizedBox(width: 10),
+              const Icon(
+                Icons.storefront_outlined,
+                size: 16,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        sellerName.isNotEmpty ? sellerName : 'Shop',
+                        style: AppTypography.subheading.copyWith(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isVerified) ...[
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.verified_rounded,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (isSelectedSeller)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Active Shop',
+                    style: AppTypography.caption.copyWith(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // Cart Item Card
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═════════════════════════════════════════════════════════════════════════════
 
 class _CartItemCard extends StatelessWidget {
-  const _CartItemCard({required this.item, this.isLast = false});
+  const _CartItemCard({
+    required this.item,
+    required this.isSelected,
+    required this.onToggleSelect,
+    this.isLast = false,
+  });
+
   final CartItem item;
+  final bool isSelected;
+  final VoidCallback onToggleSelect;
   final bool isLast;
 
   @override
@@ -250,10 +521,17 @@ class _CartItemCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+          border: Border.all(
+            color: isSelected
+                ? AppColors.primary.withValues(alpha: 0.5)
+                : AppColors.border.withValues(alpha: 0.6),
+            width: isSelected ? 1.5 : 1,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: isSelected
+                  ? AppColors.primary.withValues(alpha: 0.07)
+                  : Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),
@@ -261,38 +539,48 @@ class _CartItemCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // â”€â”€ Product details row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // Details row with checkbox
             Padding(
               padding: const EdgeInsets.all(14),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Product image
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: CachedNetworkImage(
-                      imageUrl: product.imageUrl,
-                      width: 90,
-                      height: 90,
-                      fit: BoxFit.cover,
-                      placeholder: (_, _) => Container(
+                  Padding(
+                    padding: const EdgeInsets.only(top: 34),
+                    child: _SelectionCircle(
+                      isSelected: isSelected,
+                      onTap: onToggleSelect,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: onToggleSelect,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: CachedNetworkImage(
+                        imageUrl: product.imageUrl,
                         width: 90,
                         height: 90,
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceVariant,
-                          borderRadius: BorderRadius.circular(14),
+                        fit: BoxFit.cover,
+                        placeholder: (_, _) => Container(
+                          width: 90,
+                          height: 90,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceVariant,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
-                      ),
-                      errorWidget: (_, _, _) => Container(
-                        width: 90,
-                        height: 90,
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceVariant,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(
-                          Icons.image_outlined,
-                          color: AppColors.textHint,
+                        errorWidget: (_, _, _) => Container(
+                          width: 90,
+                          height: 90,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceVariant,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                            Icons.image_outlined,
+                            color: AppColors.textHint,
+                          ),
                         ),
                       ),
                     ),
@@ -301,88 +589,58 @@ class _CartItemCard extends StatelessWidget {
 
                   // Product info
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Brand
-                        if (product.brand != null &&
-                            product.brand!.isNotEmpty) ...[
+                    child: GestureDetector(
+                      onTap: onToggleSelect,
+                      behavior: HitTestBehavior.opaque,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (product.brand != null &&
+                              product.brand!.isNotEmpty) ...[
+                            Text(
+                              product.brand!.toUpperCase(),
+                              style: AppTypography.caption.copyWith(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.8,
+                                color: AppColors.textHint,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                          ],
                           Text(
-                            product.brand!.toUpperCase(),
-                            style: AppTypography.caption.copyWith(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.8,
-                              color: AppColors.textHint,
+                            product.title,
+                            style: AppTypography.body.copyWith(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              height: 1.3,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              if (product.size != null)
+                                _DetailChip(
+                                  icon: Icons.straighten_rounded,
+                                  label: product.size!,
+                                ),
+                              _DetailChip(
+                                icon: Icons.star_outline_rounded,
+                                label: product.condition.label,
+                              ),
+                              if (product.color != null)
+                                _DetailChip(
+                                  icon: Icons.palette_outlined,
+                                  label: product.color!,
+                                ),
+                            ],
+                          ),
                         ],
-                        // Title
-                        Text(
-                          product.title,
-                          style: AppTypography.body.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            height: 1.3,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 6),
-                        // Seller + condition row
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.storefront_outlined,
-                              size: 12,
-                              color: AppColors.textHint,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                product.sellerName,
-                                style: AppTypography.caption.copyWith(
-                                  fontSize: 11,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (product.sellerVerified)
-                              const Padding(
-                                padding: EdgeInsets.only(left: 4),
-                                child: Icon(
-                                  Icons.verified_rounded,
-                                  size: 13,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        // Details: size, condition, color
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: [
-                            if (product.size != null)
-                              _DetailChip(
-                                icon: Icons.straighten_rounded,
-                                label: product.size!,
-                              ),
-                            _DetailChip(
-                              icon: Icons.star_outline_rounded,
-                              label: product.condition.label,
-                            ),
-                            if (product.color != null)
-                              _DetailChip(
-                                icon: Icons.palette_outlined,
-                                label: product.color!,
-                              ),
-                          ],
-                        ),
-                      ],
+                      ),
                     ),
                   ),
 
@@ -407,15 +665,13 @@ class _CartItemCard extends StatelessWidget {
               ),
             ),
 
-            // â”€â”€ Divider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const Divider(height: 1, indent: 14, endIndent: 14),
 
-            // â”€â”€ Price + Quantity controls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // Price + Quantity controls
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               child: Row(
                 children: [
-                  // Unit price
                   Text(
                     formatCurrency(product.price),
                     style: AppTypography.subheading.copyWith(
@@ -427,7 +683,7 @@ class _CartItemCard extends StatelessWidget {
                   ),
                   if (item.quantity > 1) ...[
                     Text(
-                      '  Ã— ${item.quantity}',
+                      '  × ${item.quantity}',
                       style: AppTypography.caption.copyWith(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -447,7 +703,6 @@ class _CartItemCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                   ],
-                  // Quantity stepper
                   Container(
                     decoration: BoxDecoration(
                       color: AppColors.surfaceVariant,
@@ -499,28 +754,23 @@ class _CartItemCard extends StatelessWidget {
   }
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═════════════════════════════════════════════════════════════════════════════
 // Bottom Checkout Bar
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═════════════════════════════════════════════════════════════════════════════
 
 class _CheckoutBottomBar extends StatelessWidget {
-  const _CheckoutBottomBar({required this.items});
-  final List<CartItem> items;
+  const _CheckoutBottomBar();
 
   @override
   Widget build(BuildContext context) {
     final checkout = context.watch<CheckoutController>();
-    final subtotal = items.fold<double>(0, (sum, item) => sum + item.subtotal);
-    final shipping = checkoutShippingFee(
-      checkoutSellerCount(items.map((i) => i.product.sellerId)),
-    );
-    final platform = checkoutPlatformFee(subtotal);
-    final total = checkoutTotal(
-      subtotal: subtotal,
-      shippingFee: shipping,
-      platformFee: platform,
-    );
-    final canSubmit = checkout.hasAddress && !checkout.isSubmitting;
+    final subtotal = checkout.subtotal;
+    final shipping = checkout.shippingFee;
+    final platform = checkout.platformFee;
+    final total = checkout.total;
+    final hasSelection = checkout.selectedItems.isNotEmpty;
+    final otherCount = checkout.remainingOtherSellerCount;
+    final blocked = checkout.hasUnpaidCheckouts;
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -544,11 +794,14 @@ class _CheckoutBottomBar extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _SummaryRow(
-            label: 'Subtotal (${items.length} items)',
+            label: 'Subtotal (${checkout.selectedCount} ${checkout.selectedCount == 1 ? 'item' : 'items'} selected)',
             value: formatCurrency(subtotal),
           ),
           const SizedBox(height: 4),
-          _SummaryRow(label: 'Shipping', value: formatCurrency(shipping)),
+          _SummaryRow(
+            label: 'Shipping',
+            value: hasSelection ? formatCurrency(shipping) : '₱0.00',
+          ),
           const SizedBox(height: 4),
           _SummaryRow(
             label: 'Platform fee (2%)',
@@ -561,10 +814,17 @@ class _CheckoutBottomBar extends StatelessWidget {
           _SummaryRow(label: 'Total', value: formatCurrency(total), bold: true),
           const SizedBox(height: 8),
           Text(
-            checkout.remainingOtherSellerCount > 0
-                ? 'This checkout is for one seller. Items from other sellers stay in your cart. Payment is required next.'
+            blocked
+                ? 'Pay or cancel your existing checkout before starting a new one.'
+                : !hasSelection
+                ? 'Check the item(s) you want to pay for above.'
+                : otherCount > 0
+                ? 'Orders are paid per shop. Items from other shops remain in your cart.'
                 : 'Next you will choose Card or GCash and pay through PayMongo. The purchase completes only after payment is confirmed.',
-            style: AppTypography.caption.copyWith(fontSize: 11),
+            style: AppTypography.caption.copyWith(
+              fontSize: 11,
+              color: blocked ? AppColors.error : null,
+            ),
             textAlign: TextAlign.center,
           ),
           if (checkout.errorMessage != null) ...[
@@ -580,8 +840,22 @@ class _CheckoutBottomBar extends StatelessWidget {
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: canSubmit
-                  ? () async {
+              onPressed: blocked || !hasSelection || checkout.isSubmitting
+                  ? null
+                  : () async {
+                      if (!checkout.hasAddress) {
+                        showThriftSnackBar(
+                          context,
+                          'Please add a delivery address to continue.',
+                        );
+                        await context.push(RouteNames.addresses);
+                        if (!context.mounted) return;
+                        await context.read<CheckoutController>().load();
+                        if (!context.mounted) return;
+                        if (!context.read<CheckoutController>().hasAddress) {
+                          return;
+                        }
+                      }
                       final leftover = context
                           .read<CheckoutController>()
                           .remainingOtherSellerCount;
@@ -604,14 +878,7 @@ class _CheckoutBottomBar extends StatelessWidget {
                         );
                       }
                       context.go(RouteNames.paymentForOrder(result.orderId!));
-                    }
-                  : checkout.hasAddress
-                  ? null
-                  : () => showThriftSnackBar(
-                      context,
-                      'Add a delivery address before checkout.',
-                      isError: true,
-                    ),
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -634,10 +901,17 @@ class _CheckoutBottomBar extends StatelessWidget {
                   : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.lock_rounded, size: 18),
+                        Icon(
+                          blocked ? Icons.block_rounded : Icons.lock_rounded,
+                          size: 18,
+                        ),
                         const SizedBox(width: 8),
                         Text(
-                          'Continue to payment',
+                          blocked
+                              ? 'Pay existing checkout first'
+                              : !hasSelection
+                              ? 'Select items to pay'
+                              : 'Continue to payment (${formatCurrency(total)})',
                           style: AppTypography.subheading.copyWith(
                             color: Colors.white,
                             fontSize: 15,
@@ -654,9 +928,9 @@ class _CheckoutBottomBar extends StatelessWidget {
   }
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═════════════════════════════════════════════════════════════════════════════
 // Helper Widgets
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═════════════════════════════════════════════════════════════════════════════
 
 class _DetailChip extends StatelessWidget {
   const _DetailChip({required this.icon, required this.label});

@@ -8,7 +8,6 @@ import '../../../core/constants/app_typography.dart';
 import '../../../core/routes/route_names.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/settings_provider.dart';
-import '../../../widgets/info_bottom_sheets.dart';
 import '../../../widgets/thrift_widgets.dart';
 import '../presentation/widgets/switch_account_sheet.dart';
 import '../presentation/widgets/switchable_avatar.dart';
@@ -100,28 +99,6 @@ class SellerProfileTab extends StatelessWidget {
                 icon: Icons.settings_outlined,
                 label: 'Settings',
                 onTap: () => context.push(RouteNames.settings),
-              ),
-            ],
-          ),
-
-          // â”€â”€ Support & Legal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-          _SectionCard(
-            title: 'Support & Legal',
-            children: [
-              _MenuItem(
-                icon: Icons.help_outline_rounded,
-                label: 'Help / Support / FAQ',
-                onTap: () => HelpSupportSheet.show(context),
-              ),
-              _MenuItem(
-                icon: Icons.gavel_rounded,
-                label: 'Terms & Privacy Policy',
-                onTap: () => TermsPrivacySheet.show(context),
-              ),
-              _MenuItem(
-                icon: Icons.info_outline_rounded,
-                label: 'About ThriftLine',
-                onTap: () => AboutThriftLineSheet.show(context),
               ),
             ],
           ),

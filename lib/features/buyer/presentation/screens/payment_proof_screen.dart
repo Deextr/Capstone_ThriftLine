@@ -8,9 +8,13 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../models/address_model.dart';
+import '../../../../models/order_model.dart';
 import '../../../../providers/cart_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../profile/data/address_service.dart';
 import '../../controllers/buyer_orders_controller.dart';
 import '../../data/paymongo_checkout.dart';
 import '../widgets/pay_now_button.dart';
@@ -70,7 +74,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
       canPop: !pending,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop || !pending) return;
-        _leavePendingCheckout();
+        _leavePendingCheckout(controller);
       },
       child: Scaffold(
         appBar: AppBar(
@@ -87,7 +91,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
               if (pending) {
-                _leavePendingCheckout();
+                _leavePendingCheckout(controller);
                 return;
               }
               if (failed) {
@@ -105,12 +109,22 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                 ? _FailedPaymentBody(
                     channel: _selectedChannel,
                     expired: controller.isExpiredPayment,
-                    onReturnToCart: () => context.go(RouteNames.checkout),
-                    onTryAgain: () => context.go(RouteNames.checkout),
+                    onReturnToCart: () async {
+                      await context.read<CartProvider>().refresh();
+                      if (context.mounted) {
+                        context.go(RouteNames.checkout);
+                      }
+                    },
+                    onTryAgain: () async {
+                      await context.read<CartProvider>().refresh();
+                      if (context.mounted) {
+                        context.go(RouteNames.checkout);
+                      }
+                    },
                   )
                 : pending
                 ? _PendingPaymentBody(
-                    orderId: widget.orderId,
+                    order: order,
                     sellerName: order.sellerName,
                     itemLabel: order.items.length > 1
                         ? '${order.items.length} items from ${order.sellerName}'
@@ -119,6 +133,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                     confirming: confirming,
                     selectedChannel: _selectedChannel,
                     isAbandoning: controller.isAbandoning,
+                    isSavingAddress: controller.isSavingAddress,
                     returnLabel: (order.auctionId ?? '').isNotEmpty
                         ? 'Cancel payment'
                         : 'Return to Cart',
@@ -128,6 +143,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                     onChangeMethod: () {
                       setState(() => _selectedChannel = null);
                     },
+                    onChangeAddress: () => _changeAddress(controller),
                     onReturnToCart: confirming
                         ? null
                         : () => unawaited(_returnToCart(controller)),
@@ -144,8 +160,63 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
     );
   }
 
-  void _leavePendingCheckout() {
-    context.go(RouteNames.buyerHome);
+  Future<void> _leavePendingCheckout(BuyerOrdersController controller) async {
+    final isAuction = (controller.order?.auctionId ?? '').isNotEmpty;
+    if (isAuction) {
+      context.go(RouteNames.buyerHome);
+      return;
+    }
+
+    final cancelAndReturn = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Leave checkout?'),
+        content: const Text(
+          'Do you want to cancel this checkout and return items to your cart, or keep it pending?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Keep pending'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Return to cart'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || cancelAndReturn == null) return;
+    if (cancelAndReturn) {
+      await _returnToCart(controller);
+    } else {
+      context.go(RouteNames.buyerHome);
+    }
+  }
+
+  Future<void> _changeAddress(BuyerOrdersController controller) async {
+    final result = await context.push<dynamic>(RouteNames.addresses);
+    if (!mounted) return;
+
+    String? newAddressId;
+    if (result is AddressModel) {
+      newAddressId = result.id;
+    } else {
+      final supabase = context.read<SupabaseService>();
+      final def = await AddressService(supabase).defaultAddress();
+      newAddressId = def?.id;
+    }
+
+    if (newAddressId != null && newAddressId.isNotEmpty) {
+      final error = await controller.setAddress(newAddressId);
+      if (!mounted) return;
+      if (error != null) {
+        showThriftSnackBar(context, error, isError: true);
+      } else {
+        showThriftSnackBar(context, 'Delivery address updated.');
+      }
+    }
   }
 
   Future<void> _returnToCart(BuyerOrdersController controller) async {
@@ -158,6 +229,8 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
     }
     if (error != null) {
       showThriftSnackBar(context, error, isError: true);
+    } else {
+      showThriftSnackBar(context, 'Checkout cancelled. Items returned to your cart.');
     }
     context.go(isAuction ? RouteNames.buyerHome : RouteNames.checkout);
   }
@@ -165,12 +238,26 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
   void _scheduleReturnHandling(bool returned, bool cancelled) {
     if (!returned || _didHandleReturn) return;
     _didHandleReturn = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      final controller = context.read<BuyerOrdersController>();
+      if (cancelled) {
+        final isAuction = (controller.order?.auctionId ?? '').isNotEmpty;
+        await controller.abandonUnpaidCheckout(widget.orderId);
+        if (!mounted) return;
+        if (!isAuction) {
+          await context.read<CartProvider>().refresh();
+          if (!mounted) return;
+        }
+        showThriftSnackBar(
+          context,
+          'Checkout cancelled. Items returned to your cart.',
+        );
+        context.go(isAuction ? RouteNames.buyerHome : RouteNames.checkout);
+        return;
+      }
       unawaited(
-        context.read<BuyerOrdersController>().handlePaymongoAppReturn(
-          cancelled: cancelled,
-        ),
+        controller.handlePaymongoAppReturn(cancelled: false),
       );
     });
   }
@@ -187,29 +274,33 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
 
 class _PendingPaymentBody extends StatelessWidget {
   const _PendingPaymentBody({
-    required this.orderId,
+    required this.order,
     required this.sellerName,
     required this.itemLabel,
     required this.totalLabel,
     required this.confirming,
     required this.selectedChannel,
     required this.isAbandoning,
+    required this.isSavingAddress,
     required this.returnLabel,
     required this.onSelectChannel,
     required this.onChangeMethod,
+    required this.onChangeAddress,
     this.onReturnToCart,
   });
 
-  final String orderId;
+  final OrderModel order;
   final String sellerName;
   final String itemLabel;
   final String totalLabel;
   final bool confirming;
   final String? selectedChannel;
   final bool isAbandoning;
+  final bool isSavingAddress;
   final String returnLabel;
   final ValueChanged<String> onSelectChannel;
   final VoidCallback onChangeMethod;
+  final VoidCallback onChangeAddress;
   final VoidCallback? onReturnToCart;
 
   @override
@@ -217,56 +308,81 @@ class _PendingPaymentBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          confirming
-              ? 'Confirming payment…'
-              : selectedChannel == null
-              ? 'Payment Method'
-              : paymongoChannelLabel(selectedChannel!),
-          style: AppTypography.heading,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          confirming
-              ? 'PayMongo is confirming this payment. ThriftLine will update only after the verified webhook arrives.'
-              : selectedChannel == null
-              ? 'Choose how you want to pay. Payment is required to complete this purchase.'
-              : 'Pay securely through PayMongo',
-          style: AppTypography.body,
-        ),
-        const SizedBox(height: 16),
-        ThriftCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(itemLabel, style: AppTypography.subheading),
-              Text('Seller: $sellerName', style: AppTypography.caption),
-              const Divider(),
-              _PaymentRow(label: 'Amount to Pay', value: totalLabel),
-              _PaymentRow(
-                label: 'Status',
-                value: confirming ? 'Confirming payment…' : 'Payment required',
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        if (confirming)
-          const Expanded(
-            child: Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  confirming
+                      ? 'Confirming payment…'
+                      : selectedChannel == null
+                      ? 'Payment Method'
+                      : paymongoChannelLabel(selectedChannel!),
+                  style: AppTypography.heading,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  confirming
+                      ? 'PayMongo is confirming this payment. ThriftLine will update only after the verified webhook arrives.'
+                      : selectedChannel == null
+                      ? 'Choose how you want to pay. Payment is required to complete this purchase.'
+                      : 'Pay securely through PayMongo',
+                  style: AppTypography.body,
+                ),
+                const SizedBox(height: 16),
+                _PaymentAddressCard(
+                  order: order,
+                  isSavingAddress: isSavingAddress,
+                  onChangeAddress: onChangeAddress,
+                ),
+                const SizedBox(height: 12),
+                ThriftCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(itemLabel, style: AppTypography.subheading),
+                      Text('Seller: $sellerName', style: AppTypography.caption),
+                      const Divider(),
+                      _PaymentRow(label: 'Amount to Pay', value: totalLabel),
+                      _PaymentRow(
+                        label: 'Status',
+                        value: confirming ? 'Confirming payment…' : 'Payment required',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (confirming)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: Center(
+                      child: CircularProgressIndicator(color: AppColors.primary),
+                    ),
+                  )
+                else if (selectedChannel == null)
+                  _MethodPicker(onSelect: onSelectChannel),
+              ],
             ),
-          )
-        else if (selectedChannel == null)
-          Expanded(child: _MethodPicker(onSelect: onSelectChannel))
-        else
-          const Spacer(),
-        if (!confirming && selectedChannel != null) ...[
-          PayNowButton(
-            orderId: orderId,
-            channel: selectedChannel!,
-            amountLabel: totalLabel,
           ),
+        ),
+        if (!confirming && selectedChannel != null) ...[
+          const SizedBox(height: 12),
+          if (order.addressMissing || order.shippingAddress.trim().isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: ThriftButton(
+                label: 'Add delivery address to pay',
+                variant: ThriftButtonVariant.primary,
+                onPressed: onChangeAddress,
+              ),
+            )
+          else
+            PayNowButton(
+              orderId: order.id,
+              channel: selectedChannel!,
+              amountLabel: totalLabel,
+            ),
           const SizedBox(height: 12),
           ThriftButton(
             label: 'Change method',
@@ -286,6 +402,86 @@ class _PendingPaymentBody extends StatelessWidget {
   }
 }
 
+class _PaymentAddressCard extends StatelessWidget {
+  const _PaymentAddressCard({
+    required this.order,
+    required this.isSavingAddress,
+    required this.onChangeAddress,
+  });
+
+  final OrderModel order;
+  final bool isSavingAddress;
+  final VoidCallback onChangeAddress;
+
+  @override
+  Widget build(BuildContext context) {
+    final addressText = order.shippingAddress.trim();
+    final hasAddress = !order.addressMissing && addressText.isNotEmpty;
+
+    return ThriftCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.location_on_outlined,
+                color: AppColors.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Delivery Address',
+                  style: AppTypography.subheading,
+                ),
+              ),
+              if (isSavingAddress)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                )
+              else
+                TextButton(
+                  onPressed: onChangeAddress,
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                  ),
+                  child: Text(hasAddress ? 'Change' : 'Add'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (hasAddress) ...[
+            Text(
+              order.buyerName.isNotEmpty ? order.buyerName : 'Recipient',
+              style: AppTypography.caption.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              addressText,
+              style: AppTypography.body.copyWith(fontSize: 13),
+            ),
+          ] else ...[
+            Text(
+              'No delivery address specified. Please add an address to complete your order.',
+              style: AppTypography.caption.copyWith(color: AppColors.error),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _MethodPicker extends StatelessWidget {
   const _MethodPicker({required this.onSelect});
 
@@ -293,7 +489,8 @@ class _MethodPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Cards', style: AppTypography.caption),
         const SizedBox(height: 8),

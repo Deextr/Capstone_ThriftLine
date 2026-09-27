@@ -141,7 +141,7 @@ class BuyerProfileTab extends StatelessWidget {
                 trailing: Switch(
                   value: data.notificationsEnabled,
                   onChanged: (_) => data.toggleNotifications(),
-                  activeColor: AppColors.primary,
+                  activeThumbColor: AppColors.primary,
                 ),
               ),
               _menuItem(
@@ -154,7 +154,13 @@ class BuyerProfileTab extends StatelessWidget {
                 context,
                 'Addresses',
                 Icons.location_on_outlined,
-                () => showThriftSnackBar(context, 'Coming soon'),
+                () => context.push(RouteNames.addresses),
+              ),
+              _menuItem(
+                context,
+                'Settings',
+                Icons.settings_outlined,
+                () => context.push(RouteNames.settings),
               ),
               const Divider(height: 1, thickness: 1, color: AppColors.border),
               if (auth.canSwitchAccounts)
@@ -240,25 +246,6 @@ class BuyerProfileTab extends StatelessWidget {
                   color: AppColors.textHint,
                 ),
                 onTap: () => context.push(RouteNames.myReports),
-              ),
-            ]),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppConstants.spacingMd,
-            ),
-            child: _section('Help & Support', [
-              _menuItem(
-                context,
-                'Help Center',
-                Icons.help_outline,
-                () => showThriftSnackBar(context, 'Help center coming soon'),
-              ),
-              _menuItem(
-                context,
-                'About Thriftline',
-                Icons.info_outline,
-                () => showThriftSnackBar(context, 'Thriftline v1.0.0'),
               ),
             ]),
           ),

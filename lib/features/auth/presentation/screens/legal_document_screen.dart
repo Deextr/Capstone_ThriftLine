@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:provider/provider.dart';
+
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
+import '../../../../providers/auth_provider.dart';
 import '../../domain/legal_documents.dart';
 
-/// Full-screen reader for the Terms and Conditions or the Privacy Policy.
+/// Full-screen reader for Terms and Conditions, Privacy Policy, About, or FAQ.
 ///
-/// Reachable before sign-in so consent can be given from an informed position.
+/// Reachable before sign-in so consent can be given from an informed position,
+/// as well as from the buyer and seller profile tabs and settings.
 class LegalDocumentScreen extends StatelessWidget {
   const LegalDocumentScreen({super.key, required this.type});
 
@@ -25,8 +29,14 @@ class LegalDocumentScreen extends StatelessWidget {
         title: Text(document.title, style: AppTypography.subheading),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go(RouteNames.login),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              final auth = context.read<AuthProvider>();
+              context.go(auth.isAuthenticated ? auth.homeRoute : RouteNames.login);
+            }
+          },
         ),
       ),
       body: SafeArea(

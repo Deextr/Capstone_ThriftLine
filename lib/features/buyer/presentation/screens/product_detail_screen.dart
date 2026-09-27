@@ -987,10 +987,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                   await cart.addToCart(product);
                   if (!context.mounted) return;
                   showThriftSnackBar(context, 'Added to cart!');
-                  context.push('${RouteNames.checkout}?product=${product.id}');
-                  return;
                 }
-                context.push(RouteNames.checkout);
+                if (!context.mounted) return;
+                context.push('${RouteNames.checkout}?product=${product.id}');
               },
               icon: Icon(
                 inCart

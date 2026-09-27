@@ -215,7 +215,7 @@ class BuyerOrdersController extends ChangeNotifier {
 
     if (cancelled) {
       _isConfirmingPayment = false;
-      _unsuccessfulOutcome = 'failed';
+      _unsuccessfulOutcome = null;
       _notify();
       await abandonUnpaidCheckout(id);
       return;
@@ -295,6 +295,7 @@ class BuyerOrdersController extends ChangeNotifier {
       }
       _isConfirmingPayment = false;
       await load(showSpinner: false);
+      _unsuccessfulOutcome = null;
       return null;
     } catch (e) {
       debugPrint('BuyerOrdersController.abandonUnpaidCheckout error: $e');

@@ -399,7 +399,7 @@ class CartProvider extends ChangeNotifier {
     }
   }
 
-  void clearFixedPriceItems() {
+  Future<void> clearFixedPriceItems() async {
     final fixedIds = fixedPriceItems.map((i) => i.product.id).toList();
     _items.removeWhere((i) => i.isFixedPrice);
     notifyListeners();
@@ -408,7 +408,7 @@ class CartProvider extends ChangeNotifier {
     final supabase = _supabase;
     if (userId != null && supabase != null && fixedIds.isNotEmpty) {
       try {
-        supabase.client
+        await supabase.client
             .from('cart_items')
             .delete()
             .eq('user_id', userId)

@@ -7,10 +7,12 @@ abstract final class RouteNames {
   static const String signup = '/signup';
   static const String legal = '/legal/:doc';
 
-  /// Concrete path for the Terms and Conditions or Privacy Policy reader.
+  /// Concrete path for the Terms and Conditions, Privacy Policy, About, or FAQ reader.
   static String legalDocument(LegalDocumentType type) => switch (type) {
     LegalDocumentType.terms => '/legal/terms',
     LegalDocumentType.privacy => '/legal/privacy',
+    LegalDocumentType.about => '/legal/about',
+    LegalDocumentType.faq => '/legal/faq',
   };
 
   static const String buyerHome = '/buyer';
