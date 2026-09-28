@@ -218,14 +218,18 @@ class AuthService {
 
       return AuthResult.success(authUser);
     } on AuthException catch (e) {
-      debugPrint('AuthService.signInWithGoogle failed: ${_describe(e)}');
-      return AuthResult.failure(_friendlyGoogleAuthError(e));
-    } catch (e) {
-      debugPrint('AuthService.signInWithGoogle error: $e');
-      if (e.toString().toLowerCase().contains('already exists')) {
-        return AuthResult.failure(existingEmailPasswordAccountMessage);
-      }
-      return AuthResult.failure('Something went wrong. Please try again.');
+      debugPrint(
+        'Google Supabase AuthException: '
+        'message=${e.message}, code=${e.code}, statusCode=${e.statusCode}',
+      );
+      return AuthResult.failure(
+        'Google Supabase error: ${e.message} '
+        '(code: ${e.code}, status: ${e.statusCode})',
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Google sign-in exception: $e');
+      debugPrintStack(stackTrace: stackTrace);
+      return AuthResult.failure('Google sign-in exception: $e');
     }
   }
 

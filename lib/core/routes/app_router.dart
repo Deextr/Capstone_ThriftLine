@@ -569,7 +569,8 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: RouteNames.addresses,
-        builder: (_, _) => const AddressBookScreen(),
+        builder: (_, state) =>
+            AddressBookScreen(currentAddressId: state.extra as String?),
       ),
       GoRoute(
         path: RouteNames.paymentMethods,

@@ -28,6 +28,13 @@ class AddressService {
     return all.firstWhere((a) => a.isDefault, orElse: () => all.first);
   }
 
+  Future<void> setDefault(String id) async {
+    await _supabase.client
+        .from('addresses')
+        .update({'is_default': true})
+        .eq('address_id', id);
+  }
+
   Future<void> save({
     String? id,
     required String recipientName,

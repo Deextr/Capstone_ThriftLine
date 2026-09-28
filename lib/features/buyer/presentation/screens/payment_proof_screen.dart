@@ -199,7 +199,10 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
   }
 
   Future<void> _changeAddress(BuyerOrdersController controller) async {
-    final result = await context.push<dynamic>(RouteNames.addresses);
+    final result = await context.push<dynamic>(
+      RouteNames.addresses,
+      extra: controller.order?.addressId,
+    );
     if (!mounted) return;
 
     String? newAddressId;
@@ -233,7 +236,10 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
     if (error != null) {
       showThriftSnackBar(context, error, isError: true);
     } else {
-      showThriftSnackBar(context, 'Checkout cancelled. Items returned to your cart.');
+      showThriftSnackBar(
+        context,
+        'Checkout cancelled. Items returned to your cart.',
+      );
     }
     context.go(isAuction ? RouteNames.buyerHome : RouteNames.cart);
   }
@@ -259,9 +265,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
         context.go(isAuction ? RouteNames.buyerHome : RouteNames.checkout);
         return;
       }
-      unawaited(
-        controller.handlePaymongoAppReturn(cancelled: false),
-      );
+      unawaited(controller.handlePaymongoAppReturn(cancelled: false));
     });
   }
 
@@ -483,10 +487,7 @@ class _PaymentAddressCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 2),
-            Text(
-              addressText,
-              style: AppTypography.body.copyWith(fontSize: 13),
-            ),
+            Text(addressText, style: AppTypography.body.copyWith(fontSize: 13)),
           ] else ...[
             Text(
               'No delivery address specified. Please add an address to complete your order.',
