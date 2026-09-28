@@ -135,6 +135,7 @@ class ThriftTextField extends StatefulWidget {
     this.autofocus = false,
     this.validator,
     this.labelColor,
+    this.autovalidateMode,
   });
 
   final String? label;
@@ -154,6 +155,7 @@ class ThriftTextField extends StatefulWidget {
   final bool autofocus;
   final String? Function(String?)? validator;
   final Color? labelColor;
+  final AutovalidateMode? autovalidateMode;
 
   @override
   State<ThriftTextField> createState() => _ThriftTextFieldState();
@@ -201,9 +203,10 @@ class _ThriftTextFieldState extends State<ThriftTextField> {
           autofocus: widget.autofocus,
           validator: widget.validator,
           scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-          autovalidateMode: widget.validator != null
-              ? AutovalidateMode.onUserInteraction
-              : AutovalidateMode.disabled,
+          autovalidateMode: widget.autovalidateMode ??
+              (widget.validator != null
+                  ? AutovalidateMode.onUserInteraction
+                  : AutovalidateMode.disabled),
           decoration: InputDecoration(
             hintText: widget.hint,
             prefixIcon: widget.icon != null

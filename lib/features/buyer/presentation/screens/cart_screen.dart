@@ -87,6 +87,14 @@ class _CartScreenState extends State<CartScreen> {
     context.push(RouteNames.checkoutFor(productIds: ids));
   }
 
+  void _handleBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(RouteNames.buyerHome);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
@@ -94,19 +102,25 @@ class _CartScreenState extends State<CartScreen> {
     final selected = cart.selectedItems;
     final shops = cart.shopGroups;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: AppColors.textPrimary,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.surface,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              color: AppColors.textPrimary,
+            ),
+            onPressed: _handleBack,
           ),
-          onPressed: () => context.pop(),
-        ),
         title: Column(
           children: [
             Text('Cart', style: AppTypography.heading.copyWith(fontSize: 18)),
@@ -194,6 +208,7 @@ class _CartScreenState extends State<CartScreen> {
               busy: _checkingOut,
               onCheckout: selected.isEmpty ? null : _checkout,
             ),
+      ),
     );
   }
 }
