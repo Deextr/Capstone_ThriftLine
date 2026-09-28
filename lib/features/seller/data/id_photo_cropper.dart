@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -9,7 +10,10 @@ import 'id_bitmap_luma.dart';
 class IdPhotoCropper {
   static const int maxDecodeWidth = 1920;
 
-  static Future<Uint8List> cropToId(Uint8List bytes) async {
+  static Future<Uint8List> cropToId(
+    Uint8List bytes, {
+    double cardAspect = IdCaptureGuide.cardAspect,
+  }) async {
     if (bytes.isEmpty) return bytes;
     try {
       final codec = await ui.instantiateImageCodec(
@@ -26,6 +30,7 @@ class IdPhotoCropper {
         final overlay = IdImageMetrics.centerCardWindow(
           image.width,
           image.height,
+          aspect: cardAspect,
         );
         final crop = IdImageMetrics.extractWindow(
           luma,
@@ -48,6 +53,7 @@ class IdPhotoCropper {
           imageWidth: image.width,
           imageHeight: image.height,
           overlayGeometry: geometry,
+          aspect: cardAspect,
         );
         return await _encodePng(image, window) ?? bytes;
       } finally {
@@ -55,6 +61,52 @@ class IdPhotoCropper {
       }
     } catch (_) {
       return bytes;
+    }
+  }
+
+  /// PNG of [bytes] turned clockwise [quarterTurns] times. Null on failure.
+  static Future<Uint8List?> rotateClockwise(
+    Uint8List bytes,
+    int quarterTurns,
+  ) async {
+    final turns = quarterTurns % 4;
+    if (turns == 0) return bytes;
+    if (bytes.isEmpty) return null;
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      try {
+        final w = image.width.toDouble();
+        final h = image.height.toDouble();
+        final outW = turns.isOdd ? h : w;
+        final outH = turns.isOdd ? w : h;
+        final recorder = ui.PictureRecorder();
+        final canvas = ui.Canvas(recorder);
+        switch (turns) {
+          case 1:
+            canvas.translate(outW, 0);
+          case 2:
+            canvas.translate(outW, outH);
+          case 3:
+            canvas.translate(0, outH);
+        }
+        canvas.rotate(turns * math.pi / 2);
+        canvas.drawImage(image, ui.Offset.zero, ui.Paint());
+        final picture = recorder.endRecording();
+        final rotated = await picture.toImage(outW.round(), outH.round());
+        picture.dispose();
+        final png = await rotated.toByteData(format: ui.ImageByteFormat.png);
+        rotated.dispose();
+        if (png == null) return null;
+        return Uint8List.fromList(
+          png.buffer.asUint8List(png.offsetInBytes, png.lengthInBytes),
+        );
+      } finally {
+        image.dispose();
+      }
+    } catch (_) {
+      return null;
     }
   }
 

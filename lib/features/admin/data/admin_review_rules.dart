@@ -36,8 +36,34 @@ bool isOpenDisputeStatus(String status) => status == kAdminDisputeOpenStatus;
 bool canCloseDispute(String status) => status == kAdminDisputeOpenStatus;
 
 String adminQueueFilterLabel(AdminQueueFilter filter) => switch (filter) {
-  AdminQueueFilter.open => 'Open',
-  AdminQueueFilter.closed => 'Closed',
+  AdminQueueFilter.open => 'Needs review',
+  AdminQueueFilter.closed => 'Reviewed',
+};
+
+/// Compact queue count. [state] is the human status, such as "under review".
+String adminQueueStatusLine(int count, String state) {
+  if (count <= 0) return 'None waiting';
+  return '$count $state';
+}
+
+String reportDecisionCta(String decision) => switch (decision) {
+  'action_taken' => 'Record action taken',
+  'resolved' => 'Resolve report',
+  'dismissed' => 'Dismiss report',
+  _ => 'Save decision',
+};
+
+String adminReportActivityTitle(String status) => switch (status) {
+  'action_taken' => 'Action taken on a report',
+  'resolved' => 'Report resolved',
+  'dismissed' => 'Report dismissed',
+  _ => 'Report reviewed',
+};
+
+String adminApplicationActivityTitle(String status) => switch (status) {
+  'approved' => 'Seller application approved',
+  'rejected' => 'Seller application rejected',
+  _ => 'Seller application reviewed',
 };
 
 String reportDecisionLabel(String decision) => switch (decision) {
@@ -108,8 +134,8 @@ BadgeVariant adminStatusBadgeVariant(String status) => switch (status) {
 
 String adminEvidenceCountLabel(int count) {
   if (count <= 0) return '';
-  if (count == 1) return '1 evidence file';
-  return '$count evidence files';
+  if (count == 1) return '1 photo';
+  return '$count photos';
 }
 
 String adminFriendlyError(Object error, String fallback) {

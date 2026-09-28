@@ -685,6 +685,43 @@ void main() {
       );
     });
 
+    test(
+      'pure-white screen areas around a QR are not glare on a digital ID',
+      () {
+        // eGov Digital National ID back: ~30% of pixels are screen white.
+        final luma = _fullBleedIdBackWithQr();
+        for (var y = 14; y < 90; y++) {
+          for (var x = 88; x < 158; x++) {
+            if (y < 22 || y >= 82 || x < 96 || x >= 150) {
+              luma[y * _w + x] = 255;
+            } else if (luma[y * _w + x] > 200) {
+              luma[y * _w + x] = 255;
+            }
+          }
+        }
+        const backText = DocumentEvidence(
+          available: true,
+          alphanumericChars: 60,
+          blockCount: 5,
+          textCoverage: 0.3,
+          recognizedText: 'kasarian sex male uri ng dugo blood type unknown',
+        );
+        IdQualityResult run({required bool displayed}) =>
+            IdImageMetrics.evaluate(
+              luma: luma,
+              width: _w,
+              height: _h,
+              sourceWidth: _source,
+              sourceHeight: _source,
+              evidence: backText,
+              allowDisplayedDocument: displayed,
+            );
+        final screen = run(displayed: true);
+      expect(screen.passed, isTrue, reason: screen.debug);
+      expect(run(displayed: false).passed, isFalse);
+      },
+    );
+
     test('OCR text can confirm a card-shaped region', () {
       final result = _eval(
         _sharpId(),

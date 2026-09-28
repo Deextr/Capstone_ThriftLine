@@ -7,8 +7,12 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/supabase_rpc.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../data/listing_bucket.dart';
+import '../widgets/end_auction_dialog.dart';
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Local model
@@ -22,9 +26,17 @@ class _ListingItem {
     required this.status,
     required this.listingType,
     required this.condition,
+    required this.bucket,
     this.primaryImageUrl,
     this.brand,
     this.size,
+    this.auctionId,
+    this.auctionStatus,
+    this.endsAt,
+    this.winnerId,
+    this.bidCount = 0,
+    this.paymentDueAt,
+    this.orderStatus,
   });
 
   final String productId;
@@ -33,11 +45,35 @@ class _ListingItem {
   final String status;
   final String listingType;
   final String condition;
+  final ListingBucket bucket;
   final String? primaryImageUrl;
   final String? brand;
   final String? size;
+  final String? auctionId;
+  final String? auctionStatus;
+  final DateTime? endsAt;
+  final String? winnerId;
+  final int bidCount;
+  final DateTime? paymentDueAt;
+  final String? orderStatus;
 
-  factory _ListingItem.fromRow(Map<String, dynamic> row) {
+  ListingSnapshot snapshotAt(DateTime now) => ListingSnapshot(
+    productStatus: status,
+    listingType: listingType,
+    auctionStatus: auctionStatus,
+    endsAt: endsAt,
+    winnerId: winnerId,
+    orderStatus: orderStatus,
+    paymentDueAt: paymentDueAt,
+    bidCount: bidCount,
+    now: now,
+  );
+
+  factory _ListingItem.fromRow(
+    Map<String, dynamic> row, {
+    Map<String, dynamic>? order,
+    required DateTime now,
+  }) {
     final images = row['product_images'] as List? ?? [];
     final primary = images.isNotEmpty
         ? images.firstWhere(
@@ -45,19 +81,60 @@ class _ListingItem {
             orElse: () => images.first,
           )
         : null;
+    final auction = _auctionMap(row['auctions']);
+    final endsAt = auction?['ends_at'] != null
+        ? DateTime.tryParse(auction!['ends_at'] as String)
+        : null;
+    final due = order?['payment_due_at'] != null
+        ? DateTime.tryParse(order!['payment_due_at'] as String)
+        : null;
+    final status = row['status'] as String? ?? 'active';
+    final listingType = row['listing_type'] as String? ?? 'fixed_price';
+    final auctionStatus = auction?['status'] as String?;
+    final winnerId = auction?['winner_id'] as String?;
+    final orderStatus = order?['order_status'] as String?;
+    final bidCount = (auction?['bid_count'] as num?)?.toInt() ?? 0;
+    final current = (auction?['current_price'] as num?)?.toDouble();
+    final snapshot = ListingSnapshot(
+      productStatus: status,
+      listingType: listingType,
+      auctionStatus: auctionStatus,
+      endsAt: endsAt,
+      winnerId: winnerId,
+      orderStatus: orderStatus,
+      paymentDueAt: due,
+      bidCount: bidCount,
+      now: now,
+    );
 
     return _ListingItem(
       productId: row['product_id'] as String,
       name: row['name'] as String? ?? row['title'] as String? ?? '',
-      price: (row['price'] as num).toDouble(),
-      status: row['status'] as String,
-      listingType: row['listing_type'] as String,
-      condition: row['condition'] as String,
+      price: current ?? (row['price'] as num?)?.toDouble() ?? 0,
+      status: status,
+      listingType: listingType,
+      condition: row['condition'] as String? ?? '',
+      bucket: listingBucketFor(snapshot),
       primaryImageUrl: primary?['image_url'] as String?,
       brand: row['brand'] as String?,
       size: row['size'] as String?,
+      auctionId: auction?['auction_id'] as String?,
+      auctionStatus: auctionStatus,
+      endsAt: endsAt,
+      winnerId: winnerId,
+      bidCount: bidCount,
+      paymentDueAt: due,
+      orderStatus: orderStatus,
     );
   }
+}
+
+Map<String, dynamic>? _auctionMap(dynamic raw) {
+  if (raw is List && raw.isNotEmpty && raw.first is Map) {
+    return Map<String, dynamic>.from(raw.first as Map);
+  }
+  if (raw is Map) return Map<String, dynamic>.from(raw);
+  return null;
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -76,14 +153,16 @@ class _SellerListingsTabState extends State<SellerListingsTab>
   late TabController _tab;
 
   List<_ListingItem> _active = [];
+  List<_ListingItem> _awaiting = [];
   List<_ListingItem> _sold = [];
+  List<_ListingItem> _inactive = [];
   bool _loading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 2, vsync: this);
+    _tab = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -113,24 +192,67 @@ class _SellerListingsTabState extends State<SellerListingsTab>
         return;
       }
 
+      try {
+        await supabase.client.rpc('close_auctions');
+      } catch (error) {
+        debugPrint('SellerListingsTab.close_auctions: $error');
+      }
+
       final rows = await supabase.client
           .from('products')
           .select(
             'product_id, name, price, status, listing_type, condition, brand, size, '
-            'product_images(image_url, is_primary)',
+            'product_images(image_url, is_primary), '
+            'auctions(auction_id, status, ends_at, winner_id, current_price, bid_count)',
           )
           .eq('seller_id', sellerId)
           .inFilter('status', ['active', 'sold'])
           .order('created_at', ascending: false);
 
-      final items = (rows as List)
-          .map((r) => _ListingItem.fromRow(r as Map<String, dynamic>))
+      final productRows = (rows as List)
+          .map((r) => Map<String, dynamic>.from(r as Map))
+          .toList();
+      final auctionIds = productRows
+          .map((row) => _auctionMap(row['auctions'])?['auction_id'] as String?)
+          .whereType<String>()
+          .toList();
+      final ordersByAuction = <String, Map<String, dynamic>>{};
+      if (auctionIds.isNotEmpty) {
+        final orderRows = await supabase.client
+            .from('orders')
+            .select('auction_id, order_status, payment_due_at')
+            .inFilter('auction_id', auctionIds);
+        for (final raw in orderRows as List) {
+          final order = Map<String, dynamic>.from(raw as Map);
+          final auctionId = order['auction_id'] as String?;
+          if (auctionId != null) ordersByAuction[auctionId] = order;
+        }
+      }
+
+      final now = DateTime.now();
+      final items = productRows
+          .map(
+            (row) => _ListingItem.fromRow(
+              row,
+              order:
+                  ordersByAuction[_auctionMap(row['auctions'])?['auction_id']],
+              now: now,
+            ),
+          )
           .toList();
 
       if (mounted) {
         setState(() {
-          _active = items.where((i) => i.status == 'active').toList();
-          _sold = items.where((i) => i.status == 'sold').toList();
+          _active = items
+              .where((i) => i.bucket == ListingBucket.active)
+              .toList();
+          _awaiting = items
+              .where((i) => i.bucket == ListingBucket.awaitingPayment)
+              .toList();
+          _sold = items.where((i) => i.bucket == ListingBucket.sold).toList();
+          _inactive = items
+              .where((i) => i.bucket == ListingBucket.inactive)
+              .toList();
           _loading = false;
         });
       }
@@ -176,12 +298,15 @@ class _SellerListingsTabState extends State<SellerListingsTab>
             ),
             TabBar(
               controller: _tab,
+              isScrollable: true,
               labelColor: AppColors.primary,
               unselectedLabelColor: AppColors.textSecondary,
               indicatorColor: AppColors.primary,
               tabs: [
                 Tab(text: 'Active (${_active.length})'),
+                Tab(text: 'Awaiting payment (${_awaiting.length})'),
                 Tab(text: 'Sold (${_sold.length})'),
+                Tab(text: 'Inactive (${_inactive.length})'),
               ],
             ),
             Expanded(
@@ -196,14 +321,28 @@ class _SellerListingsTabState extends State<SellerListingsTab>
                           emptyMessage:
                               'No active listings yet.\nTap + to add one.',
                           onRefresh: _load,
-                          onDeleted: _load,
+                          onChanged: _load,
+                        ),
+                        _ListingsList(
+                          items: _awaiting,
+                          loading: _loading,
+                          emptyMessage: 'No auctions waiting for payment.',
+                          onRefresh: _load,
+                          onChanged: _load,
                         ),
                         _ListingsList(
                           items: _sold,
                           loading: _loading,
                           emptyMessage: 'No sold listings.',
                           onRefresh: _load,
-                          onDeleted: _load,
+                          onChanged: _load,
+                        ),
+                        _ListingsList(
+                          items: _inactive,
+                          loading: _loading,
+                          emptyMessage: 'No inactive auctions.',
+                          onRefresh: _load,
+                          onChanged: _load,
                         ),
                       ],
                     ),
@@ -234,14 +373,14 @@ class _ListingsList extends StatelessWidget {
     required this.loading,
     required this.emptyMessage,
     required this.onRefresh,
-    required this.onDeleted,
+    required this.onChanged,
   });
 
   final List<_ListingItem> items;
   final bool loading;
   final String emptyMessage;
   final Future<void> Function() onRefresh;
-  final Future<void> Function() onDeleted;
+  final Future<void> Function() onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -279,7 +418,7 @@ class _ListingsList extends StatelessWidget {
         padding: const EdgeInsets.all(AppConstants.spacingMd),
         itemCount: items.length,
         itemBuilder: (_, i) =>
-            _ListingCard(item: items[i], onDeleted: onDeleted),
+            _ListingCard(item: items[i], onChanged: onChanged),
       ),
     );
   }
@@ -290,10 +429,18 @@ class _ListingsList extends StatelessWidget {
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _ListingCard extends StatelessWidget {
-  const _ListingCard({required this.item, required this.onDeleted});
+  const _ListingCard({required this.item, required this.onChanged});
 
   final _ListingItem item;
-  final Future<void> Function() onDeleted;
+  final Future<void> Function() onChanged;
+
+  bool get _hasMenu {
+    final snapshot = item.snapshotAt(DateTime.now());
+    return item.bucket == ListingBucket.active ||
+        item.bucket == ListingBucket.inactive ||
+        canEndAuctionEarly(snapshot) ||
+        canRelistAuction(snapshot);
+  }
 
   String _formatLabel(String listingType) {
     if (listingType == 'fixed_price') return 'Fixed';
@@ -355,11 +502,17 @@ class _ListingCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Wrap(
                     spacing: 6,
+                    runSpacing: 4,
                     children: [
                       _Chip(
                         label: _formatLabel(item.listingType),
                         color: AppColors.primary,
                       ),
+                      if (item.bucket == ListingBucket.awaitingPayment)
+                        const _Chip(
+                          label: 'Awaiting payment',
+                          color: AppColors.primary,
+                        ),
                       _Chip(
                         label: _conditionLabel(item.condition),
                         color: AppColors.textSecondary,
@@ -371,25 +524,52 @@ class _ListingCard extends StatelessWidget {
                         ),
                     ],
                   ),
+                  if (item.bucket == ListingBucket.awaitingPayment &&
+                      item.paymentDueAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      formatPaymentDeadline(item.paymentDueAt!),
+                      style: AppTypography.caption,
+                    ),
+                  ],
                 ],
               ),
             ),
 
-            // 3-dot menu
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
-              onSelected: (value) => _onMenuAction(context, value),
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'edit', child: Text('Edit')),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: Text(
-                    'Delete',
-                    style: TextStyle(color: AppColors.error),
-                  ),
+            if (_hasMenu)
+              PopupMenuButton<String>(
+                icon: const Icon(
+                  Icons.more_vert,
+                  color: AppColors.textSecondary,
                 ),
-              ],
-            ),
+                onSelected: (value) => _onMenuAction(context, value),
+                itemBuilder: (_) {
+                  final snapshot = item.snapshotAt(DateTime.now());
+                  return [
+                    if (item.bucket == ListingBucket.active)
+                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    if (canEndAuctionEarly(snapshot))
+                      const PopupMenuItem(
+                        value: 'end',
+                        child: Text('End auction early'),
+                      ),
+                    if (canRelistAuction(snapshot))
+                      const PopupMenuItem(
+                        value: 'relist',
+                        child: Text('Relist'),
+                      ),
+                    if (item.bucket == ListingBucket.active ||
+                        item.bucket == ListingBucket.inactive)
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Text(
+                          'Delete',
+                          style: TextStyle(color: AppColors.error),
+                        ),
+                      ),
+                  ];
+                },
+              ),
           ],
         ),
       ),
@@ -409,7 +589,94 @@ class _ListingCard extends StatelessWidget {
     if (action == 'edit') {
       final path = RouteNames.editListing.replaceFirst(':id', item.productId);
       await context.push(path);
-      await onDeleted(); // refresh list after returning from edit
+      await onChanged();
+      return;
+    }
+
+    if (action == 'end') {
+      final accepted = await confirmEndAuctionEarly(
+        context,
+        highestBid: item.price,
+      );
+      if (!accepted || !context.mounted) return;
+      final auctionId = item.auctionId;
+      if (auctionId == null) return;
+      try {
+        final result = await context.read<SupabaseService>().client.rpc(
+          'end_auction_early',
+          params: {'p_auction_id': auctionId},
+        );
+        if (!context.mounted) return;
+        if (!supabaseRpcSuccess(result)) {
+          showThriftSnackBar(
+            context,
+            supabaseRpcError(result, fallback: 'Could not end this auction.') ??
+                'Could not end this auction.',
+            isError: true,
+          );
+          return;
+        }
+        showThriftSnackBar(
+          context,
+          'Auction ended. The winner has 12 hours to pay.',
+        );
+        await onChanged();
+      } catch (e) {
+        if (context.mounted) {
+          showThriftSnackBar(
+            context,
+            'Could not end this auction.',
+            isError: true,
+          );
+        }
+      }
+      return;
+    }
+
+    if (action == 'relist') {
+      final days = await showDialog<int>(
+        context: context,
+        builder: (dialogContext) => SimpleDialog(
+          title: const Text('Relist auction'),
+          children: [
+            for (final option in const [1, 3, 5, 7])
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(dialogContext, option),
+                child: Text('$option day${option == 1 ? '' : 's'}'),
+              ),
+          ],
+        ),
+      );
+      if (days == null || !context.mounted) return;
+      try {
+        final result = await context.read<SupabaseService>().client.rpc(
+          'relist_unsold_auction',
+          params: {'p_product_id': item.productId, 'p_duration_days': days},
+        );
+        if (!context.mounted) return;
+        if (!supabaseRpcSuccess(result)) {
+          showThriftSnackBar(
+            context,
+            supabaseRpcError(
+                  result,
+                  fallback: 'Could not relist this auction.',
+                ) ??
+                'Could not relist this auction.',
+            isError: true,
+          );
+          return;
+        }
+        showThriftSnackBar(context, 'Auction relisted.');
+        await onChanged();
+      } catch (e) {
+        if (context.mounted) {
+          showThriftSnackBar(
+            context,
+            'Could not relist this auction.',
+            isError: true,
+          );
+        }
+      }
       return;
     }
 
@@ -444,7 +711,7 @@ class _ListingCard extends StatelessWidget {
               .eq('product_id', item.productId);
           if (context.mounted) {
             showThriftSnackBar(context, 'Listing deleted');
-            await onDeleted();
+            await onChanged();
           }
         } catch (e) {
           if (context.mounted) {

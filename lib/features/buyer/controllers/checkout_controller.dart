@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/stock_limits.dart';
-import '../data/checkout_totals.dart';
+import '../../seller/data/davao_barangay_service.dart';
+import '../data/cart_shop_group.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/address_model.dart';
 import '../../../models/order_model.dart';
@@ -18,6 +21,7 @@ class CheckoutController extends ChangeNotifier {
     required CartProvider cart,
     AddressService? addresses,
     this.buyNowProductId,
+    this.selectedProductIds = const [],
   }) : _supabase = supabase,
        _auth = auth,
        _cart = cart,
@@ -31,6 +35,7 @@ class CheckoutController extends ChangeNotifier {
   final CartProvider _cart;
   final AddressService _addresses;
   final String? buyNowProductId;
+  final List<String> selectedProductIds;
 
   List<AddressModel> _addressBook = [];
   AddressModel? _selectedAddress;
@@ -57,6 +62,7 @@ class CheckoutController extends ChangeNotifier {
     return id;
   }
 
+<<<<<<< HEAD
   /// All available fixed-price items in the cart (or scoped product if Buy Now).
   List<CartItem> get allCartItems {
     final id = scopedProductId;
@@ -201,13 +207,33 @@ class CheckoutController extends ChangeNotifier {
         _selectedProductIds.add(allCartItems.first.product.id);
       }
     }
+=======
+  List<String> get checkoutProductIds {
+    final single = scopedProductId;
+    if (single != null) return [single];
+    return selectedProductIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toList();
   }
+
+  List<CartItem> get checkoutItems {
+    final ids = checkoutProductIds;
+    if (ids.isEmpty) return _cart.fixedPriceItems;
+    return _cart.fixedPriceItems
+        .where((item) => ids.contains(item.product.id))
+        .toList();
+>>>>>>> 17f9910 (home page of buyer: Enhance the UI)
+  }
+
+  List<CartShopGroup> get checkoutShops => groupCartItemsByShop(checkoutItems);
 
   Future<void> load() async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
     try {
+      unawaited(DavaoBarangayService.prefetch());
       await syncMyUnpaidCheckouts(_supabase);
       await _cart.refresh();
       await _loadAwaitingPayment();
@@ -241,6 +267,23 @@ class CheckoutController extends ChangeNotifier {
       debugPrint('CheckoutController awaiting payment error: $e');
       _awaitingPayment = [];
     }
+  }
+
+  Future<void> reloadAddresses() async {
+    try {
+      _addressBook = await _addresses.listMine();
+      _selectedAddress = _addressBook.isEmpty
+          ? null
+          : _addressBook.firstWhere(
+              (a) => a.isDefault,
+              orElse: () => _addressBook.first,
+            );
+      _errorMessage = null;
+    } catch (e) {
+      debugPrint('CheckoutController.reloadAddresses error: $e');
+      _errorMessage = 'Could not load your delivery addresses.';
+    }
+    notifyListeners();
   }
 
   void selectAddress(AddressModel address) {
@@ -365,13 +408,22 @@ class CheckoutController extends ChangeNotifier {
       }
 
       final params = <String, dynamic>{'p_address_id': address.id};
+<<<<<<< HEAD
       if (currentSelected.length == 1) {
         params['p_product_id'] = currentSelected.first.product.id;
+=======
+      final ids = items.map((item) => item.product.id).toList();
+      final multiShop = checkoutShops.length > 1;
+      if (ids.length > 1 || multiShop) {
+        params['p_product_ids'] = ids;
+      } else if (ids.length == 1) {
+        params['p_product_id'] = ids.first;
+>>>>>>> 17f9910 (home page of buyer: Enhance the UI)
       }
-      final rpcRes = await _supabase.client.rpc(
-        'checkout_cart',
-        params: params,
-      );
+      final rpcName = (ids.length > 1 || multiShop)
+          ? 'checkout_selected_cart'
+          : 'checkout_cart';
+      final rpcRes = await _supabase.client.rpc(rpcName, params: params);
       if (!supabaseRpcSuccess(rpcRes)) {
         final error = supabaseRpcError(
           rpcRes,

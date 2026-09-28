@@ -6,9 +6,11 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../seller/domain/seller_id_type.dart';
 import '../../data/admin_review_rules.dart';
 import '../../data/admin_verification_service.dart';
 import '../widgets/admin_review_widgets.dart';
+import '../widgets/seller_application_reject_dialog.dart';
 
 class AdminReviewScreen extends StatefulWidget {
   const AdminReviewScreen({super.key, required this.verificationId});
@@ -113,11 +115,11 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx, false),
-            child: const Text('Cancel'),
+            child: const Text('Keep pending'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx, true),
-            child: const Text('Approve'),
+            child: const Text('Approve seller'),
           ),
         ],
       ),
@@ -127,45 +129,8 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
   }
 
   Future<void> _reject() async {
-    final reasonCtrl = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Reject application'),
-        content: TextField(
-          controller: reasonCtrl,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            hintText: 'Tell the applicant what to fix.',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx, true),
-            child: const Text('Reject'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) {
-      reasonCtrl.dispose();
-      return;
-    }
-    final reason = reasonCtrl.text.trim();
-    reasonCtrl.dispose();
-    if (reason.isEmpty) {
-      showThriftSnackBar(
-        context,
-        'A rejection reason is required.',
-        isError: true,
-      );
-      return;
-    }
+    final reason = await showSellerApplicationRejectDialog(context);
+    if (reason == null || !mounted) return;
     await _review('rejected', reason: reason);
   }
 
@@ -184,16 +149,16 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
       ),
       body: SafeArea(
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const AdminDetailSkeleton()
             : _error != null
             ? AdminErrorState(message: _error!, onRetry: _load)
             : app == null
             ? const AdminEmptyState(
-                title: 'This application is no longer pending.',
-                message: 'It may already have been approved or rejected.',
+                title: 'This application is no longer available.',
+                message: 'It may already have been removed.',
               )
             : ListView(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
                 children: [
                   AdminStatusChip(
                     status: app.status,
@@ -204,8 +169,11 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
                   const SizedBox(height: 4),
                   Text(
                     app.applicantName ?? 'Applicant',
-                    style: AppTypography.body,
+                    style: AppTypography.body.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     [
                       app.shopAddress,
@@ -214,39 +182,62 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
                     ].where((part) => part.trim().isNotEmpty).join(', '),
                     style: AppTypography.caption,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
+                  AdminDetailBlock(
+                    label: 'Identity',
+                    children: [
+                      if (SellerIdType.tryParse(app.idType) case final idType?)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(idType.label, style: AppTypography.body),
+                        ),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          AdminPhotoThumb(label: 'ID front', url: _idUrl),
+                          AdminPhotoThumb(label: 'ID back', url: _idBackUrl),
+                          AdminPhotoThumb(label: 'Selfie', url: _selfieUrl),
+                        ],
+                      ),
+                    ],
+                  ),
                   AdminDetailBlock(
                     label: 'Liveness checks',
                     children: [_LivenessChips(result: app.livenessResult)],
                   ),
-                  AdminDetailBlock(
-                    label: 'Government ID',
-                    children: [
-                      Text('Front', style: AppTypography.caption),
-                      const SizedBox(height: 6),
-                      _DocImage(url: _idUrl),
-                      const SizedBox(height: 12),
-                      Text('Back', style: AppTypography.caption),
-                      const SizedBox(height: 6),
-                      _DocImage(url: _idBackUrl),
-                    ],
-                  ),
-                  AdminDetailBlock(
-                    label: 'Liveness face photo',
-                    children: [_DocImage(url: _selfieUrl)],
-                  ),
-                  ThriftButton(
-                    label: 'Approve seller',
-                    isLoading: _busy,
-                    onPressed: _busy ? null : _approve,
-                  ),
-                  const SizedBox(height: 12),
-                  ThriftButton(
-                    label: 'Reject',
-                    variant: ThriftButtonVariant.outline,
-                    color: AppColors.error,
-                    onPressed: _busy ? null : _reject,
-                  ),
+                  if (app.status == 'pending')
+                    AdminDecisionSection(
+                      title: 'Decision',
+                      children: [
+                        ThriftButton(
+                          label: 'Approve seller',
+                          isLoading: _busy,
+                          onPressed: _busy ? null : _approve,
+                        ),
+                        const SizedBox(height: 4),
+                        ThriftButton(
+                          label: 'Reject application',
+                          variant: ThriftButtonVariant.ghost,
+                          color: AppColors.error,
+                          onPressed: _busy ? null : _reject,
+                        ),
+                      ],
+                    )
+                  else
+                    AdminDetailBlock(
+                      label: 'Decision',
+                      children: [
+                        Text(
+                          app.status == 'rejected'
+                              ? (app.rejectionReason?.trim().isNotEmpty == true
+                                    ? app.rejectionReason!.trim()
+                                    : 'This application was rejected.')
+                              : 'This application was approved.',
+                          style: AppTypography.body,
+                        ),
+                      ],
+                    ),
                 ],
               ),
       ),
@@ -272,47 +263,13 @@ class _LivenessChips extends StatelessWidget {
       children: items.entries
           .map(
             (entry) => ThriftBadge(
-              label: entry.key,
+              label: entry.value
+                  ? '${entry.key} passed'
+                  : '${entry.key} not passed',
               variant: entry.value ? BadgeVariant.success : BadgeVariant.error,
             ),
           )
           .toList(),
-    );
-  }
-}
-
-class _DocImage extends StatelessWidget {
-  const _DocImage({this.url});
-  final String? url;
-
-  @override
-  Widget build(BuildContext context) {
-    if (url == null || url!.isEmpty) {
-      return Container(
-        height: 180,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppColors.surfaceVariant,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text('No image uploaded', style: AppTypography.caption),
-      );
-    }
-    return Semantics(
-      button: true,
-      label: 'Open identity document',
-      child: GestureDetector(
-        onTap: () => showAdminImagePreview(context, url!),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            url!,
-            height: 220,
-            width: double.infinity,
-            fit: BoxFit.cover,
-          ),
-        ),
-      ),
     );
   }
 }

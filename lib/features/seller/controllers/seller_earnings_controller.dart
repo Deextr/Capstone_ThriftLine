@@ -3,14 +3,18 @@ import 'package:flutter/foundation.dart';
 import '../../../core/services/supabase_service.dart';
 import '../data/seller_earnings.dart';
 import '../data/seller_earnings_service.dart';
+import '../data/seller_payout_method.dart';
+import '../data/seller_payout_method_service.dart';
 
 class SellerEarningsController extends ChangeNotifier {
   SellerEarningsController({required SupabaseService supabase})
-    : _service = SellerEarningsService(supabase) {
+    : _service = SellerEarningsService(supabase),
+      _payoutMethods = SellerPayoutMethodService(supabase) {
     load();
   }
 
   final SellerEarningsService _service;
+  final SellerPayoutMethodService _payoutMethods;
 
   SellerEarningsSnapshot? _snapshot;
   bool _isLoading = true;
@@ -41,6 +45,10 @@ class SellerEarningsController extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<SellerPayoutMethod?> loadPayoutMethod() {
+    return _payoutMethods.loadMine();
   }
 
   Future<String?> requestPayout() async {

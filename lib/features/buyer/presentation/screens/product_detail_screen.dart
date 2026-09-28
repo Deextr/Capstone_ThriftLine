@@ -7,12 +7,13 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
-import '../../../../models/enums.dart';
+import '../../../../core/utils/stock_limits.dart';
 import '../../../../models/product_model.dart';
 import '../../../../providers/cart_provider.dart';
 import '../../../../providers/saved_items_provider.dart';
 import '../../../../widgets/countdown_timer.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../seller/presentation/widgets/end_auction_dialog.dart';
 import '../../controllers/product_detail_controller.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -52,18 +53,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     super.dispose();
   }
 
-  Future<void> _openSellerChat() async {
-    final result = await context
-        .read<ProductDetailController>()
-        .openSellerConversation();
-    if (!mounted) return;
-    if (result.error != null) {
-      showThriftSnackBar(context, result.error!, isError: true);
+  Future<void> _endAuctionEarly(
+    BuildContext context,
+    ProductDetailController controller,
+  ) async {
+    final accepted = await confirmEndAuctionEarly(
+      context,
+      highestBid: controller.currentBidAmount,
+    );
+    if (!accepted || !context.mounted) return;
+    final error = await controller.endAuctionEarly();
+    if (!context.mounted) return;
+    if (error != null) {
+      showThriftSnackBar(context, error, isError: true);
       return;
     }
-    final id = result.conversationId;
-    if (id == null) return;
-    context.push(RouteNames.chatThread(id));
+    showThriftSnackBar(
+      context,
+      'Auction ended. The winner has 12 hours to pay.',
+    );
   }
 
   void _showBidBottomSheet(
@@ -461,9 +469,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                       const SizedBox(width: 4),
                       CountdownTimer(
                         endTime: controller.auctionEndTime!,
+                        format: formatReadableCountdown,
                         style: AppTypography.caption.copyWith(
                           color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
                         ),
                         onExpired: () {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -936,25 +946,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     double minBid,
   ) {
     final cart = context.watch<CartProvider>();
-    final isFixed = product.sellingType == SellingType.fixedPrice;
     final isAuction = controller.isAuction;
-    final inCart = cart.isInCart(product.id);
 
-    // Fixed price layout
-    if (isFixed) {
+    if (listingUsesShoppingCart(product.sellingType) && !isAuction) {
       return Row(
         children: [
           Expanded(
-            flex: 1,
             child: OutlinedButton.icon(
-              onPressed: _openSellerChat,
+              onPressed: () => _addFixedPriceToCart(context, cart, product),
               icon: const Icon(
-                Icons.chat_bubble_outline,
+                Icons.add_shopping_cart_outlined,
                 color: AppColors.textPrimary,
                 size: 20,
               ),
               label: Text(
-                'Chat',
+                'Add to Cart',
                 style: AppTypography.body.copyWith(
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -972,8 +978,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
           ),
           const SizedBox(width: 12),
           Expanded(
-            flex: 1,
             child: ElevatedButton.icon(
+<<<<<<< HEAD
               onPressed: () async {
                 if (product.maxPurchasableQuantity <= 0) {
                   showThriftSnackBar(
@@ -995,11 +1001,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 inCart
                     ? Icons.shopping_bag_rounded
                     : Icons.shopping_bag_outlined,
+=======
+              onPressed: () => _buyNow(context, cart, product),
+              icon: const Icon(
+                Icons.shopping_bag_outlined,
+>>>>>>> 17f9910 (home page of buyer: Enhance the UI)
                 color: Colors.white,
                 size: 20,
               ),
               label: Text(
-                inCart ? 'View Cart' : 'Buy Now',
+                'Buy Now',
                 style: AppTypography.body.copyWith(
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
@@ -1022,140 +1033,120 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
 
     // Auction layout
     if (isAuction) {
-      return Row(
-        children: [
-          Expanded(
-            flex: 1,
-            child: OutlinedButton.icon(
-              onPressed: _openSellerChat,
-              icon: const Icon(
-                Icons.chat_bubble_outline,
-                color: AppColors.textPrimary,
-                size: 20,
-              ),
-              label: Text(
-                'Chat',
-                style: AppTypography.body.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                  fontSize: 16,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                side: const BorderSide(color: AppColors.border, width: 1.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 1,
-            child: ElevatedButton.icon(
-              onPressed: controller.isAuctionActive
-                  ? () => _showBidBottomSheet(context, controller, minBid)
-                  : null,
-              icon: const Icon(
-                Icons.gavel_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
-              label: Text(
-                controller.isAuctionActive ? 'Place Bid' : 'Auction Ended',
-                style: AppTypography.body.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  fontSize: 16,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                disabledBackgroundColor: AppColors.textHint,
-                disabledForegroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    // Fallback â€” generic layout (shouldn't normally be reached)
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _openSellerChat,
-            icon: const Icon(
-              Icons.chat_bubble_outline,
-              color: AppColors.textPrimary,
-              size: 20,
-            ),
-            label: Text(
-              'Chat',
-              style: AppTypography.body.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-                fontSize: 16,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              side: const BorderSide(color: AppColors.border, width: 1.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () async {
-              if (product.maxPurchasableQuantity <= 0) {
-                showThriftSnackBar(
-                  context,
-                  '${product.title} is no longer available.',
-                  isError: true,
-                );
-                return;
-              }
-              await cart.addToCart(product);
-              if (!context.mounted) return;
-              showThriftSnackBar(context, 'Added to cart!');
-              context.push('${RouteNames.checkout}?product=${product.id}');
-            },
-            icon: const Icon(
-              Icons.shopping_bag_outlined,
-              color: Colors.white,
-              size: 20,
-            ),
-            label: Text(
-              'Buy Now',
-              style: AppTypography.body.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-                fontSize: 16,
-              ),
-            ),
+      if (controller.isOwnListing) {
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: controller.canEndAuctionEarly
+                ? () => _endAuctionEarly(context, controller)
+                : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
+              disabledBackgroundColor: AppColors.textHint,
+              disabledForegroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 18),
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
+            child: Text(
+              controller.canEndAuctionEarly
+                  ? 'End auction early'
+                  : controller.isAuctionActive
+                  ? 'Waiting for bids'
+                  : 'Auction ended',
+              style: AppTypography.body.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        );
+      }
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: controller.isAuctionActive
+              ? () => _showBidBottomSheet(context, controller, minBid)
+              : null,
+          icon: const Icon(Icons.gavel_rounded, color: Colors.white, size: 20),
+          label: Text(
+            controller.isAuctionActive ? 'Place Bid' : 'Auction Ended',
+            style: AppTypography.body.copyWith(
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+              fontSize: 16,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            disabledBackgroundColor: AppColors.textHint,
+            disabledForegroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
-      ],
-    );
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Future<void> _addFixedPriceToCart(
+    BuildContext context,
+    CartProvider cart,
+    ProductModel product,
+  ) async {
+    if (product.maxPurchasableQuantity <= 0) {
+      showThriftSnackBar(
+        context,
+        '${product.title} is no longer available.',
+        isError: true,
+      );
+      return;
+    }
+    await cart.addToCart(product);
+    if (!context.mounted) return;
+    final error = cart.errorMessage;
+    if (error != null) {
+      showThriftSnackBar(context, error, isError: true);
+      return;
+    }
+    showThriftSnackBar(context, 'Added to cart');
+  }
+
+  Future<void> _buyNow(
+    BuildContext context,
+    CartProvider cart,
+    ProductModel product,
+  ) async {
+    if (product.maxPurchasableQuantity <= 0) {
+      showThriftSnackBar(
+        context,
+        '${product.title} is no longer available.',
+        isError: true,
+      );
+      return;
+    }
+    if (!cart.isInCart(product.id)) {
+      await cart.addToCart(product);
+      if (!context.mounted) return;
+      final error = cart.errorMessage;
+      if (error != null || !cart.isInCart(product.id)) {
+        showThriftSnackBar(
+          context,
+          error ?? 'Could not start checkout for this item.',
+          isError: true,
+        );
+        return;
+      }
+    }
+    context.push(RouteNames.checkoutFor(productId: product.id));
   }
 }
 

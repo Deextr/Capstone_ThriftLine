@@ -11,18 +11,22 @@ class IdCaptureOverlay extends StatelessWidget {
     this.status = LiveIdStatus.searching,
     this.capturing = false,
     this.statusMessage,
+    this.cardAspect = IdCaptureGuide.cardAspect,
   });
 
   final LiveIdStatus status;
   final bool capturing;
   final String? statusMessage;
+  final double cardAspect;
 
-  static const double cardAspect = IdCaptureGuide.cardAspect;
-
-  static Rect holeRect(Size size) {
+  static Rect holeRect(
+    Size size, {
+    double cardAspect = IdCaptureGuide.cardAspect,
+  }) {
     final window = IdImageMetrics.centerCardWindow(
       size.width.round().clamp(8, 16384),
       size.height.round().clamp(8, 16384),
+      aspect: cardAspect,
     );
     return Rect.fromLTWH(
       window.x0.toDouble(),
@@ -58,7 +62,7 @@ class IdCaptureOverlay extends StatelessWidget {
     return IgnorePointer(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final hole = holeRect(constraints.biggest);
+          final hole = holeRect(constraints.biggest, cardAspect: cardAspect);
           return Stack(
             fit: StackFit.expand,
             children: [

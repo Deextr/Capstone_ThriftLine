@@ -92,6 +92,12 @@ class SharedPreferencesService {
     );
   }
 
+  String? get buyerHomeCacheJson =>
+      _prefs.getString(AppConstants.keyBuyerHomeCache);
+
+  Future<void> setBuyerHomeCacheJson(String json) =>
+      _prefs.setString(AppConstants.keyBuyerHomeCache, json);
+
   Future<void> clearAuthSession() async {
     await setLoggedIn(false);
     await remove(AppConstants.keyUserRole);

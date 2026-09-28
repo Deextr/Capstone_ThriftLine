@@ -5,6 +5,8 @@ import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/community_report_model.dart';
 import '../../../models/order_model.dart';
 import '../../buyer/data/order_query.dart';
+import '../../../models/enums.dart';
+import '../../trust_safety/data/report_reasons.dart';
 import 'admin_delivery_dispute.dart';
 import 'admin_review_rules.dart';
 import 'delivery_payment_hold.dart';
@@ -20,6 +22,24 @@ class AdminReviewCounts {
   final int sellerApplications;
   final int communityReports;
   final int deliveryProblems;
+}
+
+enum AdminActivityTarget { application, report, dispute }
+
+class AdminReviewActivity {
+  const AdminReviewActivity({
+    required this.title,
+    required this.detail,
+    required this.occurredAt,
+    required this.target,
+    required this.id,
+  });
+
+  final String title;
+  final String detail;
+  final DateTime occurredAt;
+  final AdminActivityTarget target;
+  final String id;
 }
 
 class AdminReviewService {
@@ -46,6 +66,114 @@ class AdminReviewService {
       communityReports: results[1],
       deliveryProblems: results[2],
     );
+  }
+
+  /// Latest real decisions the admin can already read. A failed source is
+  /// skipped so the review queues still load.
+  Future<List<AdminReviewActivity>> loadRecentActivity() async {
+    final batches = await Future.wait([
+      _recentApplications(),
+      _recentReports(),
+      _recentDisputes(),
+    ]);
+    final items = batches.expand((batch) => batch).toList()
+      ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+    if (items.length <= 5) return items;
+    return items.sublist(0, 5);
+  }
+
+  Future<List<AdminReviewActivity>> _recentApplications() async {
+    try {
+      final rows = await _supabase.client
+          .from('user_verifications')
+          .select(
+            'verification_id, shop_name, verification_status, reviewed_at',
+          )
+          .inFilter('verification_status', ['approved', 'rejected'])
+          .order('reviewed_at', ascending: false)
+          .limit(5);
+      return [
+        for (final row in rows as List)
+          if (row is Map<String, dynamic>)
+            if (_activityTime(row['reviewed_at']) case final at?)
+              if ((row['verification_id'] as String?)?.isNotEmpty == true)
+                AdminReviewActivity(
+                  title: adminApplicationActivityTitle(
+                    row['verification_status'] as String? ?? '',
+                  ),
+                  detail: (row['shop_name'] as String?)?.trim() ?? '',
+                  occurredAt: at,
+                  target: AdminActivityTarget.application,
+                  id: row['verification_id'] as String,
+                ),
+      ];
+    } catch (e) {
+      debugPrint('AdminReviewService recent applications error: $e');
+      return const [];
+    }
+  }
+
+  Future<List<AdminReviewActivity>> _recentReports() async {
+    try {
+      final rows = await _supabase.client
+          .from('reports')
+          .select('report_id, category, status, resolved_at')
+          .inFilter('status', kAdminReportClosedStatuses)
+          .order('resolved_at', ascending: false)
+          .limit(5);
+      return [
+        for (final row in rows as List)
+          if (row is Map<String, dynamic>)
+            if (_activityTime(row['resolved_at']) case final at?)
+              if ((row['report_id'] as String?)?.isNotEmpty == true)
+                AdminReviewActivity(
+                  title: adminReportActivityTitle(
+                    row['status'] as String? ?? '',
+                  ),
+                  detail: reportReasonLabel(row['category'] as String? ?? ''),
+                  occurredAt: at,
+                  target: AdminActivityTarget.report,
+                  id: row['report_id'] as String,
+                ),
+      ];
+    } catch (e) {
+      debugPrint('AdminReviewService recent reports error: $e');
+      return const [];
+    }
+  }
+
+  Future<List<AdminReviewActivity>> _recentDisputes() async {
+    try {
+      final rows = await _supabase.client
+          .from('delivery_disputes')
+          .select('dispute_id, reason, resolved_at')
+          .eq('status', kAdminDisputeClosedStatus)
+          .order('resolved_at', ascending: false)
+          .limit(5);
+      return [
+        for (final row in rows as List)
+          if (row is Map<String, dynamic>)
+            if (_activityTime(row['resolved_at']) case final at?)
+              if ((row['dispute_id'] as String?)?.isNotEmpty == true)
+                AdminReviewActivity(
+                  title: 'Delivery case closed',
+                  detail: DeliveryDisputeReason.fromDb(
+                    row['reason'] as String?,
+                  ).label,
+                  occurredAt: at,
+                  target: AdminActivityTarget.dispute,
+                  id: row['dispute_id'] as String,
+                ),
+      ];
+    } catch (e) {
+      debugPrint('AdminReviewService recent disputes error: $e');
+      return const [];
+    }
+  }
+
+  DateTime? _activityTime(Object? value) {
+    if (value is! String || value.isEmpty) return null;
+    return DateTime.tryParse(value);
   }
 
   Future<int> _countRows(

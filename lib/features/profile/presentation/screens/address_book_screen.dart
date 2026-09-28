@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +9,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../models/address_model.dart';
+import '../../../../widgets/keyboard_safe.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../seller/data/davao_barangay_service.dart';
 import '../../../seller/domain/davao_barangay.dart';
@@ -30,6 +33,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   void initState() {
     super.initState();
     _service = AddressService(context.read<SupabaseService>());
+    unawaited(DavaoBarangayService.prefetch());
     _load();
   }
 
@@ -51,6 +55,8 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      enableDrag: true,
+      useSafeArea: true,
       builder: (_) => _AddressForm(service: _service, existing: existing),
     );
     if (saved == true) await _load();
@@ -64,6 +70,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: const Text('Addresses'),
         leading: IconButton(
@@ -197,26 +204,26 @@ class _AddressFormState extends State<_AddressForm> {
   }
 
   Future<void> _loadBarangays({bool forceRefresh = false}) async {
-    setState(() {
-      _barangaysLoading = true;
-      _barangayError = null;
-    });
+    if (forceRefresh || _barangays.isEmpty) {
+      setState(() {
+        _barangaysLoading = true;
+        _barangayError = null;
+      });
+    }
     try {
       final list = await _barangayService.load(forceRefresh: forceRefresh);
       if (!mounted) return;
       final existingName = widget.existing?.barangay ?? '';
-      setState(() {
-        _barangays = list;
-        _barangaysLoading = false;
-        if (_selectedBarangay != null &&
-            !DavaoBarangay.isAllowedSelection(_selectedBarangay, list)) {
-          _selectedBarangay = null;
-        }
-        _selectedBarangay ??= DavaoBarangay.findAllowedByName(
-          existingName,
-          list,
-        );
-      });
+      final wasLoading = _barangaysLoading || _barangays.isEmpty;
+      _barangays = list;
+      _barangaysLoading = false;
+      _barangayError = null;
+      if (_selectedBarangay != null &&
+          !DavaoBarangay.isAllowedSelection(_selectedBarangay, list)) {
+        _selectedBarangay = null;
+      }
+      _selectedBarangay ??= DavaoBarangay.findAllowedByName(existingName, list);
+      if (wasLoading) setState(() {});
     } on DavaoBarangayException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -275,76 +282,84 @@ class _AddressFormState extends State<_AddressForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 16,
+    return KeyboardSafeSheet(
+      action: ThriftButton(
+        label: 'Save',
+        isLoading: _saving,
+        onPressed: _saving ? null : _save,
       ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              widget.existing == null ? 'Add address' : 'Edit address',
-              style: AppTypography.subheading,
-            ),
-            const SizedBox(height: 16),
-            ThriftTextField(label: 'Recipient', controller: _name),
-            const SizedBox(height: 12),
-            ThriftTextField(
-              label: 'Phone',
-              hint: '09XXXXXXXXX',
-              controller: _phone,
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 12),
-            ThriftTextField(label: 'Street', controller: _street, maxLines: 2),
-            const SizedBox(height: 12),
-            DavaoBarangayField(
-              barangays: _barangays,
-              selected: _selectedBarangay,
-              loading: _barangaysLoading,
-              error: _barangayError,
-              onRetry: () => _loadBarangays(forceRefresh: true),
-              onSelected: (barangay) {
-                if (!barangay.isDavaoCity) return;
-                setState(() => _selectedBarangay = barangay);
-              },
-            ),
-            const SizedBox(height: 12),
-            ThriftTextField(
-              label: 'City',
-              controller: _city,
-              readOnly: true,
-              icon: Icons.lock_outline,
-              labelSuffix: Text(
-                'Davao City only',
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.textHint,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(height: AppConstants.spacingSm),
-            ThriftTextField(label: 'Postal code', controller: _postal),
-            const SizedBox(height: 12),
-            ThriftTextField(label: 'Landmark', controller: _landmark),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Default address'),
-              value: _isDefault,
-              onChanged: (v) => setState(() => _isDefault = v),
-            ),
-            ThriftButton(
-              label: 'Save',
-              isLoading: _saving,
-              onPressed: _saving ? null : _save,
-            ),
-          ],
+      children: [
+        Text(
+          widget.existing == null ? 'Add address' : 'Edit address',
+          style: AppTypography.subheading,
         ),
-      ),
+        const SizedBox(height: 16),
+        ThriftTextField(
+          key: const ValueKey('address_recipient'),
+          label: 'Recipient',
+          controller: _name,
+        ),
+        const SizedBox(height: 12),
+        ThriftTextField(
+          key: const ValueKey('address_phone'),
+          label: 'Phone',
+          hint: '09XXXXXXXXX',
+          controller: _phone,
+          keyboardType: TextInputType.phone,
+        ),
+        const SizedBox(height: 12),
+        ThriftTextField(
+          key: const ValueKey('address_street'),
+          label: 'Street',
+          controller: _street,
+          maxLines: 2,
+        ),
+        const SizedBox(height: 12),
+        DavaoBarangayField(
+          barangays: _barangays,
+          selected: _selectedBarangay,
+          loading: _barangaysLoading,
+          error: _barangayError,
+          onRetry: () => _loadBarangays(forceRefresh: true),
+          onSelected: (barangay) {
+            if (!barangay.isDavaoCity) return;
+            setState(() => _selectedBarangay = barangay);
+          },
+        ),
+        const SizedBox(height: 12),
+        ThriftTextField(
+          key: const ValueKey('address_city'),
+          label: 'City',
+          controller: _city,
+          readOnly: true,
+          icon: Icons.lock_outline,
+          labelSuffix: Text(
+            'Davao City only',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textHint,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(height: AppConstants.spacingSm),
+        ThriftTextField(
+          key: const ValueKey('address_postal'),
+          label: 'Postal code',
+          controller: _postal,
+        ),
+        const SizedBox(height: 12),
+        ThriftTextField(
+          key: const ValueKey('address_landmark'),
+          label: 'Landmark',
+          controller: _landmark,
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Default address'),
+          value: _isDefault,
+          onChanged: (v) => setState(() => _isDefault = v),
+        ),
+      ],
     );
   }
 }

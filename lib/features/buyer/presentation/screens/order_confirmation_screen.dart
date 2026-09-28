@@ -38,7 +38,7 @@ class OrderConfirmationScreen extends StatelessWidget {
     if (order.isFailedCheckout) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) {
-          context.go(RouteNames.checkout);
+          context.go(RouteNames.cart);
         }
       });
       return const Scaffold(

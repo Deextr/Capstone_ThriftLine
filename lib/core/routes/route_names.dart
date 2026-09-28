@@ -66,7 +66,31 @@ abstract final class RouteNames {
   static const String savedItems = '/saved-items';
   static const String becomeSeller = '/become-seller';
   static const String sellerProfile = '/seller-profile/:username';
+  static const String cart = '/cart';
   static const String checkout = '/checkout';
+  static const String homeEndingSoon = '/discover/ending-soon';
+  static const String homeSuggested = '/discover/suggested';
+  static const String homeBidding = '/discover/bidding';
+  static const String homeVerifiedSellers = '/discover/verified-sellers';
+
+  /// Opens checkout for one Buy Now product, or for the cart lines selected.
+  static String checkoutFor({
+    String? productId,
+    List<String> productIds = const [],
+  }) {
+    final single = productId?.trim();
+    if (single != null && single.isNotEmpty) {
+      return '$checkout?product=$single';
+    }
+    final ids = productIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toList();
+    if (ids.length == 1) return '$checkout?product=${ids.first}';
+    if (ids.length > 1) return '$checkout?products=${ids.join(',')}';
+    return checkout;
+  }
+
   static const String reportSeller = '/report-seller';
   static const String myReports = '/my-reports';
   static const String reportDetail = '/my-reports/:id';
@@ -110,4 +134,5 @@ abstract final class RouteNames {
   static const String verifyPhone = '/verify-phone';
   static const String verifyEmailOtp = '/verify-email-otp';
   static const String addresses = '/addresses';
+  static const String paymentMethods = '/payment-methods';
 }

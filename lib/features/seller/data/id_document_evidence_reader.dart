@@ -120,16 +120,8 @@ class IdDocumentEvidenceReader {
         ? (_recognizer ??= TextRecognizer(script: TextRecognitionScript.latin))
         : TextRecognizer(script: TextRecognitionScript.latin);
     final faces = persist
-        ? (_faces ??= FaceDetector(
-            options: FaceDetectorOptions(
-              performanceMode: FaceDetectorMode.fast,
-            ),
-          ))
-        : FaceDetector(
-            options: FaceDetectorOptions(
-              performanceMode: FaceDetectorMode.fast,
-            ),
-          );
+        ? (_faces ??= FaceDetector(options: _faceOptions()))
+        : FaceDetector(options: _faceOptions());
     try {
       return await body(recognizer, faces);
     } finally {
@@ -139,6 +131,13 @@ class IdDocumentEvidenceReader {
       }
     }
   }
+
+  /// ML Kit skips faces narrower than 10% of the frame by default. The
+  /// Digital National ID photo is only a few percent of the frame.
+  static FaceDetectorOptions _faceOptions() => FaceDetectorOptions(
+    performanceMode: FaceDetectorMode.fast,
+    minFaceSize: 0.05,
+  );
 
   DocumentEvidence _measure({
     required RecognizedText text,
@@ -236,13 +235,32 @@ class IdDocumentEvidenceReader {
     );
   }
 
+  /// ML Kit boxes are in the upright image. Camera buffers are often landscape
+  /// with a 90° or 270° rotation, so the guide must use the swapped size.
+  static ({double width, double height}) displaySize({
+    required double width,
+    required double height,
+    InputImageRotation? rotation,
+  }) {
+    final swap =
+        rotation == InputImageRotation.rotation90deg ||
+        rotation == InputImageRotation.rotation270deg;
+    if (!swap) return (width: width, height: height);
+    return (width: height, height: width);
+  }
+
   Future<({double width, double height})?> _imageSize(
     InputImage input,
     Uint8List? bytes,
   ) async {
-    final meta = input.metadata?.size;
+    final metadata = input.metadata;
+    final meta = metadata?.size;
     if (meta != null && meta.width > 0 && meta.height > 0) {
-      return (width: meta.width, height: meta.height);
+      return displaySize(
+        width: meta.width,
+        height: meta.height,
+        rotation: metadata?.rotation,
+      );
     }
     if (bytes == null || bytes.isEmpty) return null;
     try {

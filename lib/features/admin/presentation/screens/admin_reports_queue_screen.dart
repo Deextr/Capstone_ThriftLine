@@ -17,6 +17,7 @@ class AdminReportsQueueScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AdminReportsController>();
+    final open = controller.filter == AdminQueueFilter.open;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -30,16 +31,14 @@ class AdminReportsQueueScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: AdminFilterBar(
-                  value: controller.filter,
-                  onChanged: (filter) =>
-                      context.read<AdminReportsController>().setFilter(filter),
-                ),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: AdminFilterBar(
+                value: controller.filter,
+                onChanged: (filter) =>
+                    context.read<AdminReportsController>().setFilter(filter),
               ),
             ),
             Expanded(
@@ -47,13 +46,7 @@ class AdminReportsQueueScreen extends StatelessWidget {
                 color: AppColors.primary,
                 onRefresh: () => context.read<AdminReportsController>().load(),
                 child: controller.isLoading
-                    ? ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: const [
-                          SizedBox(height: 120),
-                          Center(child: CircularProgressIndicator()),
-                        ],
-                      )
+                    ? const AdminQueueSkeleton()
                     : controller.errorMessage != null
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
@@ -70,61 +63,75 @@ class AdminReportsQueueScreen extends StatelessWidget {
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: [
                           AdminEmptyState(
-                            title: controller.filter == AdminQueueFilter.open
+                            title: open
                                 ? 'No community reports waiting for review.'
-                                : 'No closed community reports yet.',
-                            message: controller.filter == AdminQueueFilter.open
+                                : 'No reviewed community reports yet.',
+                            message: open
                                 ? 'New reports will appear here.'
                                 : 'Reviewed reports will appear here.',
                           ),
                         ],
                       )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
-                        itemCount: controller.reports.length + 1,
-                        separatorBuilder: (_, _) => const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          if (index == 0) {
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: Text(
-                                controller.filter == AdminQueueFilter.open
-                                    ? '${controller.reports.length} require review'
-                                    : '${controller.reports.length} reviewed',
-                                style: AppTypography.caption,
-                              ),
-                            );
-                          }
-                          final report = controller.reports[index - 1];
-                          final evidence = adminEvidenceCountLabel(
-                            report.evidence.length,
-                          );
-                          final order = report.orderNumber == null
-                              ? ''
-                              : 'Order #${report.orderNumber}';
-                          return AdminQueueItem(
-                            title: reportReasonLabel(report.category),
-                            status: report.status,
-                            statusLabel: reportStatusLabel(report.status),
-                            lines: [
-                              'Reported: ${adminHandle(report.reportedUsername, report.reportedDisplayName)}',
-                              'By: ${adminHandle(report.reporterUsername, report.reporterDisplayName)}',
-                            ],
-                            meta: [
-                              formatCompactDate(report.createdAt),
-                              if (evidence.isNotEmpty) evidence,
-                              if (order.isNotEmpty) order,
-                            ].join(' · '),
-                            actionLabel: 'View report',
-                            onTap: () => _open(context, report.id),
-                          );
-                        },
+                    : ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                        children: [
+                          Text(
+                            adminQueueStatusLine(
+                              controller.reports.length,
+                              open ? 'under review' : 'reviewed',
+                            ),
+                            style: AppTypography.subheading,
+                          ),
+                          const SizedBox(height: 4),
+                          for (
+                            var i = 0;
+                            i < controller.reports.length;
+                            i++
+                          ) ...[
+                            if (i > 0) const Divider(height: 1),
+                            _ReportRow(index: i),
+                          ],
+                        ],
                       ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ReportRow extends StatelessWidget {
+  const _ReportRow({required this.index});
+
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<AdminReportsController>();
+    final report = controller.reports[index];
+    final evidence = adminEvidenceCountLabel(report.evidence.length);
+    final order = report.orderNumber == null
+        ? ''
+        : 'Order #${report.orderNumber}';
+
+    return AdminQueueItem(
+      title: reportReasonLabel(report.category),
+      status: report.status,
+      statusLabel: reportStatusLabel(report.status),
+      lines: [
+        adminHandle(report.reportedUsername, report.reportedDisplayName),
+        'Reported by ${adminHandle(report.reporterUsername, report.reporterDisplayName)}',
+      ],
+      meta: [
+        formatCompactDate(report.createdAt),
+        if (evidence.isNotEmpty) evidence,
+        if (order.isNotEmpty) order,
+      ].join(' · '),
+      actionLabel: 'View report',
+      onTap: () => _open(context, report.id),
     );
   }
 

@@ -7,6 +7,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/ph_phone.dart';
 import '../../../../models/enums.dart';
+import '../../../../widgets/keyboard_safe.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/seller_orders_controller.dart';
 
@@ -129,82 +130,78 @@ class _ArrangeReturnScreenState extends State<ArrangeReturnScreen> {
           onPressed: () => context.pop(),
         ),
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-          children: [
-            Text(
-              order == null ? 'Return pickup' : 'Order #${order.orderNumber}',
-              style: AppTypography.subheading,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'You arrange and pay for this pickup. The buyer refund is already recorded and does not depend on this step.',
-              style: AppTypography.body.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 20),
-            ThriftTextField(
-              label: 'Rider name',
-              hint: 'Juan Dela Cruz',
-              controller: _name,
-              error: _nameError,
-            ),
-            const SizedBox(height: 12),
-            ThriftTextField(
-              label: 'Phone number',
-              hint: '09171234567',
-              controller: _phone,
-              keyboardType: TextInputType.phone,
-              error: _phoneError,
-            ),
-            const SizedBox(height: 16),
-            Text('Vehicle', style: AppTypography.label),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final vehicle in DeliveryVehicleType.values)
-                  ChoiceChip(
-                    label: Text(vehicle.label),
-                    selected: _vehicle == vehicle,
-                    selectedColor: AppColors.primaryLight,
-                    onSelected: (_) => setState(() => _vehicle = vehicle),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ThriftTextField(
-              label: 'Plate number (optional)',
-              hint: 'ABC 1234',
-              controller: _plate,
-            ),
-            const SizedBox(height: 12),
-            ThriftTextField(
-              label: 'Pickup time (optional)',
-              hint: pickupLabel,
-              readOnly: true,
-              onTap: _pickPickup,
-            ),
-            const SizedBox(height: 12),
-            ThriftTextField(
-              label: 'Note for the buyer (optional)',
-              hint: 'Call when the rider is outside.',
-              controller: _notes,
-              maxLines: 3,
-            ),
-            const SizedBox(height: 24),
-            ThriftButton(
-              label: controller.isUpdatingDelivery
-                  ? 'Saving...'
-                  : 'Save return rider',
-              isLoading: controller.isUpdatingDelivery,
-              onPressed: controller.isUpdatingDelivery ? null : _submit,
-            ),
-          ],
+      body: KeyboardSafeForm(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+        action: ThriftButton(
+          label: controller.isUpdatingDelivery
+              ? 'Saving...'
+              : 'Save return rider',
+          isLoading: controller.isUpdatingDelivery,
+          onPressed: controller.isUpdatingDelivery ? null : _submit,
         ),
+        children: [
+          Text(
+            order == null ? 'Return pickup' : 'Order #${order.orderNumber}',
+            style: AppTypography.subheading,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'You arrange and pay for this pickup. The buyer refund is already recorded and does not depend on this step.',
+            style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 20),
+          ThriftTextField(
+            label: 'Rider name',
+            hint: 'Juan Dela Cruz',
+            controller: _name,
+            error: _nameError,
+          ),
+          const SizedBox(height: 12),
+          ThriftTextField(
+            label: 'Phone number',
+            hint: '09171234567',
+            controller: _phone,
+            keyboardType: TextInputType.phone,
+            error: _phoneError,
+          ),
+          const SizedBox(height: 16),
+          Text('Vehicle', style: AppTypography.label),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final vehicle in DeliveryVehicleType.values)
+                ChoiceChip(
+                  label: Text(vehicle.label),
+                  selected: _vehicle == vehicle,
+                  selectedColor: AppColors.primaryLight,
+                  onSelected: (_) => setState(() => _vehicle = vehicle),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ThriftTextField(
+            label: 'Plate number (optional)',
+            hint: 'ABC 1234',
+            controller: _plate,
+          ),
+          const SizedBox(height: 12),
+          ThriftTextField(
+            label: 'Pickup time (optional)',
+            hint: pickupLabel,
+            readOnly: true,
+            onTap: _pickPickup,
+          ),
+          const SizedBox(height: 12),
+          ThriftTextField(
+            label: 'Note for the buyer (optional)',
+            hint: 'Call when the rider is outside.',
+            controller: _notes,
+            maxLines: 3,
+          ),
+          const SizedBox(height: 12),
+        ],
       ),
     );
   }

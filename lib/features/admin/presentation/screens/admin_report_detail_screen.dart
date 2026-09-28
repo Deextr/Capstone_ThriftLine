@@ -33,14 +33,15 @@ class AdminReportDetailScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: controller.isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const AdminDetailSkeleton()
             : report == null
             ? AdminErrorState(
-                message: controller.errorMessage ?? 'Report not found.',
+                message:
+                    controller.errorMessage ?? 'Unable to load this report.',
                 onRetry: () => context.read<AdminReportsController>().load(),
               )
             : ListView(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
                 children: [
                   AdminStatusChip(
                     status: report.status,
@@ -51,30 +52,38 @@ class AdminReportDetailScreen extends StatelessWidget {
                     reportReasonLabel(report.category),
                     style: AppTypography.heading,
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
-                    formatCompactDate(report.createdAt),
+                    'Submitted ${formatCompactDate(report.createdAt)}',
                     style: AppTypography.caption,
                   ),
                   const SizedBox(height: 28),
-                  AdminPersonBlock(
-                    label: 'Reported user',
-                    name: report.reportedDisplayName,
-                    handle: adminHandle(
-                      report.reportedUsername,
-                      report.reportedDisplayName,
-                    ),
-                    role: accountRoleLabel(report.reportedRole),
-                    shopName: report.reportedShopName,
-                  ),
-                  AdminPersonBlock(
-                    label: 'Reported by',
-                    name: report.reporterDisplayName,
-                    handle: adminHandle(
-                      report.reporterUsername,
-                      report.reporterDisplayName,
-                    ),
-                    role: accountRoleLabel(report.reporterRole),
+                  AdminDetailBlock(
+                    label: 'People',
+                    children: [
+                      AdminPersonBlock(
+                        embedded: true,
+                        label: 'Reported user',
+                        name: report.reportedDisplayName,
+                        handle: adminHandle(
+                          report.reportedUsername,
+                          report.reportedDisplayName,
+                        ),
+                        role: accountRoleLabel(report.reportedRole),
+                        shopName: report.reportedShopName,
+                      ),
+                      const SizedBox(height: 16),
+                      AdminPersonBlock(
+                        embedded: true,
+                        label: 'Reported by',
+                        name: report.reporterDisplayName,
+                        handle: adminHandle(
+                          report.reporterUsername,
+                          report.reporterDisplayName,
+                        ),
+                        role: accountRoleLabel(report.reporterRole),
+                      ),
+                    ],
                   ),
                   AdminDetailBlock(
                     label: 'What happened',
@@ -122,12 +131,12 @@ class AdminReportDetailScreen extends StatelessWidget {
                     _DecisionForm(controller: controller)
                   else
                     AdminDetailBlock(
-                      label: 'Admin response',
+                      label: 'Response',
                       children: [
                         Text(
                           report.adminResponse?.trim().isNotEmpty == true
                               ? report.adminResponse!.trim()
-                              : 'No written response was saved.',
+                              : 'No response was saved.',
                           style: AppTypography.body,
                         ),
                       ],
@@ -150,20 +159,15 @@ class _DecisionForm extends StatelessWidget {
         ? null
         : adminResponseError(controller.response);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final selected = controller.decision;
+
+    return AdminDecisionSection(
+      title: 'Decision',
       children: [
-        AdminSectionLabel('Admin decision'),
-        const SizedBox(height: 8),
-        Text(
-          'Choose a decision, write a response the reporter will see, then confirm.',
-          style: AppTypography.body.copyWith(color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 8),
         for (final decision in kAdminReportDecisions)
           AdminDecisionOption(
             value: decision,
-            groupValue: controller.decision,
+            groupValue: selected,
             onChanged: controller.isSaving
                 ? (_) {}
                 : context.read<AdminReportsController>().setDecision,
@@ -171,12 +175,13 @@ class _DecisionForm extends StatelessWidget {
         const SizedBox(height: 12),
         ThriftTextField(
           label: 'Response to reporter',
-          hint: 'Write a short explanation for the reporter.',
+          hint: 'The reporter will see this.',
           controller: controller.responseController,
           maxLines: 4,
           error: responseError,
           onChanged: context.read<AdminReportsController>().setResponse,
         ),
+        const SizedBox(height: 4),
         Align(
           alignment: Alignment.centerRight,
           child: Text(
@@ -186,7 +191,9 @@ class _DecisionForm extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         ThriftButton(
-          label: 'Confirm decision',
+          label: selected == null
+              ? 'Save decision'
+              : reportDecisionCta(selected),
           isLoading: controller.isSaving,
           onPressed: controller.canSubmitDecision
               ? () => _confirm(context)
@@ -203,18 +210,18 @@ class _DecisionForm extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Record this decision?'),
-        content: Text(
-          'The reporter will see "${reportDecisionLabel(selected)}" and your response. This does not ban the reported user or change payments.',
+        title: Text('${reportDecisionLabel(selected)}?'),
+        content: const Text(
+          'The reporter will see this decision and your response. This does not ban the reported user or change payments.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: const Text('Go back'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Confirm'),
+            child: Text(reportDecisionCta(selected)),
           ),
         ],
       ),

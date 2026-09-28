@@ -13,6 +13,7 @@ class SellerVerificationService {
 
   Future<void> submitApplication({
     required SellerAddressDraft address,
+    required SellerIdType idType,
     required Uint8List idFrontBytes,
     required Uint8List idBackBytes,
     required Uint8List selfieBytes,
@@ -33,7 +34,7 @@ class SellerVerificationService {
       'barangay': address.barangay!.name,
       'city': DavaoBarangay.cityName,
       'application_type': 'seller',
-      'government_id_type': SellerIdType.unspecifiedStorageValue,
+      'government_id_type': idType.storageValue,
       'liveness_passed': true,
       'liveness_result': liveness,
     };

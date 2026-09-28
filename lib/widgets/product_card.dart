@@ -3,32 +3,82 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/constants/app_colors.dart';
+import '../core/constants/app_constants.dart';
 import '../core/constants/app_typography.dart';
+import '../core/utils/cart_popularity.dart';
 import '../core/utils/formatters.dart';
+import '../models/enums.dart';
 import '../models/product_model.dart';
 import '../providers/saved_items_provider.dart';
 import 'countdown_timer.dart';
-import 'thrift_widgets.dart';
 
 enum ProductCardVariant { grid, list }
 
+/// Image-first marketplace card. Hierarchy: image → name → price.
 class ProductCard extends StatefulWidget {
   const ProductCard({
     super.key,
     required this.product,
     this.variant = ProductCardVariant.grid,
     this.onTap,
-    this.onSellerTap,
     this.showCountdown = false,
     this.compact = false,
+    this.cartAddCount,
   });
 
   final ProductModel product;
   final ProductCardVariant variant;
   final VoidCallback? onTap;
-  final VoidCallback? onSellerTap;
   final bool showCountdown;
   final bool compact;
+  final int? cartAddCount;
+
+  static const imageAspectRatio = 4 / 5;
+  static const gridSpacing = 12.0;
+  static const gridHorizontalPadding = 32.0;
+
+  static double footerHeight({bool compact = true, double textScale = 1}) {
+    return 0;
+  }
+
+  static int crossAxisCountFor(double maxWidth) {
+    return maxWidth >= AppConstants.breakpointTablet ? 3 : 2;
+  }
+
+  static double cardWidthFor(
+    double maxWidth, {
+    double horizontalPadding = gridHorizontalPadding,
+  }) {
+    final count = crossAxisCountFor(maxWidth);
+    final available = (maxWidth - horizontalPadding).clamp(200.0, 2000.0);
+    return (available - gridSpacing * (count - 1)) / count;
+  }
+
+  static double cardHeightFor(double cardWidth) =>
+      cardWidth / imageAspectRatio;
+
+  static double gridChildAspectRatio({
+    required double cardWidth,
+    bool compact = true,
+    double textScale = 1,
+  }) {
+    return imageAspectRatio;
+  }
+
+  static SliverGridDelegate gridDelegateFor({
+    required double maxWidth,
+    double horizontalPadding = gridHorizontalPadding,
+    double spacing = gridSpacing,
+    bool compact = true,
+    double textScale = 1,
+  }) {
+    return SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: crossAxisCountFor(maxWidth),
+      mainAxisSpacing: spacing,
+      crossAxisSpacing: spacing,
+      childAspectRatio: imageAspectRatio,
+    );
+  }
 
   @override
   State<ProductCard> createState() => _ProductCardState();
@@ -61,239 +111,123 @@ class _ProductCardState extends State<ProductCard>
         : _buildList(context);
   }
 
-  // ---------------------------------------------------------------------------
-  // Grid card — redesigned to match reference image
-  // ---------------------------------------------------------------------------
-
   Widget _buildGrid(BuildContext context) {
     final savedItems = context.watch<SavedItemsProvider>();
     final saved = savedItems.isSaved(widget.product.id);
-    final hasBid = widget.product.hasActiveBid;
+    final compact = widget.compact;
+    final isAuction = widget.product.sellingType == SellingType.auction;
+    final popularity = !isAuction
+        ? formatCartPopularity(widget.cartAddCount ?? 0)
+        : null;
+    final showTimer = widget.showCountdown && widget.product.bidEndTime != null;
 
     return AnimatedScale(
-      scale: _isPressed ? 0.965 : 1.0,
+      scale: _isPressed ? 0.97 : 1.0,
       duration: const Duration(milliseconds: 120),
       curve: Curves.easeOut,
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _isPressed = true),
-        onTapUp: (_) {
-          setState(() => _isPressed = false);
-          widget.onTap?.call();
-        },
-        onTapCancel: () => setState(() => _isPressed = false),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 10,
-                spreadRadius: 0,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // ── Product image — fixed 1:1 aspect ratio ────────────────
-                AspectRatio(
-                  aspectRatio: 1.0,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Product image — with robust error handling
-                      CachedNetworkImage(
-                        imageUrl: widget.product.imageUrl,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        memCacheWidth: 400,
-                        fadeInDuration: const Duration(milliseconds: 200),
-                        placeholder: (_, _) => const _ImagePlaceholder(),
-                        errorWidget: (_, _, _) => const _ImagePlaceholder(),
-                      ),
-
-                      // Condition badge — top left
-                      Positioned(
-                        top: 6,
-                        left: 6,
-                        child: _ConditionBadge(
-                          label: widget.product.condition.label,
-                        ),
-                      ),
-
-                      // Countdown timer pill — top right
-                      if (widget.showCountdown &&
-                          widget.product.bidEndTime != null)
-                        Positioned(
-                          top: 6,
-                          right: 6,
-                          child: _CountdownPill(
-                            endTime: widget.product.bidEndTime!,
-                          ),
-                        ),
-
-                      // Save / heart — bottom right of image
-                      Positioned(
-                        bottom: 6,
-                        right: 6,
-                        child: _SaveButton(
-                          saved: saved,
-                          controller: _heartController,
-                          onTap: () {
-                            _heartController.forward(from: 0);
-                            savedItems.toggleSave(
-                              widget.product.id,
-                              widget.product,
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ── Content section — auto height, no overflow ────────────
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    10,
-                    widget.compact ? 5 : 6,
-                    10,
-                    widget.compact ? 8 : 10,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Brand name
-                      if (widget.product.brand != null &&
-                          widget.product.brand!.isNotEmpty) ...[
-                        Text(
-                          widget.product.brand!,
-                          style: AppTypography.caption.copyWith(
-                            fontSize: widget.compact ? 9 : 10,
-                            color: AppColors.textSecondary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 1),
-                      ],
-
-                      // Product title
-                      Text(
-                        widget.product.title,
-                        style: AppTypography.body.copyWith(
-                          fontWeight: FontWeight.w700,
-                          fontSize: widget.compact ? 11.5 : 12,
-                          height: 1.2,
-                          color: AppColors.textPrimary,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-
-                      SizedBox(height: widget.compact ? 2 : 3),
-
-                      // Seller row
-                      GestureDetector(
-                        onTap: widget.onSellerTap,
-                        behavior: HitTestBehavior.opaque,
-                        child: Row(
-                          children: [
-                            ThriftAvatar(
-                              imageUrl: widget.product.sellerAvatar,
-                              size: widget.compact ? 14 : 16,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                widget.product.sellerName,
-                                style: AppTypography.caption.copyWith(
-                                  fontSize: widget.compact ? 9.5 : 10,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.textPrimary,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (widget.product.sellerVerified)
-                              Icon(
-                                Icons.verified_rounded,
-                                size: widget.compact ? 11 : 12,
-                                color: AppColors.primary,
-                              ),
-                          ],
-                        ),
-                      ),
-
-                      SizedBox(height: widget.compact ? 2 : 3),
-
-                      // Bid label (conditional)
-                      if (hasBid)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 1),
-                          child: Text(
-                            'Current Bid',
-                            style: AppTypography.caption.copyWith(
-                              fontSize: widget.compact ? 8.5 : 9,
-                              color: AppColors.textHint,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-
-                      // Price + Location row — Flexible prevents overflow
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              formatCurrency(widget.product.displayPrice),
-                              style: AppTypography.subheading.copyWith(
-                                color: AppColors.primary,
-                                fontSize: widget.compact ? 12 : 13,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.3,
-                                height: 1.2,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          // Location
-                          if (widget.product.location != null &&
-                              widget.product.location!.isNotEmpty) ...[
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.location_on_outlined,
-                              size: widget.compact ? 10 : 11,
-                              color: AppColors.textHint,
-                            ),
-                            const SizedBox(width: 1),
-                            Flexible(
-                              child: Text(
-                                widget.product.location!,
-                                style: AppTypography.caption.copyWith(
-                                  fontSize: widget.compact ? 8.5 : 9,
-                                  color: AppColors.textHint,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
+      child: Material(
+        color: AppColors.surface,
+        elevation: 0,
+        shadowColor: Colors.black.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+        child: InkWell(
+          onTap: widget.onTap,
+          onHighlightChanged: (v) => setState(() => _isPressed = v),
+          borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
                 ),
               ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+              child: AspectRatio(
+                aspectRatio: ProductCard.imageAspectRatio,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CachedNetworkImage(
+                      imageUrl: widget.product.imageUrl,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      memCacheWidth: 480,
+                      fadeInDuration: const Duration(milliseconds: 180),
+                      placeholder: (_, _) => const _ImagePlaceholder(),
+                      errorWidget: (_, _, _) => const _ImageFallback(),
+                    ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 96,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.55),
+                                Colors.black.withValues(alpha: 0.82),
+                              ],
+                              stops: const [0.0, 0.48, 1.0],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (showTimer)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: _CountdownPill(
+                          endTime: widget.product.bidEndTime!,
+                        ),
+                      ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (popularity != null) ...[
+                            _CartPopularityBadge(label: popularity),
+                            const SizedBox(width: 6),
+                          ],
+                          _SaveButton(
+                            saved: saved,
+                            controller: _heartController,
+                            onTap: () {
+                              _heartController.forward(from: 0);
+                              savedItems.toggleSave(
+                                widget.product.id,
+                                widget.product,
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      left: 10,
+                      right: 10,
+                      bottom: 10,
+                      child: _ImageCaption(
+                        product: widget.product,
+                        compact: compact,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -301,115 +235,50 @@ class _ProductCardState extends State<ProductCard>
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // List card (used in search results etc.)
-  // ---------------------------------------------------------------------------
-
   Widget _buildList(BuildContext context) {
-    final hasBid = widget.product.hasActiveBid;
+    final savedItems = context.watch<SavedItemsProvider>();
+    final saved = savedItems.isSaved(widget.product.id);
 
-    return AnimatedScale(
-      scale: _isPressed ? 0.98 : 1.0,
-      duration: const Duration(milliseconds: 120),
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _isPressed = true),
-        onTapUp: (_) {
-          setState(() => _isPressed = false);
-          widget.onTap?.call();
-        },
-        onTapCancel: () => setState(() => _isPressed = false),
-        child: Container(
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+        child: Ink(
           decoration: BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(AppConstants.radiusMd),
             border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
           ),
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              // Thumbnail with condition badge
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: CachedNetworkImage(
-                      imageUrl: widget.product.imageUrl,
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                      placeholder: (_, _) => Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryLight,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      errorWidget: (_, _, _) => Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryLight,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.image_outlined,
-                          color: AppColors.textHint,
-                        ),
-                      ),
-                    ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+                child: CachedNetworkImage(
+                  imageUrl: widget.product.imageUrl,
+                  width: 88,
+                  height: 88,
+                  fit: BoxFit.cover,
+                  memCacheWidth: 240,
+                  placeholder: (_, _) => const SizedBox(
+                    width: 88,
+                    height: 88,
+                    child: _ImagePlaceholder(),
                   ),
-                  // Condition badge on thumbnail
-                  Positioned(
-                    top: 4,
-                    left: 4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        widget.product.condition.label,
-                        style: AppTypography.caption.copyWith(
-                          fontSize: 8,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
+                  errorWidget: (_, _, _) => const SizedBox(
+                    width: 88,
+                    height: 88,
+                    child: _ImageFallback(),
                   ),
-                ],
+                ),
               ),
               const SizedBox(width: 12),
-              // Content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Brand
-                    if (widget.product.brand != null &&
-                        widget.product.brand!.isNotEmpty)
-                      Text(
-                        widget.product.brand!,
-                        style: AppTypography.caption.copyWith(
-                          fontSize: 10,
-                          color: AppColors.textSecondary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    // Title
                     Text(
                       widget.product.title,
                       style: AppTypography.body.copyWith(
@@ -419,53 +288,20 @@ class _ProductCardState extends State<ProductCard>
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    // Price row
-                    Row(
-                      children: [
-                        if (hasBid)
-                          Text(
-                            'Current Bid ',
-                            style: AppTypography.caption.copyWith(
-                              fontSize: 10,
-                              color: AppColors.textHint,
-                            ),
-                          ),
-                        Text(
-                          formatCurrency(widget.product.displayPrice),
-                          style: AppTypography.subheading.copyWith(
-                            color: AppColors.primary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    // Location
-                    if (widget.product.location != null &&
-                        widget.product.location!.isNotEmpty)
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on_outlined,
-                            size: 12,
-                            color: AppColors.textHint,
-                          ),
-                          const SizedBox(width: 2),
-                          Expanded(
-                            child: Text(
-                              widget.product.location!,
-                              style: AppTypography.caption.copyWith(
-                                fontSize: 10,
-                                color: AppColors.textHint,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
+                    _PriceLine(product: widget.product, compact: false),
                   ],
+                ),
+              ),
+              IconButton(
+                onPressed: () {
+                  _heartController.forward(from: 0);
+                  savedItems.toggleSave(widget.product.id, widget.product);
+                },
+                icon: Icon(
+                  saved
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color: saved ? AppColors.error : AppColors.textSecondary,
                 ),
               ),
             ],
@@ -476,65 +312,215 @@ class _ProductCardState extends State<ProductCard>
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper widgets
-// ─────────────────────────────────────────────────────────────────────────────
+class _ImageCaption extends StatelessWidget {
+  const _ImageCaption({required this.product, required this.compact});
 
-/// Shimmer-style placeholder shown while the image loads or on error.
+  final ProductModel product;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final isAuction = product.sellingType == SellingType.auction;
+    const shadow = [
+      Shadow(color: Color(0x99000000), blurRadius: 8, offset: Offset(0, 1)),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          product.title,
+          style: AppTypography.body.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: compact ? 14 : 15,
+            height: 1.2,
+            shadows: shadow,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 3),
+        if (isAuction)
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Current Bid  ',
+                  style: AppTypography.caption.copyWith(
+                    color: const Color(0xFFCCFBF1),
+                    fontWeight: FontWeight.w700,
+                    fontSize: compact ? 12 : 13,
+                    shadows: shadow,
+                  ),
+                ),
+                TextSpan(
+                  text: formatCurrency(product.displayPrice),
+                  style: AppTypography.subheading.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: compact ? 17 : 18,
+                    letterSpacing: -0.3,
+                    height: 1.1,
+                    shadows: shadow,
+                  ),
+                ),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          )
+        else
+          Text(
+            formatCurrency(product.displayPrice),
+            style: AppTypography.subheading.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: compact ? 17 : 18,
+              letterSpacing: -0.3,
+              height: 1.1,
+              shadows: shadow,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+      ],
+    );
+  }
+}
+
+class _PriceLine extends StatelessWidget {
+  const _PriceLine({required this.product, required this.compact});
+
+  final ProductModel product;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final isAuction = product.sellingType == SellingType.auction;
+    final priceStyle = AppTypography.subheading.copyWith(
+      color: AppColors.primary,
+      fontSize: compact ? 14 : 15,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -0.3,
+      height: 1.15,
+    );
+    if (!isAuction) {
+      return Text(
+        formatCurrency(product.displayPrice),
+        style: priceStyle,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: 'Current Bid ',
+            style: AppTypography.caption.copyWith(
+              fontSize: compact ? 10.5 : 11,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          TextSpan(
+            text: formatCurrency(product.displayPrice),
+            style: priceStyle,
+          ),
+        ],
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
 class _ImagePlaceholder extends StatelessWidget {
   const _ImagePlaceholder();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      color: AppColors.primaryLight.withValues(alpha: 0.5),
+    return ColoredBox(
+      color: AppColors.surfaceVariant,
       child: Center(
-        child: Icon(
-          Icons.image_outlined,
-          color: AppColors.textHint.withValues(alpha: 0.5),
-          size: 32,
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.primary.withValues(alpha: 0.45),
+          ),
         ),
       ),
     );
   }
 }
 
-/// Condition badge (e.g. "Good", "Like new") — semi-transparent white pill,
-/// positioned at the top-left of the image.
-class _ConditionBadge extends StatelessWidget {
-  const _ConditionBadge({required this.label});
+class _ImageFallback extends StatelessWidget {
+  const _ImageFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: AppColors.primaryLight.withValues(alpha: 0.55),
+      child: Center(
+        child: Icon(
+          Icons.image_not_supported_outlined,
+          color: AppColors.textHint.withValues(alpha: 0.7),
+          size: 28,
+        ),
+      ),
+    );
+  }
+}
+
+class _CartPopularityBadge extends StatelessWidget {
+  const _CartPopularityBadge({required this.label});
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(6),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Text(
-        label,
-        style: AppTypography.caption.copyWith(
-          color: AppColors.textPrimary,
-          fontWeight: FontWeight.w600,
-          fontSize: 9.5,
+    return Semantics(
+      label: '$label in carts',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.94),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 6,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.shopping_bag_outlined,
+              size: 12,
+              color: AppColors.textPrimary,
+            ),
+            const SizedBox(width: 3),
+            Text(
+              label,
+              style: AppTypography.caption.copyWith(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-/// Countdown timer pill — primary-colored rounded pill with clock icon,
-/// positioned at the top-right of the image.
 class _CountdownPill extends StatelessWidget {
   const _CountdownPill({required this.endTime});
   final DateTime endTime;
@@ -542,29 +528,24 @@ class _CountdownPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.35),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: AppColors.primary.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.schedule_rounded, color: Colors.white, size: 10),
-          const SizedBox(width: 3),
+          const Icon(Icons.schedule_rounded, color: Colors.white, size: 13),
+          const SizedBox(width: 4),
           CountdownTimer(
             endTime: endTime,
+            format: formatReadableCountdown,
             style: AppTypography.caption.copyWith(
               color: Colors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+              letterSpacing: 0.15,
             ),
           ),
         ],
@@ -573,7 +554,6 @@ class _CountdownPill extends StatelessWidget {
   }
 }
 
-/// Heart / save button — small white circle with shadow.
 class _SaveButton extends StatelessWidget {
   const _SaveButton({
     required this.saved,
@@ -586,29 +566,24 @@ class _SaveButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 28,
-        height: 28,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.95),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Center(
-          child: AnimatedBuilder(
-            animation: controller,
-            builder: (_, _) => Icon(
-              saved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-              color: saved ? AppColors.error : AppColors.textSecondary,
-              size: 15,
+    return Material(
+      color: Colors.white.withValues(alpha: 0.95),
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 32,
+          height: 32,
+          child: Center(
+            child: AnimatedBuilder(
+              animation: controller,
+              builder: (_, _) => Icon(
+                saved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                color: saved ? AppColors.error : AppColors.textSecondary,
+                size: 16,
+              ),
             ),
           ),
         ),

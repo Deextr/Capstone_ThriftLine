@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:thriftline/features/seller/data/id_camera_input_image.dart';
+import 'package:thriftline/features/seller/data/id_document_evidence_reader.dart';
 
 void main() {
   test('packs YUV_420_888 with padding into NV21 VU order', () {
@@ -39,5 +41,23 @@ void main() {
       uvPixelStride: 1,
     );
     expect(nv21, isNull);
+  });
+
+  test('a rotated camera buffer uses upright dimensions for the ID guide', () {
+    final upright = IdDocumentEvidenceReader.displaySize(
+      width: 1920,
+      height: 1080,
+      rotation: InputImageRotation.rotation90deg,
+    );
+    expect(upright.width, 1080);
+    expect(upright.height, 1920);
+
+    final flat = IdDocumentEvidenceReader.displaySize(
+      width: 1920,
+      height: 1080,
+      rotation: InputImageRotation.rotation0deg,
+    );
+    expect(flat.width, 1920);
+    expect(flat.height, 1080);
   });
 }

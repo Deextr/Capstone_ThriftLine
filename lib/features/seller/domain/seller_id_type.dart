@@ -1,19 +1,32 @@
-/// Government IDs accepted for Phase 1 seller verification.
+/// Government IDs accepted for seller verification.
 ///
+/// Digital National ID is separate from the physical National ID card.
 /// Voter's ID, PhilHealth ID, and Student ID are intentionally absent and
 /// must not be added as hidden, fallback, or selectable values.
 enum SellerIdType {
-  nationalId('national_id', 'National ID'),
-  driversLicense('drivers_license', "Driver's License"),
-  passport('passport', 'Passport'),
-  sssId('sss_id', 'SSS ID'),
-  umidId('umid_id', 'UMID ID');
+  nationalId('national_id', 'National ID', 'Physical card'),
+  digitalNationalId(
+    'digital_national_id',
+    'Digital National ID',
+    'In the official app',
+  ),
+  driversLicense('drivers_license', "Driver's License", null),
+  passport('passport', 'Passport', null),
+  sssId('sss_id', 'SSS ID', null),
+  umidId('umid_id', 'UMID', null);
 
-  const SellerIdType(this.storageValue, this.label);
+  const SellerIdType(this.storageValue, this.label, this.detail);
 
   /// Value persisted to `user_verifications.government_id_type`.
   final String storageValue;
   final String label;
+
+  /// Short distinction shown on the chooser. Null when the label is enough.
+  final String? detail;
+
+  /// PSA's Digital National ID is shown in the official app or national-id.gov.ph.
+  /// Physical cards keep screen rejection.
+  bool get presentedOnScreen => this == SellerIdType.digitalNationalId;
 
   /// Stored when the applicant is not asked to pick a specific type.
   static const String unspecifiedStorageValue = 'accepted_id';

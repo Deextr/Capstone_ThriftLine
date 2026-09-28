@@ -223,6 +223,38 @@ Apply this after the Phase 6 mandatory-payment file. It does not move money.
 
 Apply this after Phase 10. The dashboard card stays the same; only the RPC query changes.
 
+## Auction payment window
+
+| File | Purpose |
+| --- | --- |
+| `20260925120000_auction_payment_window.sql` | 12-hour winner payment, one second-bidder fallback, early end, relist, sold only after payment |
+
+Apply after Phase 6 payment and Phase 5 orders. `close_auctions` still settles ended auctions and now also expires unpaid winner offers.
+
+## Seller GCash payout method
+
+| File | Purpose |
+| --- | --- |
+| `20260925130000_seller_gcash_payout_method.sql` | Saved GCash destination; `request_seller_payout` requires it |
+
+Apply after Phase 10. Payouts stay recorded requests. `seller_payouts.status = requested` is unchanged.
+
+## Selected cart checkout
+
+| File | Purpose |
+| --- | --- |
+| `20260928120000_checkout_selected_cart.sql` | Checks out only the cart lines the buyer selected, using the same stock lock, order, and payment path as `checkout_cart` |
+
+Apply after mandatory payment. Buy Now still calls `checkout_cart` for one product. Checking out more than one selected cart line requires this function.
+
+## Orders per seller at checkout
+
+| File | Purpose |
+| --- | --- |
+| `20260928130000_checkout_orders_per_seller.sql` | Selected checkout keeps every shop; one order, shipping total, and later escrow per seller |
+
+Apply after `20260928120000_checkout_selected_cart.sql` if that file already ran. If it never finished, running only this file is enough because it replaces both functions. PayMongo stays one payment per order so escrow stays with the right seller.
+
 ## Conventions
 
 - Authorization lives in RLS policies and `SECURITY DEFINER` helpers, never in

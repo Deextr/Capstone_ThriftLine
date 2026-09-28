@@ -71,6 +71,7 @@ class OrderModel {
     this.addressMissing = false,
     this.shipment,
     this.itemReturn,
+    this.paymentDueAt,
   });
 
   final String id;
@@ -105,6 +106,13 @@ class OrderModel {
   final bool addressMissing;
   final ShipmentModel? shipment;
   final ReturnShipment? itemReturn;
+  final DateTime? paymentDueAt;
+
+  bool get isPaymentWindowOpen {
+    final due = paymentDueAt;
+    if (due == null) return needsBuyerPayment;
+    return needsBuyerPayment && due.isAfter(DateTime.now());
+  }
 
   bool get isRefundedSale => paymentStatus == 'refunded';
 
@@ -276,6 +284,9 @@ class OrderModel {
       addressMissing: addressMissing,
       shipment: shipmentFromOrderRow(row),
       itemReturn: returnShipmentFromOrderRow(row),
+      paymentDueAt: row['payment_due_at'] != null
+          ? DateTime.tryParse(row['payment_due_at'] as String)
+          : null,
     );
   }
 
@@ -312,6 +323,7 @@ class OrderModel {
     bool? addressMissing,
     ShipmentModel? shipment,
     ReturnShipment? itemReturn,
+    DateTime? paymentDueAt,
   }) => OrderModel(
     id: id ?? this.id,
     orderNumber: orderNumber ?? this.orderNumber,
@@ -345,6 +357,7 @@ class OrderModel {
     addressMissing: addressMissing ?? this.addressMissing,
     shipment: shipment ?? this.shipment,
     itemReturn: itemReturn ?? this.itemReturn,
+    paymentDueAt: paymentDueAt ?? this.paymentDueAt,
   );
 }
 

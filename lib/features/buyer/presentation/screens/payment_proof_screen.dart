@@ -18,6 +18,7 @@ import '../../../profile/data/address_service.dart';
 import '../../controllers/buyer_orders_controller.dart';
 import '../../data/paymongo_checkout.dart';
 import '../widgets/pay_now_button.dart';
+import '../widgets/payment_deadline_text.dart';
 
 class PaymentProofScreen extends StatefulWidget {
   const PaymentProofScreen({super.key, required this.orderId});
@@ -50,7 +51,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
           title: const Text('Payment'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go(RouteNames.checkout),
+            onPressed: () => context.go(RouteNames.cart),
           ),
         ),
         body: Center(child: Text(controller.errorMessage ?? 'Order not found')),
@@ -95,7 +96,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                 return;
               }
               if (failed) {
-                context.go(RouteNames.checkout);
+                context.go(RouteNames.cart);
                 return;
               }
               context.go(RouteNames.orderConfirmFor(widget.orderId));
@@ -109,6 +110,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                 ? _FailedPaymentBody(
                     channel: _selectedChannel,
                     expired: controller.isExpiredPayment,
+<<<<<<< HEAD
                     onReturnToCart: () async {
                       await context.read<CartProvider>().refresh();
                       if (context.mounted) {
@@ -121,6 +123,10 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                         context.go(RouteNames.checkout);
                       }
                     },
+=======
+                    onReturnToCart: () => context.go(RouteNames.cart),
+                    onTryAgain: () => context.go(RouteNames.cart),
+>>>>>>> 17f9910 (home page of buyer: Enhance the UI)
                   )
                 : pending
                 ? _PendingPaymentBody(
@@ -130,6 +136,8 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                         ? '${order.items.length} items from ${order.sellerName}'
                         : order.productTitle,
                     totalLabel: formatCurrency(order.total),
+                    paymentDueAt: order.paymentDueAt,
+                    windowOpen: order.isPaymentWindowOpen,
                     confirming: confirming,
                     selectedChannel: _selectedChannel,
                     isAbandoning: controller.isAbandoning,
@@ -232,7 +240,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
     } else {
       showThriftSnackBar(context, 'Checkout cancelled. Items returned to your cart.');
     }
-    context.go(isAuction ? RouteNames.buyerHome : RouteNames.checkout);
+    context.go(isAuction ? RouteNames.buyerHome : RouteNames.cart);
   }
 
   void _scheduleReturnHandling(bool returned, bool cancelled) {
@@ -278,6 +286,8 @@ class _PendingPaymentBody extends StatelessWidget {
     required this.sellerName,
     required this.itemLabel,
     required this.totalLabel,
+    this.paymentDueAt,
+    this.windowOpen = true,
     required this.confirming,
     required this.selectedChannel,
     required this.isAbandoning,
@@ -293,6 +303,8 @@ class _PendingPaymentBody extends StatelessWidget {
   final String sellerName;
   final String itemLabel;
   final String totalLabel;
+  final DateTime? paymentDueAt;
+  final bool windowOpen;
   final bool confirming;
   final String? selectedChannel;
   final bool isAbandoning;
@@ -308,6 +320,7 @@ class _PendingPaymentBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+<<<<<<< HEAD
         Expanded(
           child: SingleChildScrollView(
             child: Column(
@@ -364,6 +377,65 @@ class _PendingPaymentBody extends StatelessWidget {
                   _MethodPicker(onSelect: onSelectChannel),
               ],
             ),
+=======
+        Text(
+          confirming
+              ? 'Confirming payment…'
+              : selectedChannel == null
+              ? 'Payment Method'
+              : paymongoChannelLabel(selectedChannel!),
+          style: AppTypography.heading,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          confirming
+              ? 'PayMongo is confirming this payment. ThriftLine will update only after the verified webhook arrives.'
+              : selectedChannel == null
+              ? 'Choose how you want to pay. Payment is required to complete this purchase.'
+              : 'Pay securely through PayMongo',
+          style: AppTypography.body,
+        ),
+        const SizedBox(height: 16),
+        ThriftCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(itemLabel, style: AppTypography.subheading),
+              Text('Seller: $sellerName', style: AppTypography.caption),
+              const Divider(),
+              _PaymentRow(label: 'Amount to Pay', value: totalLabel),
+              _PaymentRow(
+                label: 'Status',
+                value: confirming
+                    ? 'Confirming payment…'
+                    : windowOpen
+                    ? 'Unpaid'
+                    : 'Payment window ended',
+              ),
+              if (paymentDueAt != null) ...[
+                const SizedBox(height: 8),
+                PaymentDeadlineText(due: paymentDueAt!),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        if (confirming)
+          const Expanded(
+            child: Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          )
+        else if (selectedChannel == null)
+          Expanded(child: _MethodPicker(onSelect: onSelectChannel))
+        else
+          const Spacer(),
+        if (!confirming && selectedChannel != null && windowOpen) ...[
+          PayNowButton(
+            orderId: orderId,
+            channel: selectedChannel!,
+            amountLabel: totalLabel,
+>>>>>>> 17f9910 (home page of buyer: Enhance the UI)
           ),
         ),
         if (!confirming && selectedChannel != null) ...[

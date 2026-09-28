@@ -14,6 +14,7 @@ import '../../data/id_photo_cropper.dart';
 import '../../data/id_preview_luma.dart';
 import '../../domain/id_document_classification.dart';
 import '../../domain/id_image_quality.dart';
+import '../../domain/seller_id_type.dart';
 import '../widgets/id_capture_overlay.dart';
 
 class IdCaptureResult {
@@ -30,15 +31,19 @@ class IdCaptureResult {
   final IdQualityResult backQuality;
 }
 
-/// Camera capture + on-device review for both sides of the selected ID.
+/// Camera capture + on-device review for both sides of one selected ID.
 ///
-/// Auto-capture still uses live luma as a framing guide. The JPEG still
-/// only asks whether the photo is an ID, not which government type or side.
+/// Live luma only decides whether the frame is worth a document check.
+/// The frame turns valid after the selected type and side agree, and the
+/// saved JPEG is checked again. This does not prove the ID is authentic.
 class IdCaptureScreen extends StatefulWidget {
   const IdCaptureScreen({
     super.key,
+    required this.idType,
     this.autoCaptureHold = IdCaptureGuide.autoCaptureHold,
   });
+
+  final SellerIdType idType;
 
   /// Exposed so device testing can tune the hold without a rebuild of domain.
   final Duration autoCaptureHold;
@@ -70,8 +75,24 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
   LiveIdStatus _status = LiveIdStatus.searching;
   String? _guidanceOverride;
 
-  String get _placementTitle =>
-      _side == IdCaptureSide.front ? 'FRONT OF ID' : 'BACK OF ID';
+  /// Clockwise turns that last read the on-screen ID upright.
+  int _liveQuarterTurns = 0;
+  int _probeCursor = 0;
+
+  double get _aspect => IdCaptureGuide.aspectFor(widget.idType);
+
+  bool get _isPassport => widget.idType == SellerIdType.passport;
+
+  String get _sideInstruction {
+    if (_isPassport) {
+      return _side == IdCaptureSide.front
+          ? 'Capture the photo page'
+          : 'Capture the other page';
+    }
+    return _side == IdCaptureSide.front
+        ? 'Capture the front'
+        : 'Capture the back';
+  }
 
   bool get _reviewing => _preview != null && !_validating;
 
@@ -112,9 +133,13 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
         (c) => c.lensDirection == CameraLensDirection.back,
         orElse: () => cameras.first,
       );
+      // Digital National ID labels are tiny on a phone screen; 720p frames
+      // leave them a few pixels tall, too small for on-device OCR.
       final controller = CameraController(
         back,
-        ResolutionPreset.high,
+        widget.idType.presentedOnScreen
+            ? ResolutionPreset.veryHigh
+            : ResolutionPreset.high,
         enableAudio: false,
         imageFormatGroup: Platform.isAndroid
             ? ImageFormatGroup.nv21
@@ -201,10 +226,11 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
         luma: sampled.luma,
         width: sampled.width,
         height: sampled.height,
+        cardAspect: _aspect,
       );
       if (!luma.isAligned) {
         _resetTextConfirm();
-        _guidanceOverride = null;
+        _guidanceOverride = _placementHint(luma);
         _applyAssessment(luma);
         _busyFrame = false;
         return;
@@ -249,37 +275,149 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
     _confirmOccupancy = null;
   }
 
+  String _captureFeedback(IdQualityResult quality) {
+    if (!widget.idType.presentedOnScreen) return quality.message;
+    return switch (quality.issue) {
+      IdQualityIssue.glare => 'Reduce glare on the screen.',
+      IdQualityIssue.blurry ||
+      IdQualityIssue.slightlySoft => 'Hold the camera steady.',
+      IdQualityIssue.tooFar => 'Move closer so the details are visible.',
+      IdQualityIssue.poorFraming =>
+        'Make sure the full Digital National ID is visible.',
+      _ => quality.message,
+    };
+  }
+
+  String _placementHint(LiveIdAssessment assessment) {
+    final label = widget.idType.label;
+    return assessment.message ??
+        switch (assessment.status) {
+          LiveIdStatus.tooFar =>
+            widget.idType.presentedOnScreen
+                ? 'Move closer so the details are visible.'
+                : 'Move your $label closer.',
+          LiveIdStatus.tooDark => 'Move to a brighter spot.',
+          LiveIdStatus.blurry =>
+            widget.idType.presentedOnScreen
+                ? 'Hold the camera steady.'
+                : 'Image is too blurry.',
+          LiveIdStatus.poorlyFramed =>
+            widget.idType.presentedOnScreen
+                ? 'Make sure the full Digital National ID is visible.'
+                : 'Fit the whole $label inside the frame.',
+          LiveIdStatus.wrongSide => IdDocumentClassifier.wrongSideMessage(
+            _side,
+            widget.idType,
+          ),
+          LiveIdStatus.aligned => 'Hold your $label steady.',
+          _ =>
+            widget.idType.presentedOnScreen
+                ? 'Turn the phone showing your ID sideways to fill the frame.'
+                : 'Place your $label in the frame.',
+        };
+  }
+
+  /// Guide hole in [input] (camera upright), then turned with the frame.
+  OverlayNormRect _guideOverlay(InputImage input, {int quarterTurns = 0}) {
+    final metadata = input.metadata;
+    final size = metadata?.size;
+    if (size == null || size.width < 8 || size.height < 8) {
+      return OverlayNormRect.full;
+    }
+    final upright = IdDocumentEvidenceReader.displaySize(
+      width: size.width,
+      height: size.height,
+      rotation: metadata?.rotation,
+    );
+    return IdImageMetrics.guideOverlay(
+      width: upright.width.round(),
+      height: upright.height.round(),
+      aspect: _aspect,
+    ).rotatedClockwise(quarterTurns);
+  }
+
+  Future<LiveIdAssessment> _confirmAt(
+    InputImage input,
+    int quarterTurns,
+    LiveIdAssessment lumaAssessment,
+  ) async {
+    final turned = IdCameraInputImage.turned(input, quarterTurns);
+    final evidence = turned == null
+        ? const DocumentEvidence.unknown()
+        : await _evidenceReader.inspectInputImage(
+            turned,
+            overlay: _guideOverlay(input, quarterTurns: quarterTurns),
+            detectFaces: true,
+          );
+    final confirmed = IdDocumentClassifier.confirmLive(
+      luma: lumaAssessment,
+      evidence: evidence,
+      expectedType: widget.idType,
+      expectedSide: _side,
+      sessionTypeConfirmed:
+          _side == IdCaptureSide.back && _frontQuality?.passed == true,
+    );
+    if (kDebugMode && evidence.available) {
+      debugPrint(
+        'ID_CAPTURE live aligned=${confirmed.isAligned} '
+        'expected_type=${widget.idType.storageValue} '
+        'expected_side=${_side.name} '
+        'turns=$quarterTurns '
+        'ocr_chars=${evidence.alphanumericChars} '
+        'face=${evidence.faceCoverage.toStringAsFixed(2)} '
+        'status=${confirmed.status.name}',
+      );
+    }
+    return confirmed;
+  }
+
+  /// Next orientation to probe when the on-screen ID was not recognized.
+  int _nextProbeTurns() {
+    const turns = IdImageQualityAnalyzer.screenQuarterTurns;
+    for (var i = 0; i < turns.length; i++) {
+      final candidate = turns[_probeCursor % turns.length];
+      _probeCursor++;
+      if (candidate != _liveQuarterTurns) return candidate;
+    }
+    return _liveQuarterTurns;
+  }
+
   Future<void> _confirmPrintedId({
     required InputImage? input,
     required LiveIdAssessment lumaAssessment,
   }) async {
     try {
-      var evidence = const DocumentEvidence.unknown();
-      if (input != null) {
-        evidence = await _evidenceReader.inspectInputImage(
-          input,
-          overlay: OverlayNormRect.full,
-          detectFaces: true,
-        );
+      var confirmed = input == null
+          ? IdDocumentClassifier.confirmLive(
+              luma: lumaAssessment,
+              evidence: const DocumentEvidence.unknown(),
+              expectedType: widget.idType,
+              expectedSide: _side,
+            )
+          : await _confirmAt(input, _liveQuarterTurns, lumaAssessment);
+      // One extra orientation per frame keeps the preview responsive while
+      // still cycling through every way the phone can be held.
+      if (input != null &&
+          widget.idType.presentedOnScreen &&
+          !confirmed.isAligned &&
+          confirmed.status == LiveIdStatus.notId &&
+          mounted &&
+          !_capturing &&
+          !_validating &&
+          _preview == null) {
+        final probe = _nextProbeTurns();
+        if (probe != _liveQuarterTurns) {
+          final turned = await _confirmAt(input, probe, lumaAssessment);
+          if (turned.isAligned || turned.status == LiveIdStatus.wrongSide) {
+            _liveQuarterTurns = probe;
+            confirmed = turned;
+          }
+        }
       }
       if (!mounted || _capturing || _validating || _preview != null) return;
       _lastTextConfirm = DateTime.now();
       _confirmOccupancy = lumaAssessment.occupancy;
-      final confirmed = IdImageMetrics.confirmLiveDocument(
-        lumaAssessment,
-        evidence: evidence,
-      );
-      if (kDebugMode && evidence.available) {
-        debugPrint(
-          'ID_CAPTURE live id=${confirmed.isAligned} '
-          'ocrChars=${evidence.alphanumericChars} '
-          'face=${evidence.faceCoverage.toStringAsFixed(2)} '
-          'ocr="${evidence.recognizedText.length > 80 ? evidence.recognizedText.substring(0, 80) : evidence.recognizedText}"',
-        );
-      }
-      _guidanceOverride = confirmed.status == LiveIdStatus.notId
-          ? 'No ID detected. Place your ID inside the frame.'
-          : null;
+      _guidanceOverride = confirmed.message ?? _placementHint(confirmed);
       _confirmStatus = confirmed.status;
       _applyAssessment(confirmed);
     } catch (_) {
@@ -320,7 +458,7 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
       final file = await controller.takePicture();
       tempPath = file.path;
       final bytes = await file.readAsBytes();
-      final cropped = await IdPhotoCropper.cropToId(bytes);
+      final cropped = await IdPhotoCropper.cropToId(bytes, cardAspect: _aspect);
       if (!mounted) return;
 
       setState(() {
@@ -329,8 +467,22 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
       });
 
       IdQualityResult quality;
+      var accepted = cropped;
       try {
-        quality = await _qualityAnalyzer.analyze(cropped);
+        final result = await _qualityAnalyzer.analyzeOriented(
+          cropped,
+          expectedType: widget.idType,
+          expectedSide: _side,
+          sessionTypeConfirmed:
+              _side == IdCaptureSide.back && _frontQuality?.passed == true,
+          requireIdPhoto: _side == IdCaptureSide.front,
+          preferredQuarterTurns: _liveQuarterTurns,
+        );
+        quality = result.quality;
+        if (quality.passed) {
+          accepted = result.bytes;
+          _liveQuarterTurns = result.quarterTurns;
+        }
       } catch (_) {
         quality = IdQualityResult.fail(IdQualityIssue.uncertain);
       }
@@ -339,22 +491,27 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
       if (!quality.passed) {
         setState(() {
           _validating = false;
-          _guidanceOverride = quality.message;
+          _guidanceOverride = _captureFeedback(quality);
           _status = switch (quality.issue) {
             IdQualityIssue.blurry ||
             IdQualityIssue.slightlySoft => LiveIdStatus.blurry,
-            IdQualityIssue.tooDark => LiveIdStatus.tooDark,
+            IdQualityIssue.tooDark ||
+            IdQualityIssue.lowContrast => LiveIdStatus.tooDark,
+            IdQualityIssue.tooFar => LiveIdStatus.tooFar,
+            IdQualityIssue.poorFraming => LiveIdStatus.poorlyFramed,
+            IdQualityIssue.wrongSide => LiveIdStatus.wrongSide,
+            IdQualityIssue.glare => LiveIdStatus.blurry,
             _ => LiveIdStatus.notId,
           };
         });
         await _beginStream();
         if (!mounted) return;
-        showThriftSnackBar(context, quality.message, isError: true);
+        showThriftSnackBar(context, _captureFeedback(quality), isError: true);
         return;
       }
 
       setState(() {
-        _preview = cropped;
+        _preview = accepted;
         _acceptedQuality = quality;
         _validating = false;
         _status = LiveIdStatus.searching;
@@ -390,6 +547,7 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
       _acceptedQuality = null;
       _capturing = false;
       _validating = false;
+      _guidanceOverride = null;
       _status = LiveIdStatus.searching;
     });
     await _beginStream();
@@ -413,6 +571,7 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
         _acceptedQuality = null;
         _capturing = false;
         _validating = false;
+        _guidanceOverride = null;
         _status = LiveIdStatus.searching;
       });
       await _beginStream();
@@ -458,17 +617,29 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
   }
 
   void _showHelp() {
-    final sideCopy = _side == IdCaptureSide.front ? 'front' : 'back';
+    final label = widget.idType.label;
+    final sideCopy = _isPassport
+        ? (_side == IdCaptureSide.front ? 'photo page' : 'other page')
+        : (_side == IdCaptureSide.front ? 'front' : 'back');
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('How to capture your ID'),
+        title: Text('Capture your $label'),
         content: Text(
-          'Use an accepted government ID. Place the $sideCopy of the ID '
-          'inside the frame so all four edges are visible. Hold it still. '
-          'The photo is taken automatically when an ID is clear and aligned '
-          '— you do not need to tap a button.\n\n'
-          'Use a well-lit area and avoid glare on the card.',
+          widget.idType.presentedOnScreen
+              ? 'Open your Digital National ID in the eGov app, or a '
+                    'screenshot of it, on another phone. Turn that phone '
+                    'sideways so the $sideCopy fills the frame. The photo, '
+                    'details, and code should be visible. Turn the screen '
+                    'brightness up, hold steady, and avoid glare.\n\n'
+                    'This check does not prove the ID is genuine. ThriftLine '
+                    'still reviews your application.'
+              : 'Place the $sideCopy of your $label inside the frame so the edges '
+                    'are visible. Hold it still. The photo is taken automatically when '
+                    'it matches this ID and is clear.\n\n'
+                    'Use a well-lit area and avoid glare. A photo of a screen is not '
+                    'accepted. This check does not prove the ID is genuine — ThriftLine '
+                    'still reviews your application.',
         ),
         actions: [
           TextButton(
@@ -568,6 +739,7 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
         IdCaptureOverlay(
           status: _status,
           capturing: _capturing || _validating,
+          cardAspect: _aspect,
           statusMessage: _validating ? 'Checking the ID…' : _guidanceOverride,
         ),
         SafeArea(
@@ -584,16 +756,31 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
                   ),
                 ),
                 Expanded(
-                  child: Text(
-                    _placementTitle,
-                    style: AppTypography.subheading.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      shadows: const [
-                        Shadow(blurRadius: 8, color: Colors.black54),
-                      ],
-                    ),
-                    textAlign: TextAlign.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        widget.idType.label,
+                        style: AppTypography.subheading.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          shadows: const [
+                            Shadow(blurRadius: 8, color: Colors.black54),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      Text(
+                        _sideInstruction,
+                        style: AppTypography.caption.copyWith(
+                          color: Colors.white,
+                          shadows: const [
+                            Shadow(blurRadius: 8, color: Colors.black54),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
                 IconButton(
@@ -610,7 +797,9 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
   }
 
   Widget _buildReview() {
-    final sideLabel = _side == IdCaptureSide.front ? 'front' : 'back';
+    final sideWord = _isPassport
+        ? (_side == IdCaptureSide.front ? 'photo page' : 'other page')
+        : (_side == IdCaptureSide.front ? 'front' : 'back');
     return SafeArea(
       child: Column(
         children: [
@@ -642,8 +831,8 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
             child: Text(
-              'This $sideLabel photo looks like an ID. '
-              'Use it to continue, or retake if it is hard to read.',
+              'ID image accepted for the $sideWord '
+              'of your ${widget.idType.label}. Use it, or retake if it is hard to read.',
               style: AppTypography.body.copyWith(color: Colors.white70),
               textAlign: TextAlign.center,
             ),

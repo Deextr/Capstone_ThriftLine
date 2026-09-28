@@ -14,6 +14,19 @@ void main() {
     });
   });
 
+  group('formatReadableCountdown', () {
+    test('uses labeled hours and minutes', () {
+      expect(
+        formatReadableCountdown(const Duration(hours: 21, minutes: 22)),
+        '21h 22m',
+      );
+    });
+
+    test('uses minutes only under one hour', () {
+      expect(formatReadableCountdown(const Duration(minutes: 22)), '22m');
+    });
+  });
+
   group('supabaseRpcMap', () {
     test('reads success and error from a JSONB RPC result', () {
       expect(supabaseRpcSuccess({'success': true, 'bid_id': '1'}), isTrue);

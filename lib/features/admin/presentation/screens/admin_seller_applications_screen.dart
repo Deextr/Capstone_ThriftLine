@@ -34,13 +34,7 @@ class AdminSellerApplicationsScreen extends StatelessWidget {
           onRefresh: () =>
               context.read<AdminSellerApplicationsController>().load(),
           child: controller.isLoading
-              ? ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    const SizedBox(height: 120),
-                    const Center(child: CircularProgressIndicator()),
-                  ],
-                )
+              ? const AdminQueueSkeleton()
               : controller.errorMessage != null
               ? ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -59,52 +53,62 @@ class AdminSellerApplicationsScreen extends StatelessWidget {
                   children: const [
                     AdminEmptyState(
                       title: 'No seller applications waiting for review.',
-                      message:
-                          'New Become a Seller submissions will appear here.',
+                      message: 'New applications will appear here.',
                     ),
                   ],
                 )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-                  itemCount: controller.applications.length + 1,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    if (index == 0) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Text(
-                          '${controller.applications.length} require review',
-                          style: AppTypography.caption,
-                        ),
-                      );
-                    }
-                    final application = controller.applications[index - 1];
-                    return AdminQueueItem(
-                      title: application.shopName,
-                      status: application.status,
-                      statusLabel: verificationStatusLabel(application.status),
-                      lines: [
-                        application.applicantName ?? 'Applicant',
-                        [
-                          application.barangay,
-                          application.city,
-                        ].where((part) => part.trim().isNotEmpty).join(', '),
-                      ],
-                      meta: formatCompactDate(application.submittedAt),
-                      actionLabel: 'Review application',
-                      onTap: () => _open(context, application),
-                    );
-                  },
+              : ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                  children: [
+                    Text(
+                      adminQueueStatusLine(
+                        controller.applications.length,
+                        'awaiting review',
+                      ),
+                      style: AppTypography.subheading,
+                    ),
+                    const SizedBox(height: 8),
+                    for (
+                      var i = 0;
+                      i < controller.applications.length;
+                      i++
+                    ) ...[
+                      if (i > 0) const Divider(height: 1),
+                      _ApplicationRow(application: controller.applications[i]),
+                    ],
+                  ],
                 ),
         ),
       ),
     );
   }
+}
 
-  Future<void> _open(
-    BuildContext context,
-    SellerApplication application,
-  ) async {
+class _ApplicationRow extends StatelessWidget {
+  const _ApplicationRow({required this.application});
+
+  final SellerApplication application;
+
+  @override
+  Widget build(BuildContext context) {
+    final location = [
+      application.barangay,
+      application.city,
+    ].where((part) => part.trim().isNotEmpty).join(', ');
+
+    return AdminQueueItem(
+      title: application.shopName,
+      status: application.status,
+      statusLabel: verificationStatusLabel(application.status),
+      lines: [application.applicantName ?? 'Applicant', location],
+      meta: formatCompactDate(application.submittedAt),
+      actionLabel: 'Review application',
+      onTap: () => _open(context),
+    );
+  }
+
+  Future<void> _open(BuildContext context) async {
     await context.push(RouteNames.adminReviewFor(application.id));
     if (context.mounted) {
       await context.read<AdminSellerApplicationsController>().load();

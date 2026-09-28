@@ -12,10 +12,12 @@ class AdminReviewCenterController extends ChangeNotifier {
   final AdminReviewService _service;
 
   AdminReviewCounts? _counts;
+  List<AdminReviewActivity> _activity = const [];
   bool _isLoading = true;
   String? _errorMessage;
 
   AdminReviewCounts? get counts => _counts;
+  List<AdminReviewActivity> get activity => _activity;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get hasCounts => _counts != null;
@@ -30,7 +32,21 @@ class AdminReviewCenterController extends ChangeNotifier {
     } catch (e) {
       debugPrint('AdminReviewCenterController.load error: $e');
       _counts = null;
+      _activity = const [];
       _errorMessage = 'Unable to load review queues.';
+      return;
+    } finally {
+      if (_errorMessage != null) {
+        _isLoading = false;
+        notifyListeners();
+      }
+    }
+
+    try {
+      _activity = await _service.loadRecentActivity();
+    } catch (e) {
+      debugPrint('AdminReviewCenterController activity error: $e');
+      _activity = const [];
     } finally {
       _isLoading = false;
       notifyListeners();

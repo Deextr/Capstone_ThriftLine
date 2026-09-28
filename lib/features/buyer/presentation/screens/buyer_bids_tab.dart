@@ -17,6 +17,7 @@ import '../../../../widgets/bid_card.dart';
 import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/buyer_bids_controller.dart';
+import '../widgets/payment_deadline_text.dart';
 
 class BuyerBidsTab extends StatefulWidget {
   const BuyerBidsTab({super.key});
@@ -298,11 +299,19 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                               ),
                               const SizedBox(height: 4),
                               Text(
+<<<<<<< HEAD
                                 'You won this auction!',
+=======
+                                'You won this auction. Payment is unpaid.',
+>>>>>>> 17f9910 (home page of buyer: Enhance the UI)
                                 style: AppTypography.caption.copyWith(
                                   color: AppColors.success,
                                 ),
                               ),
+                              if (bid.paymentDueAt != null) ...[
+                                const SizedBox(height: 4),
+                                PaymentDeadlineText(due: bid.paymentDueAt!),
+                              ],
                             ],
                           ),
                         ),
@@ -310,31 +319,34 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                     ),
                     const SizedBox(height: 12),
                     ThriftButton(
-                      label: 'View order',
-                      onPressed: () async {
-                        final auctionId = bid.auctionId;
-                        if (auctionId == null || auctionId.isEmpty) {
-                          showThriftSnackBar(
-                            context,
-                            'This win has no auction yet. Pull to refresh.',
-                            isError: true,
-                          );
-                          return;
-                        }
-                        final orderId = await bidsCtrl.orderIdForWonAuction(
-                          auctionId,
-                        );
-                        if (!mounted) return;
-                        if (orderId == null) {
-                          showThriftSnackBar(
-                            context,
-                            'Your pending order is not ready yet. Pull to refresh.',
-                            isError: true,
-                          );
-                          return;
-                        }
-                        context.push(RouteNames.paymentForOrder(orderId));
-                      },
+                      label: 'Pay now',
+                      onPressed:
+                          bid.paymentDueAt != null &&
+                              !bid.paymentDueAt!.isAfter(DateTime.now())
+                          ? null
+                          : () async {
+                              final auctionId = bid.auctionId;
+                              if (auctionId == null || auctionId.isEmpty) {
+                                showThriftSnackBar(
+                                  context,
+                                  'This win has no auction yet. Pull to refresh.',
+                                  isError: true,
+                                );
+                                return;
+                              }
+                              final orderId = await bidsCtrl
+                                  .orderIdForWonAuction(auctionId);
+                              if (!mounted) return;
+                              if (orderId == null) {
+                                showThriftSnackBar(
+                                  context,
+                                  'Your pending order is not ready yet. Pull to refresh.',
+                                  isError: true,
+                                );
+                                return;
+                              }
+                              context.push(RouteNames.paymentForOrder(orderId));
+                            },
                     ),
                   ],
                 ),

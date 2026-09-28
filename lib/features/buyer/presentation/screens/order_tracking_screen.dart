@@ -52,7 +52,7 @@ class OrderTrackingScreen extends StatelessWidget {
 
     if (order.isFailedCheckout) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) context.go(RouteNames.checkout);
+        if (context.mounted) context.go(RouteNames.cart);
       });
       return const Scaffold(body: _TrackingLoadingView());
     }

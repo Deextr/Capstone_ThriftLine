@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../core/services/supabase_service.dart';
 import '../core/utils/stock_limits.dart';
+import '../features/buyer/data/cart_shop_group.dart';
 import '../features/buyer/data/checkout_totals.dart';
 import '../models/enums.dart';
 import '../models/product_model.dart';
@@ -62,6 +63,8 @@ class CartProvider extends ChangeNotifier {
 
   final SupabaseService? _supabase;
   final List<CartItem> _items = [];
+  final Set<String> _selectedIds = {};
+  final Set<String> _seenIds = {};
   String? _userId;
   bool _isLoading = false;
   String? _errorMessage;
@@ -71,6 +74,42 @@ class CartProvider extends ChangeNotifier {
   /// Fixed-price items that can be checked out directly.
   List<CartItem> get fixedPriceItems =>
       _items.where((i) => i.isFixedPrice).toList();
+
+  List<CartItem> get selectedItems => fixedPriceItems
+      .where((item) => _selectedIds.contains(item.product.id))
+      .toList();
+
+  bool isSelected(String productId) => _selectedIds.contains(productId);
+
+  List<CartShopGroup> get shopGroups => groupCartItemsByShop(fixedPriceItems);
+
+  List<CartShopGroup> get selectedShopGroups =>
+      groupCartItemsByShop(selectedItems);
+
+  bool? shopCheckboxValue(String sellerKey) {
+    final match = shopGroups.where((group) => group.sellerKey == sellerKey);
+    if (match.isEmpty) return false;
+    final items = match.first.items;
+    final selectedCount = items
+        .where((item) => _selectedIds.contains(item.product.id))
+        .length;
+    if (selectedCount == 0) return false;
+    if (selectedCount == items.length) return true;
+    return null;
+  }
+
+  void setShopSelected(String sellerKey, bool selected) {
+    final match = shopGroups.where((group) => group.sellerKey == sellerKey);
+    if (match.isEmpty) return;
+    for (final item in match.first.items) {
+      if (selected) {
+        _selectedIds.add(item.product.id);
+      } else {
+        _selectedIds.remove(item.product.id);
+      }
+    }
+    notifyListeners();
+  }
 
   /// Auction items shown for reference / bidding status.
   List<CartItem> get auctionItems => _items.where((i) => i.isAuction).toList();
@@ -99,11 +138,45 @@ class CartProvider extends ChangeNotifier {
     platformFee: platformFee,
   );
 
+  double get selectedSubtotal =>
+      selectedItems.fold(0.0, (sum, item) => sum + item.subtotal);
+
+  double get selectedShippingFee => checkoutShippingFee(
+    checkoutSellerCount(selectedItems.map((item) => item.product.sellerId)),
+  );
+
+  double get selectedPlatformFee =>
+      checkoutGroupsPlatformFee(selectedShopGroups);
+
+  double get selectedTotal => checkoutGroupsTotal(selectedShopGroups);
+
+  void toggleSelected(String productId, bool selected) {
+    if (selected) {
+      _selectedIds.add(productId);
+    } else {
+      _selectedIds.remove(productId);
+    }
+    notifyListeners();
+  }
+
+  void _syncSelection() {
+    final current = fixedPriceItems.map((item) => item.product.id).toSet();
+    for (final id in current.difference(_seenIds)) {
+      _selectedIds.add(id);
+    }
+    _selectedIds.removeWhere((id) => !current.contains(id));
+    _seenIds
+      ..clear()
+      ..addAll(current);
+  }
+
   /// Called by `_SessionBindings` when the user session becomes active or changes.
   Future<void> startForUser(String? userId) async {
     if (userId == null || userId.isEmpty) {
       _userId = null;
       _items.clear();
+      _selectedIds.clear();
+      _seenIds.clear();
       _isLoading = false;
       _errorMessage = null;
       notifyListeners();
@@ -216,6 +289,10 @@ class CartProvider extends ChangeNotifier {
 
       final clamped = <CartItem>[];
       for (final item in fetched) {
+        if (!listingUsesShoppingCart(item.product.sellingType)) {
+          await _deleteRemoteLine(userId, item.product.id);
+          continue;
+        }
         final max = item.product.maxPurchasableQuantity;
         if (max <= 0) {
           await _deleteRemoteLine(userId, item.product.id);
@@ -236,6 +313,7 @@ class CartProvider extends ChangeNotifier {
 
       _items.clear();
       _items.addAll(clamped);
+      _syncSelection();
     } catch (e) {
       debugPrint('CartProvider.refresh error ($e)');
       // Non-fatal: keep any local items
@@ -248,6 +326,12 @@ class CartProvider extends ChangeNotifier {
   /// Adds a product to the cart and persists to Supabase database.
   Future<void> addToCart(ProductModel product, {int quantity = 1}) async {
     final max = product.maxPurchasableQuantity;
+    if (!listingUsesShoppingCart(product.sellingType)) {
+      _errorMessage =
+          'Auction listings are not added to the cart. Place a bid instead.';
+      notifyListeners();
+      return;
+    }
     if (max <= 0) {
       _errorMessage = '${_itemLabel(product.title)} is no longer available.';
       notifyListeners();
@@ -283,6 +367,7 @@ class CartProvider extends ChangeNotifier {
     } else {
       _items.add(CartItem(product: product, quantity: targetQuantity));
     }
+    _syncSelection();
     notifyListeners();
 
     // Persist to Supabase if authenticated
@@ -308,6 +393,7 @@ class CartProvider extends ChangeNotifier {
   /// Removes an item from the cart and database.
   Future<void> removeFromCart(String productId) async {
     _items.removeWhere((i) => i.product.id == productId);
+    _syncSelection();
     notifyListeners();
 
     final userId = _userId;

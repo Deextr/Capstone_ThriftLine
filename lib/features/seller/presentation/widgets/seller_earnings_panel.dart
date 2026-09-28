@@ -8,6 +8,8 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/seller_earnings_controller.dart';
 import '../../data/seller_earnings.dart';
+import '../../data/seller_payout_method.dart';
+import 'request_payout_dialog.dart';
 import 'seller_available_earnings_card.dart';
 
 class SellerEarningsPanel extends StatelessWidget {
@@ -53,34 +55,38 @@ class SellerEarningsPanel extends StatelessWidget {
 
   String _availableStatus(SellerEarningsSnapshot snapshot) {
     if (snapshot.availableCentavos > 0) return 'Ready for payout';
-    if (snapshot.payoutRequestedCentavos > 0) return 'Payout pending';
     return 'No earnings available yet';
   }
 
   Future<void> _confirmPayout(BuildContext context, int amountCentavos) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Request payout?'),
-        content: Text(
-          'Record a payout of ${formatCentavos(amountCentavos)}. This does not send GCash.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep earnings'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Request payout'),
-          ),
-        ],
-      ),
+    final controller = context.read<SellerEarningsController>();
+    SellerPayoutMethod? method;
+    try {
+      method = await controller.loadPayoutMethod();
+    } catch (_) {
+      if (!context.mounted) return;
+      showThriftSnackBar(
+        context,
+        'Unable to load your GCash details.',
+        isError: true,
+      );
+      return;
+    }
+    if (!context.mounted) return;
+
+    final result = await showRequestPayoutDialog(
+      context,
+      availableCentavos: amountCentavos,
+      method: method,
     );
-    if (confirmed != true || !context.mounted) return;
-    final error = await context
-        .read<SellerEarningsController>()
-        .requestPayout();
+    if (!context.mounted) return;
+    if (result.openPaymentMethods) {
+      await openPaymentMethods(context);
+      return;
+    }
+    if (!result.confirmed) return;
+
+    final error = await controller.requestPayout();
     if (!context.mounted) return;
     if (error != null) {
       showThriftSnackBar(context, error, isError: true);
@@ -99,7 +105,9 @@ class SellerEarningsFollowup extends StatelessWidget {
     if (snapshot == null) return const SizedBox.shrink();
 
     final hasRefunded = snapshot.refundedCentavos > 0;
-    final hasPayoutPending = snapshot.payoutRequestedCentavos > 0;
+    if (snapshot.heldCentavos <= 0 && !hasRefunded) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -120,14 +128,6 @@ class SellerEarningsFollowup extends StatelessWidget {
                 hint: 'Waiting for delivery & completion',
                 amount: formatCentavos(snapshot.heldCentavos),
               ),
-              if (hasPayoutPending) ...[
-                const Divider(height: 1, color: AppColors.border),
-                _MoneyLine(
-                  label: 'Payout pending',
-                  hint: 'Awaiting GCash disbursement',
-                  amount: formatCentavos(snapshot.payoutRequestedCentavos),
-                ),
-              ],
               if (hasRefunded) ...[
                 const Divider(height: 1, color: AppColors.border),
                 _MoneyLine(
@@ -168,7 +168,9 @@ class _MoneyLine extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: AppTypography.body.copyWith(fontWeight: FontWeight.w500),
+                  style: AppTypography.body.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(hint, style: AppTypography.caption),

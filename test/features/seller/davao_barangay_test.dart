@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:thriftline/features/seller/data/davao_barangay_service.dart';
 import 'package:thriftline/features/seller/domain/davao_barangay.dart';
@@ -53,9 +56,18 @@ void main() {
       expect(DavaoBarangay.findAllowedByName('agdao', list)?.code, '112402002');
       expect(DavaoBarangay.findAllowedByName('Ermita', list), isNull);
     });
+
+    test('bundled snapshot is Davao City only', () {
+      final raw = File('assets/data/davao_barangays.json').readAsStringSync();
+      final list = DavaoBarangay.fromApiList(jsonDecode(raw));
+      expect(list.length, greaterThan(100));
+      expect(list.every((item) => item.isDavaoCity), isTrue);
+    });
   });
 
   group('DavaoBarangayService', () {
+    setUp(DavaoBarangayService.resetCacheForTest);
+
     test('rejects an empty filtered payload', () async {
       final service = DavaoBarangayService(
         fetch: (_) async =>
@@ -99,6 +111,18 @@ void main() {
       final second = await service.load();
       expect(first.single.name, 'Agdao');
       expect(second, first);
+      expect(calls, 1);
+    });
+
+    test('shares the in-memory cache across service instances', () async {
+      var calls = 0;
+      Future<String> fetch(Uri uri) async {
+        calls++;
+        return '[{"code":"112402002","name":"Agdao","cityCode":"112402000"}]';
+      }
+
+      await DavaoBarangayService(fetch: fetch).load();
+      await DavaoBarangayService(fetch: fetch).load();
       expect(calls, 1);
     });
   });

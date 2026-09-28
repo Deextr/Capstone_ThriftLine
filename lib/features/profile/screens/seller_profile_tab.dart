@@ -88,7 +88,7 @@ class SellerProfileTab extends StatelessWidget {
               _MenuItem(
                 icon: Icons.payment_outlined,
                 label: 'Payment Methods',
-                onTap: () => showThriftSnackBar(context, 'Coming soon'),
+                onTap: () => context.push(RouteNames.paymentMethods),
               ),
               _MenuItem(
                 icon: Icons.location_on_outlined,

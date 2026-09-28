@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../data/admin_review_rules.dart';
 
@@ -34,7 +35,7 @@ class AdminEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 64, 24, 24),
+      padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
       child: Column(
         children: [
           Text(
@@ -70,11 +71,77 @@ class AdminErrorState extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
       child: Column(
         children: [
-          Text(message, textAlign: TextAlign.center, style: AppTypography.body),
-          const SizedBox(height: 16),
-          ThriftButton(label: 'Retry', onPressed: onRetry),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: AppTypography.subheading,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Please try again.',
+            textAlign: TextAlign.center,
+            style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 20),
+          ThriftButton(label: 'Retry', onPressed: onRetry, expand: false),
         ],
       ),
+    );
+  }
+}
+
+class AdminQueueSkeleton extends StatelessWidget {
+  const AdminQueueSkeleton({super.key, this.rows = 4});
+
+  final int rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      children: [
+        const ShimmerBox(width: 148, height: 14),
+        const SizedBox(height: 20),
+        for (var i = 0; i < rows; i++) ...[
+          const ShimmerBox(width: double.infinity, height: 16),
+          const SizedBox(height: 8),
+          const ShimmerBox(width: 196, height: 12),
+          const SizedBox(height: 8),
+          const ShimmerBox(width: 88, height: 12),
+          const SizedBox(height: 22),
+        ],
+      ],
+    );
+  }
+}
+
+class AdminDetailSkeleton extends StatelessWidget {
+  const AdminDetailSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      children: const [
+        ShimmerBox(width: 96, height: 22, radius: 20),
+        SizedBox(height: 12),
+        ShimmerBox(width: double.infinity, height: 22),
+        SizedBox(height: 8),
+        ShimmerBox(width: 120, height: 12),
+        SizedBox(height: 28),
+        ShimmerBox(width: 80, height: 12),
+        SizedBox(height: 8),
+        ShimmerBox(width: double.infinity, height: 16),
+        SizedBox(height: 6),
+        ShimmerBox(width: 160, height: 12),
+        SizedBox(height: 28),
+        ShimmerBox(width: double.infinity, height: 14),
+        SizedBox(height: 8),
+        ShimmerBox(width: double.infinity, height: 14),
+        SizedBox(height: 8),
+        ShimmerBox(width: 220, height: 14),
+      ],
     );
   }
 }
@@ -83,14 +150,18 @@ class AdminQueueNavRow extends StatelessWidget {
   const AdminQueueNavRow({
     super.key,
     required this.label,
-    required this.count,
+    required this.detail,
+    required this.loading,
+    required this.needsAttention,
     required this.icon,
     required this.onTap,
     required this.semanticLabel,
   });
 
   final String label;
-  final int? count;
+  final String detail;
+  final bool loading;
+  final bool needsAttention;
   final IconData icon;
   final VoidCallback onTap;
   final String semanticLabel;
@@ -102,31 +173,41 @@ class AdminQueueNavRow extends StatelessWidget {
       label: semanticLabel,
       child: InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          child: Row(
-            children: [
-              Icon(icon, size: 22, color: AppColors.textSecondary),
-              const SizedBox(width: 12),
-              Expanded(child: Text(label, style: AppTypography.subheading)),
-              if (count == null)
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              else
-                Text(
-                  '$count',
-                  style: AppTypography.subheading.copyWith(
-                    color: count! > 0
-                        ? AppColors.textPrimary
-                        : AppColors.textHint,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 64),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Icon(icon, size: 20, color: AppColors.textSecondary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: AppTypography.subheading),
+                      const SizedBox(height: 2),
+                      if (loading)
+                        const ShimmerBox(width: 128, height: 12)
+                      else
+                        Text(
+                          detail,
+                          style: AppTypography.body.copyWith(
+                            color: needsAttention
+                                ? AppColors.textPrimary
+                                : AppColors.textHint,
+                            fontWeight: needsAttention
+                                ? FontWeight.w500
+                                : FontWeight.w400,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-              const SizedBox(width: 4),
-              const Icon(Icons.chevron_right, color: AppColors.textHint),
-            ],
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right, color: AppColors.textHint),
+              ],
+            ),
           ),
         ),
       ),
@@ -156,45 +237,50 @@ class AdminQueueItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: Text(title, style: AppTypography.subheading)),
-                const SizedBox(width: 8),
-                AdminStatusChip(status: status, label: statusLabel),
-              ],
-            ),
-            for (final line in lines.where(
-              (item) => item.trim().isNotEmpty,
-            )) ...[
-              const SizedBox(height: 4),
-              Text(
-                line,
-                style: AppTypography.body.copyWith(
-                  color: AppColors.textSecondary,
+    final visibleLines = lines.where((item) => item.trim().isNotEmpty);
+    return Semantics(
+      button: true,
+      label: '$title, $statusLabel. $actionLabel',
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: AppTypography.subheading),
+              for (final line in visibleLines) ...[
+                const SizedBox(height: 4),
+                Text(
+                  line,
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
+              ],
+              if (meta.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(meta, style: AppTypography.caption),
+              ],
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  AdminStatusChip(status: status, label: statusLabel),
+                  Text(
+                    actionLabel,
+                    style: AppTypography.label.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ),
             ],
-            if (meta.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(meta, style: AppTypography.caption),
-            ],
-            const SizedBox(height: 8),
-            Text(
-              actionLabel,
-              style: AppTypography.label.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -209,9 +295,9 @@ class AdminSectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      label.toUpperCase(),
+      label,
       style: AppTypography.label.copyWith(
-        letterSpacing: 0.6,
+        color: AppColors.textSecondary,
         fontWeight: FontWeight.w600,
       ),
     );
@@ -231,7 +317,7 @@ class AdminDetailBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.only(bottom: 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -252,6 +338,7 @@ class AdminPersonBlock extends StatelessWidget {
     required this.handle,
     this.role,
     this.shopName,
+    this.embedded = false,
   });
 
   final String label;
@@ -259,24 +346,34 @@ class AdminPersonBlock extends StatelessWidget {
   final String handle;
   final String? role;
   final String? shopName;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
-    return AdminDetailBlock(
-      label: label,
+    final trimmedHandle = handle.trim();
+    final showHandle = trimmedHandle.isNotEmpty && trimmedHandle != name.trim();
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(label, style: AppTypography.caption),
+        const SizedBox(height: 4),
         Text(name, style: AppTypography.subheading),
-        if (handle.isNotEmpty)
+        if (showHandle) ...[
+          const SizedBox(height: 2),
           Text(
-            handle,
+            trimmedHandle,
             style: AppTypography.body.copyWith(color: AppColors.textSecondary),
           ),
-        if (role != null && role!.isNotEmpty)
-          Text(role!, style: AppTypography.caption),
+        ],
+        if (role != null && role!.trim().isNotEmpty && role!.trim() != label)
+          Text(role!.trim(), style: AppTypography.caption),
         if (shopName != null && shopName!.trim().isNotEmpty)
           Text(shopName!.trim(), style: AppTypography.caption),
       ],
     );
+
+    if (embedded) return content;
+    return Padding(padding: const EdgeInsets.only(bottom: 28), child: content);
   }
 }
 
@@ -292,22 +389,66 @@ class AdminFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SegmentedButton<AdminQueueFilter>(
-      segments: [
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      children: [
         for (final filter in AdminQueueFilter.values)
-          ButtonSegment(
-            value: filter,
-            label: Text(adminQueueFilterLabel(filter)),
+          _FilterChoice(
+            label: adminQueueFilterLabel(filter),
+            selected: filter == value,
+            onTap: () => onChanged(filter),
           ),
       ],
-      selected: {value},
-      onSelectionChanged: (next) {
-        if (next.isNotEmpty) onChanged(next.first);
-      },
-      showSelectedIcon: false,
-      style: ButtonStyle(
-        visualDensity: VisualDensity.compact,
-        tapTargetSize: MaterialTapTargetSize.padded,
+    );
+  }
+}
+
+class _FilterChoice extends StatelessWidget {
+  const _FilterChoice({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: selected ? AppColors.primary : Colors.transparent,
+                    width: 2,
+                  ),
+                ),
+              ),
+              child: Text(
+                label,
+                style: AppTypography.body.copyWith(
+                  color: selected
+                      ? AppColors.textPrimary
+                      : AppColors.textSecondary,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -322,47 +463,93 @@ class AdminEvidenceGallery extends StatelessWidget {
   Widget build(BuildContext context) {
     if (urls.isEmpty) {
       return Text(
-        'No evidence files were attached.',
+        'No evidence was attached.',
         style: AppTypography.body.copyWith(color: AppColors.textSecondary),
       );
     }
 
     return Wrap(
-      spacing: 10,
-      runSpacing: 10,
+      spacing: 12,
+      runSpacing: 12,
       children: [
-        for (final url in urls)
-          Semantics(
-            button: true,
-            label: 'Open evidence photo',
-            child: GestureDetector(
-              onTap: () => showAdminImagePreview(context, url),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: CachedNetworkImage(
-                  imageUrl: url,
-                  width: 88,
-                  height: 88,
-                  fit: BoxFit.cover,
-                  placeholder: (_, _) => Container(
-                    width: 88,
-                    height: 88,
-                    color: AppColors.surfaceVariant,
-                  ),
-                  errorWidget: (_, _, _) => Container(
-                    width: 88,
-                    height: 88,
-                    color: AppColors.surfaceVariant,
-                    child: const Icon(
-                      Icons.image_outlined,
-                      color: AppColors.textHint,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+        for (var i = 0; i < urls.length; i++)
+          AdminPhotoThumb(
+            label: urls.length == 1 ? 'Photo' : 'Photo ${i + 1}',
+            url: urls[i],
+            semanticLabel: 'Open evidence photo ${i + 1}',
           ),
       ],
+    );
+  }
+}
+
+class AdminPhotoThumb extends StatelessWidget {
+  const AdminPhotoThumb({
+    super.key,
+    required this.label,
+    required this.url,
+    this.semanticLabel,
+  });
+
+  final String label;
+  final String? url;
+  final String? semanticLabel;
+
+  static const double width = 104;
+  static const double height = 132;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolved = url?.trim() ?? '';
+    final canOpen = resolved.isNotEmpty;
+    return Semantics(
+      button: canOpen,
+      label: semanticLabel ?? 'Open $label',
+      child: GestureDetector(
+        onTap: canOpen ? () => showAdminImagePreview(context, resolved) : null,
+        child: SizedBox(
+          width: width,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: canOpen
+                    ? CachedNetworkImage(
+                        imageUrl: resolved,
+                        width: width,
+                        height: height,
+                        fit: BoxFit.cover,
+                        placeholder: (_, _) => const _PhotoPlaceholder(),
+                        errorWidget: (_, _, _) => const _PhotoPlaceholder(
+                          icon: Icons.broken_image_outlined,
+                        ),
+                      )
+                    : const _PhotoPlaceholder(),
+              ),
+              const SizedBox(height: 4),
+              Text(label, style: AppTypography.caption),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PhotoPlaceholder extends StatelessWidget {
+  const _PhotoPlaceholder({this.icon = Icons.image_outlined});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: AdminPhotoThumb.width,
+      height: AdminPhotoThumb.height,
+      color: AppColors.surfaceVariant,
+      alignment: Alignment.center,
+      child: Icon(icon, color: AppColors.textHint, size: 22),
     );
   }
 }
@@ -377,7 +564,25 @@ Future<void> showAdminImagePreview(BuildContext context, String url) {
         child: Stack(
           children: [
             InteractiveViewer(
-              child: CachedNetworkImage(imageUrl: url, fit: BoxFit.contain),
+              child: CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.contain,
+                placeholder: (_, _) => const SizedBox(
+                  height: 240,
+                  child: Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
+                ),
+                errorWidget: (_, _, _) => const SizedBox(
+                  height: 240,
+                  child: Center(
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
             ),
             Positioned(
               top: 4,
@@ -396,6 +601,98 @@ Future<void> showAdminImagePreview(BuildContext context, String url) {
   );
 }
 
+class AdminDecisionSection extends StatelessWidget {
+  const AdminDecisionSection({
+    super.key,
+    required this.title,
+    required this.children,
+  });
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(top: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: AppTypography.subheading),
+              const SizedBox(height: 12),
+              ...children,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class AdminChoiceRow extends StatelessWidget {
+  const AdminChoiceRow({
+    super.key,
+    required this.label,
+    required this.hint,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final String hint;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  selected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                  size: 22,
+                  color: selected ? AppColors.primary : AppColors.textHint,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: AppTypography.subheading),
+                      if (hint.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(hint, style: AppTypography.caption),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class AdminDecisionOption extends StatelessWidget {
   const AdminDecisionOption({
     super.key,
@@ -410,44 +707,11 @@ class AdminDecisionOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = value == groupValue;
-    return Semantics(
-      button: true,
-      selected: selected,
+    return AdminChoiceRow(
       label: reportDecisionLabel(value),
-      child: InkWell(
-        onTap: () => onChanged(value),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                size: 22,
-                color: selected ? AppColors.primary : AppColors.textHint,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      reportDecisionLabel(value),
-                      style: AppTypography.subheading,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      reportDecisionHint(value),
-                      style: AppTypography.caption,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      hint: reportDecisionHint(value),
+      selected: value == groupValue,
+      onTap: () => onChanged(value),
     );
   }
 }

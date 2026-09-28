@@ -156,24 +156,27 @@ class _BuyerSearchTabState extends State<BuyerSearchTab> {
                     )
                   : RefreshIndicator(
                       onRefresh: _search,
-                      child: GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 12,
-                              crossAxisSpacing: 12,
-                              childAspectRatio: 0.65,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final textScale = MediaQuery.textScalerOf(
+                            context,
+                          ).scale(1);
+                          return GridView.builder(
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate: ProductCard.gridDelegateFor(
+                              maxWidth: constraints.maxWidth,
+                              compact: true,
+                              textScale: textScale,
                             ),
-                        itemCount: results.length,
-                        itemBuilder: (_, i) => ProductCard(
-                          product: results[i],
-                          onTap: () =>
-                              context.push('/product/${results[i].id}'),
-                          onSellerTap: () => context.push(
-                            '/seller-profile/${results[i].sellerUsername}',
-                          ),
-                        ),
+                            itemCount: results.length,
+                            itemBuilder: (_, i) => ProductCard(
+                              product: results[i],
+                              compact: true,
+                              onTap: () =>
+                                  context.push('/product/${results[i].id}'),
+                            ),
+                          );
+                        },
                       ),
                     ),
             ),

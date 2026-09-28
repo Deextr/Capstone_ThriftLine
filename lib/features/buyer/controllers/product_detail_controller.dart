@@ -108,6 +108,44 @@ class ProductDetailController extends ChangeNotifier {
     return end.isAfter(DateTime.now());
   }
 
+  bool get isOwnListing {
+    final uid = _auth.user?.id;
+    final sellerId = _product?.sellerId;
+    return uid != null && sellerId != null && uid == sellerId;
+  }
+
+  String? get auctionId => _auction?['auction_id'] as String?;
+
+  /// Seller may close only while bidding is still open and someone has bid.
+  bool get canEndAuctionEarly =>
+      isOwnListing && isAuctionActive && bidCount > 0;
+
+  Future<String?> endAuctionEarly() async {
+    final id = auctionId;
+    if (id == null || id.isEmpty) return 'Auction not found.';
+    if (!canEndAuctionEarly) {
+      return 'End the auction early only after someone has bid.';
+    }
+    try {
+      final result = await _supabase.client.rpc(
+        'end_auction_early',
+        params: {'p_auction_id': id},
+      );
+      if (!supabaseRpcSuccess(result)) {
+        return supabaseRpcError(
+          result,
+          fallback: 'Could not end this auction.',
+        );
+      }
+      await _loadAuctionData();
+      notifyListeners();
+      return null;
+    } catch (e) {
+      debugPrint('ProductDetailController.endAuctionEarly: $e');
+      return 'Could not end this auction.';
+    }
+  }
+
   bool get isViewerLeading {
     final uid = _auth.user?.id;
     if (uid == null || !isAuction) return false;

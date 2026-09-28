@@ -115,7 +115,7 @@ class ThriftButton extends StatelessWidget {
       : Colors.white;
 }
 
-class ThriftTextField extends StatelessWidget {
+class ThriftTextField extends StatefulWidget {
   const ThriftTextField({
     super.key,
     this.label,
@@ -156,45 +156,60 @@ class ThriftTextField extends StatelessWidget {
   final Color? labelColor;
 
   @override
+  State<ThriftTextField> createState() => _ThriftTextFieldState();
+}
+
+class _ThriftTextFieldState extends State<ThriftTextField> {
+  late final FocusNode _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (label != null) ...[
+        if (widget.label != null) ...[
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                label!,
+                widget.label!,
                 style: AppTypography.label.copyWith(
-                  color: labelColor ?? AppColors.textPrimary,
+                  color: widget.labelColor ?? AppColors.textPrimary,
                 ),
               ),
-              ?labelSuffix,
+              ?widget.labelSuffix,
             ],
           ),
           const SizedBox(height: AppConstants.spacingXs),
         ],
         TextFormField(
-          controller: controller,
-          obscureText: obscureText,
-          onChanged: onChanged,
-          keyboardType: keyboardType,
-          inputFormatters: inputFormatters,
-          maxLines: maxLines,
-          onTap: onTap,
-          readOnly: readOnly,
-          autofocus: autofocus,
-          validator: validator,
-          autovalidateMode: validator != null
+          focusNode: _focusNode,
+          controller: widget.controller,
+          obscureText: widget.obscureText,
+          onChanged: widget.onChanged,
+          keyboardType: widget.keyboardType,
+          inputFormatters: widget.inputFormatters,
+          maxLines: widget.maxLines,
+          onTap: widget.onTap,
+          readOnly: widget.readOnly,
+          autofocus: widget.autofocus,
+          validator: widget.validator,
+          scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+          autovalidateMode: widget.validator != null
               ? AutovalidateMode.onUserInteraction
               : AutovalidateMode.disabled,
           decoration: InputDecoration(
-            hintText: hint,
-            prefixIcon: icon != null
-                ? Icon(icon, color: AppColors.textHint, size: 20)
+            hintText: widget.hint,
+            prefixIcon: widget.icon != null
+                ? Icon(widget.icon, color: AppColors.textHint, size: 20)
                 : null,
-            suffixIcon: suffix,
+            suffixIcon: widget.suffix,
             filled: true,
             fillColor: AppColors.surface,
             contentPadding: const EdgeInsets.symmetric(
@@ -213,7 +228,7 @@ class ThriftTextField extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: AppColors.primary, width: 2),
             ),
-            errorText: error,
+            errorText: widget.error,
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: AppColors.error),
