@@ -15,7 +15,9 @@ import '../../data/address_service.dart';
 import '../../data/buyer_address_validation.dart';
 
 class AddressBookScreen extends StatefulWidget {
-  const AddressBookScreen({super.key});
+  const AddressBookScreen({super.key, this.currentAddressId});
+
+  final String? currentAddressId;
 
   @override
   State<AddressBookScreen> createState() => _AddressBookScreenState();
@@ -25,6 +27,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   late final AddressService _service;
   List<AddressModel> _addresses = const [];
   bool _loading = true;
+  String? _settingDefaultId;
 
   @override
   void initState() {
@@ -61,6 +64,30 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
     await _load();
   }
 
+  Future<void> _useAddress(AddressModel address) async {
+    if (widget.currentAddressId != null) {
+      context.pop(address);
+      return;
+    }
+    if (address.isDefault) return;
+
+    setState(() => _settingDefaultId = address.id);
+    try {
+      await _service.setDefault(address.id);
+      await _load();
+    } catch (_) {
+      if (mounted) {
+        showThriftSnackBar(
+          context,
+          'Could not set that address as your checkout address.',
+          isError: true,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _settingDefaultId = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -88,25 +115,37 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                 separatorBuilder: (_, _) => const SizedBox(height: 12),
                 itemBuilder: (_, i) {
                   final address = _addresses[i];
+                  final settingDefault = _settingDefaultId == address.id;
+                  final isInUse = widget.currentAddressId != null
+                      ? address.id == widget.currentAddressId
+                      : address.isDefault;
                   return ThriftCard(
-                    onTap: () => context.pop(address),
+                    onTap: settingDefault ? null : () => _useAddress(address),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
+                            if (isInUse) ...[
+                              const Icon(
+                                Icons.check_circle,
+                                size: 16,
+                                color: AppColors.success,
+                              ),
+                              const SizedBox(width: 6),
+                            ],
                             Expanded(
                               child: Text(
                                 address.recipientName,
                                 style: AppTypography.subheading,
                               ),
                             ),
-                            if (address.isDefault)
-                              Text(
-                                'Default',
-                                style: AppTypography.caption.copyWith(
-                                  color: AppColors.primary,
-                                ),
+                            if (isInUse)
+                              ThriftBadge(
+                                label: widget.currentAddressId != null
+                                    ? 'In use for this checkout'
+                                    : 'Used by default at checkout',
+                                variant: BadgeVariant.success,
                               ),
                           ],
                         ),
@@ -122,9 +161,22 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                         Row(
                           children: [
                             TextButton.icon(
-                              onPressed: () => context.pop(address),
-                              icon: const Icon(Icons.check_circle_outline, size: 16),
-                              label: const Text('Use this address'),
+                              onPressed: settingDefault
+                                  ? null
+                                  : () => _useAddress(address),
+                              icon: const Icon(
+                                Icons.check_circle_outline,
+                                size: 16,
+                              ),
+                              label: settingDefault
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text('Use this address'),
                             ),
                             const Spacer(),
                             TextButton(

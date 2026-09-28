@@ -196,7 +196,10 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
   }
 
   Future<void> _changeAddress(BuyerOrdersController controller) async {
-    final result = await context.push<dynamic>(RouteNames.addresses);
+    final result = await context.push<dynamic>(
+      RouteNames.addresses,
+      extra: controller.order?.addressId,
+    );
     if (!mounted) return;
 
     String? newAddressId;
@@ -230,7 +233,10 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
     if (error != null) {
       showThriftSnackBar(context, error, isError: true);
     } else {
-      showThriftSnackBar(context, 'Checkout cancelled. Items returned to your cart.');
+      showThriftSnackBar(
+        context,
+        'Checkout cancelled. Items returned to your cart.',
+      );
     }
     context.go(isAuction ? RouteNames.buyerHome : RouteNames.checkout);
   }
@@ -256,9 +262,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
         context.go(isAuction ? RouteNames.buyerHome : RouteNames.checkout);
         return;
       }
-      unawaited(
-        controller.handlePaymongoAppReturn(cancelled: false),
-      );
+      unawaited(controller.handlePaymongoAppReturn(cancelled: false));
     });
   }
 
@@ -347,7 +351,9 @@ class _PendingPaymentBody extends StatelessWidget {
                       _PaymentRow(label: 'Amount to Pay', value: totalLabel),
                       _PaymentRow(
                         label: 'Status',
-                        value: confirming ? 'Confirming payment…' : 'Payment required',
+                        value: confirming
+                            ? 'Confirming payment…'
+                            : 'Payment required',
                       ),
                     ],
                   ),
@@ -357,7 +363,9 @@ class _PendingPaymentBody extends StatelessWidget {
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 32),
                     child: Center(
-                      child: CircularProgressIndicator(color: AppColors.primary),
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
                     ),
                   )
                 else if (selectedChannel == null)
@@ -466,10 +474,7 @@ class _PaymentAddressCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 2),
-            Text(
-              addressText,
-              style: AppTypography.body.copyWith(fontSize: 13),
-            ),
+            Text(addressText, style: AppTypography.body.copyWith(fontSize: 13)),
           ] else ...[
             Text(
               'No delivery address specified. Please add an address to complete your order.',
