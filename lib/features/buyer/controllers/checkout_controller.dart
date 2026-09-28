@@ -1,11 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/stock_limits.dart';
-import '../../seller/data/davao_barangay_service.dart';
 import '../data/cart_shop_group.dart';
+import '../data/checkout_totals.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/address_model.dart';
 import '../../../models/order_model.dart';
@@ -21,11 +19,15 @@ class CheckoutController extends ChangeNotifier {
     required CartProvider cart,
     AddressService? addresses,
     this.buyNowProductId,
-    this.selectedProductIds = const [],
+    List<String> selectedProductIds = const [],
   }) : _supabase = supabase,
        _auth = auth,
        _cart = cart,
-       _addresses = addresses ?? AddressService(supabase) {
+       _addresses = addresses ?? AddressService(supabase),
+       _initialSelectedIds = selectedProductIds
+           .map((id) => id.trim())
+           .where((id) => id.isNotEmpty)
+           .toList() {
     _initSelection();
     load();
   }
@@ -35,7 +37,7 @@ class CheckoutController extends ChangeNotifier {
   final CartProvider _cart;
   final AddressService _addresses;
   final String? buyNowProductId;
-  final List<String> selectedProductIds;
+  final List<String> _initialSelectedIds;
 
   List<AddressModel> _addressBook = [];
   AddressModel? _selectedAddress;
@@ -62,7 +64,6 @@ class CheckoutController extends ChangeNotifier {
     return id;
   }
 
-<<<<<<< HEAD
   /// All available fixed-price items in the cart (or scoped product if Buy Now).
   List<CartItem> get allCartItems {
     final id = scopedProductId;
@@ -74,6 +75,9 @@ class CheckoutController extends ChangeNotifier {
 
   /// Kept for compatibility — returns all cart items available for checkout.
   List<CartItem> get checkoutItems => allCartItems;
+
+  List<CartShopGroup> get checkoutShops =>
+      groupCartItemsByShop(selectedItems);
 
   /// Cart items grouped by seller ID.
   Map<String, List<CartItem>> get itemsBySeller {
@@ -192,6 +196,12 @@ class CheckoutController extends ChangeNotifier {
     final availableIds = allCartItems.map((i) => i.product.id).toSet();
     _selectedProductIds.removeWhere((id) => !availableIds.contains(id));
 
+    if (_selectedProductIds.isEmpty && _initialSelectedIds.isNotEmpty) {
+      for (final id in _initialSelectedIds) {
+        if (availableIds.contains(id)) _selectedProductIds.add(id);
+      }
+    }
+
     // If nothing currently selected and cart has items:
     if (_selectedProductIds.isEmpty && allCartItems.isNotEmpty) {
       final firstSeller = firstCheckoutSellerId(
@@ -207,33 +217,13 @@ class CheckoutController extends ChangeNotifier {
         _selectedProductIds.add(allCartItems.first.product.id);
       }
     }
-=======
-  List<String> get checkoutProductIds {
-    final single = scopedProductId;
-    if (single != null) return [single];
-    return selectedProductIds
-        .map((id) => id.trim())
-        .where((id) => id.isNotEmpty)
-        .toList();
   }
-
-  List<CartItem> get checkoutItems {
-    final ids = checkoutProductIds;
-    if (ids.isEmpty) return _cart.fixedPriceItems;
-    return _cart.fixedPriceItems
-        .where((item) => ids.contains(item.product.id))
-        .toList();
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
-  }
-
-  List<CartShopGroup> get checkoutShops => groupCartItemsByShop(checkoutItems);
 
   Future<void> load() async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
     try {
-      unawaited(DavaoBarangayService.prefetch());
       await syncMyUnpaidCheckouts(_supabase);
       await _cart.refresh();
       await _loadAwaitingPayment();
@@ -269,6 +259,11 @@ class CheckoutController extends ChangeNotifier {
     }
   }
 
+  void selectAddress(AddressModel address) {
+    _selectedAddress = address;
+    notifyListeners();
+  }
+
   Future<void> reloadAddresses() async {
     try {
       _addressBook = await _addresses.listMine();
@@ -283,11 +278,6 @@ class CheckoutController extends ChangeNotifier {
       debugPrint('CheckoutController.reloadAddresses error: $e');
       _errorMessage = 'Could not load your delivery addresses.';
     }
-    notifyListeners();
-  }
-
-  void selectAddress(AddressModel address) {
-    _selectedAddress = address;
     notifyListeners();
   }
 
@@ -367,8 +357,7 @@ class CheckoutController extends ChangeNotifier {
       );
     }
 
-    final items = selectedItems;
-    if (items.isEmpty) {
+    if (selectedItems.isEmpty) {
       const error = 'Please check at least one item to check out.';
       _errorMessage = error;
       return (orderId: null, count: 0, error: error);
@@ -408,17 +397,12 @@ class CheckoutController extends ChangeNotifier {
       }
 
       final params = <String, dynamic>{'p_address_id': address.id};
-<<<<<<< HEAD
-      if (currentSelected.length == 1) {
-        params['p_product_id'] = currentSelected.first.product.id;
-=======
-      final ids = items.map((item) => item.product.id).toList();
-      final multiShop = checkoutShops.length > 1;
+      final ids = currentSelected.map((item) => item.product.id).toList();
+      final multiShop = groupCartItemsByShop(currentSelected).length > 1;
       if (ids.length > 1 || multiShop) {
         params['p_product_ids'] = ids;
       } else if (ids.length == 1) {
         params['p_product_id'] = ids.first;
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
       }
       final rpcName = (ids.length > 1 || multiShop)
           ? 'checkout_selected_cart'

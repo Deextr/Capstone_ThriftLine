@@ -12,6 +12,7 @@ import '../../../../providers/data_provider.dart';
 import '../../../../providers/saved_items_provider.dart';
 import '../../buyer/controllers/buyer_orders_controller.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../auth/presentation/widgets/auth_widgets.dart';
 import '../presentation/widgets/switch_account_sheet.dart';
 import '../presentation/widgets/switchable_avatar.dart';
 
@@ -258,10 +259,7 @@ class BuyerProfileTab extends StatelessWidget {
               label: 'Logout',
               variant: ThriftButtonVariant.ghost,
               color: AppColors.error,
-              onPressed: () async {
-                await auth.logout();
-                if (context.mounted) context.go(RouteNames.login);
-              },
+              onPressed: () => confirmAndLogout(context),
             ),
           ),
           const SizedBox(height: 32),

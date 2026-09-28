@@ -19,3 +19,9 @@ verify_jwt = false
 
 [functions.resolve-delivery-payment]
 verify_jwt = true
+
+[functions.check-trusted-device]
+verify_jwt = true
+
+[functions.revoke-trusted-device]
+verify_jwt = true

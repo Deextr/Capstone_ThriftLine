@@ -979,33 +979,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton.icon(
-<<<<<<< HEAD
-              onPressed: () async {
-                if (product.maxPurchasableQuantity <= 0) {
-                  showThriftSnackBar(
-                    context,
-                    '${product.title} is no longer available.',
-                    isError: true,
-                  );
-                  return;
-                }
-                if (!inCart) {
-                  await cart.addToCart(product);
-                  if (!context.mounted) return;
-                  showThriftSnackBar(context, 'Added to cart!');
-                }
-                if (!context.mounted) return;
-                context.push('${RouteNames.checkout}?product=${product.id}');
-              },
-              icon: Icon(
-                inCart
-                    ? Icons.shopping_bag_rounded
-                    : Icons.shopping_bag_outlined,
-=======
               onPressed: () => _buyNow(context, cart, product),
               icon: const Icon(
                 Icons.shopping_bag_outlined,
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
                 color: Colors.white,
                 size: 20,
               ),

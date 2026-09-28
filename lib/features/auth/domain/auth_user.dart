@@ -23,6 +23,7 @@ class AuthUser {
     this.verificationRejectionReason,
     this.trustScore = 80,
     this.isPhoneVerified = false,
+    this.usesEmailPasswordAuth = false,
   });
 
   final String id;
@@ -44,6 +45,12 @@ class AuthUser {
   final String? verificationRejectionReason;
   final int trustScore;
   final bool isPhoneVerified;
+
+  /// True when this account has an email/password identity.
+  ///
+  /// Google-only accounts skip email OTP, so trusted-device logout copy
+  /// does not apply to them. A Gmail address with a password still counts.
+  final bool usesEmailPasswordAuth;
 
   String get displayName => role == UserRole.seller ? (shopName ?? name) : name;
   bool get isBuyer => role == UserRole.buyer;
@@ -125,6 +132,8 @@ class AuthUser {
       verificationRejectionReason: verification?['rejection_reason'] as String?,
       trustScore: (profile?['trust_score'] as num?)?.toInt() ?? 80,
       isPhoneVerified: profile?['is_phone_verified'] as bool? ?? false,
+      usesEmailPasswordAuth:
+          supabaseUser.identities?.any((i) => i.provider == 'email') ?? false,
     );
   }
 
@@ -148,6 +157,7 @@ class AuthUser {
     String? verificationRejectionReason,
     int? trustScore,
     bool? isPhoneVerified,
+    bool? usesEmailPasswordAuth,
   }) {
     return AuthUser(
       id: id ?? this.id,
@@ -170,6 +180,8 @@ class AuthUser {
           verificationRejectionReason ?? this.verificationRejectionReason,
       trustScore: trustScore ?? this.trustScore,
       isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
+      usesEmailPasswordAuth:
+          usesEmailPasswordAuth ?? this.usesEmailPasswordAuth,
     );
   }
 }

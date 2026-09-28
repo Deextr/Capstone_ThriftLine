@@ -11,10 +11,6 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../providers/cart_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/checkout_controller.dart';
-<<<<<<< HEAD
-=======
-import '../../data/cart_shop_group.dart';
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
 import '../widgets/awaiting_payment_tile.dart';
 
 class CheckoutScreen extends StatelessWidget {
@@ -24,12 +20,7 @@ class CheckoutScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     context.watch<CartProvider>();
     final checkout = context.watch<CheckoutController>();
-<<<<<<< HEAD
     final allItems = checkout.allCartItems;
-=======
-    final items = checkout.checkoutItems;
-    final shops = checkout.checkoutShops;
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
     final awaiting = checkout.awaitingPayment;
     final itemsBySeller = checkout.itemsBySeller;
 
@@ -75,7 +66,6 @@ class CheckoutScreen extends StatelessWidget {
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-<<<<<<< HEAD
                     children: [
                       for (final entry in itemsBySeller.entries) ...[
                         _SellerGroupHeader(
@@ -92,86 +82,18 @@ class CheckoutScreen extends StatelessWidget {
                           ),
                       ],
                     ],
-=======
-                    itemCount: shops.length,
-                    itemBuilder: (context, index) {
-                      return _CheckoutShopCard(
-                        shop: shops[index],
-                        isLast: index == shops.length - 1,
-                      );
-                    },
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
                   ),
                 ),
               ],
             ),
       bottomNavigationBar: allItems.isEmpty
           ? null
-<<<<<<< HEAD
           : const _CheckoutBottomBar(),
-=======
-          : _CheckoutBottomBar(shops: shops),
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
     );
   }
 }
 
-<<<<<<< HEAD
 // ═════════════════════════════════════════════════════════════════════════════
-=======
-class _CheckoutAddressCard extends StatelessWidget {
-  const _CheckoutAddressCard({required this.checkout});
-
-  final CheckoutController checkout;
-
-  @override
-  Widget build(BuildContext context) {
-    final address = checkout.selectedAddress;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.location_on_outlined, color: AppColors.primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Delivery address', style: AppTypography.subheading),
-                  const SizedBox(height: 4),
-                  Text(
-                    address == null
-                        ? 'Add a delivery address to place this order.'
-                        : '${address.recipientName}\n${address.formatted}',
-                    style: AppTypography.caption,
-                  ),
-                ],
-              ),
-            ),
-            TextButton(
-              onPressed: () async {
-                await context.push(RouteNames.addresses);
-                if (context.mounted) await checkout.reloadAddresses();
-              },
-              child: Text(address == null ? 'Add' : 'Change'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
 // Empty State
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -250,21 +172,16 @@ class _EmptyCartState extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Nothing to check out',
+            'Your cart is empty',
             style: AppTypography.subheading.copyWith(
               color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            'Choose items in your cart\nto continue',
+            'Add items from the shop\nto start checkout',
             style: AppTypography.caption,
             textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () => context.go(RouteNames.cart),
-            child: const Text('Go to cart'),
           ),
         ],
       ),
@@ -580,7 +497,6 @@ class _SellerGroupHeader extends StatelessWidget {
 // Cart Item Card
 // ═════════════════════════════════════════════════════════════════════════════
 
-<<<<<<< HEAD
 class _CartItemCard extends StatelessWidget {
   const _CartItemCard({
     required this.item,
@@ -592,23 +508,19 @@ class _CartItemCard extends StatelessWidget {
   final CartItem item;
   final bool isSelected;
   final VoidCallback onToggleSelect;
-=======
-class _CheckoutShopCard extends StatelessWidget {
-  const _CheckoutShopCard({required this.shop, this.isLast = false});
-
-  final CartShopGroup shop;
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
   final bool isLast;
 
   @override
   Widget build(BuildContext context) {
+    final product = item.product;
+    final cart = context.read<CartProvider>();
+
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
-<<<<<<< HEAD
           border: Border.all(
             color: isSelected
                 ? AppColors.primary.withValues(alpha: 0.5)
@@ -624,22 +536,15 @@ class _CheckoutShopCard extends StatelessWidget {
               offset: const Offset(0, 3),
             ),
           ],
-=======
-          border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-<<<<<<< HEAD
             // Details row with checkbox
-=======
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+              padding: const EdgeInsets.all(14),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-<<<<<<< HEAD
                   Padding(
                     padding: const EdgeInsets.only(top: 34),
                     child: _SelectionCircle(
@@ -679,16 +584,11 @@ class _CheckoutShopCard extends StatelessWidget {
                         ),
                       ),
                     ),
-=======
-                  const Icon(
-                    Icons.storefront_outlined,
-                    size: 18,
-                    color: AppColors.primary,
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 14),
+
+                  // Product info
                   Expanded(
-<<<<<<< HEAD
                     child: GestureDetector(
                       onTap: onToggleSelect,
                       behavior: HitTestBehavior.opaque,
@@ -741,39 +641,37 @@ class _CheckoutShopCard extends StatelessWidget {
                           ),
                         ],
                       ),
-=======
-                    child: Text(
-                      shop.shopName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.subheading.copyWith(fontSize: 15),
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
                     ),
                   ),
-                  if (shop.sellerVerified)
-                    const Icon(
-                      Icons.verified_rounded,
-                      size: 16,
-                      color: AppColors.primary,
+
+                  // Remove button
+                  GestureDetector(
+                    onTap: () => cart.removeFromCart(product.id),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        size: 16,
+                        color: AppColors.error,
+                      ),
                     ),
+                  ),
                 ],
               ),
             ),
-<<<<<<< HEAD
 
             const Divider(height: 1, indent: 14, endIndent: 14),
 
             // Price + Quantity controls
-=======
-            const Divider(height: 1),
-            for (final item in shop.items) _CheckoutLine(item: item),
-            const Divider(height: 1),
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-              child: Column(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
                 children: [
-<<<<<<< HEAD
                   Text(
                     formatCurrency(product.price),
                     style: AppTypography.subheading.copyWith(
@@ -845,27 +743,6 @@ class _CheckoutShopCard extends StatelessWidget {
                         ),
                       ],
                     ),
-=======
-                  _SummaryRow(
-                    label: 'Items (${shop.quantity})',
-                    value: formatCurrency(shop.subtotal),
-                  ),
-                  const SizedBox(height: 4),
-                  _SummaryRow(
-                    label: 'Shipping',
-                    value: formatCurrency(shop.shippingFee),
-                  ),
-                  const SizedBox(height: 4),
-                  _SummaryRow(
-                    label: 'Platform fee (2%)',
-                    value: formatCurrency(shop.platformFee),
-                  ),
-                  const SizedBox(height: 8),
-                  _SummaryRow(
-                    label: 'Shop total',
-                    value: formatCurrency(shop.total),
-                    bold: true,
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
                   ),
                 ],
               ),
@@ -877,92 +754,16 @@ class _CheckoutShopCard extends StatelessWidget {
   }
 }
 
-<<<<<<< HEAD
 // ═════════════════════════════════════════════════════════════════════════════
-=======
-class _CheckoutLine extends StatelessWidget {
-  const _CheckoutLine({required this.item});
-
-  final CartItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final product = item.product;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: CachedNetworkImage(
-              imageUrl: product.imageUrl,
-              width: 72,
-              height: 72,
-              fit: BoxFit.cover,
-              errorWidget: (_, _, _) => Container(
-                width: 72,
-                height: 72,
-                color: AppColors.surfaceVariant,
-                child: const Icon(
-                  Icons.image_outlined,
-                  color: AppColors.textHint,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${formatCurrency(product.price)}  x ${item.quantity}',
-                  style: AppTypography.caption,
-                ),
-              ],
-            ),
-          ),
-          Text(
-            formatCurrency(item.subtotal),
-            style: AppTypography.subheading.copyWith(
-              color: AppColors.primary,
-              fontSize: 15,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
 // Bottom Checkout Bar
 // ═════════════════════════════════════════════════════════════════════════════
 
 class _CheckoutBottomBar extends StatelessWidget {
-<<<<<<< HEAD
   const _CheckoutBottomBar();
-=======
-  const _CheckoutBottomBar({required this.shops});
-  final List<CartShopGroup> shops;
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
 
   @override
   Widget build(BuildContext context) {
     final checkout = context.watch<CheckoutController>();
-<<<<<<< HEAD
     final subtotal = checkout.subtotal;
     final shipping = checkout.shippingFee;
     final platform = checkout.platformFee;
@@ -970,17 +771,6 @@ class _CheckoutBottomBar extends StatelessWidget {
     final hasSelection = checkout.selectedItems.isNotEmpty;
     final otherCount = checkout.remainingOtherSellerCount;
     final blocked = checkout.hasUnpaidCheckouts;
-=======
-    final itemCount = shops.fold<int>(
-      0,
-      (sum, shop) => sum + shop.items.length,
-    );
-    final subtotal = checkoutGroupsSubtotal(shops);
-    final shipping = checkoutGroupsShipping(shops);
-    final platform = checkoutGroupsPlatformFee(shops);
-    final total = checkoutGroupsTotal(shops);
-    final canSubmit = checkout.hasAddress && !checkout.isSubmitting;
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -1004,13 +794,7 @@ class _CheckoutBottomBar extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _SummaryRow(
-<<<<<<< HEAD
             label: 'Subtotal (${checkout.selectedCount} ${checkout.selectedCount == 1 ? 'item' : 'items'} selected)',
-=======
-            label: shops.length > 1
-                ? 'Subtotal ($itemCount items, ${shops.length} shops)'
-                : 'Subtotal ($itemCount items)',
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
             value: formatCurrency(subtotal),
           ),
           const SizedBox(height: 4),
@@ -1030,17 +814,12 @@ class _CheckoutBottomBar extends StatelessWidget {
           _SummaryRow(label: 'Total', value: formatCurrency(total), bold: true),
           const SizedBox(height: 8),
           Text(
-<<<<<<< HEAD
             blocked
                 ? 'Pay or cancel your existing checkout before starting a new one.'
                 : !hasSelection
                 ? 'Check the item(s) you want to pay for above.'
                 : otherCount > 0
                 ? 'Orders are paid per shop. Items from other shops remain in your cart.'
-=======
-            shops.length > 1
-                ? 'Each shop becomes its own order with its own shipping and escrow. You will pay the first shop now; remaining shops stay unpaid until you finish each payment.'
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
                 : 'Next you will choose Card or GCash and pay through PayMongo. The purchase completes only after payment is confirmed.',
             style: AppTypography.caption.copyWith(
               fontSize: 11,
@@ -1061,7 +840,6 @@ class _CheckoutBottomBar extends StatelessWidget {
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-<<<<<<< HEAD
               onPressed: blocked || !hasSelection || checkout.isSubmitting
                   ? null
                   : () async {
@@ -1081,10 +859,6 @@ class _CheckoutBottomBar extends StatelessWidget {
                       final leftover = context
                           .read<CheckoutController>()
                           .remainingOtherSellerCount;
-=======
-              onPressed: canSubmit
-                  ? () async {
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
                       final result = await context
                           .read<CheckoutController>()
                           .placeOrder();
@@ -1097,10 +871,10 @@ class _CheckoutBottomBar extends StatelessWidget {
                         );
                         return;
                       }
-                      if (result.count > 1) {
+                      if (leftover > 0) {
                         showThriftSnackBar(
                           context,
-                          'Pay this shop now. Other shop orders stay unpaid until you finish each payment.',
+                          'Pay this seller first. Items from other sellers are still in your cart.',
                         );
                       }
                       context.go(RouteNames.paymentForOrder(result.orderId!));
@@ -1157,6 +931,61 @@ class _CheckoutBottomBar extends StatelessWidget {
 // ═════════════════════════════════════════════════════════════════════════════
 // Helper Widgets
 // ═════════════════════════════════════════════════════════════════════════════
+
+class _DetailChip extends StatelessWidget {
+  const _DetailChip({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: AppColors.textSecondary),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: AppTypography.caption.copyWith(
+              fontSize: 10,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepperButton extends StatelessWidget {
+  const _StepperButton({required this.icon, this.onTap});
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+        child: Icon(
+          icon,
+          size: 16,
+          color: onTap != null ? AppColors.textPrimary : AppColors.textHint,
+        ),
+      ),
+    );
+  }
+}
 
 class _SummaryRow extends StatelessWidget {
   const _SummaryRow({

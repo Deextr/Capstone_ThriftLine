@@ -60,6 +60,14 @@ class SharedPreferencesService {
   Future<bool> setEmailOtpPending(bool value) =>
       _prefs.setBool(AppConstants.keyEmailOtpPending, value);
 
+  /// Pairs with the secure-storage device token. Not a credential.
+  /// Kept across logout so the same install can stay trusted.
+  String? get deviceTrustInstallId =>
+      _prefs.getString(AppConstants.keyDeviceTrustInstall);
+
+  Future<bool> setDeviceTrustInstallId(String value) =>
+      _prefs.setString(AppConstants.keyDeviceTrustInstall, value);
+
   /// Last Buyer/Seller workspace for [userId] on this device.
   ///
   /// Kept across logout so the same person returns to the mode they left.

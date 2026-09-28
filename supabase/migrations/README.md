@@ -56,6 +56,26 @@ Edge Functions live in `../functions/send-email-otp` and
 `GMAIL_APP_PASSWORD`, and `OTP_PEPPER`. Keep Auth "Confirm email" off so
 signup returns a session before the OTP screen. See `../../docs/agile/email-otp.md`.
 
+## Trusted devices (email OTP skip)
+
+| File | Purpose |
+| --- | --- |
+| `20260928150000_trusted_devices.sql` | Hashed install tokens, 7-day expiry from database `now()`, no client access |
+
+Apply this after the email OTP migration. Then deploy:
+
+```bash
+supabase functions deploy verify-email-otp
+supabase functions deploy check-trusted-device
+supabase functions deploy revoke-trusted-device
+```
+
+`verify-email-otp` imports `../functions/_shared/trusted_device.ts`, so deploy
+it with the CLI (a Dashboard paste of `index.ts` alone will not bundle the
+shared file). The same `OTP_PEPPER` secret is required. The raw device token
+never goes in the database. Normal logout keeps the grant; "Log out and forget
+this device" revokes it.
+
 ## One email → one account
 
 | File | Purpose |

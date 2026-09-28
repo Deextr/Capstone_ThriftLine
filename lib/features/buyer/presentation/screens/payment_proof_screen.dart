@@ -110,23 +110,18 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                 ? _FailedPaymentBody(
                     channel: _selectedChannel,
                     expired: controller.isExpiredPayment,
-<<<<<<< HEAD
                     onReturnToCart: () async {
                       await context.read<CartProvider>().refresh();
                       if (context.mounted) {
-                        context.go(RouteNames.checkout);
+                        context.go(RouteNames.cart);
                       }
                     },
                     onTryAgain: () async {
                       await context.read<CartProvider>().refresh();
                       if (context.mounted) {
-                        context.go(RouteNames.checkout);
+                        context.go(RouteNames.cart);
                       }
                     },
-=======
-                    onReturnToCart: () => context.go(RouteNames.cart),
-                    onTryAgain: () => context.go(RouteNames.cart),
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
                   )
                 : pending
                 ? _PendingPaymentBody(
@@ -320,7 +315,6 @@ class _PendingPaymentBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-<<<<<<< HEAD
         Expanded(
           child: SingleChildScrollView(
             child: Column(
@@ -360,8 +354,16 @@ class _PendingPaymentBody extends StatelessWidget {
                       _PaymentRow(label: 'Amount to Pay', value: totalLabel),
                       _PaymentRow(
                         label: 'Status',
-                        value: confirming ? 'Confirming payment…' : 'Payment required',
+                        value: confirming
+                            ? 'Confirming payment…'
+                            : windowOpen
+                            ? 'Unpaid'
+                            : 'Payment window ended',
                       ),
+                      if (paymentDueAt != null) ...[
+                        const SizedBox(height: 8),
+                        PaymentDeadlineText(due: paymentDueAt!),
+                      ],
                     ],
                   ),
                 ),
@@ -370,72 +372,15 @@ class _PendingPaymentBody extends StatelessWidget {
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 32),
                     child: Center(
-                      child: CircularProgressIndicator(color: AppColors.primary),
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
                     ),
                   )
                 else if (selectedChannel == null)
                   _MethodPicker(onSelect: onSelectChannel),
               ],
             ),
-=======
-        Text(
-          confirming
-              ? 'Confirming payment…'
-              : selectedChannel == null
-              ? 'Payment Method'
-              : paymongoChannelLabel(selectedChannel!),
-          style: AppTypography.heading,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          confirming
-              ? 'PayMongo is confirming this payment. ThriftLine will update only after the verified webhook arrives.'
-              : selectedChannel == null
-              ? 'Choose how you want to pay. Payment is required to complete this purchase.'
-              : 'Pay securely through PayMongo',
-          style: AppTypography.body,
-        ),
-        const SizedBox(height: 16),
-        ThriftCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(itemLabel, style: AppTypography.subheading),
-              Text('Seller: $sellerName', style: AppTypography.caption),
-              const Divider(),
-              _PaymentRow(label: 'Amount to Pay', value: totalLabel),
-              _PaymentRow(
-                label: 'Status',
-                value: confirming
-                    ? 'Confirming payment…'
-                    : windowOpen
-                    ? 'Unpaid'
-                    : 'Payment window ended',
-              ),
-              if (paymentDueAt != null) ...[
-                const SizedBox(height: 8),
-                PaymentDeadlineText(due: paymentDueAt!),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        if (confirming)
-          const Expanded(
-            child: Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            ),
-          )
-        else if (selectedChannel == null)
-          Expanded(child: _MethodPicker(onSelect: onSelectChannel))
-        else
-          const Spacer(),
-        if (!confirming && selectedChannel != null && windowOpen) ...[
-          PayNowButton(
-            orderId: orderId,
-            channel: selectedChannel!,
-            amountLabel: totalLabel,
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
           ),
         ),
         if (!confirming && selectedChannel != null) ...[
@@ -449,7 +394,7 @@ class _PendingPaymentBody extends StatelessWidget {
                 onPressed: onChangeAddress,
               ),
             )
-          else
+          else if (windowOpen)
             PayNowButton(
               orderId: order.id,
               channel: selectedChannel!,

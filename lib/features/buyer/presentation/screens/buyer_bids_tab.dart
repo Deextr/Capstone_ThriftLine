@@ -299,11 +299,7 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                               ),
                               const SizedBox(height: 4),
                               Text(
-<<<<<<< HEAD
-                                'You won this auction!',
-=======
                                 'You won this auction. Payment is unpaid.',
->>>>>>> 17f9910 (home page of buyer: Enhance the UI)
                                 style: AppTypography.caption.copyWith(
                                   color: AppColors.success,
                                 ),

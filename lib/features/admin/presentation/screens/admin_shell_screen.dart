@@ -7,6 +7,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../providers/auth_provider.dart';
+import '../../../auth/presentation/widgets/auth_widgets.dart';
 import '../../../../widgets/empty_state.dart';
 import '../../controllers/admin_review_center_controller.dart';
 import '../../data/admin_review_rules.dart';
@@ -38,10 +39,7 @@ class AdminShellScreen extends StatelessWidget {
           IconButton(
             tooltip: 'Log out',
             icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await auth.logout();
-              if (context.mounted) context.go(RouteNames.login);
-            },
+            onPressed: () => confirmAndLogout(context),
           ),
         ],
       ),

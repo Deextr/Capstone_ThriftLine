@@ -185,9 +185,10 @@ If you added Gmail or pepper values here, remove them.
 4. Open the inbox of **that user** (not only the sender Gmail). The subject is `Your ThriftLine verification code`.
 5. Type a wrong 6-digit code → it should fail.
 6. Type the real code → buyer home (or `/admin` if you used `dexter041711@gmail.com`).
-7. Log out, log in with email/password again → a **new** code is required.
-8. On the OTP screen, kill the app and reopen it → you should return to the OTP screen, not home.
-9. **Continue with Google** should still skip OTP and go home.
+7. Log out, log in with email/password on the **same phone** within 7 days → the code is skipped and you go home. Password is still required.
+8. On a different phone, or after **Log out and forget this device**, or 7 days after the last code → the code is required again.
+9. On the OTP screen, kill the app and reopen it → you should return to the OTP screen, not home.
+10. **Continue with Google** should still skip OTP and go home.
 
 Codes expire in **5 minutes**. Resend is limited to **once per 60 seconds**. Five wrong attempts lock that code; tap **Resend code**.
 
@@ -204,7 +205,7 @@ Codes expire in **5 minutes**. Resend is limited to **once per 60 seconds**. Fiv
 | `That code is invalid` | Typo or old code | Use the latest email only. |
 | `Sign in first` | No session (Confirm email still on) | Repeat Step 2, then sign up / log in again. |
 | Seed result `SKIPPED` | Admin auth user is not in this project | Add the user in Studio, then rerun Step 4. |
-| After login you skip OTP and go home | Old session from before this feature | Log out once, then log in with email/password again. |
+| After login you skip OTP and go home | This phone is still inside its 7-day trusted-device grant, or an old session is still signed in | Use **Log out and forget this device** if you expected a code. A brand-new install, another account, or a grant older than 7 days must ask for a code. |
 | Email is in Spam | Gmail sending to another Gmail inbox | Check Spam. Mark as Not spam. |
 
 ---
@@ -212,10 +213,25 @@ Codes expire in **5 minutes**. Resend is limited to **once per 60 seconds**. Fiv
 ## What the app does after this is set up
 
 1. User signs up or logs in with email and password.
-2. Supabase creates a session.
-3. The app marks that session as pending and calls `send-email-otp`.
-4. The function stores a hashed 6-digit code and sends it through Gmail SMTP (`smtp.gmail.com`, port 465).
-5. The user types the code. `verify-email-otp` checks it.
-6. Pending is cleared and the app opens the role home (buyer, seller, or admin).
+2. Supabase creates a session. Invalid passwords never continue.
+3. For login, the app calls `check-trusted-device` with a random install token kept in secure storage. The server hashes it with `OTP_PEPPER` and checks `trusted_devices` using database time. The app skips the code only when that response is `trusted: true`.
+4. Otherwise the app marks the session pending and calls `send-email-otp`.
+5. The function stores a hashed 6-digit code and sends it through Gmail SMTP (`smtp.gmail.com`, port 465).
+6. The user types the code. `verify-email-otp` checks it, then registers or refreshes this install for 7 days.
+7. Pending is cleared and the app opens the role home (buyer, seller, or admin).
 
-The Flutter client never sees the Gmail App Password or the OTP hash.
+A normal logout keeps the grant. **Log out and forget this device** revokes it. Google sign-in does not use this step. Reinstalling the app creates a new token, so the old grant cannot be reused.
+
+The Flutter client never sees the Gmail App Password, the OTP hash, or the device-token hash.
+
+### Trusted device deploy
+
+After Step 3, also run `supabase/migrations/20260928150000_trusted_devices.sql` in the SQL Editor. Then deploy with the CLI so the shared hash helper is bundled:
+
+```bash
+supabase functions deploy verify-email-otp
+supabase functions deploy check-trusted-device
+supabase functions deploy revoke-trusted-device
+```
+
+Until those are deployed, login keeps asking for the email code.

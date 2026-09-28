@@ -12,6 +12,10 @@ abstract final class AppConstants {
   static const String keyUserId = 'user_id';
   static const String keyDisplayName = 'display_name';
   static const String keyEmailOtpPending = 'email_otp_pending';
+
+  /// Non-secret marker that pairs with the secure-storage install token.
+  /// Logout must keep it. It is not a credential and must not be the token.
+  static const String keyDeviceTrustInstall = 'device_trust_install';
   static const String keyActiveAccount = 'active_account';
   static const String keyActiveAccountUserId = 'active_account_user_id';
   static const String keyRecentSearchesPrefix = 'recent_searches_';

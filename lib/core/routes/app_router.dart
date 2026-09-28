@@ -115,6 +115,13 @@ GoRouter createAppRouter({
         return RouteNames.onboarding;
       }
 
+      if (holdAuthScreenForTrustedDeviceCheck(
+        resolvingTrustedDevice: authProvider.isResolvingTrustedDevice,
+        location: location,
+      )) {
+        return null;
+      }
+
       if (authProvider.isEmailOtpPending) {
         if (!authProvider.isAuthenticated) {
           return unauthenticatedEmailOtpRedirect(
