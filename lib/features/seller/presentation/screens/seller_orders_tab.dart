@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -6,15 +5,19 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
-import '../../../../core/utils/formatters.dart';
-import '../../../../models/enums.dart';
-import '../../../../providers/auth_provider.dart';
-import '../../../../providers/data_provider.dart';
+import '../../../../models/order_model.dart';
 import '../../../../widgets/empty_state.dart';
-import '../../../../widgets/thrift_widgets.dart';
+import '../../controllers/seller_orders_controller.dart';
+import '../../data/seller_order_buckets.dart';
+import '../widgets/seller_order_card.dart';
 
 class SellerOrdersTab extends StatefulWidget {
-  const SellerOrdersTab({super.key});
+  const SellerOrdersTab({
+    super.key,
+    this.initialBucket = SellerOrderBucket.toShip,
+  });
+
+  final SellerOrderBucket initialBucket;
 
   @override
   State<SellerOrdersTab> createState() => _SellerOrdersTabState();
@@ -22,12 +25,28 @@ class SellerOrdersTab extends StatefulWidget {
 
 class _SellerOrdersTabState extends State<SellerOrdersTab>
     with SingleTickerProviderStateMixin {
-  late TabController _tab;
+  late final TabController _tab;
 
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 5, vsync: this);
+    _tab = TabController(
+      length: SellerOrderBucket.values.length,
+      vsync: this,
+      initialIndex: widget.initialBucket.index,
+    );
+    _tab.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant SellerOrdersTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialBucket != widget.initialBucket &&
+        _tab.index != widget.initialBucket.index) {
+      _tab.animateTo(widget.initialBucket.index);
+    }
   }
 
   @override
@@ -38,198 +57,186 @@ class _SellerOrdersTabState extends State<SellerOrdersTab>
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    final data = context.watch<DataProvider>();
-    final orders = data.ordersForSeller(auth.user?.id ?? 'seller_carla');
+    final controller = context.watch<SellerOrdersController>();
 
     return SafeArea(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.all(AppConstants.spacingMd),
-              child: Text('Orders', style: AppTypography.heading),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppConstants.spacingMd,
+              AppConstants.spacingMd,
+              AppConstants.spacingMd,
+              8,
             ),
+            child: Text('Orders', style: AppTypography.heading),
           ),
           TabBar(
             controller: _tab,
             isScrollable: true,
+            tabAlignment: TabAlignment.start,
             labelColor: AppColors.primary,
-            tabs: const [
-              Tab(text: 'Pending'),
-              Tab(text: 'To Ship'),
-              Tab(text: 'Shipped'),
-              Tab(text: 'Completed'),
-              Tab(text: 'Cancelled'),
+            unselectedLabelColor: AppColors.textSecondary,
+            indicatorColor: AppColors.primary,
+            dividerColor: AppColors.divider,
+            tabs: [
+              for (final bucket in SellerOrderBucket.values)
+                Tab(
+                  height: 46,
+                  child: _StatusTabLabel(
+                    label: bucket.tabLabel,
+                    count: controller.isLoading && controller.orders.isEmpty
+                        ? null
+                        : controller.countIn(bucket),
+                    selected: _tab.index == bucket.index,
+                  ),
+                ),
             ],
           ),
-          Expanded(
-            child: TabBarView(
-              controller: _tab,
-              children: [
-                _list(
-                  orders
-                      .where(
-                        (o) =>
-                            o.status == OrderStatus.placed ||
-                            o.status == OrderStatus.paymentPending,
-                      )
-                      .toList(),
-                ),
-                _list(
-                  orders
-                      .where(
-                        (o) =>
-                            o.status == OrderStatus.paymentConfirmed ||
-                            o.status == OrderStatus.preparing,
-                      )
-                      .toList(),
-                ),
-                _list(
-                  orders.where((o) => o.status == OrderStatus.shipped).toList(),
-                ),
-                _list(
-                  orders
-                      .where((o) => o.status == OrderStatus.delivered)
-                      .toList(),
-                ),
-                _list(
-                  orders
-                      .where((o) => o.status == OrderStatus.cancelled)
-                      .toList(),
-                ),
-              ],
-            ),
-          ),
+          Expanded(child: _body(controller)),
         ],
       ),
     );
   }
 
-  Widget _list(List orders) {
-    if (orders.isEmpty) {
-      return const EmptyState(
-        icon: Icons.inventory_2,
-        title: 'No orders',
-        message: 'Orders will appear here',
+  Widget _body(SellerOrdersController controller) {
+    if (controller.isLoading && controller.orders.isEmpty) {
+      return const _OrdersLoadingView();
+    }
+    if (controller.errorMessage != null && controller.orders.isEmpty) {
+      return ErrorState(
+        message:
+            'Unable to load orders. Please check your connection and try again.',
+        onRetry: controller.load,
       );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: orders.length,
-      itemBuilder: (_, i) {
-        final o = orders[i];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: ThriftCard(
-            onTap: () => context.push('/seller-order/${o.id}'),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('#${o.orderNumber}', style: AppTypography.caption),
-                    ThriftBadge(
-                      label: orderStatusLabel(o.status),
-                      variant: BadgeVariant.neutral,
-                    ),
-                  ],
+    return TabBarView(
+      controller: _tab,
+      children: [
+        for (final bucket in SellerOrderBucket.values)
+          _OrderBucketList(
+            bucket: bucket,
+            orders: controller.ordersIn(bucket),
+            onRefresh: controller.load,
+          ),
+      ],
+    );
+  }
+}
+
+class _StatusTabLabel extends StatelessWidget {
+  const _StatusTabLabel({
+    required this.label,
+    required this.count,
+    required this.selected,
+  });
+
+  final String label;
+  final int? count;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = count != null && count! > 0;
+    return Semantics(
+      selected: selected,
+      label: shown ? '$label, $count orders' : label,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(right: shown ? 12 : 0, top: shown ? 4 : 0),
+            child: Text(label),
+          ),
+          if (shown)
+            Positioned(
+              right: -4,
+              top: -2,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: AppColors.error,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    ThriftAvatar(imageUrl: o.buyerAvatar, size: 32),
-                    const SizedBox(width: 8),
-                    Text(o.buyerName, style: AppTypography.body),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: CachedNetworkImage(
-                        imageUrl: o.productImage,
-                        width: 48,
-                        height: 48,
-                        fit: BoxFit.cover,
-                        placeholder: (_, _) => Container(color: AppColors.surfaceVariant),
-                        errorWidget: (_, _, _) => Container(
-                          color: AppColors.surfaceVariant,
-                          child: const Icon(Icons.image_outlined, size: 20),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(o.productTitle, style: AppTypography.body),
-                    ),
-                    Text(
-                      formatCurrency(o.total),
-                      style: AppTypography.subheading.copyWith(
-                        color: AppColors.primary,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${o.paymentMethod.label} • ${o.deliveryMethod.label}',
-                  style: AppTypography.caption,
-                ),
-                const SizedBox(height: 8),
-                if (o.status == OrderStatus.placed ||
-                    o.status == OrderStatus.paymentPending)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ThriftButton(
-                          label: 'Confirm Order',
-                          expand: false,
-                          onPressed: () {
-                            context.read<DataProvider>().updateOrderStatus(
-                              o.id,
-                              OrderStatus.preparing,
-                            );
-                            showThriftSnackBar(context, 'Order confirmed');
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ThriftButton(
-                        label: 'Cancel',
-                        variant: ThriftButtonVariant.outline,
-                        color: AppColors.error,
-                        expand: false,
-                        onPressed: () {
-                          context.read<DataProvider>().updateOrderStatus(
-                            o.id,
-                            OrderStatus.cancelled,
-                          );
-                        },
-                      ),
-                    ],
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                child: Text(
+                  '${count!}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
                   ),
-                if (o.status == OrderStatus.preparing)
-                  ThriftButton(
-                    label: 'Mark as Shipped',
-                    onPressed: () {
-                      context.read<DataProvider>().updateOrderStatus(
-                        o.id,
-                        OrderStatus.shipped,
-                        tracking: 'JNT${DateTime.now().millisecondsSinceEpoch}',
-                      );
-                      showThriftSnackBar(context, 'Marked as shipped');
-                    },
-                  ),
-              ],
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrderBucketList extends StatelessWidget {
+  const _OrderBucketList({
+    required this.bucket,
+    required this.orders,
+    required this.onRefresh,
+  });
+
+  final SellerOrderBucket bucket;
+  final List<OrderModel> orders;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    if (orders.isEmpty) {
+      return EmptyState(
+        icon: bucket == SellerOrderBucket.toShip
+            ? Icons.local_shipping_outlined
+            : Icons.inventory_2_outlined,
+        title: bucket.emptyTitle,
+        message: bucket.emptyMessage,
+      );
+    }
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: onRefresh,
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+        itemCount: orders.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        itemBuilder: (_, i) {
+          final order = orders[i];
+          return SellerOrderCard(
+            order: order,
+            onTap: () => context.push('/seller-order/${order.id}'),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _OrdersLoadingView extends StatelessWidget {
+  const _OrdersLoadingView();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(AppConstants.spacingMd),
+      children: [
+        for (var i = 0; i < 3; i++) ...[
+          Container(
+            height: 148,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(AppConstants.radiusLg),
             ),
           ),
-        );
-      },
+          const SizedBox(height: 12),
+        ],
+      ],
     );
   }
 }

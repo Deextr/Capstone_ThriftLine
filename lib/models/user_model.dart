@@ -34,11 +34,7 @@ class UserModel extends BaseModel {
         username: json['username'] as String?,
         email: json['email'] as String? ?? '',
         phone: json['phone'] as String? ?? json['phone_number'] as String?,
-        avatarUrl: json['avatar_url'] as String? ??
-            json['avatar'] as String? ??
-            json['avatarUrl'] as String? ??
-            json['picture'] as String? ??
-            json['photo_url'] as String?,
+        avatarUrl: json['avatarUrl'] as String? ?? json['avatar'] as String?,
         bio: json['bio'] as String?,
         location: json['location'] as String?,
         role: UserRole.fromString(json['role'] as String? ?? 'buyer'),
@@ -57,8 +53,6 @@ class UserModel extends BaseModel {
         'username': username,
         'email': email,
         'phone': phone,
-        'avatar_url': avatarUrl,
-        'avatar': avatarUrl,
         'avatarUrl': avatarUrl,
         'bio': bio,
         'location': location,

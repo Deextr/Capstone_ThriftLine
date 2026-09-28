@@ -5,11 +5,14 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/routes/route_names.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../models/address_model.dart';
 import '../../../../models/enums.dart';
-import '../../../../providers/auth_provider.dart';
 import '../../../../providers/data_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../profile/data/address_service.dart';
 
 class PaymentDeliveryScreen extends StatefulWidget {
   const PaymentDeliveryScreen({super.key, required this.productId});
@@ -23,8 +26,30 @@ class PaymentDeliveryScreen extends StatefulWidget {
 class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
   DeliveryMethod _delivery = DeliveryMethod.standard;
   PaymentMethod _payment = PaymentMethod.gcash;
-  final _address = '123 Katipunan Ave, Quezon City, Metro Manila';
+  AddressModel? _address;
+  bool _addressLoading = true;
   final _meetupLocation = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAddress();
+  }
+
+  Future<void> _loadAddress() async {
+    try {
+      final saved = await AddressService(
+        context.read<SupabaseService>(),
+      ).defaultAddress();
+      if (!mounted) return;
+      setState(() {
+        _address = saved;
+        _addressLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _addressLoading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -36,9 +61,17 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
   Widget build(BuildContext context) {
     final data = context.watch<DataProvider>();
     final product = data.productById(widget.productId);
-    if (product == null) return Scaffold(appBar: AppBar(), body: const Center(child: Text('Not found')));
+    if (product == null)
+      return Scaffold(
+        appBar: AppBar(),
+        body: const Center(child: Text('Not found')),
+      );
 
-    final qty = int.tryParse(GoRouterState.of(context).uri.queryParameters['qty'] ?? '1') ?? 1;
+    final qty =
+        int.tryParse(
+          GoRouterState.of(context).uri.queryParameters['qty'] ?? '1',
+        ) ??
+        1;
     final subtotal = product.price * qty;
     final shipping = _delivery.fee;
     final platform = subtotal * 0.02;
@@ -48,7 +81,13 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        appBar: AppBar(title: const Text('Payment & Delivery'), leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop())),
+        appBar: AppBar(
+          title: const Text('Payment & Delivery'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
+        ),
         body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppConstants.spacingMd),
@@ -60,34 +99,59 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
                 ThriftCard(
                   child: Row(
                     children: [
-                      Expanded(child: Text(_address, style: AppTypography.body)),
-                      TextButton(onPressed: () => showThriftSnackBar(context, 'Address picker coming soon'), child: const Text('Change')),
+                      Expanded(
+                        child: Text(
+                          _addressLoading
+                              ? 'Loading addressâ€¦'
+                              : (_address?.formatted ??
+                                    'No saved address yet. Add one before placing an order.'),
+                          style: AppTypography.body,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          await context.push(RouteNames.addresses);
+                          if (mounted) await _loadAddress();
+                        },
+                        child: Text(_address == null ? 'Add' : 'Change'),
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 20),
                 Text('Delivery Method', style: AppTypography.subheading),
-                ...DeliveryMethod.values.map((d) => RadioListTile<DeliveryMethod>(
-                  title: Text('${d.label} — ${formatCurrency(d.fee)}'),
-                  value: d,
-                  groupValue: _delivery,
-                  onChanged: (v) => setState(() => _delivery = v!),
-                )),
+                ...DeliveryMethod.values.map(
+                  (d) => RadioListTile<DeliveryMethod>(
+                    title: Text('${d.label} â€” ${formatCurrency(d.fee)}'),
+                    value: d,
+                    groupValue: _delivery,
+                    onChanged: (v) => setState(() => _delivery = v!),
+                  ),
+                ),
                 if (_delivery == DeliveryMethod.meetup)
-                  ThriftTextField(label: 'Meet-up location', controller: _meetupLocation, hint: 'e.g. SM North EDSA'),
+                  ThriftTextField(
+                    label: 'Meet-up location',
+                    controller: _meetupLocation,
+                    hint: 'e.g. SM North EDSA',
+                  ),
                 const SizedBox(height: 20),
                 Text('Payment Method', style: AppTypography.subheading),
-                ...PaymentMethod.values.map((p) => RadioListTile<PaymentMethod>(
-                  title: Text(p.label),
-                  value: p,
-                  groupValue: _payment,
-                  onChanged: (v) => setState(() => _payment = v!),
-                )),
+                ...PaymentMethod.values.map(
+                  (p) => RadioListTile<PaymentMethod>(
+                    title: Text(p.label),
+                    value: p,
+                    groupValue: _payment,
+                    onChanged: (v) => setState(() => _payment = v!),
+                  ),
+                ),
                 if (_payment == PaymentMethod.cod)
                   ThriftCard(
                     child: Text(
                       '20% Downpayment Required: ${formatCurrency(codDown)}',
-                      style: AppTypography.body.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w600),
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 const SizedBox(height: 20),
@@ -101,20 +165,18 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
                 ThriftButton(
                   label: 'Place Order',
                   onPressed: () {
-                    final auth = context.read<AuthProvider>();
-                    final user = auth.user;
-                    final order = data.createOrder(
-                      product: product,
-                      buyerId: auth.user?.id ?? 'buyer_maya',
-                      buyerName: user?.name ?? 'Buyer',
-                      buyerAvatar: user?.avatarUrl ?? '',
-                      quantity: qty,
-                      delivery: _delivery,
-                      payment: _payment,
-                      address: _delivery == DeliveryMethod.meetup ? _meetupLocation.text : _address,
-                      size: product.size,
+                    if (_delivery != DeliveryMethod.meetup &&
+                        _address == null) {
+                      showThriftSnackBar(
+                        context,
+                        'Add a delivery address first.',
+                        isError: true,
+                      );
+                      return;
+                    }
+                    context.go(
+                      '${RouteNames.checkout}?product=${widget.productId}',
                     );
-                    context.go('/order-confirm/${order.id}');
                   },
                 ),
               ],
@@ -126,13 +188,21 @@ class _PaymentDeliveryScreenState extends State<PaymentDeliveryScreen> {
   }
 
   Widget _row(String label, String value, {bool bold = false}) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: bold ? AppTypography.subheading : AppTypography.body),
-            Text(value, style: bold ? AppTypography.subheading.copyWith(color: AppColors.primary) : AppTypography.body),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: bold ? AppTypography.subheading : AppTypography.body,
         ),
-      );
+        Text(
+          value,
+          style: bold
+              ? AppTypography.subheading.copyWith(color: AppColors.primary)
+              : AppTypography.body,
+        ),
+      ],
+    ),
+  );
 }

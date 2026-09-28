@@ -7,9 +7,10 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
-import '../../../../models/enums.dart';
-import '../../../../providers/data_provider.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../profile/data/address_service.dart';
+import '../../controllers/buyer_orders_controller.dart';
 
 class OrderConfirmationScreen extends StatelessWidget {
   const OrderConfirmationScreen({super.key, required this.orderId});
@@ -18,11 +19,47 @@ class OrderConfirmationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final order = context.watch<DataProvider>().orderById(orderId);
-    if (order == null) return Scaffold(appBar: AppBar(), body: const Center(child: Text('Order not found')));
+    final controller = context.watch<BuyerOrdersController>();
+    if (controller.isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+    final order = controller.order;
+    if (order == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(child: Text(controller.errorMessage ?? 'Order not found')),
+      );
+    }
 
-    final needsProof = order.paymentMethod != PaymentMethod.cod &&
-        order.status == OrderStatus.paymentPending;
+    if (order.isFailedCheckout) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.go(RouteNames.checkout);
+        }
+      });
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
+    if (order.isPaymentPending) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.go(RouteNames.paymentForOrder(orderId));
+        }
+      });
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
 
     return Scaffold(
       body: SafeArea(
@@ -38,54 +75,104 @@ class OrderConfirmationScreen extends StatelessWidget {
                     color: AppColors.success.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.check_circle, size: 64, color: AppColors.success),
+                  child: const Icon(
+                    Icons.check_circle,
+                    size: 64,
+                    color: AppColors.success,
+                  ),
                 ),
                 const SizedBox(height: 24),
-                Text('Order Placed!', style: AppTypography.display),
-                Text('Order #${order.orderNumber}', style: AppTypography.body.copyWith(color: AppColors.textSecondary)),
+                Text('Payment Successful', style: AppTypography.display),
+                Text(
+                  'Order #${order.orderNumber}',
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Your payment has been received. Order #${order.orderNumber} has been paid successfully. The seller can now prepare your order.',
+                  style: AppTypography.caption,
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 24),
                 ThriftCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(order.productTitle, style: AppTypography.subheading),
-                      Text('Seller: ${order.sellerName}', style: AppTypography.caption),
+                      Text(
+                        order.items.length > 1
+                            ? '${order.items.length} items from ${order.sellerName}'
+                            : order.productTitle,
+                        style: AppTypography.subheading,
+                      ),
+                      Text(
+                        'Seller: ${order.sellerName}',
+                        style: AppTypography.caption,
+                      ),
                       const Divider(),
-                      _row('Item', formatCurrency(order.amount)),
+                      for (final item in order.items)
+                        _row(
+                          '${item.title} × ${item.quantity}',
+                          formatCurrency(item.lineTotal),
+                        ),
+                      _row('Subtotal', formatCurrency(order.amount)),
                       _row('Shipping', formatCurrency(order.shippingFee)),
                       _row('Platform fee', formatCurrency(order.platformFee)),
                       _row('Total', formatCurrency(order.total), bold: true),
-                      _row('Payment', order.paymentMethod.label),
-                      _row('Delivery', order.deliveryMethod.label),
-                      const SizedBox(height: 16),
-                      Container(
-                        height: 80,
-                        width: 80,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.border),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.qr_code, size: 48),
+                      _row('Payment', 'Paid'),
+                      _row(
+                        'Delivery',
+                        order.addressMissing
+                            ? 'Address needed'
+                            : order.shippingAddress,
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 32),
-                if (needsProof) ...[
+                if (order.addressMissing) ...[
+                  const SizedBox(height: 16),
                   ThriftButton(
-                    label: 'Upload Payment Proof',
+                    label: controller.isSavingAddress
+                        ? 'Saving address…'
+                        : 'Add delivery address',
                     variant: ThriftButtonVariant.secondary,
-                    onPressed: () => context.push('/payment-proof/$orderId'),
+                    onPressed: controller.isSavingAddress
+                        ? null
+                        : () async {
+                            await context.push(RouteNames.addresses);
+                            if (!context.mounted) return;
+                            final saved = await AddressService(
+                              context.read<SupabaseService>(),
+                            ).defaultAddress();
+                            if (saved == null) {
+                              if (context.mounted) {
+                                showThriftSnackBar(
+                                  context,
+                                  'Save an address, then attach it here.',
+                                  isError: true,
+                                );
+                              }
+                              return;
+                            }
+                            final error = await controller.setAddress(saved.id);
+                            if (!context.mounted) return;
+                            showThriftSnackBar(
+                              context,
+                              error ?? 'Delivery address saved.',
+                              isError: error != null,
+                            );
+                          },
                   ),
-                  const SizedBox(height: 12),
                 ],
+                const SizedBox(height: 32),
                 ThriftButton(
-                  label: 'Track Order',
+                  label: 'Track order',
                   onPressed: () => context.push('/track-order/$orderId'),
                 ),
                 const SizedBox(height: 12),
                 ThriftButton(
-                  label: 'Continue Shopping',
+                  label: 'Continue shopping',
                   variant: ThriftButtonVariant.outline,
                   onPressed: () => context.go(RouteNames.buyerHome),
                 ),
@@ -98,13 +185,22 @@ class OrderConfirmationScreen extends StatelessWidget {
   }
 
   Widget _row(String label, String value, {bool bold = false}) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: AppTypography.caption),
-            Text(value, style: bold ? AppTypography.subheading.copyWith(color: AppColors.primary) : AppTypography.body),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 2),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(child: Text(label, style: AppTypography.caption)),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: bold
+                ? AppTypography.subheading.copyWith(color: AppColors.primary)
+                : AppTypography.body,
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }

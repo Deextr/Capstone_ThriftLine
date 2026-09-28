@@ -1,3 +1,4 @@
+import '../core/utils/stock_limits.dart';
 import 'enums.dart';
 
 class BidEntry {
@@ -17,6 +18,8 @@ class BidEntry {
 class ProductModel {
   const ProductModel({
     required this.id,
+    this.sellerId,
+    this.categoryId,
     required this.sellerUsername,
     required this.sellerName,
     required this.sellerAvatar,
@@ -36,6 +39,7 @@ class ProductModel {
     required this.createdAt,
     this.viewCount = 0,
     this.favoriteCount = 0,
+    this.quantityAvailable = 1,
     this.sellingType = SellingType.fixedPrice,
     this.currentBid,
     this.startingBid,
@@ -48,7 +52,157 @@ class ProductModel {
     this.likesCount = 0,
   });
 
+  /// Constructs a [ProductModel] from a Supabase `products` row that has been
+  /// selected with the following joins:
+  ///
+  /// ```sql
+  /// products (
+  ///   *,
+  ///   seller:users!products_seller_id_fkey (user_id, username, full_name, avatar, ...),
+  ///   images:product_images (image_url, is_primary, display_order),
+  ///   category:categories (category_name)
+  /// )
+  /// ```
+  factory ProductModel.fromSupabase(
+    Map<String, dynamic> row, {
+    Map<String, dynamic>? sellerProfile,
+  }) {
+    final nestedSellerUser = sellerProfile?['user'];
+    final seller =
+        (row['seller'] ??
+                row['user_public_profiles'] ??
+                row['users'] ??
+                (nestedSellerUser is Map<String, dynamic>
+                    ? nestedSellerUser
+                    : null))
+            as Map<String, dynamic>?;
+
+    final sellerUsername = seller?['username'] as String? ?? '';
+    final sellerFullName = seller?['full_name'] as String? ?? '';
+
+    // Shop name from seller_profiles if available, otherwise full_name or username
+    final rawShopName = sellerProfile?['shop_name'] as String?;
+    final shopName = (rawShopName != null && rawShopName.trim().isNotEmpty)
+        ? rawShopName.trim()
+        : (sellerFullName.trim().isNotEmpty
+              ? sellerFullName.trim()
+              : (sellerUsername.trim().isNotEmpty
+                    ? sellerUsername.trim()
+                    : 'Thrift Seller'));
+
+    final sellerAvatar = seller?['avatar'] as String? ?? '';
+    final isApproved = (sellerProfile?['is_approved'] as bool?) ?? false;
+    final isSellerRole = seller?['role'] == 'seller';
+    final ratingAvg = (seller?['rating_average'] as num?)?.toDouble() ?? 0.0;
+    final sellerVerified = isApproved || isSellerRole || ratingAvg > 0;
+
+    // â”€â”€ Images â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    final rawImages = row['images'] as List<dynamic>? ?? [];
+    final sortedImages =
+        List<Map<String, dynamic>>.from(
+          rawImages.map((e) => e as Map<String, dynamic>),
+        )..sort((a, b) {
+          // Primary images first, then by display_order
+          final aPrimary = a['is_primary'] as bool? ?? false;
+          final bPrimary = b['is_primary'] as bool? ?? false;
+          if (aPrimary != bPrimary) return aPrimary ? -1 : 1;
+          return (a['display_order'] as int? ?? 0).compareTo(
+            b['display_order'] as int? ?? 0,
+          );
+        });
+    final imageUrls = sortedImages
+        .map((img) => img['image_url'] as String?)
+        .whereType<String>()
+        .where((url) => url.isNotEmpty)
+        .toList();
+
+    // â”€â”€ Category â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    final categoryRow = row['category'] as Map<String, dynamic>?;
+    final categoryName = categoryRow?['category_name'] as String? ?? '';
+    final category = ProductCategory.fromString(categoryName);
+
+    // â”€â”€ Auction data (from joined auctions or fallback) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    final auctionsRaw = row['auctions'];
+    Map<String, dynamic>? activeAuction;
+    if (auctionsRaw is List && auctionsRaw.isNotEmpty) {
+      final activeList = auctionsRaw
+          .where((a) => (a as Map<String, dynamic>)['status'] == 'active')
+          .toList();
+      activeAuction =
+          (activeList.isNotEmpty ? activeList.first : auctionsRaw.first)
+              as Map<String, dynamic>?;
+    } else if (auctionsRaw is Map<String, dynamic>) {
+      activeAuction = auctionsRaw;
+    }
+
+    final sellingType = SellingType.fromDbString(
+      row['listing_type'] as String? ?? 'fixed_price',
+    );
+
+    double? startingBid;
+    double? currentBid;
+    double bidIncrement = 20;
+    DateTime? bidEndTime;
+
+    if (activeAuction != null) {
+      startingBid = (activeAuction['starting_price'] as num?)?.toDouble();
+      currentBid =
+          (activeAuction['current_price'] as num?)?.toDouble() ?? startingBid;
+      bidIncrement =
+          (activeAuction['minimum_increment'] as num?)?.toDouble() ?? 20;
+      if (activeAuction['ends_at'] != null) {
+        bidEndTime = DateTime.tryParse(activeAuction['ends_at'] as String);
+      }
+    }
+
+    if (sellingType == SellingType.auction) {
+      final priceVal = (row['price'] as num?)?.toDouble() ?? 0;
+      startingBid ??= priceVal > 0 ? priceVal : null;
+      currentBid ??= startingBid;
+    }
+
+    // â”€â”€ Core fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    return ProductModel(
+      id: row['product_id'] as String? ?? '',
+      sellerId: row['seller_id'] as String?,
+      categoryId: row['category_id'] as String?,
+      sellerUsername: sellerUsername,
+      sellerName: shopName,
+      sellerAvatar: sellerAvatar,
+      sellerVerified: sellerVerified,
+      title: (row['name'] as String?)?.trim().isNotEmpty == true
+          ? row['name'] as String
+          : (row['title'] as String? ?? ''),
+      description: row['description'] as String? ?? '',
+      price: (row['price'] as num?)?.toDouble() ?? 0,
+      category: category,
+      condition: ProductCondition.fromDbString(
+        row['condition'] as String? ?? 'good',
+      ),
+      imageUrls: imageUrls,
+      status: ProductStatus.fromDbString(row['status'] as String? ?? 'active'),
+      size: row['size'] as String?,
+      brand: row['brand'] as String?,
+      color: row['color'] as String?,
+      location: row['location'] as String?,
+      createdAt: row['created_at'] != null
+          ? DateTime.parse(row['created_at'] as String)
+          : DateTime.now(),
+      viewCount: (row['views'] as num?)?.toInt() ?? 0,
+      favoriteCount: (row['favorite_count'] as num?)?.toInt() ?? 0,
+      quantityAvailable: (row['quantity_available'] as num?)?.toInt() ?? 1,
+      sellingType: sellingType,
+      startingBid: startingBid,
+      currentBid: currentBid,
+      bidIncrement: bidIncrement,
+      bidEndTime: bidEndTime,
+    );
+  }
+
   final String id;
+  final String? sellerId;
+  final String? categoryId;
+
   final String sellerUsername;
   final String sellerName;
   final String sellerAvatar;
@@ -68,6 +222,7 @@ class ProductModel {
   final DateTime createdAt;
   final int viewCount;
   final int favoriteCount;
+  final int quantityAvailable;
   final SellingType sellingType;
   final double? currentBid;
   final double? startingBid;
@@ -84,15 +239,23 @@ class ProductModel {
       bidEndTime != null &&
       bidEndTime!.isAfter(DateTime.now());
 
-  String get imageUrl =>
-      imageUrls.isNotEmpty
-          ? imageUrls.first
-          : 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600&h=600';
+  String get imageUrl => imageUrls.isNotEmpty
+      ? imageUrls.first
+      : 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600&h=600';
 
-  double get displayPrice => hasActiveBid ? (currentBid ?? startingBid ?? price) : price;
+  double get displayPrice =>
+      hasActiveBid ? (currentBid ?? startingBid ?? price) : price;
+
+  /// Units a buyer may purchase right now. Auctions are always 0 or 1.
+  int get maxPurchasableQuantity => maxPurchasableQuantityFor(
+    sellingType: sellingType,
+    quantityAvailable: quantityAvailable,
+  );
 
   ProductModel copyWith({
     String? id,
+    String? sellerId,
+    String? categoryId,
     String? sellerUsername,
     String? sellerName,
     String? sellerAvatar,
@@ -112,6 +275,7 @@ class ProductModel {
     DateTime? createdAt,
     int? viewCount,
     int? favoriteCount,
+    int? quantityAvailable,
     SellingType? sellingType,
     double? currentBid,
     double? startingBid,
@@ -122,37 +286,39 @@ class ProductModel {
     bool? buyNowEnabled,
     double? distanceKm,
     int? likesCount,
-  }) =>
-      ProductModel(
-        id: id ?? this.id,
-        sellerUsername: sellerUsername ?? this.sellerUsername,
-        sellerName: sellerName ?? this.sellerName,
-        sellerAvatar: sellerAvatar ?? this.sellerAvatar,
-        sellerVerified: sellerVerified ?? this.sellerVerified,
-        title: title ?? this.title,
-        description: description ?? this.description,
-        price: price ?? this.price,
-        category: category ?? this.category,
-        condition: condition ?? this.condition,
-        imageUrls: imageUrls ?? this.imageUrls,
-        status: status ?? this.status,
-        size: size ?? this.size,
-        brand: brand ?? this.brand,
-        color: color ?? this.color,
-        material: material ?? this.material,
-        location: location ?? this.location,
-        createdAt: createdAt ?? this.createdAt,
-        viewCount: viewCount ?? this.viewCount,
-        favoriteCount: favoriteCount ?? this.favoriteCount,
-        sellingType: sellingType ?? this.sellingType,
-        currentBid: currentBid ?? this.currentBid,
-        startingBid: startingBid ?? this.startingBid,
-        bidIncrement: bidIncrement ?? this.bidIncrement,
-        bidEndTime: bidEndTime ?? this.bidEndTime,
-        bidCount: bidCount ?? this.bidCount,
-        bidHistory: bidHistory ?? this.bidHistory,
-        buyNowEnabled: buyNowEnabled ?? this.buyNowEnabled,
-        distanceKm: distanceKm ?? this.distanceKm,
-        likesCount: likesCount ?? this.likesCount,
-      );
+  }) => ProductModel(
+    id: id ?? this.id,
+    sellerId: sellerId ?? this.sellerId,
+    categoryId: categoryId ?? this.categoryId,
+    sellerUsername: sellerUsername ?? this.sellerUsername,
+    sellerName: sellerName ?? this.sellerName,
+    sellerAvatar: sellerAvatar ?? this.sellerAvatar,
+    sellerVerified: sellerVerified ?? this.sellerVerified,
+    title: title ?? this.title,
+    description: description ?? this.description,
+    price: price ?? this.price,
+    category: category ?? this.category,
+    condition: condition ?? this.condition,
+    imageUrls: imageUrls ?? this.imageUrls,
+    status: status ?? this.status,
+    size: size ?? this.size,
+    brand: brand ?? this.brand,
+    color: color ?? this.color,
+    material: material ?? this.material,
+    location: location ?? this.location,
+    createdAt: createdAt ?? this.createdAt,
+    viewCount: viewCount ?? this.viewCount,
+    favoriteCount: favoriteCount ?? this.favoriteCount,
+    quantityAvailable: quantityAvailable ?? this.quantityAvailable,
+    sellingType: sellingType ?? this.sellingType,
+    currentBid: currentBid ?? this.currentBid,
+    startingBid: startingBid ?? this.startingBid,
+    bidIncrement: bidIncrement ?? this.bidIncrement,
+    bidEndTime: bidEndTime ?? this.bidEndTime,
+    bidCount: bidCount ?? this.bidCount,
+    bidHistory: bidHistory ?? this.bidHistory,
+    buyNowEnabled: buyNowEnabled ?? this.buyNowEnabled,
+    distanceKm: distanceKm ?? this.distanceKm,
+    likesCount: likesCount ?? this.likesCount,
+  );
 }

@@ -1,0 +1,291 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/app_typography.dart';
+import '../../../core/routes/route_names.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../providers/settings_provider.dart';
+import '../../../widgets/thrift_widgets.dart';
+import '../presentation/widgets/switch_account_sheet.dart';
+import '../presentation/widgets/switchable_avatar.dart';
+
+/// Profile tab for the **Seller** workspace.
+///
+/// Buying tools stay on the Buyer account. Approved sellers switch accounts
+/// from the header or the Account section.
+class SellerProfileTab extends StatelessWidget {
+  const SellerProfileTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.symmetric(vertical: AppConstants.spacingMd),
+        children: [
+          // â”€â”€ Profile Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppConstants.spacingMd,
+            ),
+            child: _ProfileHeader(auth: auth),
+          ),
+
+          const SizedBox(height: 28),
+
+          // Selling
+          _SectionCard(
+            title: 'Selling',
+            children: [
+              _MenuItem(
+                icon: Icons.store_rounded,
+                label: 'My Shop',
+                onTap: () => context.push(RouteNames.myShop),
+              ),
+              _MenuItem(
+                icon: Icons.bar_chart_rounded,
+                label: 'Seller Dashboard',
+                onTap: () => showThriftSnackBar(context, 'Coming soon'),
+              ),
+              _MenuItem(
+                icon: Icons.sell_outlined,
+                label: 'My Listings',
+                onTap: () => showThriftSnackBar(context, 'Coming soon'),
+              ),
+              _MenuItem(
+                icon: Icons.local_shipping_outlined,
+                label: 'Seller Orders',
+                onTap: () => showThriftSnackBar(context, 'Coming soon'),
+              ),
+              _MenuItem(
+                icon: Icons.star_outline_rounded,
+                label: 'Seller Reviews',
+                onTap: () => showThriftSnackBar(context, 'Coming soon'),
+              ),
+            ],
+          ),
+
+          // â”€â”€ Account â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          _SectionCard(
+            title: 'Account',
+            children: [
+              if (auth.canSwitchAccounts)
+                _MenuItem(
+                  icon: Icons.sync_alt_rounded,
+                  label: 'Switch Account',
+                  onTap: () => SwitchAccountSheet.show(context),
+                ),
+              _MenuItem(
+                icon: Icons.person_outline_rounded,
+                label: 'Edit Profile',
+                onTap: () => context.push(RouteNames.editProfile),
+              ),
+              _NotificationToggle(),
+              _MenuItem(
+                icon: Icons.payment_outlined,
+                label: 'Payment Methods',
+                onTap: () => showThriftSnackBar(context, 'Coming soon'),
+              ),
+              _MenuItem(
+                icon: Icons.location_on_outlined,
+                label: 'Addresses',
+                onTap: () => context.push(RouteNames.addresses),
+              ),
+              _MenuItem(
+                icon: Icons.settings_outlined,
+                label: 'Settings',
+                onTap: () => context.push(RouteNames.settings),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // â”€â”€ Logout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppConstants.spacingMd,
+            ),
+            child: ThriftButton(
+              label: 'Logout',
+              variant: ThriftButtonVariant.ghost,
+              color: AppColors.error,
+              onPressed: () async {
+                await auth.logout();
+                if (context.mounted) context.go(RouteNames.login);
+              },
+            ),
+          ),
+          const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Profile Header
+// =============================================================================
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.auth});
+  final AuthProvider auth;
+
+  @override
+  Widget build(BuildContext context) {
+    final user = auth.user;
+    final name = auth.displayName ?? user?.name ?? '';
+    final username = user?.username ?? '';
+
+    return Column(
+      children: [
+        SwitchableAvatar(
+          imageUrl: user?.avatarUrl ?? '',
+          name: name,
+          canSwitch: auth.canSwitchAccounts,
+          onSwitch: () => SwitchAccountSheet.show(context),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Text(
+                name.isNotEmpty ? name : 'No Name',
+                style: AppTypography.heading.copyWith(fontSize: 22),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (user?.isVerified == true) ...[
+              const SizedBox(width: 6),
+              const Icon(Icons.verified, color: AppColors.primary, size: 20),
+            ],
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          username.isNotEmpty ? '@$username' : '@username',
+          style: AppTypography.caption.copyWith(fontSize: 14),
+        ),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// Section Card (reusable section wrapper)
+// =============================================================================
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.title, required this.children});
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppConstants.spacingMd),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            child: Text(
+              title,
+              style: AppTypography.subheading.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Material(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: AppColors.border.withValues(alpha: 0.5),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Column(children: children),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Menu Item
+// =============================================================================
+
+class _MenuItem extends StatelessWidget {
+  const _MenuItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Icon(icon, color: AppColors.textPrimary, size: 22),
+      title: Text(label, style: AppTypography.body),
+      trailing: const Icon(
+        Icons.chevron_right,
+        size: 20,
+        color: AppColors.textHint,
+      ),
+      onTap: onTap,
+    );
+  }
+}
+
+// =============================================================================
+// Notification Toggle
+// =============================================================================
+
+class _NotificationToggle extends StatelessWidget {
+  const _NotificationToggle();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: const Icon(
+        Icons.notifications_none_outlined,
+        color: AppColors.textPrimary,
+        size: 22,
+      ),
+      title: Text('Notifications', style: AppTypography.body),
+      trailing: Switch(
+        value: settings.pushNotificationsEnabled,
+        onChanged: settings.setPushNotifications,
+        activeTrackColor: AppColors.primary.withValues(alpha: 0.4),
+        activeThumbColor: AppColors.primary,
+      ),
+    );
+  }
+}

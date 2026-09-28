@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -5,7 +7,19 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../features/auth/domain/auth_user.dart';
+import '../../../../features/seller/data/davao_barangay_service.dart';
+import '../../../../features/seller/data/seller_verification_service.dart';
+import '../../../../features/seller/domain/davao_barangay.dart';
+import '../../../../features/seller/domain/id_image_quality.dart';
+import '../../../../features/seller/domain/seller_address_draft.dart';
+import '../../../../features/seller/domain/seller_id_type.dart';
+import '../../../../features/seller/presentation/screens/id_capture_screen.dart';
+import '../../../../features/seller/presentation/screens/liveness_capture_screen.dart';
+import '../../../../features/seller/presentation/widgets/davao_barangay_field.dart';
+import '../../../../features/seller/presentation/widgets/id_side_review_card.dart';
+import '../../../../features/seller/presentation/widgets/terms_acceptance_note.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 
@@ -18,36 +32,76 @@ class BecomeSellerScreen extends StatefulWidget {
 
 class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   final _storeNameCtrl = TextEditingController();
-  final _addressCtrl = TextEditingController();
-  String _selectedRegion = 'Select Barangay';
-  bool _govIdUploaded = false;
-  bool _selfieUploaded = false;
-  int _currentStep = 0;
+  final _addressLine1Ctrl = TextEditingController();
+  final _addressLine2Ctrl = TextEditingController();
+  final _barangayService = DavaoBarangayService();
 
-  final List<String> _davaoBarangays = [
-    'Select Barangay',
-    'Poblacion District',
-    'Agdao',
-    'Buhangin',
-    'Bunawan',
-    'Calinan',
-    'Catalunan Grande',
-    'Catalunan Pequeño',
-    'Matina',
-    'Talomo',
-    'Toril',
-    'Tugbok',
-    'Mintal',
-    'Tibungco',
-    'Panacan',
-    'Sasa',
-  ];
+  List<DavaoBarangay> _barangays = const [];
+  DavaoBarangay? _selectedBarangay;
+  bool _barangaysLoading = true;
+  String? _barangayError;
+
+  Uint8List? _idFrontBytes;
+  Uint8List? _idBackBytes;
+  IdQualityResult? _frontQuality;
+  IdQualityResult? _backQuality;
+
+  bool _selfieUploaded = false;
+  bool _submitting = false;
+  int _currentStep = 0;
+  LivenessResult? _liveness;
+
+  bool get _idGateOpen =>
+      _idFrontBytes != null &&
+      _idBackBytes != null &&
+      IdCapturePair(front: _frontQuality, back: _backQuality).canProceed;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBarangays();
+  }
 
   @override
   void dispose() {
     _storeNameCtrl.dispose();
-    _addressCtrl.dispose();
+    _addressLine1Ctrl.dispose();
+    _addressLine2Ctrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadBarangays({bool forceRefresh = false}) async {
+    setState(() {
+      _barangaysLoading = true;
+      _barangayError = null;
+    });
+    try {
+      final list = await _barangayService.load(forceRefresh: forceRefresh);
+      if (!mounted) return;
+      setState(() {
+        _barangays = list;
+        _barangaysLoading = false;
+        if (_selectedBarangay != null &&
+            !DavaoBarangay.isAllowedSelection(_selectedBarangay, list)) {
+          _selectedBarangay = null;
+        }
+      });
+    } on DavaoBarangayException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _barangays = const [];
+        _barangaysLoading = false;
+        _barangayError = e.userMessage;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _barangays = const [];
+        _barangaysLoading = false;
+        _barangayError =
+            'Could not load Davao City barangays. Check your connection and try again.';
+      });
+    }
   }
 
   @override
@@ -62,151 +116,142 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       return _buildRejectedScreen(context, user);
     }
 
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Become a Seller'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
+    return PopScope(
+      canPop: _currentStep == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (_currentStep > 0) {
+          setState(() => _currentStep--);
+        }
+      },
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Become a Seller'),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                if (_currentStep > 0) {
+                  setState(() => _currentStep--);
+                } else {
+                  context.pop();
+                }
+              },
+            ),
+            elevation: 0,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           ),
-          elevation: 0,
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Sleek segmented indicator
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppConstants.spacingMd,
-                  vertical: 16,
-                ),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.02),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    )
-                  ]
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        _buildSegment(0, 'Store Info'),
-                        const SizedBox(width: 8),
-                        _buildSegment(1, 'ID Upload'),
-                        const SizedBox(width: 8),
-                        _buildSegment(2, 'Selfie'),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _getStepTitle(),
-                          style: AppTypography.subheading.copyWith(color: AppColors.primary),
-                        ),
-                        Text(
-                          'Step ${_currentStep + 1} of 3',
-                          style: AppTypography.caption,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              // Content
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(AppConstants.spacingMd),
-                  child: _buildStep(),
-                ),
-              ),
-              // Bottom button
-              Container(
-                padding: const EdgeInsets.all(AppConstants.spacingMd),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, -4),
-                    )
-                  ]
-                ),
-                child: _currentStep < 2
-                    ? ThriftButton(
-                        label: 'Continue',
-                        onPressed: () {
-                          if (_currentStep == 0) {
-                            if (_storeNameCtrl.text.trim().isEmpty) {
-                              showThriftSnackBar(context, 'Please enter a store name.');
-                              return;
-                            }
-                            if (_selectedRegion == 'Select Barangay') {
-                              showThriftSnackBar(context, 'Please select a barangay.');
-                              return;
-                            }
-                            if (_addressCtrl.text.trim().isEmpty) {
-                              showThriftSnackBar(context, 'Please enter a store address.');
-                              return;
-                            }
-                          } else if (_currentStep == 1) {
-                            if (!_govIdUploaded) {
-                              showThriftSnackBar(context, 'Please upload a photo of your valid ID.');
-                              return;
-                            }
-                          }
-                          setState(() => _currentStep++);
-                        },
-                      )
-                    : ThriftButton(
-                        label: 'Submit Application',
-                        onPressed: () async {
-                          if (!_govIdUploaded) {
-                            showThriftSnackBar(context, 'Please upload your government ID first.');
-                            return;
-                          }
-                          if (!_selfieUploaded) {
-                            showThriftSnackBar(context, 'Please upload your selfie first.');
-                            return;
-                          }
-                          
-                          await auth.submitSellerApplication(
-                            storeName: _storeNameCtrl.text.isEmpty ? 'My Thrift Shop' : _storeNameCtrl.text,
-                            address: _addressCtrl.text.isEmpty ? 'Davao City' : _addressCtrl.text,
-                            region: _selectedRegion == 'Select Barangay' ? 'Poblacion District' : _selectedRegion,
-                          );
-                          
-                          if (context.mounted) {
-                            showThriftSnackBar(
-                              context,
-                              'Seller application submitted! We\'ll review it shortly.',
-                            );
-                          }
-                        },
+          body: SafeArea(
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppConstants.spacingMd,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
                       ),
-              ),
-            ],
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          _buildSegment(0, 'Seller Info'),
+                          const SizedBox(width: 8),
+                          _buildSegment(1, 'ID Capture'),
+                          const SizedBox(width: 8),
+                          _buildSegment(2, 'Selfie'),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _getStepTitle(),
+                            style: AppTypography.subheading.copyWith(
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          Text(
+                            'Step ${_currentStep + 1} of 3',
+                            style: AppTypography.caption,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(AppConstants.spacingMd),
+                    child: _buildStep(),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(AppConstants.spacingMd),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: _buildBottomActions(auth),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  Widget _buildBottomActions(AuthProvider auth) {
+    if (_currentStep == 0) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const TermsAcceptanceNote(),
+          const SizedBox(height: 12),
+          ThriftButton(label: 'Continue', onPressed: _continueFromAddress),
+        ],
+      );
+    }
+    if (_currentStep == 1) {
+      return ThriftButton(
+        label: 'Continue',
+        onPressed: _idGateOpen ? _continueFromId : null,
+      );
+    }
+    return ThriftButton(
+      label: 'Submit Application',
+      isLoading: _submitting,
+      onPressed: _submitting ? null : () => _submit(auth),
+    );
+  }
+
   String _getStepTitle() {
     switch (_currentStep) {
-      case 0: return 'Store Details';
-      case 1: return 'Government ID Verification';
-      case 2: return 'Selfie Verification';
-      default: return '';
+      case 0:
+        return 'Seller information & address';
+      case 1:
+        return 'Capture your ID';
+      case 2:
+        return 'Take a selfie';
+      default:
+        return '';
     }
   }
 
@@ -215,7 +260,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       case 0:
         return _storeInfoStep();
       case 1:
-        return _idUploadStep();
+        return _idCaptureStep();
       case 2:
         return _selfieStep();
       default:
@@ -223,7 +268,6 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     }
   }
 
-  // ─── Step 1: Store Information ───
   Widget _storeInfoStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -245,44 +289,38 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                 icon: Icons.store_outlined,
               ),
               const SizedBox(height: 20),
-              Text(
-                'Region / Barangay',
-                style: AppTypography.label.copyWith(
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant.withValues(alpha: 0.3),
-                  border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedRegion,
-                    isExpanded: true,
-                    icon: const Icon(
-                      Icons.keyboard_arrow_down,
-                      color: AppColors.textHint,
-                    ),
-                    items: _davaoBarangays
-                        .map(
-                          (b) => DropdownMenuItem(value: b, child: Text(b, style: AppTypography.body)),
-                        )
-                        .toList(),
-                    onChanged: (v) => setState(() => _selectedRegion = v!),
-                  ),
-                ),
+              DavaoBarangayField(
+                barangays: _barangays,
+                selected: _selectedBarangay,
+                loading: _barangaysLoading,
+                error: _barangayError,
+                onRetry: () => _loadBarangays(forceRefresh: true),
+                onSelected: (barangay) {
+                  if (!barangay.isDavaoCity) return;
+                  setState(() => _selectedBarangay = barangay);
+                },
               ),
               const SizedBox(height: 20),
               ThriftTextField(
-                label: 'Store Address',
-                hint: 'Complete street address',
-                controller: _addressCtrl,
+                label: 'Address Line 1',
+                hint: 'Street, building, or house number',
+                controller: _addressLine1Ctrl,
                 icon: Icons.location_on_outlined,
                 maxLines: 2,
+              ),
+              const SizedBox(height: 20),
+              ThriftTextField(
+                label: 'Address Line 2',
+                hint: 'Unit / Floor / Building / Landmark',
+                controller: _addressLine2Ctrl,
+                icon: Icons.apartment_outlined,
+                labelSuffix: Text(
+                  'Optional',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textHint,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ],
           ),
@@ -300,16 +338,34 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.stars_outlined, color: AppColors.primary, size: 20),
+                  const Icon(
+                    Icons.stars_outlined,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
-                  Text('Why sell on Thriftline?', style: AppTypography.subheading.copyWith(color: AppColors.primary)),
+                  Text(
+                    'Why sell on Thriftline?',
+                    style: AppTypography.subheading.copyWith(
+                      color: AppColors.primary,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
-              _benefitRow(Icons.trending_up_outlined, 'Reach thousands of thrift buyers'),
-              _benefitRow(Icons.auto_awesome_outlined, 'AI-powered pricing suggestions'),
+              _benefitRow(
+                Icons.trending_up_outlined,
+                'Reach thousands of thrift buyers',
+              ),
+              _benefitRow(
+                Icons.auto_awesome_outlined,
+                'AI-powered pricing suggestions',
+              ),
               _benefitRow(Icons.security_outlined, 'Secure payment processing'),
-              _benefitRow(Icons.local_shipping_outlined, 'Integrated shipping options'),
+              _benefitRow(
+                Icons.local_shipping_outlined,
+                'Integrated shipping options',
+              ),
             ],
           ),
         ),
@@ -330,291 +386,217 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     );
   }
 
-  // ─── Step 2: Government ID Upload ───
-  Widget _idUploadStep() {
+  Widget _idCaptureStep() {
+    final pair = IdCapturePair(front: _frontQuality, back: _backQuality);
+    if (_idGateOpen) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Both sides of your ID passed the ID check.',
+            style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 20),
+          IdSideReviewCard(
+            title: 'Front ID',
+            bytes: _idFrontBytes,
+            quality: _frontQuality,
+            checking: false,
+          ),
+          const SizedBox(height: 16),
+          IdSideReviewCard(
+            title: 'Back ID',
+            bytes: _idBackBytes,
+            quality: _backQuality,
+            checking: false,
+          ),
+          const SizedBox(height: 16),
+          ThriftButton(
+            label: 'Retake ID photos',
+            variant: ThriftButtonVariant.outline,
+            onPressed: _startIdCaptureFlow,
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              _idPairStatusMessage(pair),
+              style: AppTypography.body.copyWith(
+                color: AppColors.success,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Upload a clear photo of your valid government ID. Ensure all details are readable.',
-                style: AppTypography.body.copyWith(color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 24),
-              GestureDetector(
-                onTap: () {
-                  setState(() => _govIdUploaded = true);
-                  showThriftSnackBar(context, 'ID photo selected');
-                },
-                child: Container(
-                  width: double.infinity,
-                  height: 220,
-                  decoration: BoxDecoration(
-                    color: _govIdUploaded
-                        ? AppColors.success.withValues(alpha: 0.05)
-                        : AppColors.primaryLight.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(16),
-                    // Simulated dashed border using a light border
-                    border: Border.all(
-                      color: _govIdUploaded
-                          ? AppColors.success
-                          : AppColors.primary.withValues(alpha: 0.5),
-                      width: 2,
-                    ),
-                  ),
-                  child: _govIdUploaded
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: AppColors.success.withValues(alpha: 0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.check_circle_outline, color: AppColors.success, size: 40),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'ID Photo Uploaded',
-                              style: AppTypography.body.copyWith(
-                                color: AppColors.success,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextButton.icon(
-                              onPressed: () => setState(() => _govIdUploaded = false),
-                              icon: const Icon(Icons.refresh, size: 16),
-                              label: const Text('Replace Photo'),
-                            )
-                          ],
-                        )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.primary.withValues(alpha: 0.1),
-                                    blurRadius: 10,
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.add_photo_alternate_outlined,
-                                color: AppColors.primary,
-                                size: 36,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Tap to upload ID',
-                              style: AppTypography.body.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'JPG, PNG (Max 5MB)',
-                              style: AppTypography.caption,
-                            ),
-                          ],
-                        ),
-                ),
-              ),
-            ],
-          ),
+        Text(
+          'Use one of the accepted IDs below. You will photograph the front, '
+          'then the back.',
+          style: AppTypography.body.copyWith(color: AppColors.textSecondary),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
         Text('Accepted IDs', style: AppTypography.subheading),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _idChip('Philippine National ID'),
-            _idChip('Driver\'s License'),
-            _idChip('Passport'),
-            _idChip('PhilHealth ID'),
-            _idChip('SSS ID'),
-            _idChip('Voter\'s ID'),
-          ],
-        )
+        for (final type in SellerIdType.values) ...[
+          _acceptedIdRow(type.label),
+          const SizedBox(height: 8),
+        ],
+        const SizedBox(height: 16),
+        ThriftButton(
+          label: 'Proceed to capture',
+          onPressed: _startIdCaptureFlow,
+        ),
       ],
     );
   }
 
-  Widget _idChip(String text) {
-    return Chip(
-      label: Text(text, style: AppTypography.caption.copyWith(color: AppColors.textPrimary)),
-      backgroundColor: AppColors.surfaceVariant.withValues(alpha: 0.5),
-      side: const BorderSide(color: AppColors.border),
-      avatar: const Icon(Icons.check, size: 16, color: AppColors.success),
+  Widget _acceptedIdRow(String label) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle_outline, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // ─── Step 3: Verification Selfie ───
   Widget _selfieStep() {
+    if (_selfieUploaded) {
+      return Column(
+        children: [
+          const Icon(
+            Icons.check_circle_outline,
+            color: AppColors.success,
+            size: 56,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Face check passed',
+            style: AppTypography.subheading.copyWith(color: AppColors.success),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Look left, look right, and a blink were completed. The selfie was captured automatically.',
+            style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          TextButton.icon(
+            onPressed: _startLiveness,
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('Retake face check'),
+          ),
+        ],
+      );
+    }
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+          'Look at the camera, then look right, look left, and blink. '
+          'The selfie is taken automatically once your face is clear and still.',
+          style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 28),
+        Icon(
+          Icons.account_circle_outlined,
+          size: 96,
+          color: AppColors.textHint.withValues(alpha: 0.8),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _bannedIcon(Icons.visibility_outlined),
+            const SizedBox(width: 20),
+            _bannedIcon(Icons.school_outlined),
+            const SizedBox(width: 20),
+            _bannedIcon(Icons.masks_outlined),
+          ],
+        ),
+        const SizedBox(height: 24),
         Container(
-          padding: const EdgeInsets.all(20),
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: AppColors.surfaceVariant,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Take a selfie while holding your ID next to your face to verify your identity.',
-                style: AppTypography.body.copyWith(color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 24),
-              GestureDetector(
-                onTap: () {
-                  setState(() => _selfieUploaded = true);
-                  showThriftSnackBar(context, 'Selfie captured');
-                },
-                child: Container(
-                  width: double.infinity,
-                  height: 280,
-                  decoration: BoxDecoration(
-                    color: _selfieUploaded
-                        ? AppColors.success.withValues(alpha: 0.05)
-                        : AppColors.primaryLight.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _selfieUploaded
-                          ? AppColors.success
-                          : AppColors.primary.withValues(alpha: 0.5),
-                      width: 2,
-                    ),
-                  ),
-                  child: _selfieUploaded
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: AppColors.success.withValues(alpha: 0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.check_circle_outline, color: AppColors.success, size: 40),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Selfie Captured',
-                              style: AppTypography.body.copyWith(
-                                color: AppColors.success,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextButton.icon(
-                              onPressed: () => setState(() => _selfieUploaded = false),
-                              icon: const Icon(Icons.refresh, size: 16),
-                              label: const Text('Retake Selfie'),
-                            )
-                          ],
-                        )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.primary.withValues(alpha: 0.1),
-                                    blurRadius: 10,
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.camera_front_outlined,
-                                color: AppColors.primary,
-                                size: 40,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Tap to open camera',
-                              style: AppTypography.body.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                ),
-              ),
+              _bullet('Look directly at the camera'),
+              _bullet('Remove glasses, hats and masks'),
+              _bullet('Make sure your face is well-lit'),
             ],
           ),
         ),
         const SizedBox(height: 24),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.secondary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.lightbulb_outline, color: AppColors.secondary, size: 20),
-                  const SizedBox(width: 8),
-                  Text('Selfie Tips', style: AppTypography.subheading.copyWith(color: AppColors.secondary)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _tipRow(Icons.light_mode_outlined, 'Ensure good lighting'),
-              _tipRow(Icons.crop_portrait_outlined, 'Hold your ID beside your face'),
-              _tipRow(Icons.visibility_outlined, 'Make sure your face and ID are clearly visible'),
-            ],
+        ThriftButton(label: 'Next', onPressed: _startLiveness),
+      ],
+    );
+  }
+
+  Widget _bannedIcon(IconData icon) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(icon, size: 36, color: AppColors.textHint),
+        Positioned(
+          right: -6,
+          bottom: -4,
+          child: Container(
+            width: 16,
+            height: 16,
+            decoration: const BoxDecoration(
+              color: AppColors.error,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.close, size: 12, color: Colors.white),
           ),
         ),
       ],
     );
   }
 
-  Widget _tipRow(IconData icon, String text) {
+  Widget _bullet(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: AppColors.secondary),
-          const SizedBox(width: 10),
+          Text('•  ', style: AppTypography.body),
           Expanded(child: Text(text, style: AppTypography.body)),
         ],
       ),
     );
   }
 
-  // ─── Segmented Indicator ───
   Widget _buildSegment(int stepIndex, String label) {
     final isActive = _currentStep >= stepIndex;
     final isPast = _currentStep > stepIndex;
@@ -636,7 +618,11 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
               if (isPast)
                 const Padding(
                   padding: EdgeInsets.only(right: 4),
-                  child: Icon(Icons.check_circle, size: 12, color: AppColors.primary),
+                  child: Icon(
+                    Icons.check_circle,
+                    size: 12,
+                    color: AppColors.primary,
+                  ),
                 ),
               Text(
                 label,
@@ -655,9 +641,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     );
   }
 
-  // ─── Pending Screen (Under Review) ───
   Widget _buildPendingScreen(BuildContext context, AuthUser? user) {
-    final auth = context.read<AuthProvider>();
     return Scaffold(
       appBar: AppBar(
         title: const Text('Verification Status'),
@@ -674,18 +658,23 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Pending Card
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [AppColors.warning.withValues(alpha: 0.1), AppColors.warning.withValues(alpha: 0.05)],
+                    colors: [
+                      AppColors.warning.withValues(alpha: 0.1),
+                      AppColors.warning.withValues(alpha: 0.05),
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.3), width: 1.5),
+                  border: Border.all(
+                    color: AppColors.warning.withValues(alpha: 0.3),
+                    width: 1.5,
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -704,20 +693,23 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                     const SizedBox(height: 16),
                     Text(
                       'Application Under Review',
-                      style: AppTypography.heading.copyWith(fontSize: 20, color: AppColors.warning),
+                      style: AppTypography.heading.copyWith(
+                        fontSize: 20,
+                        color: AppColors.warning,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Your seller verification request is currently being reviewed by our trust and safety team. We\'ll notify you once it\'s processed.',
-                      style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 24),
-              
-              // Timeline Steps
               Text('Verification Progress', style: AppTypography.subheading),
               const SizedBox(height: 16),
               _buildTimelineStep(
@@ -728,7 +720,8 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
               ),
               _buildTimelineStep(
                 title: 'Document Review',
-                subtitle: 'Simulated review processing (under 5 mins for demo)',
+                subtitle:
+                    'An admin will compare your ID and face photo in the app',
                 isDone: false,
                 isPending: true,
               ),
@@ -740,8 +733,6 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                 isLast: true,
               ),
               const SizedBox(height: 24),
-
-              // Summary Details
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -753,85 +744,25 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Submitted Details', style: AppTypography.body.copyWith(fontWeight: FontWeight.bold)),
+                    Text(
+                      'Submitted Details',
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     _detailRow('Shop Name', user?.shopName ?? 'Vintage PH'),
                     _detailRow('Location', user?.location ?? 'Davao City'),
-                    _detailRow('Government ID', 'Philippine National ID (Verified File)'),
-                    _detailRow('Verification Selfie', 'Face Match Photo (Selfie + ID)'),
+                    _detailRow('Government ID', 'Uploaded for admin review'),
+                    _detailRow('Face verification', 'Liveness check completed'),
                   ],
                 ),
               ),
-              const SizedBox(height: 32),
-
-              // Admin Review Simulation Panel
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 1.5),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.construction_outlined, color: AppColors.primary),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Review Control Panel (Simulator)',
-                          style: AppTypography.subheading.copyWith(color: AppColors.primaryDark),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Use these buttons to simulate how the admin review will affect your profile in real-time.',
-                      style: AppTypography.caption,
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.error,
-                              side: const BorderSide(color: AppColors.error),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            icon: const Icon(Icons.close_rounded, size: 18),
-                            label: const Text('Reject ID'),
-                            onPressed: () => _showRejectionDialog(context, auth),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              elevation: 0,
-                            ),
-                            icon: const Icon(Icons.check_rounded, size: 18),
-                            label: const Text('Approve ID'),
-                            onPressed: () async {
-                              await auth.simulateApproveApplication();
-                              if (context.mounted) {
-                                showThriftSnackBar(context, '🎉 Congratulations! You are now a Verified Seller!');
-                                context.pop();
-                              }
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 24),
+              Text(
+                'You will get an in-app notification when an admin approves or rejects this application.',
+                style: AppTypography.caption,
+                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -840,7 +771,6 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     );
   }
 
-  // ─── Rejected Screen ───
   Widget _buildRejectedScreen(BuildContext context, AuthUser? user) {
     final auth = context.read<AuthProvider>();
     return Scaffold(
@@ -858,18 +788,23 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
           padding: const EdgeInsets.all(AppConstants.spacingMd),
           child: Column(
             children: [
-              // Rejection Card
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [AppColors.error.withValues(alpha: 0.1), AppColors.error.withValues(alpha: 0.05)],
+                    colors: [
+                      AppColors.error.withValues(alpha: 0.1),
+                      AppColors.error.withValues(alpha: 0.05),
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.error.withValues(alpha: 0.3), width: 1.5),
+                  border: Border.all(
+                    color: AppColors.error.withValues(alpha: 0.3),
+                    width: 1.5,
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -888,20 +823,23 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                     const SizedBox(height: 16),
                     Text(
                       'Application Rejected',
-                      style: AppTypography.heading.copyWith(fontSize: 20, color: AppColors.error),
+                      style: AppTypography.heading.copyWith(
+                        fontSize: 20,
+                        color: AppColors.error,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Unfortunately, your seller verification application has been rejected.',
-                      style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Rejection Reason Card
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -915,11 +853,18 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.info_outline, color: AppColors.error, size: 20),
+                        const Icon(
+                          Icons.info_outline,
+                          color: AppColors.error,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Reason for Rejection',
-                          style: AppTypography.body.copyWith(fontWeight: FontWeight.bold, color: AppColors.error),
+                          style: AppTypography.body.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.error,
+                          ),
                         ),
                       ],
                     ),
@@ -927,20 +872,20 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                     Text(
                       user?.verificationRejectionReason ??
                           'The ID submission details could not be verified. Please make sure the name on your store matches the name on your ID.',
-                      style: AppTypography.body.copyWith(color: AppColors.textPrimary),
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 32),
-
               Text(
                 'Want to try again? Please ensure your document and selfie match and are shot in bright lighting.',
                 style: AppTypography.caption,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              
               ThriftButton(
                 label: 'Reapply & Edit Details',
                 onPressed: () => _handleReapply(auth),
@@ -959,8 +904,8 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     required bool isPending,
     bool isLast = false,
   }) {
-    Color lineCol = isDone ? AppColors.success : AppColors.border;
-    
+    final lineCol = isDone ? AppColors.success : AppColors.border;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -970,35 +915,34 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
               width: 24,
               height: 24,
               decoration: BoxDecoration(
-                color: isDone 
-                    ? AppColors.success.withValues(alpha: 0.15) 
-                    : (isPending ? AppColors.warning.withValues(alpha: 0.15) : AppColors.surfaceVariant),
+                color: isDone
+                    ? AppColors.success.withValues(alpha: 0.15)
+                    : (isPending
+                          ? AppColors.warning.withValues(alpha: 0.15)
+                          : AppColors.surfaceVariant),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isDone 
-                      ? AppColors.success 
+                  color: isDone
+                      ? AppColors.success
                       : (isPending ? AppColors.warning : AppColors.border),
                   width: 2,
                 ),
               ),
               child: isDone
                   ? const Icon(Icons.check, size: 14, color: AppColors.success)
-                  : (isPending 
-                      ? const Padding(
-                          padding: EdgeInsets.all(4.0),
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.warning),
-                          ),
-                        )
-                      : null),
+                  : (isPending
+                        ? const Padding(
+                            padding: EdgeInsets.all(4.0),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.warning,
+                              ),
+                            ),
+                          )
+                        : null),
             ),
-            if (!isLast)
-              Container(
-                width: 2,
-                height: 36,
-                color: lineCol,
-              ),
+            if (!isLast) Container(width: 2, height: 36, color: lineCol),
           ],
         ),
         const SizedBox(width: 12),
@@ -1010,14 +954,13 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                 title,
                 style: AppTypography.body.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: isDone ? AppColors.textPrimary : (isPending ? AppColors.warning : AppColors.textHint),
+                  color: isDone
+                      ? AppColors.textPrimary
+                      : (isPending ? AppColors.warning : AppColors.textHint),
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: AppTypography.caption,
-              ),
+              Text(subtitle, style: AppTypography.caption),
               const SizedBox(height: 12),
             ],
           ),
@@ -1033,73 +976,177 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: AppTypography.caption),
-          Text(value, style: AppTypography.body.copyWith(fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-
-  void _showRejectionDialog(BuildContext context, AuthProvider auth) {
-    final reasonCtrl = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Simulate Application Rejection'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Specify a reason for rejecting this ID verification submission to simulate the feedback loop.',
-              style: AppTypography.body,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonCtrl,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'e.g. Selfie photo is too dark. Please retake the selfie under better lighting.',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              final reason = reasonCtrl.text.trim().isEmpty
-                  ? 'The submitted selfie holding your ID is too blurry to match the face on the ID.'
-                  : reasonCtrl.text.trim();
-              await auth.simulateRejectApplication(reason);
-              if (dialogCtx.mounted) {
-                Navigator.pop(dialogCtx);
-                showThriftSnackBar(context, 'Application rejected (simulation)');
-              }
-            },
-            child: const Text('Reject Submission'),
+          Text(
+            value,
+            style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _handleReapply(AuthProvider auth) async {
+  void _continueFromAddress() {
+    final error = SellerAddressDraft.validate(
+      storeName: _storeNameCtrl.text,
+      barangay: _selectedBarangay,
+      allowedBarangays: _barangays,
+      addressLine1: _addressLine1Ctrl.text,
+    );
+    if (error != null) {
+      showThriftSnackBar(context, error);
+      return;
+    }
+    setState(() => _currentStep = 1);
+  }
+
+  String _idPairStatusMessage(IdCapturePair pair) {
+    if (pair.canProceed) {
+      return 'Both ID photos passed the quality check.';
+    }
+    if (_idFrontBytes == null || _idBackBytes == null) {
+      return 'Both front and back photos are required.';
+    }
+    if (pair.front == null || pair.back == null) {
+      return 'Checking ID photos…';
+    }
+    if (pair.blockingIssue == IdQualityIssue.notId) {
+      return 'No ID detected on one of the photos. Place the ID in the frame and retake.';
+    }
+    return 'Retake the photo that did not pass before continuing.';
+  }
+
+  void _continueFromId() {
+    final pair = IdCapturePair(front: _frontQuality, back: _backQuality);
+    if (!pair.canProceed) {
+      showThriftSnackBar(context, _idPairStatusMessage(pair));
+      return;
+    }
+    setState(() => _currentStep = 2);
+  }
+
+  Future<void> _startIdCaptureFlow() async {
+    final result = await Navigator.of(context).push<IdCaptureResult>(
+      MaterialPageRoute(builder: (_) => const IdCaptureScreen()),
+    );
+    if (!mounted || result == null) return;
+
+    setState(() {
+      _idFrontBytes = result.frontBytes;
+      _idBackBytes = result.backBytes;
+      _frontQuality = result.frontQuality;
+      _backQuality = result.backQuality;
+    });
+  }
+
+  Future<void> _startLiveness() async {
+    final result = await Navigator.of(context).push<LivenessResult>(
+      MaterialPageRoute(builder: (_) => const LivenessCaptureScreen()),
+    );
+    if (!mounted || result == null) return;
+    if (!result.livenessPassed) {
+      showThriftSnackBar(
+        context,
+        'Complete look left, look right, and a blink before capturing.',
+        isError: true,
+      );
+      return;
+    }
+    if (!result.imageQualityPassed || !result.passed) {
+      showThriftSnackBar(
+        context,
+        'No face detected. Please position your face inside the frame.',
+        isError: true,
+      );
+      return;
+    }
+    setState(() {
+      _liveness = result;
+      _selfieUploaded = true;
+    });
+  }
+
+  Future<void> _submit(AuthProvider auth) async {
+    final front = _idFrontBytes;
+    final back = _idBackBytes;
+    final liveness = _liveness;
+    final pair = IdCapturePair(front: _frontQuality, back: _backQuality);
+    if (front == null || back == null || !pair.canProceed) {
+      showThriftSnackBar(
+        context,
+        'Please complete ID capture and pass the quality check first.',
+      );
+      setState(() => _currentStep = 1);
+      return;
+    }
+    if (liveness == null || !liveness.passed) {
+      showThriftSnackBar(context, 'Please complete the live face check first.');
+      return;
+    }
+
+    final address = SellerAddressDraft(
+      storeName: _storeNameCtrl.text,
+      barangay: _selectedBarangay,
+      addressLine1: _addressLine1Ctrl.text,
+      addressLine2: _addressLine2Ctrl.text,
+    );
+    final addressError = SellerAddressDraft.validate(
+      storeName: address.storeName,
+      barangay: address.barangay,
+      allowedBarangays: _barangays,
+      addressLine1: address.addressLine1,
+    );
+    if (addressError != null) {
+      showThriftSnackBar(context, addressError);
+      setState(() => _currentStep = 0);
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      await SellerVerificationService(
+        context.read<SupabaseService>(),
+      ).submitApplication(
+        address: address,
+        idFrontBytes: front,
+        idBackBytes: back,
+        selfieBytes: liveness.imageBytes,
+        selfieFileName: liveness.fileName,
+        liveness: liveness.challenges,
+      );
+      await auth.reloadUser();
+      if (mounted) {
+        showThriftSnackBar(
+          context,
+          'Seller application submitted. An admin will review it.',
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        showThriftSnackBar(
+          context,
+          sellerSubmitUserMessage(error),
+          isError: true,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  void _handleReapply(AuthProvider auth) {
     setState(() {
       _currentStep = 0;
-      _govIdUploaded = false;
+      _idFrontBytes = null;
+      _idBackBytes = null;
+      _frontQuality = null;
+      _backQuality = null;
       _selfieUploaded = false;
+      _liveness = null;
       _storeNameCtrl.clear();
-      _addressCtrl.clear();
-      _selectedRegion = 'Select Barangay';
+      _addressLine1Ctrl.clear();
+      _addressLine2Ctrl.clear();
+      _selectedBarangay = null;
     });
-    await auth.resetVerificationStatus();
+    auth.prepareVerificationReapply();
   }
 }

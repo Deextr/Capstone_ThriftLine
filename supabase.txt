@@ -1315,7 +1315,7 @@
 					"udt": "numeric",
 					"name": "trust_score",
 					"type": "numeric",
-					"default": "0",
+					"default": null,
 					"nullable": "NO"
 				},
 				{

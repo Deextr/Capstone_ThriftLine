@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
-
-import '../../../../core/routes/route_names.dart';
+import '../../../../core/services/supabase_service.dart';
+import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/curved_navigation_bar.dart';
-import '../../../../widgets/thrift_widgets.dart';
+import '../../../chat/controllers/chat_list_controller.dart';
+import '../../../chat/presentation/widgets/chat_inbox_view.dart';
+import '../../../profile/screens/buyer_profile_tab.dart';
+import '../../controllers/buyer_bids_controller.dart';
+import '../../controllers/home_controller.dart';
+import '../../controllers/looking_for_controller.dart';
 import 'buyer_bids_tab.dart';
 import 'buyer_home_tab.dart';
 import 'buyer_looking_for_tab.dart';
-import 'buyer_profile_tab.dart';
 
 class BuyerShellScreen extends StatefulWidget {
   const BuyerShellScreen({super.key});
@@ -20,14 +24,37 @@ class BuyerShellScreen extends StatefulWidget {
 class _BuyerShellScreenState extends State<BuyerShellScreen> {
   int _index = 0;
 
+  /// The Home and Bids tabs are wrapped in [ChangeNotifierProvider]
+  /// so their controllers are scoped to the buyer shell lifetime.
+  late final List<Widget> _tabs;
 
-  static const _tabs = [
-    BuyerHomeTab(),
-    BuyerBidsTab(),
-    BuyerLookingForTab(),
-    _MessagesTab(),
-    BuyerProfileTab(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _tabs = [
+      ChangeNotifierProvider(
+        create: (context) =>
+            HomeController(supabase: context.read<SupabaseService>()),
+        child: const BuyerHomeTab(),
+      ),
+      ChangeNotifierProvider(
+        create: (context) => BuyerBidsController(
+          supabase: context.read<SupabaseService>(),
+          auth: context.read<AuthProvider>(),
+        ),
+        child: const BuyerBidsTab(),
+      ),
+      const BuyerLookingForTab(),
+      ChangeNotifierProvider(
+        create: (context) => ChatListController(
+          supabase: context.read<SupabaseService>(),
+          auth: context.read<AuthProvider>(),
+        ),
+        child: const ChatInboxView(showHeader: true),
+      ),
+      const BuyerProfileTab(),
+    ];
+  }
 
   static const _navItems = [
     CurvedNavItem(
@@ -64,44 +91,26 @@ class _BuyerShellScreenState extends State<BuyerShellScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // Use extendBody so the curved nav bar can overlap the body edge
-      extendBody: true,
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        switchInCurve: Curves.easeOut,
-        switchOutCurve: Curves.easeIn,
-        transitionBuilder: (child, animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: child,
-          );
-        },
-        child: KeyedSubtree(
-          key: ValueKey<int>(_index),
-          child: _tabs[_index],
+    return ChangeNotifierProvider(
+      create: (context) => LookingForController(
+        supabase: context.read<SupabaseService>(),
+        auth: context.read<AuthProvider>(),
+      ),
+      child: Scaffold(
+        extendBody: true,
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, animation) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          child: KeyedSubtree(key: ValueKey<int>(_index), child: _tabs[_index]),
         ),
-      ),
-      bottomNavigationBar: CurvedNavigationBar(
-        selectedIndex: _index,
-        onTap: _onTabChanged,
-        items: _navItems,
-      ),
-    );
-  }
-}
-
-class _MessagesTab extends StatelessWidget {
-  const _MessagesTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Center(
-        child: ThriftButton(
-          label: 'Open Messages',
-          expand: false,
-          onPressed: () => context.push(RouteNames.chat),
+        bottomNavigationBar: CurvedNavigationBar(
+          selectedIndex: _index,
+          onTap: _onTabChanged,
+          items: _navItems,
         ),
       ),
     );
