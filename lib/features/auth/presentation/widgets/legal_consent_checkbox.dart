@@ -118,9 +118,7 @@ class _LegalConsentCheckboxState extends State<LegalConsentCheckbox> {
                           color: AppColors.textPrimary,
                         ),
                         children: [
-                          const TextSpan(
-                            text: 'I have read and agree to the ',
-                          ),
+                          const TextSpan(text: 'I have read and agree to the '),
                           TextSpan(
                             text: 'Terms and Conditions',
                             style: linkStyle,

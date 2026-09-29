@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../core/constants/app_colors.dart';
 import '../core/constants/app_constants.dart';
 import '../core/constants/app_typography.dart';
+import '../core/theme/app_gradients.dart';
 
 enum ThriftButtonVariant { primary, secondary, outline, ghost }
 
@@ -57,19 +58,26 @@ class ThriftButton extends StatelessWidget {
           );
 
     final btn = switch (variant) {
-      ThriftButtonVariant.primary => ElevatedButton(
-        onPressed: isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color ?? AppColors.primary,
-          foregroundColor: Colors.white,
-          minimumSize: Size(expand ? double.infinity : 0, 48),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 0,
-        ),
-        child: child,
-      ),
+      ThriftButtonVariant.primary =>
+        color == null
+            ? _GradientButton(
+                onPressed: isLoading ? null : onPressed,
+                expand: expand,
+                child: child,
+              )
+            : ElevatedButton(
+                onPressed: isLoading ? null : onPressed,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: color,
+                  foregroundColor: Colors.white,
+                  minimumSize: Size(expand ? double.infinity : 0, 48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                child: child,
+              ),
       ThriftButtonVariant.secondary => ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
@@ -113,6 +121,57 @@ class ThriftButton extends StatelessWidget {
           variant == ThriftButtonVariant.ghost
       ? (color ?? AppColors.primary)
       : Colors.white;
+}
+
+class _GradientButton extends StatelessWidget {
+  const _GradientButton({
+    required this.onPressed,
+    required this.expand,
+    required this.child,
+  });
+
+  final VoidCallback? onPressed;
+  final bool expand;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: enabled ? AppGradients.buttonGradient : null,
+        color: enabled ? null : AppColors.primary.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: enabled ? AppGradients.emphasisShadow : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(12),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: 48,
+              minWidth: expand ? double.infinity : 0,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.center,
+                child: DefaultTextStyle.merge(
+                  style: const TextStyle(color: Colors.white),
+                  child: IconTheme.merge(
+                    data: const IconThemeData(color: Colors.white),
+                    child: child,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class ThriftTextField extends StatefulWidget {

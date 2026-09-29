@@ -31,8 +31,8 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
       title: 'Mega Thrift Sale',
       subtitle: 'Up to 70% off pre-loved fashion',
       cta: 'Shop Now',
-      gradientStart: Color(0xFF0D9488),
-      gradientEnd: Color(0xFF0F766E),
+      gradientStart: AppColors.primary,
+      gradientEnd: AppColors.primaryDark,
     ),
     _BannerData(
       imageUrl:

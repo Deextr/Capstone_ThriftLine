@@ -34,7 +34,9 @@ class LegalDocumentScreen extends StatelessWidget {
               context.pop();
             } else {
               final auth = context.read<AuthProvider>();
-              context.go(auth.isAuthenticated ? auth.homeRoute : RouteNames.login);
+              context.go(
+                auth.isAuthenticated ? auth.homeRoute : RouteNames.login,
+              );
             }
           },
         ),

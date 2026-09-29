@@ -47,6 +47,46 @@ void main() {
       expect(reportDecisionLabel('resolved'), 'Resolved');
       expect(reportDecisionLabel('dismissed'), 'Dismissed');
     });
+
+    test('classifies existing report reasons without inventing types', () {
+      expect(
+        isAdminOrderReport(category: 'item_not_as_described', orderId: null),
+        isTrue,
+      );
+      expect(
+        isAdminOrderReport(category: 'failure_to_ship', orderId: null),
+        isTrue,
+      );
+      expect(
+        isAdminOrderReport(category: 'harassment', orderId: null),
+        isFalse,
+      );
+      expect(
+        isAdminOrderReport(category: 'scam_or_fraud', orderId: null),
+        isFalse,
+      );
+      expect(
+        isAdminOrderReport(category: 'scam_or_fraud', orderId: 'order-1'),
+        isTrue,
+      );
+      expect(
+        adminReportKindOf(category: 'fake_identity', orderId: null),
+        'Community',
+      );
+      expect(
+        adminReportKindOf(category: 'fake_product', orderId: null),
+        'Order',
+      );
+    });
+
+    test('formats compact report ids and previews', () {
+      expect(
+        adminReportShortId('a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
+        'A1B2C3D4',
+      );
+      expect(adminReportPreview('Short note.'), 'Short note.');
+      expect(adminReportPreview('A' * 120).endsWith('…'), isTrue);
+    });
   });
 
   group('admin delivery problems', () {

@@ -12,11 +12,7 @@ import '../../domain/legal_documents.dart';
 /// Continuing (email or Google sign-in) records consent. The document names
 /// open the existing [LegalDocumentScreen] viewers.
 class LegalConsentNotice extends StatefulWidget {
-  const LegalConsentNotice({
-    super.key,
-    this.textColor,
-    this.linkColor,
-  });
+  const LegalConsentNotice({super.key, this.textColor, this.linkColor});
 
   final Color? textColor;
   final Color? linkColor;

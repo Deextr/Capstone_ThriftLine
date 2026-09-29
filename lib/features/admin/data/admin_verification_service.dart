@@ -113,11 +113,15 @@ class AdminVerificationService {
     return application;
   }
 
-  Future<List<SellerApplication>> listPending() async {
+  Future<List<SellerApplication>> listPending() {
+    return listByStatus('pending');
+  }
+
+  Future<List<SellerApplication>> listByStatus(String status) async {
     final rows = await _supabase.client
         .from('user_verifications')
         .select()
-        .eq('verification_status', 'pending')
+        .eq('verification_status', status)
         .order('submitted_at', ascending: false);
     final applications = (rows as List)
         .map(
@@ -144,6 +148,25 @@ class AdminVerificationService {
     } catch (_) {
       return applications;
     }
+  }
+
+  /// Returns the count of verifications grouped by status.
+  Future<({int pending, int approved, int rejected})> countAll() async {
+    final rows = await _supabase.client
+        .from('user_verifications')
+        .select('verification_status');
+    int pending = 0, approved = 0, rejected = 0;
+    for (final row in (rows as List)) {
+      switch ((row as Map)['verification_status'] as String?) {
+        case 'pending':
+          pending++;
+        case 'approved':
+          approved++;
+        case 'rejected':
+          rejected++;
+      }
+    }
+    return (pending: pending, approved: approved, rejected: rejected);
   }
 
   Future<String?> signedUrl(String? path) async {

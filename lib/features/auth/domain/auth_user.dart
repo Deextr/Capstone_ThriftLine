@@ -128,6 +128,7 @@ class AuthUser {
       sales: sellerProfile?['total_sales'] as int?,
       isVerified: approved,
       bio: profile?['bio'] as String? ?? sellerProfile?['shop_bio'] as String?,
+      lastActive: _parseTime(profile?['last_active_at']),
       verificationStatus: approved ? 'approved' : status,
       verificationRejectionReason: verification?['rejection_reason'] as String?,
       trustScore: (profile?['trust_score'] as num?)?.toInt() ?? 80,
@@ -135,6 +136,14 @@ class AuthUser {
       usesEmailPasswordAuth:
           supabaseUser.identities?.any((i) => i.provider == 'email') ?? false,
     );
+  }
+
+  static DateTime? _parseTime(Object? value) {
+    if (value is DateTime) return value;
+    if (value is String && value.trim().isNotEmpty) {
+      return DateTime.tryParse(value);
+    }
+    return null;
   }
 
   AuthUser copyWith({

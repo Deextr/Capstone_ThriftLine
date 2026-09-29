@@ -8,10 +8,19 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/settings_provider.dart';
+import '../../../../widgets/thrift_widgets.dart';
 import '../../../auth/domain/legal_documents.dart';
+import '../../../auth/presentation/widgets/auth_widgets.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({
+    super.key,
+    this.showBackButton = true,
+    this.showLogout = false,
+  });
+
+  final bool showBackButton;
+  final bool showLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -22,16 +31,21 @@ class SettingsScreen extends StatelessWidget {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Settings'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        automaticallyImplyLeading: showBackButton,
+        leading: showBackButton
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.pop(),
+              )
+            : null,
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppConstants.spacingMd,
-            vertical: AppConstants.spacingSm,
+          padding: EdgeInsets.fromLTRB(
+            AppConstants.spacingMd,
+            AppConstants.spacingSm,
+            AppConstants.spacingMd,
+            showBackButton ? AppConstants.spacingSm : 112,
           ),
           children: [
             _buildSection(
@@ -106,7 +120,10 @@ class SettingsScreen extends StatelessWidget {
                     color: AppColors.textPrimary,
                     size: 22,
                   ),
-                  title: Text('Terms and Conditions', style: AppTypography.body),
+                  title: Text(
+                    'Terms and Conditions',
+                    style: AppTypography.body,
+                  ),
                   trailing: const Icon(
                     Icons.chevron_right,
                     size: 20,
@@ -156,6 +173,15 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ],
             ),
+            if (showLogout) ...[
+              const SizedBox(height: 24),
+              ThriftButton(
+                label: 'Logout',
+                variant: ThriftButtonVariant.ghost,
+                color: AppColors.error,
+                onPressed: () => confirmAndLogout(context),
+              ),
+            ],
             const SizedBox(height: 32),
           ],
         ),

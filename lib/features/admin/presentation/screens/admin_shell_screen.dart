@@ -1,267 +1,200 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_typography.dart';
-import '../../../../core/routes/route_names.dart';
-import '../../../../core/utils/formatters.dart';
-import '../../../../providers/auth_provider.dart';
-import '../../../auth/presentation/widgets/auth_widgets.dart';
-import '../../../../widgets/empty_state.dart';
-import '../../controllers/admin_review_center_controller.dart';
-import '../../data/admin_review_rules.dart';
-import '../../data/admin_review_service.dart';
-import '../widgets/admin_review_widgets.dart';
+import '../../../../core/constants/app_constants.dart';
+import '../../../../widgets/curved_navigation_bar.dart';
+import '../../../settings/presentation/screens/settings_screen.dart';
+import '../../controllers/admin_dashboard_controller.dart';
+import '../../controllers/admin_reports_controller.dart';
+import '../../controllers/admin_seller_applications_controller.dart';
+import 'admin_dashboard_tab.dart';
+import 'admin_reports_queue_screen.dart';
+import 'admin_seller_applications_screen.dart';
+import 'admin_tab_scope.dart';
 
-class AdminShellScreen extends StatelessWidget {
+class AdminShellScreen extends StatefulWidget {
   const AdminShellScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    final controller = context.watch<AdminReviewCenterController>();
-    final counts = controller.counts;
-    final name = auth.user?.name.trim() ?? '';
+  State<AdminShellScreen> createState() => _AdminShellScreenState();
+}
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Review Center'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh),
-            onPressed: controller.isLoading
-                ? null
-                : () => context.read<AdminReviewCenterController>().load(),
-          ),
-          IconButton(
-            tooltip: 'Log out',
-            icon: const Icon(Icons.logout),
-            onPressed: () => confirmAndLogout(context),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () => context.read<AdminReviewCenterController>().load(),
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-            children: [
-              if (name.isNotEmpty) ...[
-                Text('Signed in as $name', style: AppTypography.caption),
-                const SizedBox(height: 20),
-              ],
-              if (controller.errorMessage != null)
-                AdminErrorState(
-                  message: controller.errorMessage!,
-                  onRetry: () =>
-                      context.read<AdminReviewCenterController>().load(),
-                )
-              else if (controller.isLoading && counts == null)
-                const _QueueSkeleton()
-              else ...[
-                _QueueSurface(
-                  children: [
-                    AdminQueueNavRow(
-                      label: 'Seller Applications',
-                      detail: adminQueueStatusLine(
-                        counts?.sellerApplications ?? 0,
-                        'awaiting review',
-                      ),
-                      loading: counts == null,
-                      needsAttention: (counts?.sellerApplications ?? 0) > 0,
-                      icon: Icons.storefront_outlined,
-                      semanticLabel: _queueSemantics(
-                        'Seller Applications',
-                        counts?.sellerApplications,
-                        'awaiting review',
-                      ),
-                      onTap: () => _open(context, RouteNames.adminApplications),
-                    ),
-                    AdminQueueNavRow(
-                      label: 'Community Reports',
-                      detail: adminQueueStatusLine(
-                        counts?.communityReports ?? 0,
-                        'under review',
-                      ),
-                      loading: counts == null,
-                      needsAttention: (counts?.communityReports ?? 0) > 0,
-                      icon: Icons.flag_outlined,
-                      semanticLabel: _queueSemantics(
-                        'Community Reports',
-                        counts?.communityReports,
-                        'under review',
-                      ),
-                      onTap: () => _open(context, RouteNames.adminReports),
-                    ),
-                    AdminQueueNavRow(
-                      label: 'Delivery Problems',
-                      detail: adminQueueStatusLine(
-                        counts?.deliveryProblems ?? 0,
-                        'open',
-                      ),
-                      loading: counts == null,
-                      needsAttention: (counts?.deliveryProblems ?? 0) > 0,
-                      icon: Icons.local_shipping_outlined,
-                      semanticLabel: _queueSemantics(
-                        'Delivery Problems',
-                        counts?.deliveryProblems,
-                        'open',
-                      ),
-                      onTap: () => _open(context, RouteNames.adminDisputes),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                Text('Recent activity', style: AppTypography.subheading),
-                const SizedBox(height: 8),
-                if (controller.activity.isEmpty)
-                  Text(
-                    'No recent decisions.',
-                    style: AppTypography.body.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  )
-                else
-                  for (final item in controller.activity) ...[
-                    _ActivityRow(
-                      item: item,
-                      onTap: () => _open(context, _activityRoute(item)),
-                    ),
-                  ],
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
+class _AdminShellScreenState extends State<AdminShellScreen> {
+  int _index = 0;
+
+  void _onTabChanged(int newIndex) {
+    if (newIndex == _index) return;
+    setState(() => _index = newIndex);
+    if (newIndex == AdminTabScope.dashboard) {
+      context.read<AdminDashboardController>().load();
+    }
+    if (newIndex == AdminTabScope.verifications) {
+      context.read<AdminSellerApplicationsController>().load();
+    }
+    if (newIndex == AdminTabScope.reports) {
+      context.read<AdminReportsController>().load();
+    }
   }
 
-  String _queueSemantics(String label, int? count, String state) {
-    if (count == null) return '$label, loading count';
-    return '$label, ${adminQueueStatusLine(count, state)}';
-  }
-
-  String _activityRoute(AdminReviewActivity item) {
-    return switch (item.target) {
-      AdminActivityTarget.application => RouteNames.adminReviewFor(item.id),
-      AdminActivityTarget.report => RouteNames.adminReportDetailFor(item.id),
-      AdminActivityTarget.dispute => RouteNames.adminDisputeDetailFor(item.id),
+  Widget _page(int index) {
+    return switch (index) {
+      AdminTabScope.verifications => const AdminSellerApplicationsScreen(
+        embedded: true,
+      ),
+      AdminTabScope.reports => const AdminReportsQueueScreen(embedded: true),
+      AdminTabScope.settings => const SettingsScreen(
+        showBackButton: false,
+        showLogout: true,
+      ),
+      _ => const AdminDashboardTab(),
     };
   }
 
-  Future<void> _open(BuildContext context, String route) async {
-    await context.push(route);
-    if (context.mounted) {
-      await context.read<AdminReviewCenterController>().load();
-    }
-  }
-}
-
-class _QueueSurface extends StatelessWidget {
-  const _QueueSurface({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
+  Widget? _badge(int count) {
+    if (count <= 0) return null;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        color: AppColors.error,
+        borderRadius: BorderRadius.circular(10),
       ),
-      child: Column(
-        children: [
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) const Divider(height: 1, indent: 48),
-            children[i],
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _QueueSkeleton extends StatelessWidget {
-  const _QueueSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return const _QueueSurface(
-      children: [_SkeletonNavRow(), _SkeletonNavRow(), _SkeletonNavRow()],
-    );
-  }
-}
-
-class _SkeletonNavRow extends StatelessWidget {
-  const _SkeletonNavRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          ShimmerBox(width: 20, height: 20, radius: 4),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ShimmerBox(width: 160, height: 14),
-                SizedBox(height: 8),
-                ShimmerBox(width: 112, height: 12),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActivityRow extends StatelessWidget {
-  const _ActivityRow({required this.item, required this.onTap});
-
-  final AdminReviewActivity item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final detail = [
-      if (item.detail.trim().isNotEmpty) item.detail.trim(),
-      formatCompactDate(item.occurredAt),
-    ].join(' · ');
-
-    return Semantics(
-      button: true,
-      label: '${item.title}. $detail',
-      child: InkWell(
-        onTap: onTap,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(detail, style: AppTypography.caption),
-              ],
-            ),
-          ),
+      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+      child: Text(
+        '$count',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
         ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final counts = context.watch<AdminDashboardController>().counts;
+    final pending = counts?.pendingVerifications ?? 0;
+    final openReports = counts?.openReports ?? 0;
+    final wide =
+        MediaQuery.sizeOf(context).width >= AppConstants.breakpointDesktop;
+    final page = KeyedSubtree(key: ValueKey<int>(_index), child: _page(_index));
+
+    final destinations = [
+      const NavigationRailDestination(
+        icon: Icon(Icons.dashboard_outlined),
+        selectedIcon: Icon(Icons.dashboard_rounded),
+        label: Text('Dashboard'),
+      ),
+      NavigationRailDestination(
+        icon: Badge(
+          isLabelVisible: pending > 0,
+          label: Text('$pending'),
+          child: const Icon(Icons.verified_outlined),
+        ),
+        selectedIcon: Badge(
+          isLabelVisible: pending > 0,
+          label: Text('$pending'),
+          child: const Icon(Icons.verified_rounded),
+        ),
+        label: const Text('Verifications'),
+      ),
+      NavigationRailDestination(
+        icon: Badge(
+          isLabelVisible: openReports > 0,
+          label: Text('$openReports'),
+          child: const Icon(Icons.flag_outlined),
+        ),
+        selectedIcon: Badge(
+          isLabelVisible: openReports > 0,
+          label: Text('$openReports'),
+          child: const Icon(Icons.flag_rounded),
+        ),
+        label: const Text('Reports'),
+      ),
+      const NavigationRailDestination(
+        icon: Icon(Icons.settings_outlined),
+        selectedIcon: Icon(Icons.settings_rounded),
+        label: Text('Settings'),
+      ),
+    ];
+
+    final navItems = [
+      const CurvedNavItem(
+        icon: Icons.dashboard_outlined,
+        activeIcon: Icons.dashboard_rounded,
+        label: 'Dashboard',
+      ),
+      CurvedNavItem(
+        icon: Icons.verified_outlined,
+        activeIcon: Icons.verified_rounded,
+        label: 'Verify',
+        badge: _badge(pending),
+      ),
+      CurvedNavItem(
+        icon: Icons.flag_outlined,
+        activeIcon: Icons.flag_rounded,
+        label: 'Reports',
+        badge: _badge(openReports),
+      ),
+      const CurvedNavItem(
+        icon: Icons.settings_outlined,
+        activeIcon: Icons.settings_rounded,
+        label: 'Settings',
+      ),
+    ];
+
+    return AdminTabScope(
+      openTab: _onTabChanged,
+      child: Scaffold(
+        extendBody: !wide,
+        body: wide
+            ? Row(
+                children: [
+                  NavigationRail(
+                    selectedIndex: _index,
+                    onDestinationSelected: _onTabChanged,
+                    labelType: NavigationRailLabelType.all,
+                    backgroundColor: AppColors.surface,
+                    selectedIconTheme: const IconThemeData(
+                      color: AppColors.primary,
+                    ),
+                    selectedLabelTextStyle: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                    unselectedIconTheme: const IconThemeData(
+                      color: AppColors.textSecondary,
+                    ),
+                    destinations: destinations,
+                  ),
+                  const VerticalDivider(width: 1, color: AppColors.border),
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: page,
+                    ),
+                  ),
+                ],
+              )
+            : AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+                child: page,
+              ),
+        bottomNavigationBar: wide
+            ? null
+            : CurvedNavigationBar(
+                selectedIndex: _index,
+                onTap: _onTabChanged,
+                items: navItems,
+              ),
       ),
     );
   }

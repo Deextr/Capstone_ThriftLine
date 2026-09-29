@@ -4,9 +4,9 @@ import 'package:provider/provider.dart';
 
 import '../../features/auth/domain/legal_documents.dart';
 import '../../features/auth/presentation/screens/legal_document_screen.dart';
+import '../../features/admin/controllers/admin_dashboard_controller.dart';
 import '../../features/admin/controllers/admin_disputes_controller.dart';
 import '../../features/admin/controllers/admin_reports_controller.dart';
-import '../../features/admin/controllers/admin_review_center_controller.dart';
 import '../../features/admin/controllers/admin_seller_applications_controller.dart';
 import '../../features/admin/presentation/screens/admin_dispute_detail_screen.dart';
 import '../../features/admin/presentation/screens/admin_disputes_queue_screen.dart';
@@ -505,10 +505,25 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: RouteNames.adminHome,
-        builder: (context, _) => ChangeNotifierProvider(
-          create: (context) => AdminReviewCenterController(
-            supabase: context.read<SupabaseService>(),
-          ),
+        builder: (context, _) => MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (context) => AdminDashboardController(
+                supabase: context.read<SupabaseService>(),
+                prefs: context.read<SharedPreferencesService>(),
+              ),
+            ),
+            ChangeNotifierProvider(
+              create: (context) => AdminReportsController(
+                supabase: context.read<SupabaseService>(),
+              ),
+            ),
+            ChangeNotifierProvider(
+              create: (context) => AdminSellerApplicationsController(
+                supabase: context.read<SupabaseService>(),
+              ),
+            ),
+          ],
           child: const AdminShellScreen(),
         ),
       ),

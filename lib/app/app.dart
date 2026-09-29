@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../core/constants/app_constants.dart';
+import '../core/services/presence_service.dart';
 import '../core/services/shared_preferences_service.dart';
 import '../core/services/supabase_service.dart';
 import '../core/theme/app_theme.dart';
@@ -47,8 +50,9 @@ class ThriftlineApp extends StatelessWidget {
       providers: [
         Provider<SharedPreferencesService>.value(value: prefs),
         Provider<SupabaseService>.value(value: supabaseService),
-        Provider<AuthService>(
-          create: (_) => AuthService(supabaseService),
+        Provider<AuthService>(create: (_) => AuthService(supabaseService)),
+        Provider<PresenceService>(
+          create: (_) => PresenceService(supabaseService),
         ),
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
         ChangeNotifierProvider<AppProvider>.value(value: appProvider),
@@ -83,8 +87,44 @@ class _SessionBindings extends StatefulWidget {
   State<_SessionBindings> createState() => _SessionBindingsState();
 }
 
-class _SessionBindingsState extends State<_SessionBindings> {
+class _SessionBindingsState extends State<_SessionBindings>
+    with WidgetsBindingObserver {
   String? _boundUserId;
+  Timer? _presenceTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _presenceTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _boundUserId != null) {
+      context.read<PresenceService>().touch();
+    }
+  }
+
+  void _bindSession(String? userId) {
+    context.read<NotificationsProvider>().startForUser(userId);
+    context.read<SettingsProvider>().loadForUser(userId);
+    context.read<SavedItemsProvider>().startForUser(userId);
+    context.read<CartProvider>().startForUser(userId);
+    _presenceTimer?.cancel();
+    if (userId == null) return;
+    context.read<PresenceService>().touch();
+    _presenceTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      if (!mounted) return;
+      context.read<PresenceService>().touch();
+    });
+  }
 
   @override
   void didChangeDependencies() {
@@ -94,10 +134,7 @@ class _SessionBindingsState extends State<_SessionBindings> {
     _boundUserId = userId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<NotificationsProvider>().startForUser(userId);
-      context.read<SettingsProvider>().loadForUser(userId);
-      context.read<SavedItemsProvider>().startForUser(userId);
-      context.read<CartProvider>().startForUser(userId);
+      _bindSession(userId);
     });
   }
 
@@ -108,10 +145,7 @@ class _SessionBindingsState extends State<_SessionBindings> {
       _boundUserId = userId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        context.read<NotificationsProvider>().startForUser(userId);
-        context.read<SettingsProvider>().loadForUser(userId);
-        context.read<SavedItemsProvider>().startForUser(userId);
-        context.read<CartProvider>().startForUser(userId);
+        _bindSession(userId);
       });
     }
     return widget.child;

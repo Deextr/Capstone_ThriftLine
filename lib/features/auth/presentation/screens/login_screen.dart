@@ -126,7 +126,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight -
+                        minHeight:
+                            constraints.maxHeight -
                             (compact
                                 ? AppConstants.spacingMd
                                 : AppConstants.spacingXl) -
@@ -218,18 +219,18 @@ class _LoginScreenState extends State<LoginScreen> {
                             SizedBox(height: compact ? 20 : 24),
                             ThriftButton(
                               label: lockedOut ? 'Locked' : 'Login',
-                              onPressed:
-                                  (auth.isLoading || lockedOut)
-                                      ? null
-                                      : _loginWithEmail,
+                              onPressed: (auth.isLoading || lockedOut)
+                                  ? null
+                                  : _loginWithEmail,
                               isLoading: auth.isLoading,
                             ),
                             SizedBox(height: compact ? 16 : 24),
                             const _OrDivider(),
                             SizedBox(height: compact ? 16 : 24),
                             _GoogleSignInButton(
-                              onPressed:
-                                  auth.isLoading ? null : _loginWithGoogle,
+                              onPressed: auth.isLoading
+                                  ? null
+                                  : _loginWithGoogle,
                               isLoading: auth.isLoading,
                             ),
                             SizedBox(height: compact ? 20 : 24),
