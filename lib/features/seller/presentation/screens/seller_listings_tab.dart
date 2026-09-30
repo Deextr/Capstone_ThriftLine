@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -553,6 +554,11 @@ class _ListingCard extends StatelessWidget {
                         value: 'end',
                         child: Text('End auction early'),
                       ),
+                    if (canOfferToNextBidder(snapshot))
+                      const PopupMenuItem(
+                        value: 'offer_next',
+                        child: Text('Offer to next bidder'),
+                      ),
                     if (canRelistAuction(snapshot))
                       const PopupMenuItem(
                         value: 'relist',
@@ -633,25 +639,423 @@ class _ListingCard extends StatelessWidget {
       return;
     }
 
-    if (action == 'relist') {
-      final days = await showDialog<int>(
+    if (action == 'offer_next') {
+      final auctionId = item.auctionId;
+      if (auctionId == null) return;
+
+      // Show temporary loading indicator while fetching auction bids
+      showDialog(
         context: context,
-        builder: (dialogContext) => SimpleDialog(
-          title: const Text('Relist auction'),
-          children: [
-            for (final option in const [1, 3, 5, 7])
-              SimpleDialogOption(
-                onPressed: () => Navigator.pop(dialogContext, option),
-                child: Text('$option day${option == 1 ? '' : 's'}'),
+        barrierDismissible: false,
+        builder: (_) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      Map<String, dynamic>? auctionData;
+      List<Map<String, dynamic>> roundBids = [];
+      try {
+        final client = context.read<SupabaseService>().client;
+        auctionData = await client
+            .from('auctions')
+            .select('bid_round, winner_id, current_price, starting_price')
+            .eq('auction_id', auctionId)
+            .maybeSingle();
+
+        final round = (auctionData?['bid_round'] as num?)?.toInt() ?? 1;
+
+        final bidsRes = await client
+            .from('bids')
+            .select('''
+              bid_id,
+              bidder_id,
+              bid_amount,
+              created_at,
+              bidder:users!bids_bidder_id_fkey (
+                username,
+                full_name,
+                avatar
+              )
+            ''')
+            .eq('auction_id', auctionId)
+            .eq('bid_round', round)
+            .order('bid_amount', ascending: false);
+
+        roundBids = List<Map<String, dynamic>>.from(bidsRes as List);
+      } catch (e) {
+        debugPrint('Error fetching auction bids: $e');
+      }
+
+      if (context.mounted) {
+        Navigator.pop(context); // Dismiss loading
+      } else {
+        return;
+      }
+
+      final currentWinnerId = auctionData?['winner_id'] as String?;
+      final sellerUid = context.read<AuthProvider>().user?.id;
+
+      // Find the winning bid (for comparison)
+      Map<String, dynamic>? winningBid;
+      if (currentWinnerId != null) {
+        winningBid = roundBids.cast<Map<String, dynamic>?>().firstWhere(
+              (b) => b?['bidder_id'] == currentWinnerId,
+              orElse: () => roundBids.isNotEmpty ? roundBids.first : null,
+            );
+      } else if (roundBids.isNotEmpty) {
+        winningBid = roundBids.first;
+      }
+
+      // Filter out the current winner and seller to find the next highest valid bidder
+      final candidateBids = roundBids.where((b) {
+        final bidderId = b['bidder_id'] as String?;
+        return bidderId != currentWinnerId && bidderId != sellerUid;
+      }).toList();
+
+      if (candidateBids.isEmpty) {
+        if (context.mounted) {
+          showThriftSnackBar(
+            context,
+            'No other valid bidders found for this auction round. You can relist the item.',
+            isError: true,
+          );
+        }
+        return;
+      }
+
+      final nextBid = candidateBids.first;
+      final bidder = nextBid['bidder'] as Map<String, dynamic>?;
+      final nextUsername = bidder?['username'] as String? ??
+          bidder?['full_name'] as String? ??
+          'Next Bidder';
+      final nextAmount = (nextBid['bid_amount'] as num?)?.toDouble() ?? 0.0;
+      final nextTime = nextBid['created_at'] != null
+          ? DateTime.tryParse(nextBid['created_at'] as String)
+          : null;
+
+      final winBidder = winningBid?['bidder'] as Map<String, dynamic>?;
+      final winUsername = winBidder?['username'] as String? ?? 'Previous Winner';
+      final winAmount = (winningBid?['bid_amount'] as num?)?.toDouble() ?? 0.0;
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.swap_horiz_rounded, color: AppColors.primary),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Offer to 2nd Highest Bidder',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'The previous winning buyer failed or expired. Pass "${item.name}" to the next highest bidder in line:',
+                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 16),
+
+                // 2nd Highest Bidder Card (Highlighted)
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              '2nd Highest Bidder',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          if (nextTime != null)
+                            Text(
+                              formatRelativeTime(nextTime),
+                              style: const TextStyle(fontSize: 11, color: AppColors.textHint),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '@$nextUsername',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (bidder?['full_name'] != null &&
+                                    bidder?['full_name'] != nextUsername)
+                                  Text(
+                                    bidder!['full_name'] as String,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            formatCurrency(nextAmount),
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Comparison with 1st bidder (Previous/Failed)
+                if (winningBid != null && winAmount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '1st Bid (@$winUsername - Expired):',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                        ),
+                        Text(
+                          formatCurrency(winAmount),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade700,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                const SizedBox(height: 14),
+                const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: AppColors.primary),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'The 2nd highest bidder will receive an instant notification and a 12-hour payment window to complete checkout at their bid amount.',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text(
+                'Send Offer (${formatCurrency(nextAmount)})',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
       );
-      if (days == null || !context.mounted) return;
+      if (confirmed != true || !context.mounted) return;
+      try {
+        final result = await context.read<SupabaseService>().client.rpc(
+          'offer_auction_to_next_bidder',
+          params: {'p_auction_id': auctionId},
+        );
+        if (!context.mounted) return;
+        if (!supabaseRpcSuccess(result)) {
+          showThriftSnackBar(
+            context,
+            supabaseRpcError(
+                  result,
+                  fallback: 'Could not send offer to next bidder.',
+                ) ??
+                'Could not send offer to next bidder.',
+            isError: true,
+          );
+          return;
+        }
+        showThriftSnackBar(context, 'Offer sent to @$nextUsername for ${formatCurrency(nextAmount)}.');
+        await onChanged();
+      } catch (e) {
+        if (context.mounted) {
+          showThriftSnackBar(
+            context,
+            'Could not send offer to next bidder.',
+            isError: true,
+          );
+        }
+      }
+      return;
+    }
+
+    if (action == 'relist') {
+      final startPriceCtrl = TextEditingController(
+        text: item.price.toStringAsFixed(0),
+      );
+      final minIncrementCtrl = TextEditingController(
+        text: '20',
+      );
+      int selectedDays = 3;
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('Relist Auction'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Update auction details before restarting:',
+                      style: TextStyle(fontSize: 13, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: startPriceCtrl,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Starting Price (₱)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: minIncrementCtrl,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Minimum Bid Increment (₱)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Auction Duration:',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [1, 3, 5, 7].map((d) {
+                        final isSelected = selectedDays == d;
+                        return ChoiceChip(
+                          label: Text('$d day${d == 1 ? '' : 's'}'),
+                          selected: isSelected,
+                          onSelected: (val) {
+                            if (val) setDialogState(() => selectedDays = d);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                  ),
+                  child: const Text(
+                    'Relist Item',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      if (confirmed != true || !context.mounted) return;
+
+      final parsedStart = double.tryParse(startPriceCtrl.text.trim());
+      final parsedIncr = double.tryParse(minIncrementCtrl.text.trim());
+
+      final params = <String, dynamic>{
+        'p_product_id': item.productId,
+        'p_duration_days': selectedDays,
+      };
+      if (parsedStart != null && parsedStart > 0) {
+        params['p_starting_price'] = parsedStart;
+      }
+      if (parsedIncr != null && parsedIncr > 0) {
+        params['p_minimum_increment'] = parsedIncr;
+      }
+
       try {
         final result = await context.read<SupabaseService>().client.rpc(
           'relist_unsold_auction',
-          params: {'p_product_id': item.productId, 'p_duration_days': days},
+          params: params,
         );
         if (!context.mounted) return;
         if (!supabaseRpcSuccess(result)) {

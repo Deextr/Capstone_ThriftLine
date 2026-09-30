@@ -14,6 +14,11 @@ import '../features/auth/domain/legal_documents.dart';
 import '../features/auth/domain/trusted_device.dart';
 import '../models/enums.dart';
 
+/// TEMPORARY: skips the email OTP step on login and sign-up.
+/// Only takes effect in debug builds. Set to false to restore OTP.
+const bool kBypassEmailOtp = true;
+bool get _bypassOtp => kDebugMode && kBypassEmailOtp;
+
 /// Router-facing gate: a restored session is not enough while email OTP is
 /// still outstanding.
 bool authIsFullyAuthenticated({
@@ -111,7 +116,10 @@ class AuthProvider extends ChangeNotifier {
       final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         _user = currentUser;
-        _emailOtpPending = _prefs.isEmailOtpPending;
+        // TEMP: with the OTP bypass on, also clear any stale pending flag so
+        // the router doesn't get stuck on the OTP gate.
+        _emailOtpPending = _bypassOtp ? false : _prefs.isEmailOtpPending;
+        if (_bypassOtp) await _prefs.setEmailOtpPending(false);
         _syncActiveAccount(currentUser, restoreFromPrefs: true);
         await _saveSession(currentUser);
       } else {
@@ -204,10 +212,10 @@ class AuthProvider extends ChangeNotifier {
         serverTrusted = false;
       }
 
-      final skipOtp = shouldSkipEmailOtp(
-        passwordAccepted: true,
-        serverTrusted: serverTrusted,
-      );
+      // TEMP: _bypassOtp forces the skip (debug builds only).
+      final skipOtp =
+          _bypassOtp ||
+          shouldSkipEmailOtp(passwordAccepted: true, serverTrusted: serverTrusted);
       if (skipOtp) {
         await _setEmailOtpPending(false);
       } else {
@@ -286,6 +294,9 @@ class AuthProvider extends ChangeNotifier {
       return AuthResult.failure('Something went wrong. Please try again.');
     }
 
+    // TEMP: with the OTP bypass on, sign-up never enters the OTP step.
+    final needsOtp = result.requiresEmailOtp && !_bypassOtp;
+
     if (result.requiresEmailVerification) {
       // Supabase withheld the session pending confirmation, so the app must
       // not treat the account as signed in.
@@ -296,7 +307,7 @@ class AuthProvider extends ChangeNotifier {
       if (_user != null) {
         _syncActiveAccount(_user!, restoreFromPrefs: true);
         await _saveSession(_user!);
-        if (result.requiresEmailOtp) {
+        if (needsOtp) {
           await _setEmailOtpPending(true);
         }
       }
@@ -304,7 +315,7 @@ class AuthProvider extends ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
-    if (result.requiresEmailOtp && _user != null) {
+    if (needsOtp && _user != null) {
       await sendEmailOtp();
     }
     return result;

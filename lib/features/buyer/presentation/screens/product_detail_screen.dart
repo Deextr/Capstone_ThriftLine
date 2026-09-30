@@ -74,6 +74,357 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     );
   }
 
+  Future<void> _sellerOfferNextBidder(
+    BuildContext context,
+    ProductDetailController controller,
+  ) async {
+    final winnerId = controller.auction?['winner_id'] as String?;
+    final winningBid = controller.bids.isNotEmpty ? controller.bids.first : null;
+    final candidateBids = controller.bids.where((b) {
+      final bidderId = b['bidder_id'] as String?;
+      return bidderId != winnerId;
+    }).toList();
+
+    if (candidateBids.isEmpty) {
+      showThriftSnackBar(
+        context,
+        'No other valid bidders found for this auction round. You can relist the item.',
+        isError: true,
+      );
+      return;
+    }
+
+    final nextBid = candidateBids.first;
+    final bidder = nextBid['bidder'] as Map<String, dynamic>?;
+    final username = bidder?['username'] as String? ??
+        bidder?['full_name'] as String? ??
+        'Next highest bidder';
+    final amount = (nextBid['bid_amount'] as num?)?.toDouble() ?? 0.0;
+    final nextTime = nextBid['created_at'] != null
+        ? DateTime.tryParse(nextBid['created_at'] as String)
+        : null;
+
+    final winBidder = winningBid?['bidder'] as Map<String, dynamic>?;
+    final winUsername = winBidder?['username'] as String? ?? 'Previous Winner';
+    final winAmount = (winningBid?['bid_amount'] as num?)?.toDouble() ?? 0.0;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.swap_horiz_rounded, color: AppColors.primary),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Offer to 2nd Highest Bidder',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'The previous winning buyer failed or cancelled. You can pass the item to the next-highest bidder:',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+
+              // 2nd Highest Bidder Card (Highlighted)
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                    width: 1.5,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            '2nd Highest Bidder',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        if (nextTime != null)
+                          Text(
+                            formatRelativeTime(nextTime),
+                            style: const TextStyle(fontSize: 11, color: AppColors.textHint),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '@$username',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: AppColors.textPrimary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (bidder?['full_name'] != null &&
+                                  bidder?['full_name'] != username)
+                                Text(
+                                  bidder!['full_name'] as String,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          formatCurrency(amount),
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Comparison with 1st bidder (Previous/Failed)
+              if (winningBid != null && winAmount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '1st Bid (@$winUsername - Expired):',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                      ),
+                      Text(
+                        formatCurrency(winAmount),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade700,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              const SizedBox(height: 14),
+              const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: AppColors.primary),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'They will have a 12-hour window to complete checkout at their bid price.',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Text(
+              'Send Offer (${formatCurrency(amount)})',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final error = await controller.offerToNextBidder();
+    if (!context.mounted) return;
+    if (error != null) {
+      showThriftSnackBar(context, error, isError: true);
+      return;
+    }
+    showThriftSnackBar(context, 'Offer sent to @$username.');
+  }
+
+  Future<void> _sellerRelist(
+    BuildContext context,
+    ProductDetailController controller,
+  ) async {
+    final startPriceCtrl = TextEditingController(
+      text: controller.auctionStartingPrice.toStringAsFixed(0),
+    );
+    final minIncrementCtrl = TextEditingController(
+      text: controller.auctionMinimumIncrement.toStringAsFixed(0),
+    );
+    int selectedDays = controller.auctionDurationDays;
+    if (![1, 3, 5, 7].contains(selectedDays)) selectedDays = 3;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: const Text('Relist Auction'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Update auction details before restarting:',
+                    style: TextStyle(fontSize: 13, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: startPriceCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Starting Price (₱)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: minIncrementCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Minimum Bid Increment (₱)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Auction Duration:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [1, 3, 5, 7].map((d) {
+                      final isSelected = selectedDays == d;
+                      return ChoiceChip(
+                        label: Text('$d day${d == 1 ? '' : 's'}'),
+                        selected: isSelected,
+                        onSelected: (val) {
+                          if (val) setDialogState(() => selectedDays = d);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                ),
+                child: const Text(
+                  'Relist Item',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final parsedStart = double.tryParse(startPriceCtrl.text.trim());
+    final parsedIncr = double.tryParse(minIncrementCtrl.text.trim());
+
+    final error = await controller.relistAuction(
+      selectedDays,
+      startingPrice:
+          parsedStart != null && parsedStart > 0 ? parsedStart : null,
+      minimumIncrement:
+          parsedIncr != null && parsedIncr > 0 ? parsedIncr : null,
+    );
+    if (!context.mounted) return;
+    if (error != null) {
+      showThriftSnackBar(context, error, isError: true);
+      return;
+    }
+    showThriftSnackBar(context, 'Auction relisted.');
+  }
+
+  Future<void> _proceedToWinnerCheckout(
+    BuildContext context,
+    ProductDetailController controller,
+  ) async {
+    final orderId = await controller.getWonAuctionOrderId();
+    if (!context.mounted) return;
+    if (orderId == null || orderId.isEmpty) {
+      showThriftSnackBar(
+        context,
+        'Your pending order is not ready yet. Please try again.',
+        isError: true,
+      );
+      return;
+    }
+    context.push(RouteNames.paymentForOrder(orderId));
+  }
+
   void _showBidBottomSheet(
     BuildContext context,
     ProductDetailController controller,
@@ -870,12 +1221,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
   }
 
   Widget _buildRecentBidsCard(ProductDetailController controller) {
+    final title = controller.bidRound > 1
+        ? 'Recent Bids (Round ${controller.bidRound})'
+        : 'Recent Bids';
     return _buildSectionCard(
-      'Recent Bids',
+      title,
       Column(
         children: controller.bids.take(5).map<Widget>((b) {
           final bidder = b['bidder'] as Map<String, dynamic>?;
           final username = bidder?['username'] as String? ?? 'Anonymous';
+          final isViewer = controller.isViewerBid(b);
           final amount = (b['bid_amount'] as num?)?.toDouble() ?? 0;
           final createdAt = b['created_at'] != null
               ? DateTime.parse(b['created_at'] as String)
@@ -889,11 +1244,36 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      username,
-                      style: AppTypography.body.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          username,
+                          style: AppTypography.body.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        if (isViewer) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'You',
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     Text(
                       formatRelativeTime(createdAt),
@@ -1010,60 +1390,220 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     // Auction layout
     if (isAuction) {
       if (controller.isOwnListing) {
-        return SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: controller.canEndAuctionEarly
-                ? () => _endAuctionEarly(context, controller)
-                : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              disabledBackgroundColor: AppColors.textHint,
-              disabledForegroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+        if (controller.isAuctionActive) {
+          return SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: controller.canEndAuctionEarly
+                  ? () => _endAuctionEarly(context, controller)
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                disabledBackgroundColor: AppColors.textHint,
+                disabledForegroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                controller.canEndAuctionEarly
+                    ? 'End auction early'
+                    : 'Waiting for bids',
+                style: AppTypography.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
               ),
             ),
-            child: Text(
-              controller.canEndAuctionEarly
-                  ? 'End auction early'
-                  : controller.isAuctionActive
-                  ? 'Waiting for bids'
-                  : 'Auction ended',
+          );
+        }
+
+        // Seller viewing ended auction: can relist or offer to next bidder
+        return Row(
+          children: [
+            if (controller.canOfferToNextBidder) ...[
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _sellerOfferNextBidder(context, controller),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    side: const BorderSide(
+                      color: AppColors.primary,
+                      width: 1.5,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Offer Next Bidder',
+                    style: AppTypography.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _sellerRelist(context, controller),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Relist Auction',
+                  style: AppTypography.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      }
+
+      // Buyer view of active auction
+      if (controller.isAuctionActive) {
+        if (controller.isViewerLeading) {
+          return SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: null,
+              icon: const Icon(
+                Icons.check_circle_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              label: Text(
+                "You're the Highest Bidder",
+                style: AppTypography.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                disabledBackgroundColor: AppColors.success,
+                disabledForegroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          );
+        }
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () =>
+                _showBidBottomSheet(context, controller, minBid),
+            icon: const Icon(
+              Icons.gavel_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+            label: Text(
+              'Place Bid',
               style: AppTypography.body.copyWith(
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
                 fontSize: 16,
               ),
             ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
         );
       }
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: controller.isAuctionActive
-              ? () => _showBidBottomSheet(context, controller, minBid)
-              : null,
-          icon: const Icon(Icons.gavel_rounded, color: Colors.white, size: 20),
-          label: Text(
-            controller.isAuctionActive ? 'Place Bid' : 'Auction Ended',
-            style: AppTypography.body.copyWith(
-              fontWeight: FontWeight.w600,
+
+      // Ended auction for buyer: winner checkout vs ended status
+      if (controller.isViewerWinner) {
+        final due = controller.paymentDueAt;
+        String payLabel = 'Proceed to Checkout';
+        if (due != null) {
+          final diff = due.difference(DateTime.now());
+          if (!diff.isNegative) {
+            final hours = diff.inHours;
+            final mins = diff.inMinutes % 60;
+            payLabel = 'Proceed to Checkout (${hours}h ${mins}m left)';
+          }
+        }
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _proceedToWinnerCheckout(context, controller),
+            icon: const Icon(
+              Icons.payment_rounded,
               color: Colors.white,
-              fontSize: 16,
+              size: 20,
+            ),
+            label: Text(
+              payLabel,
+              style: AppTypography.body.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                fontSize: 16,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
+        );
+      }
+
+      final label = controller.isViewerExpiredWinner
+          ? 'Payment Expired — Item No Longer Available'
+          : controller.hasNoWinner
+              ? 'Auction Ended — No Winner'
+              : 'Auction Ended';
+
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: null,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
+            backgroundColor: AppColors.textHint,
             disabledBackgroundColor: AppColors.textHint,
             disabledForegroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 18),
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: Text(
+            label,
+            style: AppTypography.body.copyWith(
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+              fontSize: 16,
             ),
           ),
         ),

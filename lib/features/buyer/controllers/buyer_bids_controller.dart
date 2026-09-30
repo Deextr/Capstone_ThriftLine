@@ -160,6 +160,7 @@ class BuyerBidsController extends ChangeNotifier {
             auction_id,
             bidder_id,
             bid_amount,
+            bid_round,
             is_highest_bid,
             created_at,
             auction:auctions!bids_auction_id_fkey (
@@ -172,6 +173,7 @@ class BuyerBidsController extends ChangeNotifier {
               starts_at,
               ends_at,
               status,
+              bid_round,
               product:products!auctions_product_id_fkey (
                 product_id,
                 seller_id,
@@ -198,6 +200,10 @@ class BuyerBidsController extends ChangeNotifier {
         .eq('bidder_id', userId)
         .order('created_at', ascending: false);
 
+    // Keep only the buyer's best bid from the auction's CURRENT bid_round.
+    // This mirrors the v_user_bids view's behaviour: after a relist the
+    // bid_round increments, so any bids from previous rounds are ignored and
+    // the buyer's card disappears until they bid again in the new round.
     final Map<String, UserBid> auctionBidsMap = {};
 
     for (final row in response as List) {
@@ -207,8 +213,15 @@ class BuyerBidsController extends ChangeNotifier {
       final auctionId = auctionMap['auction_id'] as String? ?? '';
       if (auctionId.isEmpty) continue;
 
+      final auctionRound = (auctionMap['bid_round'] as num?)?.toInt() ?? 1;
+      final bidRound = (map['bid_round'] as num?)?.toInt() ?? 1;
+
+      // Skip bids that belong to an older round (relist scenario).
+      if (bidRound != auctionRound) continue;
+
       final parsedBid = UserBid.fromSupabase(map);
       if (auctionBidsMap.containsKey(auctionId)) {
+        // Within the same round keep the highest bid amount.
         if (parsedBid.amount > auctionBidsMap[auctionId]!.amount) {
           auctionBidsMap[auctionId] = parsedBid;
         }
@@ -303,9 +316,19 @@ class BuyerBidsController extends ChangeNotifier {
     }
   }
 
-  /// Fetches complete public bid history for a specific auction.
+  /// Fetches the public bid history for the CURRENT round of a specific auction.
+  /// Bids from previous rounds (after a relist) are excluded.
   Future<List<BidEntry>> fetchAuctionBids(String auctionId) async {
     try {
+      // Fetch the current bid_round for this auction first.
+      final auctionRow = await _supabase.client
+          .from('auctions')
+          .select('bid_round')
+          .eq('auction_id', auctionId)
+          .maybeSingle();
+
+      final currentRound = (auctionRow?['bid_round'] as num?)?.toInt() ?? 1;
+
       final res = await _supabase.client
           .from('bids')
           .select('''
@@ -318,6 +341,7 @@ class BuyerBidsController extends ChangeNotifier {
             )
           ''')
           .eq('auction_id', auctionId)
+          .eq('bid_round', currentRound)
           .order('bid_amount', ascending: false);
 
       return (res as List).map((b) {
@@ -381,10 +405,17 @@ class BuyerBidsController extends ChangeNotifier {
       debugPrint('orderIdForWonAuction close_auctions: $e');
     }
     try {
-      final row = await _supabase.client
+      final userId = _auth.user?.id;
+      var query = _supabase.client
           .from('orders')
           .select('order_id')
-          .eq('auction_id', auctionId)
+          .eq('auction_id', auctionId);
+      if (userId != null) {
+        query = query.eq('buyer_id', userId);
+      }
+      final row = await query
+          .order('created_at', ascending: false)
+          .limit(1)
           .maybeSingle();
       return row?['order_id'] as String?;
     } catch (e) {
