@@ -27,10 +27,7 @@ ProductModel _mockProduct({
     sellerProfile: {
       'shop_name': sellerName,
       'is_approved': true,
-      'user': {
-        'user_id': sellerId,
-        'username': sellerName,
-      },
+      'user': {'user_id': sellerId, 'username': sellerName},
     },
   );
 }
@@ -38,14 +35,14 @@ ProductModel _mockProduct({
 class _MockAuthProvider extends Fake implements AuthProvider {
   @override
   AuthUser? get user => const AuthUser(
-        id: 'test-buyer',
-        email: 'test@example.com',
-        username: 'testbuyer',
-        name: 'Test Buyer',
-        role: UserRole.buyer,
-        avatarUrl: '',
-        location: '',
-      );
+    id: 'test-buyer',
+    email: 'test@example.com',
+    username: 'testbuyer',
+    name: 'Test Buyer',
+    role: UserRole.buyer,
+    avatarUrl: '',
+    location: '',
+  );
 }
 
 class _TestCartProvider extends CartProvider {
@@ -63,9 +60,24 @@ class _TestCartProvider extends CartProvider {
 void main() {
   group('Multi-seller cart item selection in CheckoutController', () {
     test('groups items by seller and allows selecting items', () {
-      final p1 = _mockProduct(id: 'p1', sellerId: 'seller-a', sellerName: 'Shop A', price: 500);
-      final p2 = _mockProduct(id: 'p2', sellerId: 'seller-a', sellerName: 'Shop A', price: 300);
-      final p3 = _mockProduct(id: 'p3', sellerId: 'seller-b', sellerName: 'Shop B', price: 400);
+      final p1 = _mockProduct(
+        id: 'p1',
+        sellerId: 'seller-a',
+        sellerName: 'Shop A',
+        price: 500,
+      );
+      final p2 = _mockProduct(
+        id: 'p2',
+        sellerId: 'seller-a',
+        sellerName: 'Shop A',
+        price: 300,
+      );
+      final p3 = _mockProduct(
+        id: 'p3',
+        sellerId: 'seller-b',
+        sellerName: 'Shop B',
+        price: 400,
+      );
 
       final cart = _TestCartProvider([
         CartItem(product: p1, quantity: 1),
@@ -79,11 +91,10 @@ void main() {
         cart: cart,
       );
 
-      // All items from all sellers are visible
       expect(controller.allCartItems.length, 3);
-      expect(controller.itemsBySeller.keys, containsAll(['seller-a', 'seller-b']));
+      expect(controller.itemsBySeller.keys, ['seller-a']);
       expect(controller.itemsBySeller['seller-a']!.length, 2);
-      expect(controller.itemsBySeller['seller-b']!.length, 1);
+      expect(controller.checkoutShops.length, 1);
 
       // By default first seller's items are selected
       expect(controller.selectedSellerId, 'seller-a');
@@ -96,6 +107,11 @@ void main() {
       expect(controller.isSelected('p1'), isTrue);
       expect(controller.isSelected('p2'), isTrue);
       expect(controller.isSelected('p3'), isTrue);
+      expect(
+        controller.itemsBySeller.keys,
+        containsAll(['seller-a', 'seller-b']),
+      );
+      expect(controller.checkoutShops.length, 2);
       expect(controller.subtotal, 1200.0);
       expect(controller.shippingFee, 160.0);
       expect(controller.platformFee, 24.0);
@@ -110,8 +126,18 @@ void main() {
     });
 
     test('scoped buyNowProductId pre-selects that specific product', () {
-      final p1 = _mockProduct(id: 'p1', sellerId: 'seller-a', sellerName: 'Shop A', price: 500);
-      final p2 = _mockProduct(id: 'p2', sellerId: 'seller-b', sellerName: 'Shop B', price: 700);
+      final p1 = _mockProduct(
+        id: 'p1',
+        sellerId: 'seller-a',
+        sellerName: 'Shop A',
+        price: 500,
+      );
+      final p2 = _mockProduct(
+        id: 'p2',
+        sellerId: 'seller-b',
+        sellerName: 'Shop B',
+        price: 700,
+      );
 
       final cart = _TestCartProvider([
         CartItem(product: p1, quantity: 1),

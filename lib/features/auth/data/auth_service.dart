@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/validators.dart';
 import '../domain/auth_error.dart';
 import '../domain/auth_user.dart';
 import '../domain/legal_documents.dart';
@@ -45,11 +46,17 @@ class AuthService {
     required String name,
     required LegalConsent consent,
   }) async {
+    final sanitizedName = Validators.normalizeFullName(name);
+    final nameError = Validators.name(sanitizedName);
+    if (nameError != null) {
+      return AuthResult.failure(nameError);
+    }
+
     try {
       final response = await _auth.signUp(
         email: email,
         password: password,
-        data: {'full_name': name, ...consent.toMetadata()},
+        data: {'full_name': sanitizedName, ...consent.toMetadata()},
       );
 
       final supabaseUser = response.user;

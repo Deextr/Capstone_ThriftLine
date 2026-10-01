@@ -81,10 +81,10 @@ class CheckoutController extends ChangeNotifier {
 
   List<CartShopGroup> get checkoutShops => groupCartItemsByShop(selectedItems);
 
-  /// Cart items grouped by seller ID.
+  /// Selected checkout lines grouped by seller ID (read-only review on checkout).
   Map<String, List<CartItem>> get itemsBySeller {
     final map = <String, List<CartItem>>{};
-    for (final item in allCartItems) {
+    for (final item in selectedItems) {
       final sId = item.product.sellerId ?? 'unknown';
       map.putIfAbsent(sId, () => []).add(item);
     }
