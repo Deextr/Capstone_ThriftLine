@@ -8,7 +8,31 @@ bool holdAuthScreenForTrustedDeviceCheck({
   required String location,
 }) {
   if (!resolvingTrustedDevice) return false;
-  return location == RouteNames.login || location == RouteNames.signup;
+  return location == RouteNames.login ||
+      location == RouteNames.signup ||
+      location == RouteNames.forgotPassword;
+}
+
+bool isPasswordRecoveryAuthRoute(String location) {
+  return location == RouteNames.forgotPassword ||
+      location == RouteNames.resetPassword;
+}
+
+/// Keeps the user on the reset screen while a recovery session is active.
+String? passwordRecoveryWorkspaceRedirect({
+  required bool recoveryActive,
+  required String location,
+}) {
+  if (!recoveryActive) return null;
+  if (location == RouteNames.resetPassword) return null;
+  return RouteNames.resetPassword;
+}
+
+/// Routes reachable without a full session (login, signup, password recovery).
+bool isPublicAuthRoute(String location) {
+  return location == RouteNames.login ||
+      location == RouteNames.signup ||
+      isPasswordRecoveryAuthRoute(location);
 }
 
 /// When email OTP is marked pending but there is no session yet, keep the

@@ -32,4 +32,11 @@ abstract final class Validators {
     if (trimmed.length < 6) return 'Password must be at least 6 characters.';
     return null;
   }
+
+  static String? confirmPassword(String? value, String password) {
+    final confirm = value ?? '';
+    if (confirm.isEmpty) return 'Passwords do not match.';
+    if (confirm != password) return 'Passwords do not match.';
+    return null;
+  }
 }
