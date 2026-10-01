@@ -18,6 +18,7 @@ class SellerApplication {
     this.selfiePath,
     this.applicantName,
     this.rejectionReason,
+    this.claimedSellingRange,
   });
 
   final String id;
@@ -36,6 +37,7 @@ class SellerApplication {
   final String? selfiePath;
   final String? applicantName;
   final String? rejectionReason;
+  final String? claimedSellingRange;
 
   factory SellerApplication.fromJson(Map<String, dynamic> json) {
     final user = json['users'];
@@ -60,6 +62,7 @@ class SellerApplication {
       selfiePath: json['selfie_image'] as String?,
       applicantName: user is Map ? user['full_name'] as String? : null,
       rejectionReason: json['rejection_reason'] as String?,
+      claimedSellingRange: json['claimed_selling_range'] as String?,
     );
   }
 
@@ -83,6 +86,7 @@ class SellerApplication {
           ? name
           : applicantName,
       rejectionReason: rejectionReason,
+      claimedSellingRange: claimedSellingRange,
     );
   }
 }

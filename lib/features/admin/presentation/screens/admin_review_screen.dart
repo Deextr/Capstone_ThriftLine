@@ -7,9 +7,12 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../seller/domain/seller_id_type.dart';
+import '../../../seller/domain/external_selling.dart';
 import '../../data/admin_review_rules.dart';
 import '../../data/admin_verification_service.dart';
+import '../../data/external_history_service.dart';
 import '../widgets/admin_review_widgets.dart';
+import '../widgets/external_selling_history_section.dart';
 import '../widgets/seller_application_reject_dialog.dart';
 
 class AdminReviewScreen extends StatefulWidget {
@@ -23,7 +26,9 @@ class AdminReviewScreen extends StatefulWidget {
 
 class _AdminReviewScreenState extends State<AdminReviewScreen> {
   late final AdminVerificationService _service;
+  late final ExternalHistoryService _historyService;
   SellerApplication? _application;
+  List<ExternalHistoryItem> _history = const [];
   String? _idUrl;
   String? _idBackUrl;
   String? _selfieUrl;
@@ -34,7 +39,9 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
   @override
   void initState() {
     super.initState();
-    _service = AdminVerificationService(context.read<SupabaseService>());
+    final supabase = context.read<SupabaseService>();
+    _service = AdminVerificationService(supabase);
+    _historyService = ExternalHistoryService(supabase);
     _load();
   }
 
@@ -57,9 +64,16 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
       final idUrl = await _service.signedUrl(match.idPath);
       final idBackUrl = await _service.signedUrl(match.idBackPath);
       final selfieUrl = await _service.signedUrl(match.selfiePath);
+      List<ExternalHistoryItem> history = const [];
+      try {
+        history = await _historyService.load(match.id);
+      } catch (_) {
+        history = const [];
+      }
       if (!mounted) return;
       setState(() {
         _application = match;
+        _history = history;
         _idUrl = idUrl;
         _idBackUrl = idBackUrl;
         _selfieUrl = selfieUrl;
@@ -96,6 +110,66 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
         showThriftSnackBar(
           context,
           adminFriendlyError(e, 'Could not save that decision. Try again.'),
+          isError: true,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _reviewExternal(
+    ExternalHistoryItem item,
+    ExternalReviewStatus decision,
+  ) async {
+    final noteCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(decision.label),
+        content: TextField(
+          controller: noteCtrl,
+          maxLength: 500,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Note (optional)',
+            hintText: 'Only other admins see this',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    final note = noteCtrl.text.trim();
+    noteCtrl.dispose();
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await _historyService.review(
+        transactionId: item.id,
+        decision: decision,
+        note: note.isEmpty ? null : note,
+      );
+      final history = await _historyService.load(widget.verificationId);
+      if (!mounted) return;
+      setState(() => _history = history);
+      showThriftSnackBar(context, 'External transaction updated.');
+    } catch (e) {
+      if (mounted) {
+        showThriftSnackBar(
+          context,
+          adminFriendlyError(
+            e,
+            'Could not save that review. Two different photos are required to verify.',
+          ),
           isError: true,
         );
       }
@@ -196,7 +270,8 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
                         runSpacing: 12,
                         children: [
                           AdminPhotoThumb(label: 'ID front', url: _idUrl),
-                          AdminPhotoThumb(label: 'ID back', url: _idBackUrl),
+                          if (_showIdBack(app))
+                            AdminPhotoThumb(label: 'ID back', url: _idBackUrl),
                           AdminPhotoThumb(label: 'Selfie', url: _selfieUrl),
                         ],
                       ),
@@ -205,6 +280,12 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
                   AdminDetailBlock(
                     label: 'Liveness checks',
                     children: [_LivenessChips(result: app.livenessResult)],
+                  ),
+                  ExternalSellingHistorySection(
+                    claimedRange: app.claimedSellingRange,
+                    items: _history,
+                    busy: _busy,
+                    onReview: _reviewExternal,
                   ),
                   if (app.status == 'pending')
                     AdminDecisionSection(
@@ -242,6 +323,12 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
               ),
       ),
     );
+  }
+
+  bool _showIdBack(SellerApplication app) {
+    if (_idBackUrl?.trim().isNotEmpty == true) return true;
+    final type = SellerIdType.tryParse(app.idType);
+    return type == null || type.requiresBackCapture;
   }
 }
 

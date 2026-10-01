@@ -24,6 +24,8 @@ class ProductModel {
     required this.sellerName,
     required this.sellerAvatar,
     required this.sellerVerified,
+    this.sellerTrustScore,
+    this.sellerTrustLevel,
     required this.title,
     required this.description,
     required this.price,
@@ -95,6 +97,8 @@ class ProductModel {
     final isSellerRole = seller?['role'] == 'seller';
     final ratingAvg = (seller?['rating_average'] as num?)?.toDouble() ?? 0.0;
     final sellerVerified = isApproved || isSellerRole || ratingAvg > 0;
+    final sellerTrustScore = (seller?['trust_score'] as num?)?.toInt();
+    final sellerTrustLevel = seller?['trust_level'] as String?;
 
     // â”€â”€ Images â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final rawImages = row['images'] as List<dynamic>? ?? [];
@@ -170,6 +174,8 @@ class ProductModel {
       sellerName: shopName,
       sellerAvatar: sellerAvatar,
       sellerVerified: sellerVerified,
+      sellerTrustScore: sellerTrustScore,
+      sellerTrustLevel: sellerTrustLevel,
       title: (row['name'] as String?)?.trim().isNotEmpty == true
           ? row['name'] as String
           : (row['title'] as String? ?? ''),
@@ -207,6 +213,8 @@ class ProductModel {
   final String sellerName;
   final String sellerAvatar;
   final bool sellerVerified;
+  final int? sellerTrustScore;
+  final String? sellerTrustLevel;
   final String title;
   final String description;
   final double price;
@@ -260,6 +268,8 @@ class ProductModel {
     String? sellerName,
     String? sellerAvatar,
     bool? sellerVerified,
+    int? sellerTrustScore,
+    String? sellerTrustLevel,
     String? title,
     String? description,
     double? price,
@@ -294,6 +304,8 @@ class ProductModel {
     sellerName: sellerName ?? this.sellerName,
     sellerAvatar: sellerAvatar ?? this.sellerAvatar,
     sellerVerified: sellerVerified ?? this.sellerVerified,
+    sellerTrustScore: sellerTrustScore ?? this.sellerTrustScore,
+    sellerTrustLevel: sellerTrustLevel ?? this.sellerTrustLevel,
     title: title ?? this.title,
     description: description ?? this.description,
     price: price ?? this.price,

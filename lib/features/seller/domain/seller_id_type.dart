@@ -28,6 +28,25 @@ enum SellerIdType {
   /// Physical cards keep screen rejection.
   bool get presentedOnScreen => this == SellerIdType.digitalNationalId;
 
+  /// Whether this document has a second side the seller check must photograph.
+  ///
+  /// Physical PhilID and the eGov Digital National ID print the issue date
+  /// or the demographic block and the verification QR on the reverse.
+  /// The current LTO license prints the restriction and condition legend
+  /// on the back, including the DL codes on the card issued since 2021.
+  /// A passport contributes its biographical photo page only.
+  /// UMID keeps the photo, name, birth date, and CRN on the front; the
+  /// reverse is a magnetic stripe, barcode, or agency marks.
+  /// The SSS ID this check recognizes is the Social Security System card
+  /// with the photo and SS number on the front. The MySSS bank card is a
+  /// different document and is not a selectable type.
+  bool get requiresBackCapture => switch (this) {
+    SellerIdType.nationalId ||
+    SellerIdType.digitalNationalId ||
+    SellerIdType.driversLicense => true,
+    SellerIdType.passport || SellerIdType.sssId || SellerIdType.umidId => false,
+  };
+
   /// Stored when the applicant is not asked to pick a specific type.
   static const String unspecifiedStorageValue = 'accepted_id';
 

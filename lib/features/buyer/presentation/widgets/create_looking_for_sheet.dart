@@ -98,8 +98,14 @@ class _CreateLookingForSheetState extends State<CreateLookingForSheet> {
       if (!mounted) return;
       setState(() {
         _imageBytes = bytes;
+        // Keep _existingImageUrl for preview fallback only when bytes are
+        // cleared; new bytes take precedence in _previewImage.
         _clearedImage = false;
       });
+      debugPrint(
+        'CreateLookingForSheet: picked ${bytes.length} bytes '
+        '(editing=$_isEditing)',
+      );
     } catch (e) {
       if (!mounted) return;
       showThriftSnackBar(
@@ -145,7 +151,9 @@ class _CreateLookingForSheetState extends State<CreateLookingForSheet> {
 
   bool get _hasPreview =>
       _imageBytes != null ||
-      (_existingImageUrl != null && _existingImageUrl!.isNotEmpty);
+      (!_clearedImage &&
+          _existingImageUrl != null &&
+          _existingImageUrl!.isNotEmpty);
 
   DecorationImage? get _previewImage {
     if (_imageBytes != null) {
@@ -154,6 +162,7 @@ class _CreateLookingForSheetState extends State<CreateLookingForSheet> {
         fit: BoxFit.cover,
       );
     }
+    if (_clearedImage) return null;
     final url = _existingImageUrl;
     if (url != null && url.isNotEmpty) {
       return DecorationImage(image: NetworkImage(url), fit: BoxFit.cover);
@@ -236,11 +245,12 @@ class _CreateLookingForSheetState extends State<CreateLookingForSheet> {
                             : Align(
                                 alignment: Alignment.topRight,
                                 child: IconButton(
-                                  onPressed: () => setState(() {
-                                    _imageBytes = null;
-                                    _existingImageUrl = null;
-                                    _clearedImage = true;
-                                  }),
+                                  onPressed: _submitting
+                                      ? null
+                                      : () => setState(() {
+                                          _imageBytes = null;
+                                          _clearedImage = true;
+                                        }),
                                   icon: const Icon(
                                     Icons.close,
                                     color: Colors.white,

@@ -115,6 +115,25 @@ void main() {
       });
       expect(post.thumbnailUrl, 'https://example.com/ref.jpg');
     });
+
+    test('reads looking-for object keys from public storage URLs', () {
+      expect(
+        lookingForStoragePathFromPublicUrl(
+          'https://xyz.supabase.co/storage/v1/object/public/looking-for/uid/pid/file.jpg',
+        ),
+        'uid/pid/file.jpg',
+      );
+      expect(
+        lookingForStoragePathFromPublicUrl(
+          'https://xyz.supabase.co/storage/v1/object/public/looking-for/uid/pid.jpg?token=1',
+        ),
+        'uid/pid.jpg',
+      );
+      expect(
+        lookingForStoragePathFromPublicUrl('https://cdn.example/other.jpg'),
+        isNull,
+      );
+    });
   });
 
   group('recordRecentSearch', () {

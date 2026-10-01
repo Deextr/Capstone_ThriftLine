@@ -7,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/seller_trust.dart';
 import '../../../../core/utils/stock_limits.dart';
 import '../../../../models/product_model.dart';
 import '../../../../providers/cart_provider.dart';
@@ -79,7 +80,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     ProductDetailController controller,
   ) async {
     final winnerId = controller.auction?['winner_id'] as String?;
-    final winningBid = controller.bids.isNotEmpty ? controller.bids.first : null;
+    final winningBid = controller.bids.isNotEmpty
+        ? controller.bids.first
+        : null;
     final candidateBids = controller.bids.where((b) {
       final bidderId = b['bidder_id'] as String?;
       return bidderId != winnerId;
@@ -96,7 +99,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
 
     final nextBid = candidateBids.first;
     final bidder = nextBid['bidder'] as Map<String, dynamic>?;
-    final username = bidder?['username'] as String? ??
+    final username =
+        bidder?['username'] as String? ??
         bidder?['full_name'] as String? ??
         'Next highest bidder';
     final amount = (nextBid['bid_amount'] as num?)?.toDouble() ?? 0.0;
@@ -153,7 +157,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primary,
                             borderRadius: BorderRadius.circular(6),
@@ -170,7 +177,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                         if (nextTime != null)
                           Text(
                             formatRelativeTime(nextTime),
-                            style: const TextStyle(fontSize: 11, color: AppColors.textHint),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textHint,
+                            ),
                           ),
                       ],
                     ),
@@ -224,7 +234,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
               // Comparison with 1st bidder (Previous/Failed)
               if (winningBid != null && winAmount > 0)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(8),
@@ -235,7 +248,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                     children: [
                       Text(
                         '1st Bid (@$winUsername - Expired):',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                        ),
                       ),
                       Text(
                         formatCurrency(winAmount),
@@ -259,7 +275,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                   Expanded(
                     child: Text(
                       'They will have a 12-hour window to complete checkout at their bid price.',
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
                 ],
@@ -277,11 +296,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: Text(
               'Send Offer (${formatCurrency(amount)})',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -328,8 +352,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                   const SizedBox(height: 16),
                   TextField(
                     controller: startPriceCtrl,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     decoration: const InputDecoration(
                       labelText: 'Starting Price (₱)',
                       border: OutlineInputBorder(),
@@ -338,8 +363,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                   const SizedBox(height: 12),
                   TextField(
                     controller: minIncrementCtrl,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     decoration: const InputDecoration(
                       labelText: 'Minimum Bid Increment (₱)',
                       border: OutlineInputBorder(),
@@ -395,10 +421,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
 
     final error = await controller.relistAuction(
       selectedDays,
-      startingPrice:
-          parsedStart != null && parsedStart > 0 ? parsedStart : null,
-      minimumIncrement:
-          parsedIncr != null && parsedIncr > 0 ? parsedIncr : null,
+      startingPrice: parsedStart != null && parsedStart > 0
+          ? parsedStart
+          : null,
+      minimumIncrement: parsedIncr != null && parsedIncr > 0
+          ? parsedIncr
+          : null,
     );
     if (!context.mounted) return;
     if (error != null) {
@@ -1107,6 +1135,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                             fontSize: 12,
                           ),
                         ),
+                      if (product.sellerTrustScore != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '${resolveTrustLabel(score: product.sellerTrustScore!, storedLevel: product.sellerTrustLevel)} · ${product.sellerTrustScore}/100',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                       const SizedBox(height: 4),
                       if (product.location != null &&
                           product.location!.isNotEmpty)
@@ -1510,8 +1551,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
         return SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () =>
-                _showBidBottomSheet(context, controller, minBid),
+            onPressed: () => _showBidBottomSheet(context, controller, minBid),
             icon: const Icon(
               Icons.gavel_rounded,
               color: Colors.white,
@@ -1581,8 +1621,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
       final label = controller.isViewerExpiredWinner
           ? 'Payment Expired — Item No Longer Available'
           : controller.hasNoWinner
-              ? 'Auction Ended — No Winner'
-              : 'Auction Ended';
+          ? 'Auction Ended — No Winner'
+          : 'Auction Ended';
 
       return SizedBox(
         width: double.infinity,

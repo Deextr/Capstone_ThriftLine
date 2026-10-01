@@ -56,8 +56,23 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _user != null;
   bool get isEmailOtpPending => _emailOtpPending;
 
-  /// Email/password identity, not “the address is Gmail”.
-  bool get usesEmailPasswordAuth => _user?.usesEmailPasswordAuth ?? false;
+  /// Current session used email/password — not Gmail, not Buyer/Seller mode.
+  ///
+  /// Computed from the live GoTrue session (JWT `amr` + identities) so a
+  /// Buyer ↔ Seller switch cannot keep a stale trusted-device flag.
+  bool get usesEmailPasswordAuth {
+    final session = _authService.currentSession;
+    return authSessionUsesEmailPassword(
+      lastAuthProvider: lastAuthProviderFromAppMetadata(
+        session?.user.appMetadata,
+      ),
+      identityProviders: <String>{
+        ...?_user?.authIdentityProviders,
+        ...?session?.user.identities?.map((i) => i.provider),
+      },
+      amrMethods: sessionAmrMethodsFromAccessToken(session?.accessToken),
+    );
+  }
 
   /// True while email/password sign-in is waiting on the trusted-device check.
   /// The router stays on the login screen until this clears.
@@ -215,7 +230,10 @@ class AuthProvider extends ChangeNotifier {
       // TEMP: _bypassOtp forces the skip (debug builds only).
       final skipOtp =
           _bypassOtp ||
-          shouldSkipEmailOtp(passwordAccepted: true, serverTrusted: serverTrusted);
+          shouldSkipEmailOtp(
+            passwordAccepted: true,
+            serverTrusted: serverTrusted,
+          );
       if (skipOtp) {
         await _setEmailOtpPending(false);
       } else {
@@ -332,7 +350,8 @@ class AuthProvider extends ChangeNotifier {
   /// [forgetDevice] revokes that grant first and replaces the local token.
   /// If revocation fails, the session stays signed in.
   Future<String?> logout({bool forgetDevice = false}) async {
-    if (forgetDevice) {
+    final revokeTrust = forgetDevice && usesEmailPasswordAuth;
+    if (revokeTrust) {
       final error = await _forgetTrustedDevice();
       if (error != null) return error;
     }

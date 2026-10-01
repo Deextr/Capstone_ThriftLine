@@ -14,6 +14,7 @@ class SellerProfile {
     required this.isVerified,
     required this.location,
     this.trustScore = 80,
+    this.trustLevel,
     this.shopBio,
     this.followerCount = 0,
     this.followingCount = 0,
@@ -73,6 +74,7 @@ class SellerProfile {
     final followerCount = (row['follower_count'] as num?)?.toInt() ?? 0;
     final followingCount = (row['following_count'] as num?)?.toInt() ?? 0;
     final trustScore = (user?['trust_score'] as num?)?.toInt() ?? 80;
+    final trustLevel = user?['trust_level'] as String?;
     final shopBio =
         row['shop_bio'] as String? ??
         user?['bio'] as String? ??
@@ -106,6 +108,7 @@ class SellerProfile {
       isVerified: isApproved,
       location: city.isNotEmpty ? city : 'Davao City',
       trustScore: trustScore,
+      trustLevel: trustLevel,
       shopBio: shopBio,
       followerCount: followerCount,
       followingCount: followingCount,
@@ -129,6 +132,7 @@ class SellerProfile {
   final bool isVerified;
   final String location;
   final int trustScore;
+  final String? trustLevel;
   final String? shopBio;
   final int followerCount;
   final int followingCount;
@@ -151,6 +155,7 @@ class SellerProfile {
     bool? isVerified,
     String? location,
     int? trustScore,
+    String? trustLevel,
     String? shopBio,
     int? followerCount,
     int? followingCount,
@@ -172,6 +177,7 @@ class SellerProfile {
     isVerified: isVerified ?? this.isVerified,
     location: location ?? this.location,
     trustScore: trustScore ?? this.trustScore,
+    trustLevel: trustLevel ?? this.trustLevel,
     shopBio: shopBio ?? this.shopBio,
     followerCount: followerCount ?? this.followerCount,
     followingCount: followingCount ?? this.followingCount,
@@ -195,6 +201,7 @@ class SellerProfile {
     'is_verified': isVerified,
     'location': location,
     'trust_score': trustScore,
+    'trust_level': trustLevel,
     'shop_bio': shopBio,
     'follower_count': followerCount,
     'following_count': followingCount,

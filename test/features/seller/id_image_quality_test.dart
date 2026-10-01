@@ -201,6 +201,22 @@ List<int> _clippedLeftId() {
 /// PhilID-style card on a white tray (low corner contrast vs the desk).
 List<int> _idOnWhiteTray() => _sharpId(background: 205);
 
+/// Guide filled by a light card: one text line on the left, a dense QR
+/// on the right. Module score is past the ordinary text range, and the
+/// QR keeps the text-band count under 3.
+List<int> _denseQrBackFillingGuide() {
+  final luma = _fill(_w, _h, 198);
+  for (var x = 6; x < 62; x++) {
+    luma[46 * _w + x] = 28;
+  }
+  for (var y = 6; y < _h - 6; y++) {
+    for (var x = 72; x < _w - 6; x++) {
+      luma[y * _w + x] = ((x ~/ 2) + (y ~/ 2)).isEven ? 16 : 236;
+    }
+  }
+  return luma;
+}
+
 /// ID back: white card, sparse text, large QR/barcode block (square bbox).
 List<int> _idBackWithQr() {
   final luma = _fill(_w, _h, 78);
@@ -717,8 +733,8 @@ void main() {
               allowDisplayedDocument: displayed,
             );
         final screen = run(displayed: true);
-      expect(screen.passed, isTrue, reason: screen.debug);
-      expect(run(displayed: false).passed, isFalse);
+        expect(screen.passed, isTrue, reason: screen.debug);
+        expect(run(displayed: false).passed, isFalse);
       },
     );
 
@@ -906,6 +922,38 @@ void main() {
           height: _h,
         ).isAligned,
         isTrue,
+      );
+    });
+
+    test('a light card dominated by a QR still reaches the text check', () {
+      final luma = _denseQrBackFillingGuide();
+      final live = IdImageMetrics.assessLivePreview(
+        luma: luma,
+        width: _w,
+        height: _h,
+      );
+      expect(live.geometry!.moduleScore, greaterThan(0.70));
+      expect(live.geometry!.bandCount, lessThan(3));
+      expect(live.isAligned, isTrue, reason: live.status.name);
+      expect(
+        IdImageMetrics.isLiveAligned(luma: _charger(), width: _w, height: _h),
+        isFalse,
+      );
+      expect(
+        IdImageMetrics.isLiveAligned(luma: _mouse(), width: _w, height: _h),
+        isFalse,
+      );
+      expect(
+        IdImageMetrics.isLiveAligned(
+          luma: _blackMouseOnPad(),
+          width: _w,
+          height: _h,
+        ),
+        isFalse,
+      );
+      expect(
+        IdImageMetrics.isLiveAligned(luma: _clutter(), width: _w, height: _h),
+        isFalse,
       );
     });
 
@@ -1131,11 +1179,19 @@ void main() {
       final fail = IdQualityResult.fail(IdQualityIssue.blurry);
       final notId = IdQualityResult.fail(IdQualityIssue.notId);
 
-      expect(const IdCapturePair().canProceed, isFalse);
-      expect(const IdCapturePair(front: ok).canProceed, isFalse);
-      expect(IdCapturePair(front: ok, back: fail).canProceed, isFalse);
-      expect(IdCapturePair(front: ok, back: notId).canProceed, isFalse);
-      expect(const IdCapturePair(front: ok, back: ok).canProceed, isTrue);
+      expect(const IdCapturePair().canProceed(), isFalse);
+      expect(const IdCapturePair(front: ok).canProceed(), isFalse);
+      expect(IdCapturePair(front: ok, back: fail).canProceed(), isFalse);
+      expect(IdCapturePair(front: ok, back: notId).canProceed(), isFalse);
+      expect(const IdCapturePair(front: ok, back: ok).canProceed(), isTrue);
+      expect(
+        const IdCapturePair(front: ok).canProceed(requiresBack: false),
+        isTrue,
+      );
+      expect(
+        IdCapturePair(front: fail).canProceed(requiresBack: false),
+        isFalse,
+      );
     });
   });
 }
