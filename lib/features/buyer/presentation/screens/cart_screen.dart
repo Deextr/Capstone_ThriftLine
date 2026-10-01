@@ -37,6 +37,9 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> _reload() async {
+    final supabase = context.read<SupabaseService>();
+    await syncMyUnpaidCheckouts(supabase);
+    if (!mounted) return;
     final cart = context.read<CartProvider>();
     await cart.refresh();
     if (!mounted) return;
@@ -46,10 +49,7 @@ class _CartScreenState extends State<CartScreen> {
       return;
     }
     try {
-      final orders = await fetchOrdersForBuyer(
-        context.read<SupabaseService>(),
-        buyerId,
-      );
+      final orders = await fetchOrdersForBuyer(supabase, buyerId);
       if (!mounted) return;
       setState(() => _awaiting = buyerAwaitingPayment(orders));
     } catch (_) {
@@ -147,7 +147,7 @@ class _CartScreenState extends State<CartScreen> {
                           Padding(
                             padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                             child: Text(
-                              'Payment needed',
+                              'Auction payment due',
                               style: AppTypography.subheading,
                             ),
                           ),
@@ -175,7 +175,7 @@ class _CartScreenState extends State<CartScreen> {
                       children: [
                         if (_awaiting.isNotEmpty) ...[
                           Text(
-                            'Payment needed',
+                            'Auction payment due',
                             style: AppTypography.subheading,
                           ),
                           const SizedBox(height: 8),

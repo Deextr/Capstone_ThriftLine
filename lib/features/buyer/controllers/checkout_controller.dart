@@ -56,6 +56,9 @@ class CheckoutController extends ChangeNotifier {
   bool get isCancellingCheckout => _isCancellingCheckout;
   String? get errorMessage => _errorMessage;
   bool get hasAddress => _selectedAddress != null;
+
+  bool get hasValidDeliveryPhone =>
+      _selectedAddress?.hasValidPhoneContact ?? false;
   Set<String> get selectedProductIds => Set.unmodifiable(_selectedProductIds);
 
   String? get scopedProductId {
@@ -76,8 +79,7 @@ class CheckoutController extends ChangeNotifier {
   /// Kept for compatibility — returns all cart items available for checkout.
   List<CartItem> get checkoutItems => allCartItems;
 
-  List<CartShopGroup> get checkoutShops =>
-      groupCartItemsByShop(selectedItems);
+  List<CartShopGroup> get checkoutShops => groupCartItemsByShop(selectedItems);
 
   /// Cart items grouped by seller ID.
   Map<String, List<CartItem>> get itemsBySeller {
@@ -103,8 +105,9 @@ class CheckoutController extends ChangeNotifier {
   }
 
   /// The list of items currently checked for payment.
-  List<CartItem> get selectedItems =>
-      allCartItems.where((i) => _selectedProductIds.contains(i.product.id)).toList();
+  List<CartItem> get selectedItems => allCartItems
+      .where((i) => _selectedProductIds.contains(i.product.id))
+      .toList();
 
   int get selectedCount => selectedItems.length;
 
@@ -114,22 +117,24 @@ class CheckoutController extends ChangeNotifier {
   double get subtotal =>
       selectedItems.fold(0.0, (sum, item) => sum + item.subtotal);
 
-  double get shippingFee =>
-      selectedItems.isEmpty ? 0 : kCheckoutShippingPerSeller;
+  double get shippingFee => checkoutShippingFee(
+    checkoutSellerCount(selectedItems.map((item) => item.product.sellerId)),
+  );
 
   double get platformFee => checkoutPlatformFee(subtotal);
 
   double get total => checkoutTotal(
-        subtotal: subtotal,
-        shippingFee: shippingFee,
-        platformFee: platformFee,
-      );
+    subtotal: subtotal,
+    shippingFee: shippingFee,
+    platformFee: platformFee,
+  );
 
   bool get hasUnpaidCheckouts => _awaitingPayment.isNotEmpty;
 
   bool get canSubmit =>
       selectedItems.isNotEmpty &&
       hasAddress &&
+      hasValidDeliveryPhone &&
       !_isSubmitting &&
       !hasUnpaidCheckouts;
 
@@ -148,11 +153,6 @@ class CheckoutController extends ChangeNotifier {
     if (_selectedProductIds.contains(productId)) {
       _selectedProductIds.remove(productId);
     } else {
-      final currentSeller = selectedSellerId;
-      if (currentSeller != null && currentSeller != item.product.sellerId) {
-        // Orders are placed per seller — switch selection to this seller
-        _selectedProductIds.clear();
-      }
       _selectedProductIds.add(productId);
     }
     _errorMessage = null;
@@ -161,19 +161,20 @@ class CheckoutController extends ChangeNotifier {
 
   /// Selects or deselects all items for a given seller.
   void toggleSellerSelection(String sellerId) {
-    final sellerItems =
-        allCartItems.where((i) => i.product.sellerId == sellerId).toList();
+    final sellerItems = allCartItems
+        .where((i) => i.product.sellerId == sellerId)
+        .toList();
     if (sellerItems.isEmpty) return;
 
-    final allSelected =
-        sellerItems.every((i) => _selectedProductIds.contains(i.product.id));
+    final allSelected = sellerItems.every(
+      (i) => _selectedProductIds.contains(i.product.id),
+    );
 
     if (allSelected) {
       for (final i in sellerItems) {
         _selectedProductIds.remove(i.product.id);
       }
     } else {
-      _selectedProductIds.clear();
       for (final i in sellerItems) {
         _selectedProductIds.add(i.product.id);
       }
@@ -349,6 +350,13 @@ class CheckoutController extends ChangeNotifier {
         error: 'Add a delivery address before checkout.',
       );
     }
+    if (!address.hasValidPhoneContact) {
+      const error =
+          'Update the phone contact on your delivery address '
+          '(09XXXXXXXXX) before checkout.';
+      _errorMessage = error;
+      return (orderId: null, count: 0, error: error);
+    }
     if (_isSubmitting) {
       return (
         orderId: null,
@@ -370,7 +378,7 @@ class CheckoutController extends ChangeNotifier {
       await _loadAwaitingPayment();
       if (_awaitingPayment.isNotEmpty) {
         const error =
-            'You have an unpaid checkout. Pay or cancel it before placing a new order.';
+            'You have an auction win that still needs payment. Pay that first.';
         _errorMessage = error;
         return (orderId: null, count: 0, error: error);
       }

@@ -51,14 +51,14 @@ class PurchaseHistoryScreen extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                         child: Text(
-                          'Payment needed',
+                          'Auction payment due',
                           style: AppTypography.subheading,
                         ),
                       ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                         child: Text(
-                          'These checkouts are still unpaid. Continue payment or cancel from the payment screen.',
+                          'These auction wins still need payment before the deadline.',
                           style: AppTypography.caption,
                         ),
                       ),

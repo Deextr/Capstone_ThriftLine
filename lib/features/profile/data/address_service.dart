@@ -1,4 +1,5 @@
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/ph_phone.dart';
 import '../../../models/address_model.dart';
 import 'buyer_address_validation.dart';
 
@@ -52,10 +53,13 @@ class AddressService {
     if (barangayName.isEmpty) {
       throw StateError('Please select a Davao City barangay.');
     }
+    final trimmedPhone = phoneNumber.trim();
+    final phoneError = phMobile09FormatValidationError(trimmedPhone);
+    if (phoneError != null) throw StateError(phoneError);
     final payload = {
       'user_id': userId,
       'recipient_name': recipientName.trim(),
-      'phone_number': phoneNumber.trim(),
+      'phone_number': trimmedPhone,
       'street_address': streetAddress.trim(),
       'barangay': barangayName,
       'city': buyerAddressCity(city),

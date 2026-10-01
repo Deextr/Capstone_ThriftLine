@@ -101,6 +101,7 @@ Deno.serve(async (req) => {
   const amountCentavos = Number(prep.amount_centavos);
   const paymentId = String(prep.payment_id ?? "");
   const orderNumber = String(prep.order_number ?? "ThriftLine order");
+  const orderCount = Number(prep.order_count ?? 1);
   if (!Number.isInteger(amountCentavos) || amountCentavos < 1 || !paymentId) {
     return json(400, {
       success: false,
@@ -142,10 +143,14 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         data: {
           attributes: {
-            description: `ThriftLine ${orderNumber}`,
+            description: orderCount > 1
+              ? `ThriftLine checkout (${orderCount} shops)`
+              : `ThriftLine ${orderNumber}`,
             line_items: [
               {
-                name: orderNumber,
+                name: orderCount > 1
+                  ? `ThriftLine checkout (${orderCount} shops)`
+                  : orderNumber,
                 amount: amountCentavos,
                 currency: "PHP",
                 quantity: 1,
@@ -164,6 +169,10 @@ Deno.serve(async (req) => {
               order_id: orderId,
               payment_id: paymentId,
               paymongo_channel: channel,
+              checkout_group_id: typeof prep.checkout_group_id === "string"
+                ? prep.checkout_group_id
+                : "",
+              order_count: String(orderCount),
             },
           },
         },

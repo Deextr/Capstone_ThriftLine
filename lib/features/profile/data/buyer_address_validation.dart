@@ -1,3 +1,4 @@
+import '../../../core/utils/ph_phone.dart';
 import '../../seller/domain/davao_barangay.dart';
 
 /// Buyer delivery addresses are Davao City only, matching Become a Seller.
@@ -16,6 +17,8 @@ String? buyerAddressFormError({
       streetAddress.trim().isEmpty) {
     return 'Name, phone, and street are required.';
   }
+  final phoneError = phMobile09FormatValidationError(phoneNumber);
+  if (phoneError != null) return phoneError;
   if (!DavaoBarangay.isAllowedSelection(barangay, allowedBarangays)) {
     return 'Please select a Davao City barangay.';
   }
