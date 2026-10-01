@@ -71,14 +71,9 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
     final pending = order.isPaymentPending;
     final returnUri = GoRouterState.of(context).uri;
     final returned = returnUri.queryParameters['returned'] == '1';
-    final returnStatus = (returnUri.queryParameters['status'] ?? '')
-        .trim()
-        .toLowerCase();
-    final cancelledReturn =
-        returnStatus == 'cancel' || returnStatus == 'cancelled';
     final failed = order.isFailedCheckout || controller.isExpiredPayment;
-    _scheduleReturnHandling(returned, cancelledReturn);
     final confirming = pending && !failed && controller.isConfirmingPayment;
+    _scheduleReturnHandling(returned || confirming);
     _schedulePaidConfirmation(pending, failed);
 
     return PopScope(
@@ -94,6 +89,8 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                 ? (controller.isExpiredPayment
                       ? 'Payment Expired'
                       : 'Payment Failed')
+                : confirming
+                ? 'Confirming your payment...'
                 : pending
                 ? 'Complete payment'
                 : 'Payment Successful',
@@ -247,28 +244,14 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
     context.go(isAuction ? RouteNames.buyerHome : RouteNames.cart);
   }
 
-  void _scheduleReturnHandling(bool returned, bool cancelled) {
+  void _scheduleReturnHandling(bool returned) {
     if (!returned || _didHandleReturn) return;
     _didHandleReturn = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final controller = context.read<BuyerOrdersController>();
-      if (cancelled) {
-        final isAuction = (controller.order?.auctionId ?? '').isNotEmpty;
-        await controller.abandonUnpaidCheckout(widget.orderId);
-        if (!mounted) return;
-        if (!isAuction) {
-          await context.read<CartProvider>().refresh();
-          if (!mounted) return;
-        }
-        showThriftSnackBar(
-          context,
-          'Checkout cancelled. Items returned to your cart.',
-        );
-        context.go(isAuction ? RouteNames.buyerHome : RouteNames.cart);
-        return;
-      }
-      unawaited(controller.handlePaymongoAppReturn(cancelled: false));
+      unawaited(
+        context.read<BuyerOrdersController>().handlePaymongoAppReturn(),
+      );
     });
   }
 

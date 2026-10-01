@@ -84,7 +84,34 @@ void main() {
         PaymongoReconcileResult.fromMap({'outcome': 'pending'}).isPending,
         isTrue,
       );
+      expect(
+        PaymongoReconcileResult.fromMap({'error': 'network'}).isPending,
+        isTrue,
+      );
+      expect(PaymongoReconcileResult.fromMap(null).isUnsuccessful, isFalse);
     });
+
+    test('does not treat a missing outcome as payment failed', () {
+      final result = PaymongoReconcileResult.fromMap({'success': true});
+      expect(result.isPending, isTrue);
+      expect(result.isPaid, isFalse);
+      expect(result.isUnsuccessful, isFalse);
+    });
+
+    test(
+      'keeps pending when PayMongo is paid but the order is still recording',
+      () {
+        final result = PaymongoReconcileResult.fromMap({
+          'success': true,
+          'outcome': 'pending',
+          'error':
+              'Payment is confirmed at PayMongo and is still being recorded.',
+        });
+        expect(result.isPending, isTrue);
+        expect(result.isPaid, isFalse);
+        expect(result.isUnsuccessful, isFalse);
+      },
+    );
   });
 
   group('PayMongo channel', () {

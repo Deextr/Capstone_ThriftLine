@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:thriftline/features/trust_safety/data/delivery_report_mapping.dart';
 import 'package:thriftline/features/trust_safety/data/report_reasons.dart';
 import 'package:thriftline/features/trust_safety/data/review_rules.dart';
+import 'package:thriftline/models/review_model.dart';
 import 'package:thriftline/models/community_report_model.dart';
 import 'package:thriftline/models/enums.dart';
 import 'package:thriftline/models/order_model.dart';
@@ -148,6 +149,25 @@ void main() {
       expect(reportStatusLabel('action_taken'), 'Action Taken');
       expect(reportStatusLabel('resolved'), 'Resolved');
       expect(reportStatusLabel('dismissed'), 'Dismissed');
+    });
+
+    test('allows up to three optional review photos', () {
+      expect(kReviewPhotoMaxCount, 3);
+      final review = ReviewModel.fromSupabase({
+        'review_id': 'r1',
+        'order_id': 'o1',
+        'reviewer_id': 'buyer-1',
+        'reviewed_user_id': 'seller-1',
+        'rating': 5,
+        'review_text': 'Great item',
+        'review_type': 'buyer_to_seller',
+        'created_at': '2026-09-13T03:00:00Z',
+        'review_photos': [
+          {'review_photo_id': 'p1', 'file_path': 'u/r/a.jpg'},
+          {'review_photo_id': 'p2', 'file_path': 'u/r/b.jpg'},
+        ],
+      });
+      expect(review.photos.length, 2);
     });
 
     test('requires a reasonable details length', () {

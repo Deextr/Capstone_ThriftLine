@@ -221,8 +221,10 @@ class _EmailSentBody extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          'If an account exists for $email, you will receive a password reset '
-          'link shortly. Open it on this device to choose a new password.',
+          'If an email and password account exists for $email, you will receive '
+          'a password reset link shortly. Open it on this device to choose a '
+          'new password. If you created your account with Continue with Google, '
+          'sign in with Google instead.',
           style: AppTypography.body.copyWith(
             color: Colors.white.withValues(alpha: 0.82),
           ),

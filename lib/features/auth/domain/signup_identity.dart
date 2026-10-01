@@ -38,14 +38,14 @@ SignupOutcome classifySignupIdentities({
 String existingAccountSignupMessage(SignupOutcome outcome) {
   return switch (outcome) {
     SignupOutcome.existingGoogleAccount =>
-      'This email is already associated with an existing ThriftLine account. '
-          'Please sign in using Google.',
+      'An account with this email already exists. '
+          'Please continue with Google to sign in.',
     SignupOutcome.alreadyRegistered =>
-      'This email is already associated with an existing ThriftLine account. '
-          'Please log in instead.',
+      'An account with this email already exists. '
+          'Please sign in with the method you used to create it.',
     SignupOutcome.proceed =>
-      'This email is already associated with an existing ThriftLine account. '
-          'Please log in instead.',
+      'An account with this email already exists. '
+          'Please sign in with the method you used to create it.',
   };
 }
 

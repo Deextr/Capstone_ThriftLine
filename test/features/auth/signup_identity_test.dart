@@ -5,30 +5,27 @@ void main() {
   group('classifySignupIdentities', () {
     test('Scenario C: new email signup with only email identity proceeds', () {
       expect(
-        classifySignupIdentities(
-          hasSession: true,
-          providers: const ['email'],
-        ),
+        classifySignupIdentities(hasSession: true, providers: const ['email']),
         SignupOutcome.proceed,
       );
     });
 
-    test('Scenario C: confirm-email pending (no session, email identity) proceeds', () {
-      expect(
-        classifySignupIdentities(
-          hasSession: false,
-          providers: const ['email'],
-        ),
-        SignupOutcome.proceed,
-      );
-    });
+    test(
+      'Scenario C: confirm-email pending (no session, email identity) proceeds',
+      () {
+        expect(
+          classifySignupIdentities(
+            hasSession: false,
+            providers: const ['email'],
+          ),
+          SignupOutcome.proceed,
+        );
+      },
+    );
 
     test('Scenario E: unverified email retry still looks like email-only', () {
       expect(
-        classifySignupIdentities(
-          hasSession: false,
-          providers: const ['email'],
-        ),
+        classifySignupIdentities(hasSession: false, providers: const ['email']),
         SignupOutcome.proceed,
       );
     });
@@ -57,19 +54,22 @@ void main() {
       );
     });
 
-    test('Scenario D: a different provider list is not inferred from empty data', () {
-      expect(
-        classifySignupIdentities(hasSession: true, providers: const ['email']),
-        isNot(SignupOutcome.existingGoogleAccount),
-      );
-    });
+    test(
+      'Scenario D: a different provider list is not inferred from empty data',
+      () {
+        expect(
+          classifySignupIdentities(
+            hasSession: true,
+            providers: const ['email'],
+          ),
+          isNot(SignupOutcome.existingGoogleAccount),
+        );
+      },
+    );
 
     test('provider names are matched case-insensitively', () {
       expect(
-        classifySignupIdentities(
-          hasSession: true,
-          providers: const ['Google'],
-        ),
+        classifySignupIdentities(hasSession: true, providers: const ['Google']),
         SignupOutcome.existingGoogleAccount,
       );
     });
@@ -79,21 +79,24 @@ void main() {
     test('names Google only when that identity was on the Auth response', () {
       expect(
         existingAccountSignupMessage(SignupOutcome.existingGoogleAccount),
-        'This email is already associated with an existing ThriftLine account. '
-        'Please sign in using Google.',
+        'An account with this email already exists. '
+        'Please continue with Google to sign in.',
       );
       expect(
         existingAccountSignupMessage(SignupOutcome.alreadyRegistered),
-        'This email is already associated with an existing ThriftLine account. '
-        'Please log in instead.',
+        'An account with this email already exists. '
+        'Please sign in with the method you used to create it.',
       );
     });
 
-    test('Scenario B: Google login against an email account points at password login', () {
-      expect(
-        existingEmailPasswordAccountMessage,
-        contains('email and password'),
-      );
-    });
+    test(
+      'Scenario B: Google login against an email account points at password login',
+      () {
+        expect(
+          existingEmailPasswordAccountMessage,
+          contains('email and password'),
+        );
+      },
+    );
   });
 }

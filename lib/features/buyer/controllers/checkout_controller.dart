@@ -45,6 +45,7 @@ class CheckoutController extends ChangeNotifier {
   final Set<String> _selectedProductIds = {};
   bool _isLoading = true;
   bool _isSubmitting = false;
+  bool _isContinuingToPayment = false;
   bool _isCancellingCheckout = false;
   String? _errorMessage;
 
@@ -53,6 +54,7 @@ class CheckoutController extends ChangeNotifier {
   List<OrderModel> get awaitingPayment => _awaitingPayment;
   bool get isLoading => _isLoading;
   bool get isSubmitting => _isSubmitting;
+  bool get isContinuingToPayment => _isContinuingToPayment;
   bool get isCancellingCheckout => _isCancellingCheckout;
   String? get errorMessage => _errorMessage;
   bool get hasAddress => _selectedAddress != null;
@@ -133,9 +135,8 @@ class CheckoutController extends ChangeNotifier {
 
   bool get canSubmit =>
       selectedItems.isNotEmpty &&
-      hasAddress &&
-      hasValidDeliveryPhone &&
       !_isSubmitting &&
+      !_isContinuingToPayment &&
       !hasUnpaidCheckouts;
 
   /// Toggles selection of an item.
@@ -338,26 +339,32 @@ class CheckoutController extends ChangeNotifier {
     }
   }
 
+  /// Waits for the initial checkout load, then creates pending order(s).
+  Future<({String? orderId, int count, String? error})>
+  continueToPayment() async {
+    if (_isContinuingToPayment || _isSubmitting) {
+      return (
+        orderId: null,
+        count: 0,
+        error: 'Checkout is already in progress.',
+      );
+    }
+    _isContinuingToPayment = true;
+    notifyListeners();
+    try {
+      return await placeOrder();
+    } finally {
+      _isContinuingToPayment = false;
+      notifyListeners();
+    }
+  }
+
   /// Returns the first created order id, or an error string.
   Future<({String? orderId, int count, String? error})> placeOrder() async {
     if (_auth.user?.id == null) {
       return (orderId: null, count: 0, error: 'Please sign in to check out.');
     }
     final address = _selectedAddress;
-    if (address == null) {
-      return (
-        orderId: null,
-        count: 0,
-        error: 'Add a delivery address before checkout.',
-      );
-    }
-    if (!address.hasValidPhoneContact) {
-      const error =
-          'Update the phone contact on your delivery address '
-          '(09XXXXXXXXX) before checkout.';
-      _errorMessage = error;
-      return (orderId: null, count: 0, error: error);
-    }
     if (_isSubmitting) {
       return (
         orderId: null,
@@ -405,7 +412,7 @@ class CheckoutController extends ChangeNotifier {
         }
       }
 
-      final params = <String, dynamic>{'p_address_id': address.id};
+      final params = <String, dynamic>{'p_address_id': address?.id};
       final ids = currentSelected.map((item) => item.product.id).toList();
       final multiShop = groupCartItemsByShop(currentSelected).length > 1;
       if (ids.length > 1 || multiShop) {

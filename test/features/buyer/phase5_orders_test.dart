@@ -134,6 +134,52 @@ void main() {
       expect(order.auctionId, 'auction-1');
       expect(order.source, 'auction');
       expect(order.addressMissing, isTrue);
+      expect(order.hasValidDeliveryAddress, isFalse);
+    });
+
+    test('requires a valid delivery phone for payment', () {
+      final withoutPhone = OrderModel.fromSupabase({
+        'order_id': 'order-3',
+        'order_number': 'TL-3',
+        'buyer_id': 'buyer-1',
+        'seller_id': 'seller-1',
+        'status': 'pending',
+        'payment_status': 'pending',
+        'subtotal': 100,
+        'shipping_fee': 80,
+        'platform_fee': 2,
+        'total': 182,
+        'shipping_address': {
+          'formatted': '123 Main, Brgy, Davao City',
+          'street_address': '123 Main',
+          'phone_number': 'invalid',
+        },
+        'created_at': '2026-09-11T02:00:00Z',
+        'order_items': const [],
+      });
+      expect(withoutPhone.addressMissing, isFalse);
+      expect(withoutPhone.hasValidDeliveryAddress, isFalse);
+
+      final ready = OrderModel.fromSupabase({
+        'order_id': 'order-4',
+        'order_number': 'TL-4',
+        'buyer_id': 'buyer-1',
+        'seller_id': 'seller-1',
+        'status': 'pending',
+        'payment_status': 'pending',
+        'subtotal': 100,
+        'shipping_fee': 80,
+        'platform_fee': 2,
+        'total': 182,
+        'shipping_address': {
+          'formatted': '123 Main, Brgy, Davao City',
+          'street_address': '123 Main',
+          'phone_number': '09123456789',
+        },
+        'created_at': '2026-09-11T02:00:00Z',
+        'order_items': const [],
+      });
+      expect(ready.hasValidDeliveryAddress, isTrue);
     });
   });
 }

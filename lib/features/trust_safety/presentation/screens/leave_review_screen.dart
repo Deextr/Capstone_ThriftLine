@@ -9,6 +9,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/leave_review_controller.dart';
 import '../../data/review_rules.dart';
+import '../widgets/review_photo_section.dart';
 import '../widgets/star_rating_input.dart';
 
 class LeaveReviewScreen extends StatefulWidget {
@@ -46,6 +47,7 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         backgroundColor: AppColors.background,
+        resizeToAvoidBottomInset: true,
         appBar: AppBar(
           title: Text(
             controller.isSellerReviewingBuyer ? 'Rate Buyer' : 'Leave a Review',
@@ -133,6 +135,26 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
                               style: AppTypography.caption,
                             ),
                           ),
+                          if (!controller.isSellerReviewingBuyer) ...[
+                            const SizedBox(height: 24),
+                            ReviewPhotoSection(
+                              existingPhotos: controller.existingPhotos,
+                              newDrafts: controller.photoDrafts,
+                              readOnly: controller.readOnly,
+                              onAddGallery: () => context
+                                  .read<LeaveReviewController>()
+                                  .addPhotoFromGallery(),
+                              onAddCamera: () => context
+                                  .read<LeaveReviewController>()
+                                  .addPhotoFromCamera(),
+                              onRemoveExisting: (photo) => context
+                                  .read<LeaveReviewController>()
+                                  .markExistingPhotoRemoved(photo),
+                              onRemoveDraft: (i) => context
+                                  .read<LeaveReviewController>()
+                                  .removePhotoDraft(i),
+                            ),
+                          ],
                           if (controller.errorMessage != null &&
                               controller.order != null &&
                               !controller.order!.isCompleted) ...[
@@ -149,7 +171,12 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
                     ),
                     if (!controller.readOnly)
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                        padding: EdgeInsets.fromLTRB(
+                          20,
+                          8,
+                          20,
+                          16 + MediaQuery.viewInsetsOf(context).bottom,
+                        ),
                         child: ThriftButton(
                           label: controller.existing == null
                               ? 'Submit Review'

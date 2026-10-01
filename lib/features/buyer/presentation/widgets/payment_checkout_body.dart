@@ -42,8 +42,7 @@ class PaymentCheckoutBody extends StatelessWidget {
   final VoidCallback? onReturnToCart;
   final DateTime? paymentDueAt;
 
-  bool get _hasAddress =>
-      !order.addressMissing && order.shippingAddress.trim().isNotEmpty;
+  bool get _hasValidDeliveryAddress => order.hasValidDeliveryAddress;
 
   List<OrderModel> get _orders {
     if (groupOrders.isNotEmpty) return groupOrders;
@@ -129,7 +128,7 @@ class PaymentCheckoutBody extends StatelessWidget {
           totalLabel: totalLabel,
           confirming: confirming,
           selectedChannel: selectedChannel,
-          hasAddress: _hasAddress,
+          hasAddress: _hasValidDeliveryAddress,
           windowOpen: windowOpen,
           isAbandoning: isAbandoning,
           returnLabel: returnLabel,
@@ -197,14 +196,14 @@ class _ConfirmingBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Confirming payment',
+                  'Confirming your payment...',
                   style: AppTypography.body.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  "We're checking your payment. This screen updates when PayMongo confirms it.",
+                  "We're confirming your payment with PayMongo. This can take a few seconds.",
                   style: AppTypography.caption.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -378,7 +377,7 @@ class _PaymentAddressSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final addressText = order.shippingAddress.trim();
-    final hasAddress = !order.addressMissing && addressText.isNotEmpty;
+    final hasAddress = order.hasValidDeliveryAddress;
 
     return ThriftCard(
       padding: const EdgeInsets.all(14),
@@ -405,14 +404,14 @@ class _PaymentAddressSection extends StatelessWidget {
                     color: AppColors.primary,
                   ),
                 )
-              else
+              else if (hasAddress)
                 TextButton(
                   onPressed: onChangeAddress,
                   style: TextButton.styleFrom(
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
                   ),
-                  child: Text(hasAddress ? 'Change' : 'Add'),
+                  child: const Text('Change'),
                 ),
             ],
           ),
@@ -428,11 +427,21 @@ class _PaymentAddressSection extends StatelessWidget {
               ),
             if (order.buyerName.isNotEmpty) const SizedBox(height: 2),
             Text(addressText, style: AppTypography.body.copyWith(fontSize: 13)),
-          ] else
+          ] else ...[
             Text(
-              'Add a delivery address before you pay.',
+              'Please add a delivery address before proceeding with payment.',
               style: AppTypography.caption.copyWith(color: AppColors.error),
             ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: isSavingAddress ? null : onChangeAddress,
+                icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+                label: const Text('Add Delivery Address'),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -733,36 +742,45 @@ class _PaymentStickyBar extends StatelessWidget {
             ],
             if (confirming)
               const ThriftButton(
-                label: 'Confirming payment…',
+                label: 'Confirming your payment...',
                 onPressed: null,
                 isLoading: true,
               )
-            else if (!hasAddress)
-              ThriftButton(
-                label: 'Add delivery address to pay',
-                onPressed: onChangeAddress,
-              )
-            else if (!windowOpen)
-              const ThriftButton(label: 'Payment window ended', onPressed: null)
-            else if (selectedChannel == null)
-              const ThriftButton(
-                label: 'Select a payment method',
-                onPressed: null,
-              )
-            else
-              PayNowButton(
-                orderId: order.id,
-                channel: selectedChannel!,
-                amountLabel: totalLabel,
-              ),
+            else ...[
+              if (!hasAddress)
+                ThriftButton(
+                  label: 'Add Delivery Address',
+                  onPressed: onChangeAddress,
+                )
+              else if (!windowOpen)
+                const ThriftButton(
+                  label: 'Payment window ended',
+                  onPressed: null,
+                )
+              else if (selectedChannel == null)
+                const ThriftButton(
+                  label: 'Select a payment method',
+                  onPressed: null,
+                )
+              else
+                PayNowButton(
+                  orderId: order.id,
+                  channel: selectedChannel!,
+                  amountLabel: totalLabel,
+                ),
+            ],
             if (!confirming) ...[
               const SizedBox(height: 8),
               Text(
-                selectedChannel != null && hasAddress && windowOpen
+                !hasAddress
+                    ? 'Payment is unavailable until you add a delivery address.'
+                    : selectedChannel != null && windowOpen
                     ? 'You will continue to PayMongo to complete payment.'
                     : 'Choose a payment method above to continue.',
                 style: AppTypography.caption.copyWith(
-                  color: AppColors.textSecondary,
+                  color: !hasAddress
+                      ? AppColors.error.withValues(alpha: 0.85)
+                      : AppColors.textSecondary,
                   fontSize: 11,
                 ),
                 textAlign: TextAlign.center,

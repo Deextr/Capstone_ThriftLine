@@ -51,7 +51,8 @@ class BuyerOrdersController extends ChangeNotifier {
   String? _deliveryPin;
   RealtimeChannel? _channel;
   AppLifecycleListener? _lifecycle;
-  Timer? _returnPoll;
+  int _returnGeneration = 0;
+  int _loadGeneration = 0;
   bool _disposed = false;
 
   List<OrderModel> get orders => _orders;
@@ -79,6 +80,7 @@ class BuyerOrdersController extends ChangeNotifier {
 
   Future<void> load({bool showSpinner = true}) async {
     final myId = _auth.user?.id;
+    final generation = ++_loadGeneration;
     if (myId == null) {
       _orders = [];
       _order = null;
@@ -99,10 +101,18 @@ class BuyerOrdersController extends ChangeNotifier {
         await restoreAbandonedFixedPriceCheckouts(_supabase);
         await syncMyUnpaidCheckouts(_supabase);
       }
+      if (generation != _loadGeneration) return;
       if (orderId != null) {
-        _order = await fetchOrderById(_supabase, orderId!, buyerId: myId);
+        final fetched = await fetchOrderById(
+          _supabase,
+          orderId!,
+          buyerId: myId,
+        );
+        if (generation != _loadGeneration) return;
+        _order = fetched;
         if (_order != null && _order!.needsBuyerPayment) {
           await _reconcileOpenCheckout(orderId!);
+          if (generation != _loadGeneration) return;
         }
         if (_order == null) {
           _errorMessage = 'Order not found.';
@@ -110,6 +120,7 @@ class BuyerOrdersController extends ChangeNotifier {
         } else {
           await _loadPaymentGroup(myId);
         }
+        if (generation != _loadGeneration) return;
         if (_order != null && !_order!.needsBuyerPayment) {
           _isConfirmingPayment = false;
           if (_order!.isFailedCheckout) {
@@ -121,6 +132,7 @@ class BuyerOrdersController extends ChangeNotifier {
         await _maybeLoadDeliveryPin();
       } else {
         _orders = await fetchOrdersForBuyer(_supabase, myId);
+        if (generation != _loadGeneration) return;
         if (_orders.every((o) => !o.needsBuyerPayment)) {
           _isConfirmingPayment = false;
         }
@@ -128,10 +140,14 @@ class BuyerOrdersController extends ChangeNotifier {
       await _loadMyReviews(myId);
     } catch (e) {
       debugPrint('BuyerOrdersController.load error: $e');
-      _errorMessage = 'Unable to load orders.';
+      if (generation == _loadGeneration) {
+        _errorMessage = 'Unable to load orders.';
+      }
     } finally {
-      _isLoading = false;
-      _notify();
+      if (generation == _loadGeneration) {
+        _isLoading = false;
+        _notify();
+      }
     }
   }
 
@@ -185,6 +201,13 @@ class BuyerOrdersController extends ChangeNotifier {
         error: 'Payment is already starting.',
       );
     }
+    final current = _order;
+    if (current != null && !current.hasValidDeliveryAddress) {
+      return const PaymongoCheckoutResult(
+        success: false,
+        error: 'Add a delivery address before paying.',
+      );
+    }
     _isStartingPayment = true;
     _notify();
     try {
@@ -208,75 +231,70 @@ class BuyerOrdersController extends ChangeNotifier {
     }
   }
 
-  Future<void> handlePaymongoAppReturn({required bool cancelled}) async {
-    _returnPoll?.cancel();
+  Future<PaymongoAppReturnResult> handlePaymongoAppReturn() async {
     final id = orderId ?? _order?.id;
-    if (id == null || id.isEmpty) return;
+    if (id == null || id.isEmpty) return PaymongoAppReturnResult.pending;
+    final generation = ++_returnGeneration;
 
     _isConfirmingPayment = true;
     _unsuccessfulOutcome = null;
     _notify();
 
-    final reconciled = await reconcilePaymongoCheckout(_supabase, orderId: id);
-    await load(showSpinner: false);
-    if (_disposed) return;
-
-    if (reconciled.isPaid) {
-      _isConfirmingPayment = false;
-      _unsuccessfulOutcome = null;
-      _notify();
-      return;
-    }
-    if (reconciled.isUnsuccessful || _order?.isFailedCheckout == true) {
-      _isConfirmingPayment = false;
-      _unsuccessfulOutcome =
-          reconciled.isExpired || (_order?.isExpiredCheckout ?? false)
-          ? 'expired'
-          : 'failed';
-      _notify();
-      return;
-    }
-    if (_order != null &&
-        !_order!.isPaymentPending &&
-        !_order!.isFailedCheckout) {
-      _isConfirmingPayment = false;
-      _unsuccessfulOutcome = null;
-      _notify();
-      return;
-    }
-
-    if (cancelled) {
-      _isConfirmingPayment = false;
-      _unsuccessfulOutcome = null;
-      _notify();
-      await abandonUnpaidCheckout(id);
-      return;
-    }
-
-    _isConfirmingPayment = true;
-    _notify();
-    var attempts = 0;
-    _returnPoll = Timer.periodic(const Duration(seconds: 2), (timer) {
-      if (_disposed) {
-        timer.cancel();
-        return;
+    for (var attempt = 0; attempt < 16; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(const Duration(seconds: 2));
       }
-      if (attempts >= 10) {
-        timer.cancel();
+      if (_disposed || generation != _returnGeneration) {
+        return PaymongoAppReturnResult.pending;
+      }
+
+      final reconciled = await reconcilePaymongoCheckout(
+        _supabase,
+        orderId: id,
+      );
+      await load(showSpinner: false);
+      if (_disposed || generation != _returnGeneration) {
+        return PaymongoAppReturnResult.pending;
+      }
+
+      final paidOnRecord =
+          _order != null &&
+          !_order!.isPaymentPending &&
+          !_order!.isFailedCheckout;
+      if (paidOnRecord) {
         _isConfirmingPayment = false;
+        _unsuccessfulOutcome = null;
         _notify();
-        return;
+        return PaymongoAppReturnResult.paid;
       }
-      attempts += 1;
-      unawaited(_pollReconcile(id, timer));
-    });
+      if (reconciled.isPaid) {
+        continue;
+      }
+
+      if (reconciled.isUnsuccessful || _order?.isFailedCheckout == true) {
+        _isConfirmingPayment = false;
+        _unsuccessfulOutcome =
+            reconciled.isExpired || (_order?.isExpiredCheckout ?? false)
+            ? 'expired'
+            : 'failed';
+        _notify();
+        return PaymongoAppReturnResult.failed;
+      }
+    }
+
+    if (_disposed || generation != _returnGeneration) {
+      return PaymongoAppReturnResult.pending;
+    }
+    _isConfirmingPayment = false;
+    _notify();
+    return PaymongoAppReturnResult.pending;
   }
 
   Future<void> _refreshAfterResume() async {
     await load(showSpinner: false);
     if (_disposed || orderId == null) return;
     if (_isConfirmingPayment && _order?.needsBuyerPayment == true) {
-      await handlePaymongoAppReturn(cancelled: false);
+      await handlePaymongoAppReturn();
     }
   }
 
@@ -311,27 +329,6 @@ class BuyerOrdersController extends ChangeNotifier {
       return;
     }
     _order = await fetchOrderById(_supabase, id, buyerId: _auth.user?.id);
-  }
-
-  Future<void> _pollReconcile(String id, Timer timer) async {
-    final reconciled = await reconcilePaymongoCheckout(_supabase, orderId: id);
-    await load(showSpinner: false);
-    if (_disposed) {
-      timer.cancel();
-      return;
-    }
-    if (reconciled.isPaid ||
-        reconciled.isUnsuccessful ||
-        _order == null ||
-        !_order!.isPaymentPending ||
-        _order!.isFailedCheckout) {
-      _isConfirmingPayment = false;
-      if (reconciled.isUnsuccessful || (_order?.isFailedCheckout ?? false)) {
-        _unsuccessfulOutcome = reconciled.isExpired ? 'expired' : 'failed';
-      }
-      timer.cancel();
-      _notify();
-    }
   }
 
   Future<String?> abandonUnpaidCheckout(String payOrderId) async {
@@ -580,7 +577,7 @@ class BuyerOrdersController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    _returnPoll?.cancel();
+    _returnGeneration++;
     _lifecycle?.dispose();
     final channel = _channel;
     _channel = null;

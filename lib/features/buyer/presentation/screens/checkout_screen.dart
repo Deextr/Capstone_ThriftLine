@@ -442,38 +442,19 @@ class _CheckoutBottomBar extends StatelessWidget {
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: blocked || checkout.isSubmitting
+              onPressed:
+                  blocked ||
+                      checkout.isLoading ||
+                      checkout.isSubmitting ||
+                      checkout.isContinuingToPayment
                   ? null
                   : () async {
-                      if (!checkout.hasAddress ||
-                          !checkout.hasValidDeliveryPhone) {
-                        showThriftSnackBar(
-                          context,
-                          checkout.hasAddress
-                              ? 'Edit your delivery address and enter a valid '
-                                    'phone contact (09XXXXXXXXX) to continue.'
-                              : 'Please add a delivery address to continue.',
-                          isError: checkout.hasAddress,
-                        );
-                        await context.push(
-                          RouteNames.addresses,
-                          extra: checkout.selectedAddress?.id,
-                        );
-                        if (!context.mounted) return;
-                        await context.read<CheckoutController>().load();
-                        if (!context.mounted) return;
-                        final updated = context.read<CheckoutController>();
-                        if (!updated.hasAddress ||
-                            !updated.hasValidDeliveryPhone) {
-                          return;
-                        }
-                      }
                       final leftoverCount = context
                           .read<CheckoutController>()
                           .remainingOtherSellerCount;
                       final result = await context
                           .read<CheckoutController>()
-                          .placeOrder();
+                          .continueToPayment();
                       if (!context.mounted) return;
                       if (result.error != null) {
                         showThriftSnackBar(
@@ -501,7 +482,7 @@ class _CheckoutBottomBar extends StatelessWidget {
                 ),
                 shadowColor: AppColors.primary.withValues(alpha: 0.3),
               ),
-              child: checkout.isSubmitting
+              child: checkout.isSubmitting || checkout.isContinuingToPayment
                   ? const SizedBox(
                       width: 22,
                       height: 22,

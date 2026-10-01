@@ -1096,6 +1096,32 @@ class _ReviewCard extends StatelessWidget {
               ),
             ),
           ],
+          if (review.photos.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 72,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: review.photos.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (_, i) {
+                  final url = review.photos[i].publicUrl;
+                  if (url == null || url.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      url,
+                      width: 72,
+                      height: 72,
+                      fit: BoxFit.cover,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ],
       ),
     );
