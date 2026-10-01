@@ -417,9 +417,9 @@ class _PaymentAddressSection extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           if (hasAddress) ...[
-            if (order.buyerName.isNotEmpty)
+            if (order.addressName?.trim().isNotEmpty == true)
               Text(
-                order.buyerName,
+                order.addressName!.trim(),
                 style: AppTypography.caption.copyWith(
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,

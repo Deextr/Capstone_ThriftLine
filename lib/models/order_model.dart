@@ -58,6 +58,7 @@ class OrderModel {
     required this.deliveryMethod,
     required this.shippingAddress,
     this.addressId,
+    this.addressName,
     required this.createdAt,
     this.trackingNumber,
     this.courier,
@@ -95,6 +96,7 @@ class OrderModel {
   final DeliveryMethod deliveryMethod;
   final String shippingAddress;
   final String? addressId;
+  final String? addressName;
   final DateTime createdAt;
   final String? trackingNumber;
   final String? courier;
@@ -280,6 +282,9 @@ class OrderModel {
       deliveryMethod: DeliveryMethod.standard,
       shippingAddress: formatted,
       addressId: address is Map ? address['address_id'] as String? : null,
+      addressName: address is Map
+          ? address['recipient_name'] as String?
+          : null,
       createdAt: row['created_at'] != null
           ? DateTime.parse(row['created_at'] as String)
           : DateTime.now(),
@@ -322,6 +327,7 @@ class OrderModel {
     DeliveryMethod? deliveryMethod,
     String? shippingAddress,
     String? addressId,
+    String? addressName,
     DateTime? createdAt,
     String? trackingNumber,
     String? courier,
@@ -358,6 +364,7 @@ class OrderModel {
     deliveryMethod: deliveryMethod ?? this.deliveryMethod,
     shippingAddress: shippingAddress ?? this.shippingAddress,
     addressId: addressId ?? this.addressId,
+    addressName: addressName ?? this.addressName,
     createdAt: createdAt ?? this.createdAt,
     trackingNumber: trackingNumber ?? this.trackingNumber,
     courier: courier ?? this.courier,
