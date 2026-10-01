@@ -15,7 +15,9 @@ import '../../features/admin/presentation/screens/admin_reports_queue_screen.dar
 import '../../features/admin/presentation/screens/admin_review_screen.dart';
 import '../../features/admin/presentation/screens/admin_seller_applications_screen.dart';
 import '../../features/admin/presentation/screens/admin_shell_screen.dart';
+import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/auth/presentation/screens/signup_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/verify_email_otp_screen.dart';
@@ -81,6 +83,7 @@ import '../../features/trust_safety/presentation/screens/report_seller_screen.da
 import '../../providers/app_provider.dart';
 import '../../providers/auth_provider.dart';
 import 'auth_redirect.dart';
+import 'password_recovery_coordinator.dart';
 import 'paymongo_return_coordinator.dart';
 import 'route_names.dart';
 
@@ -88,6 +91,7 @@ GoRouter createAppRouter({
   required AuthProvider authProvider,
   required AppProvider appProvider,
   PaymongoReturnCoordinator? paymongoReturn,
+  PasswordRecoveryCoordinator? passwordRecovery,
 }) {
   return GoRouter(
     initialLocation: RouteNames.splash,
@@ -95,6 +99,7 @@ GoRouter createAppRouter({
       authProvider,
       appProvider,
       ?paymongoReturn,
+      ?passwordRecovery,
     ]),
     redirect: (context, state) {
       final location = state.matchedLocation;
@@ -102,6 +107,8 @@ GoRouter createAppRouter({
       final isOnboarding = location == RouteNames.onboarding;
       final isLogin = location == RouteNames.login;
       final isSignup = location == RouteNames.signup;
+      final isForgotPassword = location == RouteNames.forgotPassword;
+      final isResetPassword = location == RouteNames.resetPassword;
       final isLegal = location.startsWith('/legal/');
       final isVerifyEmailOtp = location == RouteNames.verifyEmailOtp;
 
@@ -122,6 +129,16 @@ GoRouter createAppRouter({
         return null;
       }
 
+      if (passwordRecovery?.linkError != null && !isResetPassword) {
+        return RouteNames.resetPassword;
+      }
+
+      final recoveryRoute = passwordRecoveryWorkspaceRedirect(
+        recoveryActive: authProvider.isPasswordRecoveryActive,
+        location: location,
+      );
+      if (recoveryRoute != null) return recoveryRoute;
+
       if (authProvider.isEmailOtpPending) {
         if (!authProvider.isAuthenticated) {
           return unauthenticatedEmailOtpRedirect(
@@ -137,7 +154,9 @@ GoRouter createAppRouter({
       if (!authProvider.isFullyAuthenticated &&
           !isLogin &&
           !isSignup &&
-          !isOnboarding) {
+          !isOnboarding &&
+          !isForgotPassword &&
+          !isResetPassword) {
         return RouteNames.login;
       }
 
@@ -151,7 +170,12 @@ GoRouter createAppRouter({
           }
           paymongoReturn?.clear();
         }
-        if (isLogin || isSignup || isOnboarding || isVerifyEmailOtp) {
+        if (isLogin ||
+            isSignup ||
+            isOnboarding ||
+            isVerifyEmailOtp ||
+            isForgotPassword ||
+            isResetPassword) {
           return authProvider.homeRoute;
         }
         return authenticatedWorkspaceRedirect(
@@ -172,6 +196,14 @@ GoRouter createAppRouter({
       ),
       GoRoute(path: RouteNames.login, builder: (_, _) => const LoginScreen()),
       GoRoute(path: RouteNames.signup, builder: (_, _) => const SignupScreen()),
+      GoRoute(
+        path: RouteNames.forgotPassword,
+        builder: (_, _) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.resetPassword,
+        builder: (_, _) => const ResetPasswordScreen(),
+      ),
       GoRoute(
         path: RouteNames.verifyEmailOtp,
         builder: (_, _) => const VerifyEmailOtpScreen(),

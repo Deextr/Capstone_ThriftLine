@@ -46,6 +46,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isInitialized = false;
   bool _emailOtpPending = false;
   bool _resolvingTrustedDevice = false;
+  bool _passwordRecoveryActive = false;
   AccountMode _activeAccount = AccountMode.buyer;
 
   StreamSubscription? _authSubscription;
@@ -55,6 +56,9 @@ class AuthProvider extends ChangeNotifier {
   bool get isInitialized => _isInitialized;
   bool get isAuthenticated => _user != null;
   bool get isEmailOtpPending => _emailOtpPending;
+
+  /// True after the user opens a valid Supabase password recovery deep link.
+  bool get isPasswordRecoveryActive => _passwordRecoveryActive;
 
   /// Current session used email/password — not Gmail, not Buyer/Seller mode.
   ///
@@ -79,10 +83,12 @@ class AuthProvider extends ChangeNotifier {
   bool get isResolvingTrustedDevice => _resolvingTrustedDevice;
 
   /// Session exists and the email OTP step is not still outstanding.
-  bool get isFullyAuthenticated => authIsFullyAuthenticated(
-    hasSession: isAuthenticated,
-    emailOtpPending: _emailOtpPending,
-  );
+  bool get isFullyAuthenticated =>
+      authIsFullyAuthenticated(
+        hasSession: isAuthenticated,
+        emailOtpPending: _emailOtpPending,
+      ) &&
+      !_passwordRecoveryActive;
 
   /// Current Buyer/Seller workspace. Independent of `users.role`.
   AccountMode get activeAccount => _activeAccount;
@@ -161,8 +167,17 @@ class AuthProvider extends ChangeNotifier {
     if (authEvent == AuthChangeEvent.signedOut) {
       _user = null;
       _emailOtpPending = false;
+      _passwordRecoveryActive = false;
       _activeAccount = AccountMode.buyer;
       await _clearSession();
+      notifyListeners();
+    } else if (authEvent == AuthChangeEvent.passwordRecovery) {
+      _passwordRecoveryActive = true;
+      await _setEmailOtpPending(false);
+      if (_authService.currentSession == null) return;
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser == null || _authService.currentSession == null) return;
+      _user = currentUser;
       notifyListeners();
     } else if (authEvent == AuthChangeEvent.signedIn ||
         authEvent == AuthChangeEvent.tokenRefreshed ||
@@ -251,6 +266,48 @@ class AuthProvider extends ChangeNotifier {
   /// Signs in with Google after the user has accepted the legal documents.
   ///
   /// Returns an error message on failure, or `null` on success.
+  /// Sends a password reset email. Does not reveal whether the address exists.
+  Future<String?> requestPasswordReset({required String email}) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      return await _authService.requestPasswordReset(email: email);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Updates the password from a recovery session, then signs out so the user
+  /// must sign in again (including email OTP when required).
+  Future<String?> completePasswordReset({required String password}) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final error = await _authService.updatePasswordForRecovery(
+        password: password,
+      );
+      if (error != null) return error;
+
+      _passwordRecoveryActive = false;
+      await _authService.signOut();
+      _user = null;
+      _emailOtpPending = false;
+      _activeAccount = AccountMode.buyer;
+      await _clearSession();
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void clearPasswordRecoveryState() {
+    if (!_passwordRecoveryActive) return;
+    _passwordRecoveryActive = false;
+    notifyListeners();
+  }
+
   Future<String?> loginWithGoogle({required LegalConsent consent}) async {
     _isLoading = true;
     notifyListeners();

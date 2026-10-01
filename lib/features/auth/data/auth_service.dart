@@ -10,6 +10,7 @@ import '../domain/legal_documents.dart';
 import '../domain/signup_identity.dart';
 import '../domain/trusted_device.dart';
 import 'auth_result.dart';
+import 'password_recovery_link.dart';
 
 /// Handles all authentication operations against Supabase.
 ///
@@ -145,6 +146,79 @@ class AuthService {
     } catch (e) {
       debugPrint('AuthService.signInWithEmail error: $e');
       return AuthResult.failure('Something went wrong. Please try again.');
+    }
+  }
+
+  /// Sends a password reset email when the address belongs to an account.
+  ///
+  /// Always reports success to the caller so the UI cannot infer whether the
+  /// email is registered.
+  Future<String?> requestPasswordReset({required String email}) async {
+    try {
+      await _auth.resetPasswordForEmail(
+        email.trim(),
+        redirectTo: PasswordRecoveryLink.redirectUrl,
+      );
+      return null;
+    } on AuthException catch (e) {
+      debugPrint('AuthService.requestPasswordReset failed: ${_describe(e)}');
+      final parsed = parseGoTrueError(code: e.code, message: e.message);
+      if (parsed.code == 'over_email_send_rate_limit' ||
+          parsed.code == 'over_request_rate_limit') {
+        return 'Too many reset emails requested. Please wait a moment and '
+            'try again.';
+      }
+      final msg = parsed.message.toLowerCase();
+      if (msg.contains('rate limit') || msg.contains('too many')) {
+        return 'Too many reset emails requested. Please wait a moment and '
+            'try again.';
+      }
+      if (msg.contains('smtp') ||
+          msg.contains('email provider') ||
+          msg.contains('error sending')) {
+        return 'We could not send the reset email right now. '
+            'Please try again in a moment.';
+      }
+      // Do not reveal whether the address exists.
+      return null;
+    } catch (e) {
+      debugPrint('AuthService.requestPasswordReset error: $e');
+      return 'We could not send the reset email right now. '
+          'Please try again in a moment.';
+    }
+  }
+
+  /// Sets a new password during an active Supabase recovery session.
+  Future<String?> updatePasswordForRecovery({required String password}) async {
+    if (_auth.currentSession == null) {
+      return 'Your reset session expired. Request a new password reset email.';
+    }
+    try {
+      await _auth.updateUser(UserAttributes(password: password));
+      return null;
+    } on AuthException catch (e) {
+      debugPrint(
+        'AuthService.updatePasswordForRecovery failed: ${_describe(e)}',
+      );
+      final parsed = parseGoTrueError(code: e.code, message: e.message);
+      if (parsed.code == 'weak_password') {
+        return 'Password must be at least 6 characters.';
+      }
+      final msg = parsed.message.toLowerCase();
+      if (msg.contains('session') && msg.contains('missing')) {
+        return 'Your reset session expired. Request a new password reset email.';
+      }
+      if (msg.contains('same password') || msg.contains('different')) {
+        return 'Choose a new password that is different from your old one.';
+      }
+      if (msg.contains('weak password') || msg.contains('password')) {
+        return 'Password must be at least 6 characters.';
+      }
+      return 'Could not update your password. '
+          'Request a new reset link and try again.';
+    } catch (e) {
+      debugPrint('AuthService.updatePasswordForRecovery error: $e');
+      return 'Could not update your password. Please try again.';
     }
   }
 
