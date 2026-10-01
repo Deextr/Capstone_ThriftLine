@@ -91,23 +91,22 @@ void main() {
       expect(controller.isSelected('p2'), isTrue);
       expect(controller.isSelected('p3'), isFalse);
 
-      // Switching selection to Shop B deselects Shop A (per-seller checkout rule)
+      // Selecting Shop B keeps Shop A selected for one combined checkout.
       controller.toggleItemSelection('p3');
-      expect(controller.selectedSellerId, 'seller-b');
-      expect(controller.isSelected('p1'), isFalse);
-      expect(controller.isSelected('p2'), isFalse);
+      expect(controller.isSelected('p1'), isTrue);
+      expect(controller.isSelected('p2'), isTrue);
       expect(controller.isSelected('p3'), isTrue);
-      expect(controller.subtotal, 400.0);
-      expect(controller.shippingFee, 80.0);
-      expect(controller.platformFee, 8.0);
-      expect(controller.total, 488.0);
+      expect(controller.subtotal, 1200.0);
+      expect(controller.shippingFee, 160.0);
+      expect(controller.platformFee, 24.0);
+      expect(controller.total, 1384.0);
 
-      // Toggling p3 off clears selection
+      // Toggling p3 off leaves Shop A selected.
       controller.toggleItemSelection('p3');
-      expect(controller.selectedItems.isEmpty, isTrue);
-      expect(controller.subtotal, 0.0);
-      expect(controller.shippingFee, 0.0);
-      expect(controller.total, 0.0);
+      expect(controller.isSelected('p3'), isFalse);
+      expect(controller.subtotal, 800.0);
+      expect(controller.shippingFee, 80.0);
+      expect(controller.total, 896.0);
     });
 
     test('scoped buyNowProductId pre-selects that specific product', () {

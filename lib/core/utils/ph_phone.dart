@@ -37,3 +37,19 @@ String? phMobileValidationError(String? raw) {
   }
   return null;
 }
+
+/// Buyer delivery contact: exactly 11 digits starting with `09`, digits only.
+bool isPhMobile09Format(String? raw) {
+  if (raw == null) return false;
+  return RegExp(r'^09[0-9]{9}$').hasMatch(raw.trim());
+}
+
+String? phMobile09FormatValidationError(String? raw) {
+  if (raw == null || raw.trim().isEmpty) {
+    return 'Enter a Philippine mobile number.';
+  }
+  if (!isPhMobile09Format(raw)) {
+    return 'Enter a valid 11-digit mobile number starting with 09.';
+  }
+  return null;
+}

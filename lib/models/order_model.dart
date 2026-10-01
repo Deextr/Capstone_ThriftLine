@@ -73,6 +73,7 @@ class OrderModel {
     this.shipment,
     this.itemReturn,
     this.paymentDueAt,
+    this.checkoutGroupId,
   });
 
   final String id;
@@ -109,6 +110,10 @@ class OrderModel {
   final ShipmentModel? shipment;
   final ReturnShipment? itemReturn;
   final DateTime? paymentDueAt;
+  final String? checkoutGroupId;
+
+  bool get isAuctionObligation =>
+      (auctionId != null && auctionId!.isNotEmpty) || source == 'auction';
 
   bool get isPaymentWindowOpen {
     final due = paymentDueAt;
@@ -135,6 +140,9 @@ class OrderModel {
 
   /// Unpaid checkout the buyer can still finish. Not a completed purchase.
   bool get needsBuyerPayment => isPaymentPending && !isFailedCheckout;
+
+  /// Auction wins require payment. Abandoned fixed-price checkouts do not.
+  bool get showsAsAwaitingPayment => needsBuyerPayment && isAuctionObligation;
 
   bool get showsInPurchaseHistory => !isPaymentPending && !isFailedCheckout;
 
@@ -290,6 +298,7 @@ class OrderModel {
       paymentDueAt: row['payment_due_at'] != null
           ? DateTime.tryParse(row['payment_due_at'] as String)
           : null,
+      checkoutGroupId: row['checkout_group_id'] as String?,
     );
   }
 
@@ -328,6 +337,7 @@ class OrderModel {
     ShipmentModel? shipment,
     ReturnShipment? itemReturn,
     DateTime? paymentDueAt,
+    String? checkoutGroupId,
   }) => OrderModel(
     id: id ?? this.id,
     orderNumber: orderNumber ?? this.orderNumber,
@@ -363,6 +373,7 @@ class OrderModel {
     shipment: shipment ?? this.shipment,
     itemReturn: itemReturn ?? this.itemReturn,
     paymentDueAt: paymentDueAt ?? this.paymentDueAt,
+    checkoutGroupId: checkoutGroupId ?? this.checkoutGroupId,
   );
 }
 

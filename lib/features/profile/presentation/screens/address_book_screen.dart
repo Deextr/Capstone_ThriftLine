@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/utils/ph_phone.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -72,6 +74,16 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
 
   Future<void> _useAddress(AddressModel address) async {
     if (widget.currentAddressId != null) {
+      if (!address.hasValidPhoneContact) {
+        showThriftSnackBar(
+          context,
+          'Edit this address and enter a valid phone contact (09XXXXXXXXX) '
+          'before using it at checkout.',
+          isError: true,
+        );
+        await _edit(address);
+        return;
+      }
       context.pop(address);
       return;
     }
@@ -158,6 +170,17 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(address.phoneNumber, style: AppTypography.caption),
+                        if (!address.hasValidPhoneContact)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Phone contact invalid — edit before checkout',
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.error,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
                         Text(address.formatted, style: AppTypography.body),
                         if (address.landmark != null &&
                             address.landmark!.trim().isNotEmpty)
@@ -229,6 +252,7 @@ class _AddressFormState extends State<_AddressForm> {
   bool _barangaysLoading = true;
   String? _barangayError;
   bool _saving = false;
+  String? _phoneError;
 
   @override
   void initState() {
@@ -294,7 +318,19 @@ class _AddressFormState extends State<_AddressForm> {
     }
   }
 
+  void _validatePhoneInline([String? value]) {
+    final text = value ?? _phone.text;
+    setState(() {
+      if (text.isEmpty) {
+        _phoneError = null;
+        return;
+      }
+      _phoneError = phMobile09FormatValidationError(text);
+    });
+  }
+
   Future<void> _save() async {
+    _validatePhoneInline();
     final error = buyerAddressFormError(
       recipientName: _name.text,
       phoneNumber: _phone.text,
@@ -354,10 +390,16 @@ class _AddressFormState extends State<_AddressForm> {
         const SizedBox(height: 12),
         ThriftTextField(
           key: const ValueKey('address_phone'),
-          label: 'Phone',
+          label: 'Phone contact',
           hint: '09XXXXXXXXX',
           controller: _phone,
           keyboardType: TextInputType.phone,
+          error: _phoneError,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(11),
+          ],
+          onChanged: _validatePhoneInline,
         ),
         const SizedBox(height: 12),
         ThriftTextField(

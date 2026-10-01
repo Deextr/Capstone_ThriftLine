@@ -145,8 +145,8 @@ class _EmptyCartState extends StatelessWidget {
                     Expanded(
                       child: Text(
                         awaiting.length == 1
-                            ? 'You have an unpaid checkout'
-                            : 'You have ${awaiting.length} unpaid checkouts',
+                            ? 'You have an auction payment due'
+                            : 'You have ${awaiting.length} auction payments due',
                         style: AppTypography.subheading.copyWith(
                           fontSize: 13,
                           color: AppColors.error,
@@ -157,7 +157,7 @@ class _EmptyCartState extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Pay or cancel to continue shopping.',
+                  'Pay your auction win before starting a new checkout.',
                   style: AppTypography.caption.copyWith(fontSize: 12),
                 ),
               ],
@@ -238,8 +238,8 @@ class _AwaitingPaymentBanner extends StatelessWidget {
                     Expanded(
                       child: Text(
                         awaiting.length == 1
-                            ? 'You have an unpaid checkout'
-                            : 'You have ${awaiting.length} unpaid checkouts',
+                            ? 'You have an auction payment due'
+                            : 'You have ${awaiting.length} auction payments due',
                         style: AppTypography.subheading.copyWith(
                           fontSize: 13,
                           color: AppColors.error,
@@ -250,7 +250,7 @@ class _AwaitingPaymentBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Pay or cancel before starting a new checkout.',
+                  'Pay your auction win before starting a new checkout.',
                   style: AppTypography.caption.copyWith(fontSize: 12),
                 ),
               ],
@@ -390,7 +390,7 @@ class _MultiSellerNotice extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Items from $sellerCount different shops in cart. Check the item you want to pay for now.',
+                'Items from $sellerCount shops. Selected shops become separate orders, then you pay once.',
                 style: AppTypography.caption.copyWith(
                   color: AppColors.textPrimary,
                   fontSize: 12,
@@ -421,7 +421,6 @@ class _SellerGroupHeader extends StatelessWidget {
     final firstProduct = items.first.product;
     final sellerName = firstProduct.sellerName;
     final isVerified = firstProduct.sellerVerified;
-    final isSelectedSeller = checkout.selectedSellerId == sellerId;
     final allItemsSelected =
         items.every((i) => checkout.isSelected(i.product.id));
     final hasAnySelected =
@@ -435,12 +434,12 @@ class _SellerGroupHeader extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: isSelectedSeller
+            color: hasAnySelected
                 ? AppColors.primary.withValues(alpha: 0.07)
                 : AppColors.surfaceVariant.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isSelectedSeller
+              color: hasAnySelected
                   ? AppColors.primary.withValues(alpha: 0.35)
                   : AppColors.border.withValues(alpha: 0.6),
             ),
@@ -484,7 +483,7 @@ class _SellerGroupHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              if (isSelectedSeller)
+              if (hasAnySelected)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
@@ -492,7 +491,7 @@ class _SellerGroupHeader extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    'Active Shop',
+                    'Selected',
                     style: AppTypography.caption.copyWith(
                       color: Colors.white,
                       fontSize: 10,
@@ -830,12 +829,12 @@ class _CheckoutBottomBar extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             blocked
-                ? 'Pay or cancel your existing checkout before starting a new one.'
+                ? 'Pay your auction win before starting a new checkout.'
                 : !hasSelection
                 ? 'Check the item(s) you want to pay for above.'
                 : otherCount > 0
-                ? 'Orders are paid per shop. Items from other shops remain in your cart.'
-                : 'Next you will choose Card or GCash and pay through PayMongo. The purchase completes only after payment is confirmed.',
+                ? 'Unselected items stay in your cart. Selected shops become separate orders and one payment.'
+                : 'Selected shops become separate orders. You pay once through PayMongo.',
             style: AppTypography.caption.copyWith(
               fontSize: 11,
               color: blocked ? AppColors.error : null,
@@ -858,16 +857,26 @@ class _CheckoutBottomBar extends StatelessWidget {
               onPressed: blocked || !hasSelection || checkout.isSubmitting
                   ? null
                   : () async {
-                      if (!checkout.hasAddress) {
+                      if (!checkout.hasAddress ||
+                          !checkout.hasValidDeliveryPhone) {
                         showThriftSnackBar(
                           context,
-                          'Please add a delivery address to continue.',
+                          checkout.hasAddress
+                              ? 'Edit your delivery address and enter a valid '
+                                    'phone contact (09XXXXXXXXX) to continue.'
+                              : 'Please add a delivery address to continue.',
+                          isError: checkout.hasAddress,
                         );
-                        await context.push(RouteNames.addresses);
+                        await context.push(
+                          RouteNames.addresses,
+                          extra: checkout.selectedAddress?.id,
+                        );
                         if (!context.mounted) return;
                         await context.read<CheckoutController>().load();
                         if (!context.mounted) return;
-                        if (!context.read<CheckoutController>().hasAddress) {
+                        final updated = context.read<CheckoutController>();
+                        if (!updated.hasAddress ||
+                            !updated.hasValidDeliveryPhone) {
                           return;
                         }
                       }
@@ -889,7 +898,7 @@ class _CheckoutBottomBar extends StatelessWidget {
                       if (leftover > 0) {
                         showThriftSnackBar(
                           context,
-                          'Pay this seller first. Items from other sellers are still in your cart.',
+                          'Unselected items are still in your cart.',
                         );
                       }
                       context.go(RouteNames.paymentForOrder(result.orderId!));
@@ -923,7 +932,7 @@ class _CheckoutBottomBar extends StatelessWidget {
                         const SizedBox(width: 8),
                         Text(
                           blocked
-                              ? 'Pay existing checkout first'
+                              ? 'Pay auction win first'
                               : !hasSelection
                               ? 'Select items to pay'
                               : 'Continue to payment (${formatCurrency(total)})',

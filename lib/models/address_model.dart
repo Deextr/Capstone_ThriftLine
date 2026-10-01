@@ -1,3 +1,5 @@
+import '../core/utils/ph_phone.dart';
+
 class AddressModel {
   const AddressModel({
     required this.id,
@@ -23,6 +25,8 @@ class AddressModel {
   final String? landmark;
   final bool isDefault;
 
+  bool get hasValidPhoneContact => isPhMobile09Format(phoneNumber);
+
   String get formatted {
     final parts = <String>[
       streetAddress,
@@ -34,15 +38,15 @@ class AddressModel {
   }
 
   factory AddressModel.fromJson(Map<String, dynamic> json) => AddressModel(
-        id: json['address_id'] as String,
-        userId: json['user_id'] as String,
-        recipientName: json['recipient_name'] as String? ?? '',
-        phoneNumber: json['phone_number'] as String? ?? '',
-        streetAddress: json['street_address'] as String? ?? '',
-        barangay: json['barangay'] as String? ?? '',
-        city: json['city'] as String? ?? 'Davao City',
-        postalCode: json['postal_code'] as String?,
-        landmark: json['landmark'] as String?,
-        isDefault: json['is_default'] as bool? ?? false,
-      );
+    id: json['address_id'] as String,
+    userId: json['user_id'] as String,
+    recipientName: json['recipient_name'] as String? ?? '',
+    phoneNumber: json['phone_number'] as String? ?? '',
+    streetAddress: json['street_address'] as String? ?? '',
+    barangay: json['barangay'] as String? ?? '',
+    city: json['city'] as String? ?? 'Davao City',
+    postalCode: json['postal_code'] as String?,
+    landmark: json['landmark'] as String?,
+    isDefault: json['is_default'] as bool? ?? false,
+  );
 }
