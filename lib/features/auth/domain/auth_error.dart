@@ -34,6 +34,31 @@ GoTrueErrorInfo parseGoTrueError({String? code, required String message}) {
   return GoTrueErrorInfo(code: resolvedCode, message: resolvedMessage);
 }
 
+/// True when signup was refused because this account already has a
+/// non-email provider. Matches the identity trigger and GoTrue's
+/// "Error creating identity" response. A plain "user already registered"
+/// error is not enough to claim the account is Google.
+bool isOauthAccountSignupBlocked(GoTrueErrorInfo info) {
+  final msg = info.message.toLowerCase();
+  return msg.contains('creating identity') ||
+      msg.contains('an account with this email already exists');
+}
+
+/// Safe copy for the password-reset Edge Function. Unknown server text is
+/// collapsed so logs and gateway errors are not shown to the user.
+String passwordResetUiMessage(String? serverError) {
+  final msg = (serverError ?? '').toLowerCase();
+  if (msg.contains('too many') || msg.contains('wait a moment')) {
+    return 'Too many reset emails requested. Please wait a moment and '
+        'try again.';
+  }
+  if (msg.contains('valid email')) {
+    return 'Enter a valid email address.';
+  }
+  return 'We could not send the reset email right now. '
+      'Please try again in a moment.';
+}
+
 bool isExistingAccountAuthError(GoTrueErrorInfo info) {
   final code = info.code?.toLowerCase() ?? '';
   final msg = info.message.toLowerCase();

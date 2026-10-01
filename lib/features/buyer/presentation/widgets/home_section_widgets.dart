@@ -233,11 +233,8 @@ class HomeRailShimmer extends StatelessWidget {
         itemCount: 3,
         separatorBuilder: (_, _) =>
             const SizedBox(width: ProductCard.gridSpacing),
-        itemBuilder: (_, _) => SizedBox(
-          width: cardW,
-          height: height,
-          child: const _ShimmerCard(),
-        ),
+        itemBuilder: (_, _) =>
+            SizedBox(width: cardW, height: height, child: const _ShimmerCard()),
       ),
     );
   }

@@ -10,7 +10,6 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/rider_privacy.dart';
-import '../../../../models/enums.dart';
 import '../../../../models/order_model.dart';
 import '../../../../widgets/delivery_timeline.dart';
 import '../../../../widgets/empty_state.dart';
@@ -263,32 +262,8 @@ class OrderTrackingScreen extends StatelessWidget {
     showThriftSnackBar(context, error, isError: true);
   }
 
-  Future<void> _reportProblem(BuildContext context) async {
-    final reason = await showModalBottomSheet<DeliveryDisputeReason>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final reason in DeliveryDisputeReason.values)
-              ListTile(
-                title: Text(reason.label),
-                onTap: () => Navigator.pop(context, reason),
-              ),
-          ],
-        ),
-      ),
-    );
-    if (reason == null || !context.mounted) return;
-    final error = await context
-        .read<BuyerOrdersController>()
-        .reportDeliveryProblem(reason: reason.dbValue);
-    if (!context.mounted) return;
-    showThriftSnackBar(
-      context,
-      error ?? 'Your delivery problem was submitted.',
-      isError: error != null,
-    );
+  void _reportProblem(BuildContext context) {
+    context.push(RouteNames.orderDeliveryReportFor(orderId));
   }
 }
 

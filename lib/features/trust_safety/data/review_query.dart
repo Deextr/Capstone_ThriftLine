@@ -3,6 +3,10 @@ import 'package:flutter/foundation.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../models/review_model.dart';
 import '../../buyer/data/order_query.dart';
+import 'review_photo_upload.dart';
+
+const _reviewSelect =
+    '*, review_photos(review_photo_id, file_path, display_order, created_at)';
 
 Future<Map<String, ReviewModel>> fetchMyReviewsForOrders(
   SupabaseService supabase,
@@ -15,13 +19,16 @@ Future<Map<String, ReviewModel>> fetchMyReviewsForOrders(
   try {
     final rows = await supabase.client
         .from('reviews')
-        .select()
+        .select(_reviewSelect)
         .eq('reviewer_id', reviewerId)
         .inFilter('order_id', ids);
 
     final out = <String, ReviewModel>{};
     for (final raw in rows as List<dynamic>) {
-      final review = ReviewModel.fromSupabase(raw as Map<String, dynamic>);
+      final review = _withPhotoUrls(
+        supabase,
+        ReviewModel.fromSupabase(raw as Map<String, dynamic>),
+      );
       if (review.orderId.isNotEmpty) {
         out[review.orderId] = review;
       }
@@ -43,13 +50,18 @@ Future<List<ReviewModel>> fetchReviewsForUser(
   try {
     final rows = await supabase.client
         .from('reviews')
-        .select()
+        .select(_reviewSelect)
         .eq('reviewed_user_id', reviewedUserId)
         .order('created_at', ascending: false)
         .limit(limit);
 
     final reviews = (rows as List<dynamic>)
-        .map((raw) => ReviewModel.fromSupabase(raw as Map<String, dynamic>))
+        .map(
+          (raw) => _withPhotoUrls(
+            supabase,
+            ReviewModel.fromSupabase(raw as Map<String, dynamic>),
+          ),
+        )
         .toList();
 
     final reviewerIds = reviews.map((review) => review.reviewerId).toSet();
@@ -72,6 +84,45 @@ Future<List<ReviewModel>> fetchReviewsForUser(
     }).toList();
   } catch (e) {
     debugPrint('fetchReviewsForUser error: $e');
+    return [];
+  }
+}
+
+ReviewModel _withPhotoUrls(SupabaseService supabase, ReviewModel review) {
+  if (review.photos.isEmpty) return review;
+  final photos = review.photos
+      .map(
+        (p) =>
+            p.copyWith(publicUrl: reviewPhotoPublicUrl(supabase, p.filePath)),
+      )
+      .toList();
+  return review.copyWith(photos: photos);
+}
+
+Future<List<ReviewModel>> fetchMyBuyerToSellerReviews(
+  SupabaseService supabase,
+  String reviewerId,
+) async {
+  if (reviewerId.isEmpty) return [];
+
+  try {
+    final rows = await supabase.client
+        .from('reviews')
+        .select(_reviewSelect)
+        .eq('reviewer_id', reviewerId)
+        .eq('review_type', 'buyer_to_seller')
+        .order('created_at', ascending: false);
+
+    return (rows as List<dynamic>)
+        .map(
+          (raw) => _withPhotoUrls(
+            supabase,
+            ReviewModel.fromSupabase(raw as Map<String, dynamic>),
+          ),
+        )
+        .toList();
+  } catch (e) {
+    debugPrint('fetchMyBuyerToSellerReviews error: $e');
     return [];
   }
 }

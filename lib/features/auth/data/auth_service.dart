@@ -4,13 +4,13 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/validators.dart';
 import '../domain/auth_error.dart';
 import '../domain/auth_user.dart';
 import '../domain/legal_documents.dart';
 import '../domain/signup_identity.dart';
 import '../domain/trusted_device.dart';
 import 'auth_result.dart';
-import 'password_recovery_link.dart';
 
 /// Handles all authentication operations against Supabase.
 ///
@@ -45,11 +45,17 @@ class AuthService {
     required String name,
     required LegalConsent consent,
   }) async {
+    final sanitizedName = Validators.normalizeFullName(name);
+    final nameError = Validators.name(sanitizedName);
+    if (nameError != null) {
+      return AuthResult.failure(nameError);
+    }
+
     try {
       final response = await _auth.signUp(
         email: email,
         password: password,
-        data: {'full_name': name, ...consent.toMetadata()},
+        data: {'full_name': sanitizedName, ...consent.toMetadata()},
       );
 
       final supabaseUser = response.user;
@@ -149,42 +155,35 @@ class AuthService {
     }
   }
 
-  /// Sends a password reset email when the address belongs to an account.
+  /// Asks the `send-password-reset` Edge Function to email a recovery link.
   ///
-  /// Always reports success to the caller so the UI cannot infer whether the
-  /// email is registered.
+  /// GoTrue's own mailer is not used. The function returns the same success
+  /// response when the address is missing or belongs only to Google, so the
+  /// UI cannot tell those cases apart. Delivery and rate-limit failures are
+  /// the only errors shown.
   Future<String?> requestPasswordReset({required String email}) async {
     try {
-      await _auth.resetPasswordForEmail(
-        email.trim(),
-        redirectTo: PasswordRecoveryLink.redirectUrl,
+      final response = await _supabaseService.client.functions.invoke(
+        'send-password-reset',
+        body: {'email': email.trim()},
       );
+      final data = response.data;
+      if (data is Map && data['error'] != null) {
+        return passwordResetUiMessage(data['error'].toString());
+      }
+      if (response.status >= 400) {
+        debugPrint(
+          'AuthService.requestPasswordReset failed: status=${response.status}',
+        );
+        return passwordResetUiMessage(null);
+      }
       return null;
-    } on AuthException catch (e) {
-      debugPrint('AuthService.requestPasswordReset failed: ${_describe(e)}');
-      final parsed = parseGoTrueError(code: e.code, message: e.message);
-      if (parsed.code == 'over_email_send_rate_limit' ||
-          parsed.code == 'over_request_rate_limit') {
-        return 'Too many reset emails requested. Please wait a moment and '
-            'try again.';
-      }
-      final msg = parsed.message.toLowerCase();
-      if (msg.contains('rate limit') || msg.contains('too many')) {
-        return 'Too many reset emails requested. Please wait a moment and '
-            'try again.';
-      }
-      if (msg.contains('smtp') ||
-          msg.contains('email provider') ||
-          msg.contains('error sending')) {
-        return 'We could not send the reset email right now. '
-            'Please try again in a moment.';
-      }
-      // Do not reveal whether the address exists.
-      return null;
+    } on FunctionException catch (e) {
+      debugPrint('AuthService.requestPasswordReset failed: status=${e.status}');
+      return passwordResetUiMessage(_functionExceptionMessage(e));
     } catch (e) {
-      debugPrint('AuthService.requestPasswordReset error: $e');
-      return 'We could not send the reset email right now. '
-          'Please try again in a moment.';
+      debugPrint('AuthService.requestPasswordReset failed');
+      return passwordResetUiMessage(null);
     }
   }
 
@@ -293,18 +292,12 @@ class AuthService {
 
       return AuthResult.success(authUser);
     } on AuthException catch (e) {
-      debugPrint(
-        'Google Supabase AuthException: '
-        'message=${e.message}, code=${e.code}, statusCode=${e.statusCode}',
-      );
-      return AuthResult.failure(
-        'Google Supabase error: ${e.message} '
-        '(code: ${e.code}, status: ${e.statusCode})',
-      );
+      debugPrint('AuthService.signInWithGoogle failed: ${_describe(e)}');
+      return AuthResult.failure(_friendlyGoogleAuthError(e));
     } catch (e, stackTrace) {
-      debugPrint('Google sign-in exception: $e');
+      debugPrint('AuthService.signInWithGoogle failed');
       debugPrintStack(stackTrace: stackTrace);
-      return AuthResult.failure('Google sign-in exception: $e');
+      return AuthResult.failure('Google sign-in failed. Please try again.');
     }
   }
 
@@ -687,7 +680,11 @@ class AuthService {
   }
 
   String _friendlySignupAuthError(AuthException e) {
-    if (_isExistingAccountConflict(e)) {
+    final parsed = parseGoTrueError(code: e.code, message: e.message);
+    if (isOauthAccountSignupBlocked(parsed)) {
+      return existingAccountSignupMessage(SignupOutcome.existingGoogleAccount);
+    }
+    if (isExistingAccountAuthError(parsed)) {
       return existingAccountSignupMessage(SignupOutcome.alreadyRegistered);
     }
     return _friendlyAuthError(e);

@@ -4,6 +4,7 @@ const Duration kReviewEditWindow = Duration(hours: 24);
 const int kReviewCommentMaxLength = 1000;
 const int kReviewRatingMin = 1;
 const int kReviewRatingMax = 5;
+const int kReviewPhotoMaxCount = 3;
 
 enum ReviewActionKind { leave, edit, view }
 

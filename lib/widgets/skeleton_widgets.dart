@@ -96,6 +96,27 @@ class ProductCardSkeleton extends StatelessWidget {
   }
 }
 
+class SearchResultsGridSkeleton extends StatelessWidget {
+  const SearchResultsGridSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    return ThriftShimmer(
+      child: GridView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: 8,
+        gridDelegate: ProductCard.gridDelegateFor(
+          maxWidth: MediaQuery.sizeOf(context).width,
+          compact: true,
+          textScale: textScale,
+        ),
+        itemBuilder: (_, _) => const ProductCardSkeleton(),
+      ),
+    );
+  }
+}
+
 class ProductGridSkeleton extends StatelessWidget {
   const ProductGridSkeleton({
     super.key,

@@ -44,8 +44,8 @@ import '../../features/seller/controllers/my_shop_controller.dart';
 import '../../features/seller/controllers/seller_orders_controller.dart';
 import '../../providers/cart_provider.dart';
 import '../../features/buyer/presentation/screens/product_detail_screen.dart';
-import '../../features/buyer/presentation/screens/purchase_history_screen.dart';
-import '../../features/buyer/presentation/screens/track_orders_screen.dart';
+import '../../features/buyer/data/buyer_purchase_category.dart';
+import '../../features/buyer/presentation/screens/my_purchases_screen.dart';
 import '../../features/buyer/presentation/screens/saved_items_screen.dart';
 import '../../features/buyer/presentation/screens/buyer_search_tab.dart';
 import '../../features/chat/controllers/chat_detail_controller.dart';
@@ -71,14 +71,18 @@ import '../../features/seller/presentation/screens/seller_order_detail_screen.da
 import '../../features/seller/presentation/screens/seller_shell_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/seller/presentation/screens/my_shop_screen.dart';
+import '../../features/trust_safety/controllers/buyer_to_rate_controller.dart';
 import '../../features/trust_safety/controllers/leave_review_controller.dart';
 import '../../features/trust_safety/controllers/my_reports_controller.dart';
 import '../../features/trust_safety/controllers/report_appeal_controller.dart';
 import '../../features/trust_safety/controllers/report_user_controller.dart';
+import '../../features/trust_safety/presentation/screens/buyer_to_rate_screen.dart';
 import '../../features/trust_safety/presentation/screens/leave_review_screen.dart';
 import '../../features/trust_safety/presentation/screens/my_reports_screen.dart';
 import '../../features/trust_safety/presentation/screens/report_appeal_screen.dart';
 import '../../features/trust_safety/presentation/screens/report_detail_screen.dart';
+import '../../features/trust_safety/controllers/order_delivery_report_controller.dart';
+import '../../features/trust_safety/presentation/screens/order_delivery_report_screen.dart';
 import '../../features/trust_safety/presentation/screens/report_seller_screen.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -311,6 +315,17 @@ GoRouter createAppRouter({
         ),
       ),
       GoRoute(
+        path: RouteNames.orderDeliveryReport,
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => OrderDeliveryReportController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+            orderId: state.pathParameters['orderId']!,
+          ),
+          child: const OrderDeliveryReportScreen(),
+        ),
+      ),
+      GoRoute(
         path: RouteNames.addListing,
         builder: (context, _) => ChangeNotifierProvider(
           create: (context) => AddListingController(
@@ -409,24 +424,27 @@ GoRouter createAppRouter({
         builder: (_, _) => const SettingsScreen(),
       ),
       GoRoute(
+        path: RouteNames.myPurchases,
+        builder: (context, state) {
+          final tab = BuyerPurchaseCategory.fromQuery(
+            state.uri.queryParameters['tab'],
+          );
+          return ChangeNotifierProvider(
+            create: (context) => BuyerOrdersController(
+              supabase: context.read<SupabaseService>(),
+              auth: context.read<AuthProvider>(),
+            ),
+            child: MyPurchasesScreen(initialCategory: tab),
+          );
+        },
+      ),
+      GoRoute(
         path: RouteNames.trackOrders,
-        builder: (context, _) => ChangeNotifierProvider(
-          create: (context) => BuyerOrdersController(
-            supabase: context.read<SupabaseService>(),
-            auth: context.read<AuthProvider>(),
-          ),
-          child: const TrackOrdersScreen(),
-        ),
+        redirect: (_, _) => RouteNames.myPurchases,
       ),
       GoRoute(
         path: RouteNames.purchaseHistory,
-        builder: (context, _) => ChangeNotifierProvider(
-          create: (context) => BuyerOrdersController(
-            supabase: context.read<SupabaseService>(),
-            auth: context.read<AuthProvider>(),
-          ),
-          child: const PurchaseHistoryScreen(),
-        ),
+        redirect: (_, _) => RouteNames.myPurchases,
       ),
       GoRoute(
         path: RouteNames.savedItems,
@@ -524,6 +542,20 @@ GoRouter createAppRouter({
           ),
           child: const LeaveReviewScreen(),
         ),
+      ),
+      GoRoute(
+        path: RouteNames.buyerToRate,
+        builder: (context, state) {
+          final tab = state.uri.queryParameters['tab'];
+          final initialTab = tab == 'reviews' ? 1 : 0;
+          return ChangeNotifierProvider(
+            create: (context) => BuyerToRateController(
+              supabase: context.read<SupabaseService>(),
+              auth: context.read<AuthProvider>(),
+            ),
+            child: BuyerToRateScreen(initialTab: initialTab),
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.myShop,

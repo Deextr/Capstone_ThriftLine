@@ -1,13 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
-import 'package:uuid/uuid.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/order_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../buyer/data/order_query.dart';
+import '../data/report_evidence_upload.dart';
 import '../data/report_reasons.dart';
 
 class ReportEvidenceDraft {
@@ -57,7 +56,6 @@ class ReportUserController extends ChangeNotifier {
   final String? _initialUserId;
   final String? _initialOrderId;
   final ImagePicker _picker;
-  final _uuid = const Uuid();
 
   String? _reportedUserId;
   String? _reportedUsername;
@@ -70,6 +68,7 @@ class ReportUserController extends ChangeNotifier {
   bool _isLoading = true;
   bool _isSubmitting = false;
   String? _errorMessage;
+  String? _evidenceError;
   String? _usernameQuery;
 
   String? get reportedUserId => _reportedUserId;
@@ -83,6 +82,7 @@ class ReportUserController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isSubmitting => _isSubmitting;
   String? get errorMessage => _errorMessage;
+  String? get evidenceError => _evidenceError;
   String? get usernameQuery => _usernameQuery;
   bool get hasResolvedTarget =>
       _reportedUserId != null && _reportedUserId!.isNotEmpty;
@@ -90,7 +90,8 @@ class ReportUserController extends ChangeNotifier {
   bool get canSubmit {
     if (_isSubmitting || !hasResolvedTarget) return false;
     if (_selectedCategory == null) return false;
-    return reportDetailsError(_details) == null;
+    if (reportDetailsError(_details) != null) return false;
+    return _evidence.length >= kReportEvidenceMinCount;
   }
 
   Future<void> load() async {
@@ -161,30 +162,34 @@ class ReportUserController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String?> addEvidence() async {
+  Future<String?> addEvidenceFromGallery() =>
+      _addEvidence(ImageSource.gallery, multi: true);
+
+  Future<String?> addEvidenceFromCamera() =>
+      _addEvidence(ImageSource.camera, multi: false);
+
+  Future<String?> _addEvidence(
+    ImageSource source, {
+    required bool multi,
+  }) async {
+    _evidenceError = null;
     if (_evidence.length >= kReportEvidenceMaxCount) {
-      return 'You can attach up to 4 photos.';
+      return 'You can attach up to $kReportEvidenceMaxCount photos.';
     }
     try {
-      final files = await _picker.pickMultiImage(imageQuality: 80);
-      if (files.isEmpty) return null;
-
-      for (final file in files) {
-        if (_evidence.length >= kReportEvidenceMaxCount) break;
-        if (!isAllowedReportImageName(file.name)) {
-          return 'Please choose a JPG, PNG, or WebP photo.';
+      if (multi) {
+        final files = await _picker.pickMultiImage(imageQuality: 80);
+        if (files.isEmpty) return null;
+        for (final file in files) {
+          if (_evidence.length >= kReportEvidenceMaxCount) break;
+          final err = await _appendEvidenceFile(file);
+          if (err != null) return err;
         }
-        final bytes = await file.readAsBytes();
-        if (bytes.length > kReportEvidenceMaxBytes) {
-          return 'Each photo must be 5 MB or smaller.';
-        }
-        _evidence.add(
-          ReportEvidenceDraft(
-            bytes: bytes,
-            name: file.name,
-            contentType: reportImageContentType(file.name),
-          ),
-        );
+      } else {
+        final file = await _picker.pickImage(source: source, imageQuality: 80);
+        if (file == null) return null;
+        final err = await _appendEvidenceFile(file);
+        if (err != null) return err;
       }
       notifyListeners();
       return null;
@@ -194,9 +199,28 @@ class ReportUserController extends ChangeNotifier {
     }
   }
 
+  Future<String?> _appendEvidenceFile(XFile file) async {
+    if (!isAllowedReportImageName(file.name)) {
+      return 'Please choose a JPG, PNG, or WebP photo.';
+    }
+    final bytes = await file.readAsBytes();
+    if (bytes.length > kReportEvidenceMaxBytes) {
+      return 'Each photo must be 5 MB or smaller.';
+    }
+    _evidence.add(
+      ReportEvidenceDraft(
+        bytes: bytes,
+        name: file.name,
+        contentType: reportImageContentType(file.name),
+      ),
+    );
+    return null;
+  }
+
   void removeEvidence(int index) {
     if (index < 0 || index >= _evidence.length) return;
     _evidence.removeAt(index);
+    _evidenceError = null;
     notifyListeners();
   }
 
@@ -209,9 +233,15 @@ class ReportUserController extends ChangeNotifier {
     if (_selectedCategory == null) return 'Please choose a reason.';
     final detailsError = reportDetailsError(_details);
     if (detailsError != null) return detailsError;
+    if (_evidence.length < kReportEvidenceMinCount) {
+      _evidenceError = 'Please attach at least one photo as evidence.';
+      notifyListeners();
+      return _evidenceError;
+    }
 
     _isSubmitting = true;
     notifyListeners();
+    String? reportId;
     try {
       final rpcRes = await _supabase.client.rpc(
         'submit_report',
@@ -230,19 +260,29 @@ class ReportUserController extends ChangeNotifier {
       }
 
       final map = supabaseRpcMap(rpcRes);
-      final reportId = map?['report_id']?.toString();
+      reportId = map?['report_id']?.toString();
       if (reportId == null || reportId.isEmpty) {
         return 'Could not submit this report.';
       }
 
       final uid = _auth.user?.id;
-      if (uid != null && _evidence.isNotEmpty) {
-        final attachError = await _uploadEvidence(uid, reportId);
-        if (attachError != null) return attachError;
+      if (uid == null) return 'Please sign in.';
+      final attachError = await uploadReportEvidence(
+        supabase: _supabase,
+        uid: uid,
+        reportId: reportId,
+        evidence: _evidence,
+      );
+      if (attachError != null) {
+        await abandonOpenReport(_supabase, reportId);
+        return attachError;
       }
       return null;
     } catch (e) {
       debugPrint('ReportUserController.submit error: $e');
+      if (reportId != null) {
+        await abandonOpenReport(_supabase, reportId);
+      }
       return 'Could not submit this report.';
     } finally {
       _isSubmitting = false;
@@ -301,56 +341,6 @@ class ReportUserController extends ChangeNotifier {
     } catch (e) {
       debugPrint('ReportUserController._loadOrders error: $e');
       _orders = [];
-    }
-  }
-
-  Future<String?> _uploadEvidence(String uid, String reportId) async {
-    for (final file in _evidence) {
-      final ext = reportImageExtension(file.name);
-      final path = '$uid/$reportId/${_uuid.v4()}.$ext';
-      try {
-        await _supabase.client.storage
-            .from('report-evidence')
-            .uploadBinary(
-              path,
-              file.bytes,
-              fileOptions: FileOptions(
-                contentType: file.contentType,
-                upsert: false,
-              ),
-            );
-      } catch (e) {
-        debugPrint('report evidence upload error: $e');
-        return 'Your report was submitted, but a photo could not be uploaded.';
-      }
-
-      try {
-        final rpcRes = await _supabase.client.rpc(
-          'attach_report_evidence',
-          params: {'p_report_id': reportId, 'p_file_path': path},
-        );
-        if (!supabaseRpcSuccess(rpcRes)) {
-          await _bestEffortRemove(path);
-          return supabaseRpcError(
-            rpcRes,
-            fallback:
-                'Your report was submitted, but a photo could not be attached.',
-          );
-        }
-      } catch (e) {
-        debugPrint('attach_report_evidence error: $e');
-        await _bestEffortRemove(path);
-        return 'Your report was submitted, but a photo could not be attached.';
-      }
-    }
-    return null;
-  }
-
-  Future<void> _bestEffortRemove(String path) async {
-    try {
-      await _supabase.client.storage.from('report-evidence').remove([path]);
-    } catch (e) {
-      debugPrint('report evidence cleanup error: $e');
     }
   }
 }

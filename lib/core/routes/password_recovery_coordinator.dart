@@ -21,7 +21,22 @@ class PasswordRecoveryCoordinator extends ChangeNotifier {
   Future<void> accept(Uri uri) async {
     if (!PasswordRecoveryLink.isRecoveryUri(uri)) return;
     try {
-      await SupabaseConfig.client.auth.getSessionFromUrl(uri);
+      final tokenHash = PasswordRecoveryLink.recoveryTokenHash(uri);
+      if (tokenHash != null) {
+        final response = await SupabaseConfig.client.auth.verifyOTP(
+          type: OtpType.recovery,
+          tokenHash: tokenHash,
+        );
+        if (response.session == null) {
+          _linkError =
+              'This reset link is invalid or has expired. '
+              'Request a new one from the login screen.';
+          notifyListeners();
+          return;
+        }
+      } else {
+        await SupabaseConfig.client.auth.getSessionFromUrl(uri);
+      }
       _linkError = null;
     } on AuthException catch (e) {
       debugPrint(

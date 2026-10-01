@@ -73,7 +73,8 @@ const List<ReportReason> kReportReasons = [
 
 const int kReportDetailsMinLength = 10;
 const int kReportDetailsMaxLength = 2000;
-const int kReportEvidenceMaxCount = 4;
+const int kReportEvidenceMinCount = 1;
+const int kReportEvidenceMaxCount = 3;
 const int kReportEvidenceMaxBytes = 5 * 1024 * 1024;
 
 const Set<String> kReportImageExtensions = {'jpg', 'jpeg', 'png', 'webp'};

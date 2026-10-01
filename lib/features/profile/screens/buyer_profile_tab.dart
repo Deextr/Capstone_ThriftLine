@@ -2,17 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_constants.dart';
-import '../../../../core/constants/app_typography.dart';
-import '../../../../core/routes/route_names.dart';
-import '../../../../models/enums.dart';
-import '../../../../providers/auth_provider.dart';
-import '../../../../providers/data_provider.dart';
-import '../../../../providers/saved_items_provider.dart';
-import '../../buyer/controllers/buyer_orders_controller.dart';
-import '../../../../widgets/thrift_widgets.dart';
+import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/app_typography.dart';
+import '../../../core/routes/route_names.dart';
+import '../../../providers/auth_provider.dart';
+import '../../auth/domain/auth_user.dart';
+import '../../../providers/data_provider.dart';
+import '../../../widgets/thrift_widgets.dart';
 import '../../auth/presentation/widgets/auth_widgets.dart';
+import '../../buyer/controllers/buyer_orders_controller.dart';
+import '../../buyer/data/buyer_purchase_category.dart';
+import '../../../models/review_model.dart';
+import '../../trust_safety/data/buyer_to_rate_buckets.dart';
 import '../presentation/widgets/switch_account_sheet.dart';
 import '../presentation/widgets/switchable_avatar.dart';
 
@@ -23,15 +25,21 @@ class BuyerProfileTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
-    final savedItems = context.watch<SavedItemsProvider>();
     final buyerOrders = context.watch<BuyerOrdersController>();
     final user = auth.user;
-    final buyerId = auth.user?.id ?? 'buyer_maya';
-    final activeBids = data.bidsForBuyer(buyerId, BidTab.active).length;
-    final purchases = buyerOrders.orders
-        .where((order) => order.showsInPurchaseHistory)
+
+    final myPurchasesCount = buyerOrders.orders
+        .where(orderIncludedInMyPurchases)
         .length;
-    final toPay = buyerOrders.awaitingPayment.length;
+    final myReviews = <String, ReviewModel>{
+      for (final order in buyerOrders.orders)
+        if (buyerOrders.reviewFor(order.id) != null)
+          order.id: buyerOrders.reviewFor(order.id)!,
+    };
+    final toRateCount = ordersPendingBuyerReview(
+      buyerOrders.orders,
+      myReviews,
+    ).length;
 
     return SafeArea(
       child: ListView(
@@ -41,92 +49,44 @@ class BuyerProfileTab extends StatelessWidget {
             padding: const EdgeInsets.symmetric(
               horizontal: AppConstants.spacingMd,
             ),
-            child: _buildProfileHeader(context, auth),
+            child: _ProfileHeader(auth: auth),
           ),
-          const SizedBox(height: 24),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppConstants.spacingMd,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: _stat(
-                    'Purchases',
-                    '$purchases',
-                    Icons.shopping_bag_outlined,
-                  ),
-                ),
-                Container(height: 24, width: 1, color: AppColors.border),
-                Expanded(
-                  child: _stat(
-                    'Active Bids',
-                    '$activeBids',
-                    Icons.gavel_outlined,
-                  ),
-                ),
-                Container(height: 24, width: 1, color: AppColors.border),
-                Expanded(
-                  child: _stat(
-                    'Saved Items',
-                    '${savedItems.savedCount}',
-                    Icons.favorite_border,
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 28),
+          _SectionCard(
+            title: 'My Activity',
+            children: [
+              _MenuItem(
+                icon: Icons.shopping_bag_outlined,
+                label: myPurchasesCount > 0
+                    ? 'My Purchases ($myPurchasesCount)'
+                    : 'My Purchases',
+                onTap: () => context.push(RouteNames.myPurchases),
+              ),
+              _MenuItem(
+                icon: Icons.star_outline_rounded,
+                label: toRateCount > 0 ? 'To Rate ($toRateCount)' : 'To Rate',
+                onTap: () async {
+                  await context.push(RouteNames.buyerToRate);
+                  if (!context.mounted) return;
+                  await context.read<BuyerOrdersController>().load(
+                    showSpinner: false,
+                  );
+                },
+              ),
+              _MenuItem(
+                icon: Icons.favorite_border,
+                label: 'Saved Items',
+                onTap: () => context.push(RouteNames.savedItems),
+              ),
+            ],
           ),
-          const SizedBox(height: 32),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppConstants.spacingMd,
-            ),
-            child: _section('My Activity', [
-              if (toPay > 0)
-                _menuItem(
-                  context,
-                  'To Pay ($toPay)',
-                  Icons.payments_outlined,
-                  () => context.push(RouteNames.purchaseHistory),
-                ),
-              _menuItem(
-                context,
-                'Track Order',
-                Icons.local_shipping_outlined,
-                () => context.push(RouteNames.trackOrders),
-              ),
-              _menuItem(
-                context,
-                'Purchase History',
-                Icons.history_outlined,
-                () => context.push(RouteNames.purchaseHistory),
-              ),
-              _menuItem(context, 'Active Bids', Icons.gavel_outlined, () {}),
-              _menuItem(
-                context,
-                'Saved Items',
-                Icons.favorite_border,
-                () => context.push(RouteNames.savedItems),
-              ),
-              _menuItem(
-                context,
-                'My Requests',
-                Icons.inventory_2_outlined,
-                () {},
-              ),
-            ]),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppConstants.spacingMd,
-            ),
-            child: _section('Account', [
-              _menuItem(
-                context,
-                'Edit Profile',
-                Icons.person_outline,
-                () => context.push(RouteNames.editProfile),
+          _SectionCard(
+            title: 'Account & Settings',
+            children: [
+              _MenuItem(
+                icon: Icons.person_outline_rounded,
+                label: 'Edit Profile',
+                onTap: () => context.push(RouteNames.editProfile),
               ),
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(
@@ -142,113 +102,56 @@ class BuyerProfileTab extends StatelessWidget {
                 trailing: Switch(
                   value: data.notificationsEnabled,
                   onChanged: (_) => data.toggleNotifications(),
+                  activeTrackColor: AppColors.primary.withValues(alpha: 0.4),
                   activeThumbColor: AppColors.primary,
                 ),
               ),
-              _menuItem(
-                context,
-                'Payment Methods',
-                Icons.payment_outlined,
-                () => showThriftSnackBar(context, 'Coming soon'),
+              _MenuItem(
+                icon: Icons.payment_outlined,
+                label: 'Payment Methods',
+                onTap: () => showThriftSnackBar(context, 'Coming soon'),
               ),
-              _menuItem(
-                context,
-                'Addresses',
-                Icons.location_on_outlined,
-                () => context.push(RouteNames.addresses),
+              _MenuItem(
+                icon: Icons.location_on_outlined,
+                label: 'Addresses',
+                onTap: () => context.push(RouteNames.addresses),
               ),
-              _menuItem(
-                context,
-                'Settings',
-                Icons.settings_outlined,
-                () => context.push(RouteNames.settings),
+              _MenuItem(
+                icon: Icons.settings_outlined,
+                label: 'Settings',
+                onTap: () => context.push(RouteNames.settings),
               ),
               const Divider(height: 1, thickness: 1, color: AppColors.border),
               if (auth.canSwitchAccounts)
-                _menuItem(
-                  context,
-                  'Switch Account',
-                  Icons.sync_alt_rounded,
-                  () => SwitchAccountSheet.show(context),
+                _MenuItem(
+                  icon: Icons.sync_alt_rounded,
+                  label: 'Switch Account',
+                  onTap: () => SwitchAccountSheet.show(context),
                 )
               else
-                _buildBecomeSellerTile(context, user),
-            ]),
+                _BecomeSellerTile(user: user),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppConstants.spacingMd,
-            ),
-            child: _section('Trust & Safety', [
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.flag_outlined,
-                    color: AppColors.error,
-                    size: 22,
-                  ),
-                ),
-                title: Text(
-                  'Report a Seller',
-                  style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  'Report suspicious or fraudulent activity',
-                  style: AppTypography.caption,
-                ),
-                trailing: const Icon(
-                  Icons.chevron_right,
-                  size: 20,
-                  color: AppColors.textHint,
-                ),
+          _SectionCard(
+            title: 'Trust & Safety',
+            children: [
+              _TrustMenuItem(
+                icon: Icons.flag_outlined,
+                iconColor: AppColors.error,
+                iconBackground: AppColors.error.withValues(alpha: 0.1),
+                title: 'Report a Seller',
+                subtitle: 'Report suspicious or fraudulent activity',
                 onTap: () => context.push(RouteNames.reportSeller),
               ),
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.assignment_outlined,
-                    color: AppColors.primary,
-                    size: 22,
-                  ),
-                ),
-                title: Text(
-                  'My Reports',
-                  style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  'Track reports you submitted',
-                  style: AppTypography.caption,
-                ),
-                trailing: const Icon(
-                  Icons.chevron_right,
-                  size: 20,
-                  color: AppColors.textHint,
-                ),
+              _TrustMenuItem(
+                icon: Icons.assignment_outlined,
+                iconColor: AppColors.primary,
+                iconBackground: AppColors.primary.withValues(alpha: 0.1),
+                title: 'My Reports',
+                subtitle: 'Track reports you submitted',
                 onTap: () => context.push(RouteNames.myReports),
               ),
-            ]),
+            ],
           ),
           const SizedBox(height: 16),
           Padding(
@@ -267,8 +170,225 @@ class BuyerProfileTab extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildBecomeSellerTile(BuildContext context, user) {
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.auth});
+
+  final AuthProvider auth;
+
+  @override
+  Widget build(BuildContext context) {
+    final user = auth.user;
+    final name = auth.displayName ?? user?.name ?? '';
+    final username = user?.username ?? '';
+    final email = user?.email ?? '';
+    final phone = user?.phone ?? '';
+
+    return Column(
+      children: [
+        SwitchableAvatar(
+          imageUrl: user?.avatarUrl ?? '',
+          name: name,
+          canSwitch: auth.canSwitchAccounts,
+          onSwitch: () => SwitchAccountSheet.show(context),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Text(
+                name.isNotEmpty ? name : 'No Name',
+                style: AppTypography.heading.copyWith(fontSize: 22),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ),
+            if (user?.isVerified == true) ...[
+              const SizedBox(width: 6),
+              const Icon(Icons.verified, color: AppColors.primary, size: 20),
+            ],
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          username.isNotEmpty ? '@$username' : '@username',
+          style: AppTypography.caption.copyWith(fontSize: 14),
+        ),
+        if (email.isNotEmpty || phone.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              if (email.isNotEmpty)
+                _ContactChip(icon: Icons.email_outlined, label: email),
+              if (phone.isNotEmpty)
+                _ContactChip(icon: Icons.phone_outlined, label: phone),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ContactChip extends StatelessWidget {
+  const _ContactChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: AppColors.textSecondary),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppConstants.spacingMd),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            child: Text(
+              title,
+              style: AppTypography.subheading.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Material(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: AppColors.border.withValues(alpha: 0.5),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Column(children: children),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+class _MenuItem extends StatelessWidget {
+  const _MenuItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Icon(icon, color: AppColors.textPrimary, size: 22),
+      title: Text(label, style: AppTypography.body),
+      trailing: const Icon(
+        Icons.chevron_right,
+        size: 20,
+        color: AppColors.textHint,
+      ),
+      onTap: onTap,
+    );
+  }
+}
+
+class _TrustMenuItem extends StatelessWidget {
+  const _TrustMenuItem({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBackground,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBackground;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: iconBackground,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: iconColor, size: 22),
+      ),
+      title: Text(
+        title,
+        style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(subtitle, style: AppTypography.caption),
+      trailing: const Icon(
+        Icons.chevron_right,
+        size: 20,
+        color: AppColors.textHint,
+      ),
+      onTap: onTap,
+    );
+  }
+}
+
+class _BecomeSellerTile extends StatelessWidget {
+  const _BecomeSellerTile({required this.user});
+
+  final AuthUser? user;
+
+  @override
+  Widget build(BuildContext context) {
     final status = user?.verificationStatus ?? 'none';
 
     IconData icon = Icons.storefront_outlined;
@@ -343,149 +463,4 @@ class BuyerProfileTab extends StatelessWidget {
       onTap: () => context.push(RouteNames.becomeSeller),
     );
   }
-
-  Widget _buildProfileHeader(BuildContext context, AuthProvider auth) {
-    final user = auth.user;
-    final username = user?.username ?? '';
-    final email = user?.email ?? '';
-    final phone = user?.phone ?? '';
-
-    return Column(
-      children: [
-        SwitchableAvatar(
-          imageUrl: user?.avatarUrl ?? '',
-          name: user?.name,
-          canSwitch: auth.canSwitchAccounts,
-          onSwitch: () => SwitchAccountSheet.show(context),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              user?.name ?? '',
-              style: AppTypography.heading.copyWith(fontSize: 22),
-            ),
-            if (user?.isVerified == true) ...[
-              const SizedBox(width: 6),
-              const Icon(Icons.verified, color: AppColors.primary, size: 20),
-            ],
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          username.isNotEmpty ? '@$username' : '@username',
-          style: AppTypography.caption.copyWith(fontSize: 14),
-        ),
-        if (email.isNotEmpty || phone.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (email.isNotEmpty) ...[
-                const Icon(
-                  Icons.email_outlined,
-                  size: 14,
-                  color: AppColors.textSecondary,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  email,
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-              if (email.isNotEmpty && phone.isNotEmpty) ...[
-                const SizedBox(width: 12),
-                Text(
-                  'â€¢',
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.textHint,
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
-              if (phone.isNotEmpty) ...[
-                const Icon(
-                  Icons.phone_outlined,
-                  size: 14,
-                  color: AppColors.textSecondary,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  phone,
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _stat(String label, String value, IconData icon) => Column(
-    children: [
-      Text(
-        value,
-        style: AppTypography.heading.copyWith(
-          fontSize: 20,
-          color: AppColors.textPrimary,
-        ),
-      ),
-      const SizedBox(height: 4),
-      Text(label, style: AppTypography.caption),
-    ],
-  );
-
-  Widget _section(String title, List<Widget> children) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-        child: Text(
-          title,
-          style: AppTypography.subheading.copyWith(
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ),
-      Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(children: children),
-      ),
-      const SizedBox(height: 24),
-    ],
-  );
-
-  Widget _menuItem(
-    BuildContext context,
-    String title,
-    IconData icon,
-    VoidCallback onTap,
-  ) => ListTile(
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-    leading: Icon(icon, color: AppColors.textPrimary, size: 22),
-    title: Text(title, style: AppTypography.body),
-    trailing: const Icon(
-      Icons.chevron_right,
-      size: 20,
-      color: AppColors.textHint,
-    ),
-    onTap: onTap,
-  );
 }

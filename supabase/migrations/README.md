@@ -93,9 +93,34 @@ existing rows. If Google auto-link already attached a password to a Google
 user, run `../introspection/duplicate_identities_report.sql` and clean those
 up separately.
 
-In the Dashboard, set **Authentication → Providers → (identity linking)** to
-**Manual** if the control is available, so GoTrue itself refuses unauthenticated
-linking. The trigger is the repo-owned enforcement.
+The trigger is the repo-owned block on attaching a password to a Google
+account. Verified Google sign-in onto an existing email/password user stays
+on that same `auth.users` row when Supabase identity linking allows it.
+Google asserts the email is verified, so that link is not based on an
+unverified address. Do not turn linking off in a way that creates a second
+auth user; `auth.users` email uniqueness already prevents a second account
+with the same address.
+
+## Password reset email
+
+| File | Purpose |
+| --- | --- |
+| `20261001180000_password_reset_delivery.sql` | Service-role-only rate limit and "does this email have a password identity?" helper |
+
+Auth's built-in mailer returns `Error sending recovery email`. Recovery mail
+is sent by `../functions/send-password-reset` with the existing `GMAIL_USER`
+and `GMAIL_APP_PASSWORD` secrets. Apply the SQL, then:
+
+```bash
+supabase functions deploy send-password-reset --no-verify-jwt
+```
+
+The email opens `thriftline://reset-password` on the phone. The app exchanges
+the hashed token with Auth and does not rely on the built-in mailer. Also add
+`thriftline://reset-password` under **Authentication → URL Configuration →
+Redirect URLs** so any Auth redirect still lands in the app. The function
+never returns the recovery link to the Flutter client. Google-only accounts
+do not receive a link, so a password is not attached to them.
 
 ## Seed data
 

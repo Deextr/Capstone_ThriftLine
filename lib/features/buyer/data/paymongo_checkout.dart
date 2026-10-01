@@ -5,6 +5,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/supabase_rpc.dart';
 
+/// Result of verifying a PayMongo app return. The redirect itself is not proof.
+enum PaymongoAppReturnResult { paid, pending, failed }
+
 class PaymongoCheckoutResult {
   const PaymongoCheckoutResult({
     required this.success,

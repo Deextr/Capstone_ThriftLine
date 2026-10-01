@@ -7,6 +7,15 @@ const kPasswordRecoveryHost = 'reset-password';
 abstract final class PasswordRecoveryLink {
   static const redirectUrl = '$kThriftlineAppScheme://$kPasswordRecoveryHost';
 
+  /// Hashed recovery token carried on the app deep link. Null for browser
+  /// redirects that still use [getSessionFromUrl].
+  static String? recoveryTokenHash(Uri? uri) {
+    if (!isRecoveryUri(uri)) return null;
+    final value = uri!.queryParameters['token_hash']?.trim();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
   static bool isRecoveryUri(Uri? uri) {
     if (uri == null) return false;
     final scheme = uri.scheme.toLowerCase();

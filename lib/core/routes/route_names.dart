@@ -44,9 +44,14 @@ abstract final class RouteNames {
     return '/payment-proof/$orderId?returned=1&status=$status';
   }
 
+  static const String myPurchases = '/my-purchases';
+  static String myPurchasesTab(String queryValue) => '$myPurchases?tab=$queryValue';
   static const String trackOrders = '/track-orders';
   static const String trackOrder = '/track-order/:orderId';
   static String trackOrderFor(String orderId) => '/track-order/$orderId';
+  static const String orderDeliveryReport = '/orders/:orderId/report-problem';
+  static String orderDeliveryReportFor(String orderId) =>
+      '/orders/$orderId/report-problem';
   static const String addListing = '/add-listing';
   static const String editListing = '/edit-listing/:id';
   static const String sellerOrder = '/seller-order/:id';
@@ -98,8 +103,12 @@ abstract final class RouteNames {
   static const String reportDetail = '/my-reports/:id';
   static const String accountReview = '/account-review/:reportId';
   static const String leaveReview = '/leave-review/:orderId';
+  static const String buyerToRate = '/buyer/to-rate';
 
   static String leaveReviewFor(String orderId) => '/leave-review/$orderId';
+
+  static String buyerToRateTab({bool reviews = false}) =>
+      reviews ? '$buyerToRate?tab=reviews' : buyerToRate;
 
   static String reportDetailFor(String id) => '/my-reports/$id';
 

@@ -207,6 +207,198 @@ export function parsePaymongoEvent(raw: unknown): PaymongoEvent | null {
   };
 }
 
+const PAID_STATUSES = new Set(["paid", "succeeded"]);
+const FAILED_STATUSES = new Set(["failed", "cancelled", "canceled"]);
+const EXPIRED_STATUSES = new Set(["expired"]);
+const IN_FLIGHT_STATUSES = new Set([
+  "pending",
+  "processing",
+  "awaiting_next_action",
+  "awaiting_payment_method",
+  "unpaid",
+]);
+
+export type CheckoutSessionOutcome = {
+  outcome: "paid" | "expired" | "failed" | "pending";
+  sessionId: string | null;
+  paymentId: string | null;
+  amountCentavos: number | null;
+  currency: string;
+  metadataOrderId: string | null;
+  sessionStatus: string;
+};
+
+function unwrapResource(
+  raw: unknown,
+): Record<string, unknown> | null {
+  const value = asRecord(raw);
+  if (!value) return null;
+  return asRecord(value.data) ?? value;
+}
+
+function resourceAttrs(
+  raw: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  if (!raw) return null;
+  return asRecord(raw.attributes) ?? raw;
+}
+
+function asPaymentList(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  const wrapped = asRecord(value);
+  if (wrapped && Array.isArray(wrapped.data)) return wrapped.data;
+  return [];
+}
+
+function collectPaymentRecords(
+  attrs: Record<string, unknown> | null,
+): unknown[] {
+  const records: unknown[] = [];
+  if (!attrs) return records;
+  records.push(...asPaymentList(attrs.payments));
+  const intent = unwrapResource(attrs.payment_intent);
+  const intentAttrs = resourceAttrs(intent);
+  if (intentAttrs) records.push(...asPaymentList(intentAttrs.payments));
+  return records;
+}
+
+export function paymentIntentIdFromCheckout(
+  payload: unknown,
+): string | null {
+  const root = asRecord(payload);
+  const data = asRecord(root?.data) ?? root;
+  const attrs = asRecord(data?.attributes);
+  const raw = attrs?.payment_intent;
+  if (typeof raw === "string" && raw.startsWith("pi_")) return raw;
+  const intent = unwrapResource(raw);
+  const id = readString(intent?.id);
+  return id?.startsWith("pi_") ? id : null;
+}
+
+function intentStatusOf(attrs: Record<string, unknown> | null): string {
+  const intent = unwrapResource(attrs?.payment_intent);
+  const intentAttrs = resourceAttrs(intent);
+  return (readString(intentAttrs?.status) ?? "").toLowerCase();
+}
+
+function intentAmountOf(attrs: Record<string, unknown> | null): number | null {
+  const intent = unwrapResource(attrs?.payment_intent);
+  const intentAttrs = resourceAttrs(intent);
+  return readAmount(intentAttrs?.amount);
+}
+
+function paymentRecordStatus(raw: unknown): string {
+  const resource = unwrapResource(raw);
+  const attrs = resourceAttrs(resource);
+  return (readString(attrs?.status) ?? "").toLowerCase();
+}
+
+function paymentRecordId(raw: unknown): string | null {
+  const resource = unwrapResource(raw);
+  const id = readString(resource?.id);
+  if (id?.startsWith("pay_")) return id;
+  const attrs = resourceAttrs(resource);
+  const attrId = readString(attrs?.id);
+  return attrId?.startsWith("pay_") ? attrId : null;
+}
+
+function paymentRecordAmount(raw: unknown): number | null {
+  const attrs = resourceAttrs(unwrapResource(raw));
+  return readAmount(attrs?.amount);
+}
+
+function paymentRecordCurrency(raw: unknown): string | null {
+  const attrs = resourceAttrs(unwrapResource(raw));
+  return readString(attrs?.currency);
+}
+
+/**
+ * PayMongo checkout sessions are `active` or `expired`. Payment success lives
+ * on `payments[].status` / `payment_intent.status`, not the session status.
+ * `inactive` means the session can no longer accept payment — it is not
+ * proof of expiry or failure, and a paid payment may already exist.
+ */
+export function checkoutSessionOutcome(
+  payload: unknown,
+): CheckoutSessionOutcome {
+  const root = asRecord(payload);
+  const data = asRecord(root?.data) ?? root;
+  const attrs = asRecord(data?.attributes);
+  const sessionId = readString(data?.id)?.startsWith("cs_")
+    ? readString(data?.id)
+    : null;
+  const sessionStatus = (readString(attrs?.status) ?? "").toLowerCase();
+  const metadata = asRecord(attrs?.metadata);
+  const metadataOrderId = readUuid(metadata?.order_id);
+  const payments = collectPaymentRecords(attrs);
+  const intentStatus = intentStatusOf(attrs);
+  const paidPayment = payments.find((item) =>
+    PAID_STATUSES.has(paymentRecordStatus(item))
+  );
+  const currency = (
+    (paidPayment ? paymentRecordCurrency(paidPayment) : null) ??
+    readString(resourceAttrs(unwrapResource(attrs?.payment_intent))?.currency) ??
+    readString(attrs?.currency) ??
+    "PHP"
+  ).toUpperCase();
+  const amountCentavos = (paidPayment
+    ? paymentRecordAmount(paidPayment)
+    : null) ??
+    intentAmountOf(attrs) ??
+    readAmount(attrs?.amount) ??
+    lineItemsAmount(attrs);
+  const paymentId = (paidPayment ? paymentRecordId(paidPayment) : null) ??
+    payments.map(paymentRecordId).find((id) => id != null) ??
+    null;
+
+  const base = {
+    sessionId,
+    paymentId,
+    amountCentavos,
+    currency,
+    metadataOrderId,
+    sessionStatus,
+  };
+
+  if (
+    paidPayment ||
+    PAID_STATUSES.has(intentStatus) ||
+    PAID_STATUSES.has(sessionStatus)
+  ) {
+    return { ...base, outcome: "paid" };
+  }
+
+  const inFlight = IN_FLIGHT_STATUSES.has(intentStatus) ||
+    payments.some((item) => IN_FLIGHT_STATUSES.has(paymentRecordStatus(item)));
+  if (inFlight) {
+    return { ...base, outcome: "pending" };
+  }
+
+  const sessionExpired = sessionStatus === "expired";
+  const hasFailed = FAILED_STATUSES.has(intentStatus) ||
+    payments.some((item) => FAILED_STATUSES.has(paymentRecordStatus(item)));
+  const hasExpiredPayment = EXPIRED_STATUSES.has(intentStatus) ||
+    payments.some((item) => EXPIRED_STATUSES.has(paymentRecordStatus(item)));
+
+  // An active session can still be retried after a failed attempt.
+  if (!sessionExpired && sessionStatus !== "inactive") {
+    return { ...base, outcome: "pending" };
+  }
+
+  if (sessionExpired && (hasExpiredPayment || payments.length === 0)) {
+    return { ...base, outcome: "expired" };
+  }
+  if (hasFailed) {
+    return { ...base, outcome: "failed" };
+  }
+  if (sessionExpired || hasExpiredPayment) {
+    return { ...base, outcome: "expired" };
+  }
+
+  // `inactive` with no payments yet is a race after authorization, not expiry.
+  return { ...base, outcome: "pending" };
+}
+
 export function isPaymongoCheckoutUrl(url: string): boolean {
   try {
     const parsed = new URL(url);

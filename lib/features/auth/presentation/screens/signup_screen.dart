@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -28,6 +29,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _submitted = false;
   String? _errorMessage;
 
   @override
@@ -40,6 +42,7 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Future<void> _signUpWithEmail() async {
+    setState(() => _submitted = true);
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _errorMessage = null);
@@ -48,7 +51,7 @@ class _SignupScreenState extends State<SignupScreen> {
     final result = await auth.signUpWithEmail(
       email: _emailController.text.trim(),
       password: _passwordController.text,
-      name: _nameController.text.trim(),
+      name: Validators.normalizeFullName(_nameController.text),
       consent: LegalConsent.now(),
     );
     if (!mounted) return;
@@ -78,14 +81,7 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   String? _confirmPasswordValidator(String? value) {
-    final confirmPassword = value?.trim() ?? '';
-    if (confirmPassword.isEmpty) {
-      return 'Passwords do not match.';
-    }
-    if (confirmPassword != _passwordController.text) {
-      return 'Passwords do not match.';
-    }
-    return null;
+    return Validators.confirmPassword(value, _passwordController.text);
   }
 
   @override
@@ -134,6 +130,9 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                             child: Form(
                               key: _formKey,
+                              autovalidateMode: _submitted
+                                  ? AutovalidateMode.onUserInteraction
+                                  : AutovalidateMode.disabled,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -186,6 +185,11 @@ class _SignupScreenState extends State<SignupScreen> {
                                     icon: Icons.person_outline,
                                     validator: Validators.name,
                                     labelColor: fieldLabelColor,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.allow(
+                                        Validators.fullNameInputCharacters,
+                                      ),
+                                    ],
                                   ),
                                   const SizedBox(height: 16),
                                   ThriftTextField(

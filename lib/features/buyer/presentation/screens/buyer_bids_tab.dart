@@ -236,7 +236,8 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
           Widget cardContent;
 
           if (tab == BidTab.won) {
-            final isExpired = bid.paymentDueAt != null &&
+            final isExpired =
+                bid.paymentDueAt != null &&
                 bid.paymentDueAt!.isBefore(DateTime.now());
 
             cardContent = ThriftCard(

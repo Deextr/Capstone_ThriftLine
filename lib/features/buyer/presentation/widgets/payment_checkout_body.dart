@@ -42,8 +42,7 @@ class PaymentCheckoutBody extends StatelessWidget {
   final VoidCallback? onReturnToCart;
   final DateTime? paymentDueAt;
 
-  bool get _hasAddress =>
-      !order.addressMissing && order.shippingAddress.trim().isNotEmpty;
+  bool get _hasValidDeliveryAddress => order.hasValidDeliveryAddress;
 
   List<OrderModel> get _orders {
     if (groupOrders.isNotEmpty) return groupOrders;
@@ -85,10 +84,7 @@ class PaymentCheckoutBody extends StatelessWidget {
                 const SizedBox(height: 10),
                 for (var i = 0; i < _orders.length; i++) ...[
                   if (i > 0) const SizedBox(height: 10),
-                  _OrderItemsCard(
-                    order: _orders[i],
-                    showShopHeader: shops > 1,
-                  ),
+                  _OrderItemsCard(order: _orders[i], showShopHeader: shops > 1),
                 ],
                 const SizedBox(height: 16),
                 _PaymentAddressSection(
@@ -132,7 +128,7 @@ class PaymentCheckoutBody extends StatelessWidget {
           totalLabel: totalLabel,
           confirming: confirming,
           selectedChannel: selectedChannel,
-          hasAddress: _hasAddress,
+          hasAddress: _hasValidDeliveryAddress,
           windowOpen: windowOpen,
           isAbandoning: isAbandoning,
           returnLabel: returnLabel,
@@ -160,7 +156,9 @@ class _SectionLabel extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             subtitle!,
-            style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ],
@@ -198,12 +196,14 @@ class _ConfirmingBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Confirming payment',
-                  style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
+                  'Confirming your payment...',
+                  style: AppTypography.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  "We're checking your payment. This screen updates when PayMongo confirms it.",
+                  "We're confirming your payment with PayMongo. This can take a few seconds.",
                   style: AppTypography.caption.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -377,7 +377,7 @@ class _PaymentAddressSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final addressText = order.shippingAddress.trim();
-    final hasAddress = !order.addressMissing && addressText.isNotEmpty;
+    final hasAddress = order.hasValidDeliveryAddress;
 
     return ThriftCard(
       padding: const EdgeInsets.all(14),
@@ -404,14 +404,14 @@ class _PaymentAddressSection extends StatelessWidget {
                     color: AppColors.primary,
                   ),
                 )
-              else
+              else if (hasAddress)
                 TextButton(
                   onPressed: onChangeAddress,
                   style: TextButton.styleFrom(
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
                   ),
-                  child: Text(hasAddress ? 'Change' : 'Add'),
+                  child: const Text('Change'),
                 ),
             ],
           ),
@@ -426,15 +426,22 @@ class _PaymentAddressSection extends StatelessWidget {
                 ),
               ),
             if (order.buyerName.isNotEmpty) const SizedBox(height: 2),
+            Text(addressText, style: AppTypography.body.copyWith(fontSize: 13)),
+          ] else ...[
             Text(
-              addressText,
-              style: AppTypography.body.copyWith(fontSize: 13),
-            ),
-          ] else
-            Text(
-              'Add a delivery address before you pay.',
+              'Please add a delivery address before proceeding with payment.',
               style: AppTypography.caption.copyWith(color: AppColors.error),
             ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: isSavingAddress ? null : onChangeAddress,
+                icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+                label: const Text('Add Delivery Address'),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -462,10 +469,7 @@ class _PaymentTotalsCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       child: Column(
         children: [
-          _SummaryLine(
-            label: 'Subtotal',
-            value: formatCurrency(subtotal),
-          ),
+          _SummaryLine(label: 'Subtotal', value: formatCurrency(subtotal)),
           const SizedBox(height: 8),
           _SummaryLine(
             label: shopCount > 1
@@ -521,7 +525,9 @@ class _SummaryLine extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
         Text(value, style: AppTypography.body),
@@ -612,7 +618,9 @@ class _PaymentMethodOption extends StatelessWidget {
                 ),
                 child: Icon(
                   icon,
-                  color: selected ? AppColors.primaryDark : AppColors.textSecondary,
+                  color: selected
+                      ? AppColors.primaryDark
+                      : AppColors.textSecondary,
                 ),
               ),
               const SizedBox(width: 12),
@@ -687,7 +695,9 @@ class _PaymentStickyBar extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.border.withValues(alpha: 0.8))),
+        border: Border(
+          top: BorderSide(color: AppColors.border.withValues(alpha: 0.8)),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -732,39 +742,45 @@ class _PaymentStickyBar extends StatelessWidget {
             ],
             if (confirming)
               const ThriftButton(
-                label: 'Confirming payment…',
+                label: 'Confirming your payment...',
                 onPressed: null,
                 isLoading: true,
               )
-            else if (!hasAddress)
-              ThriftButton(
-                label: 'Add delivery address to pay',
-                onPressed: onChangeAddress,
-              )
-            else if (!windowOpen)
-              const ThriftButton(
-                label: 'Payment window ended',
-                onPressed: null,
-              )
-            else if (selectedChannel == null)
-              const ThriftButton(
-                label: 'Select a payment method',
-                onPressed: null,
-              )
-            else
-              PayNowButton(
-                orderId: order.id,
-                channel: selectedChannel!,
-                amountLabel: totalLabel,
-              ),
+            else ...[
+              if (!hasAddress)
+                ThriftButton(
+                  label: 'Add Delivery Address',
+                  onPressed: onChangeAddress,
+                )
+              else if (!windowOpen)
+                const ThriftButton(
+                  label: 'Payment window ended',
+                  onPressed: null,
+                )
+              else if (selectedChannel == null)
+                const ThriftButton(
+                  label: 'Select a payment method',
+                  onPressed: null,
+                )
+              else
+                PayNowButton(
+                  orderId: order.id,
+                  channel: selectedChannel!,
+                  amountLabel: totalLabel,
+                ),
+            ],
             if (!confirming) ...[
               const SizedBox(height: 8),
               Text(
-                selectedChannel != null && hasAddress && windowOpen
+                !hasAddress
+                    ? 'Payment is unavailable until you add a delivery address.'
+                    : selectedChannel != null && windowOpen
                     ? 'You will continue to PayMongo to complete payment.'
                     : 'Choose a payment method above to continue.',
                 style: AppTypography.caption.copyWith(
-                  color: AppColors.textSecondary,
+                  color: !hasAddress
+                      ? AppColors.error.withValues(alpha: 0.85)
+                      : AppColors.textSecondary,
                   fontSize: 11,
                 ),
                 textAlign: TextAlign.center,

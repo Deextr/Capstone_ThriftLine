@@ -1,3 +1,4 @@
+import '../core/utils/ph_phone.dart';
 import 'enums.dart';
 import 'return_shipment.dart';
 import 'shipment_model.dart';
@@ -71,6 +72,7 @@ class OrderModel {
     this.paymentStatus = 'pending',
     this.items = const [],
     this.addressMissing = false,
+    this.deliveryPhone = '',
     this.shipment,
     this.itemReturn,
     this.paymentDueAt,
@@ -109,6 +111,7 @@ class OrderModel {
   final String paymentStatus;
   final List<OrderLineItem> items;
   final bool addressMissing;
+  final String deliveryPhone;
   final ShipmentModel? shipment;
   final ReturnShipment? itemReturn;
   final DateTime? paymentDueAt;
@@ -142,6 +145,11 @@ class OrderModel {
 
   /// Unpaid checkout the buyer can still finish. Not a completed purchase.
   bool get needsBuyerPayment => isPaymentPending && !isFailedCheckout;
+
+  bool get hasValidDeliveryAddress =>
+      !addressMissing &&
+      shippingAddress.trim().isNotEmpty &&
+      isPhMobile09Format(deliveryPhone);
 
   /// Auction wins require payment. Abandoned fixed-price checkouts do not.
   bool get showsAsAwaitingPayment => needsBuyerPayment && isAuctionObligation;
@@ -223,8 +231,10 @@ class OrderModel {
     final first = items.isNotEmpty ? items.first : null;
     final address = row['shipping_address'];
     var formatted = '';
+    var deliveryPhone = '';
     var addressMissing = true;
     if (address is Map) {
+      deliveryPhone = address['phone_number'] as String? ?? '';
       formatted = address['formatted'] as String? ?? '';
       addressMissing =
           formatted.trim().isEmpty &&
@@ -282,9 +292,7 @@ class OrderModel {
       deliveryMethod: DeliveryMethod.standard,
       shippingAddress: formatted,
       addressId: address is Map ? address['address_id'] as String? : null,
-      addressName: address is Map
-          ? address['recipient_name'] as String?
-          : null,
+      addressName: address is Map ? address['recipient_name'] as String? : null,
       createdAt: row['created_at'] != null
           ? DateTime.parse(row['created_at'] as String)
           : DateTime.now(),
@@ -298,6 +306,7 @@ class OrderModel {
       paymentStatus: paymentStatusFromOrderRow(row),
       items: items,
       addressMissing: addressMissing,
+      deliveryPhone: deliveryPhone,
       shipment: shipmentFromOrderRow(row),
       itemReturn: returnShipmentFromOrderRow(row),
       paymentDueAt: row['payment_due_at'] != null
@@ -340,6 +349,7 @@ class OrderModel {
     String? paymentStatus,
     List<OrderLineItem>? items,
     bool? addressMissing,
+    String? deliveryPhone,
     ShipmentModel? shipment,
     ReturnShipment? itemReturn,
     DateTime? paymentDueAt,
@@ -377,6 +387,7 @@ class OrderModel {
     paymentStatus: paymentStatus ?? this.paymentStatus,
     items: items ?? this.items,
     addressMissing: addressMissing ?? this.addressMissing,
+    deliveryPhone: deliveryPhone ?? this.deliveryPhone,
     shipment: shipment ?? this.shipment,
     itemReturn: itemReturn ?? this.itemReturn,
     paymentDueAt: paymentDueAt ?? this.paymentDueAt,
