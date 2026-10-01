@@ -74,8 +74,6 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
 
   Future<void> _useAddress(AddressModel address) async {
     if (widget.currentAddressId != null) {
-<<<<<<< HEAD
-=======
       if (!address.hasValidPhoneContact) {
         showThriftSnackBar(
           context,
@@ -86,7 +84,6 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
         await _edit(address);
         return;
       }
->>>>>>> checkout-address-label-fix
       context.pop(address);
       return;
     }

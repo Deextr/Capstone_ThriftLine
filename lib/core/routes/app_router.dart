@@ -586,8 +586,6 @@ GoRouter createAppRouter({
         path: RouteNames.addresses,
         builder: (_, state) =>
             AddressBookScreen(currentAddressId: state.extra as String?),
-<<<<<<< HEAD
-=======
       ),
       GoRoute(
         path: RouteNames.paymentMethods,
@@ -597,7 +595,6 @@ GoRouter createAppRouter({
           ),
           child: const PaymentMethodsScreen(),
         ),
->>>>>>> checkout-address-label-fix
       ),
     ],
     errorBuilder: (_, state) =>

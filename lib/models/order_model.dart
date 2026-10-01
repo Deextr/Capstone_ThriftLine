@@ -58,10 +58,7 @@ class OrderModel {
     required this.deliveryMethod,
     required this.shippingAddress,
     this.addressId,
-<<<<<<< HEAD
-=======
     this.addressName,
->>>>>>> checkout-address-label-fix
     required this.createdAt,
     this.trackingNumber,
     this.courier,
@@ -99,10 +96,7 @@ class OrderModel {
   final DeliveryMethod deliveryMethod;
   final String shippingAddress;
   final String? addressId;
-<<<<<<< HEAD
-=======
   final String? addressName;
->>>>>>> checkout-address-label-fix
   final DateTime createdAt;
   final String? trackingNumber;
   final String? courier;
@@ -288,12 +282,9 @@ class OrderModel {
       deliveryMethod: DeliveryMethod.standard,
       shippingAddress: formatted,
       addressId: address is Map ? address['address_id'] as String? : null,
-<<<<<<< HEAD
-=======
       addressName: address is Map
           ? address['recipient_name'] as String?
           : null,
->>>>>>> checkout-address-label-fix
       createdAt: row['created_at'] != null
           ? DateTime.parse(row['created_at'] as String)
           : DateTime.now(),
@@ -336,10 +327,7 @@ class OrderModel {
     DeliveryMethod? deliveryMethod,
     String? shippingAddress,
     String? addressId,
-<<<<<<< HEAD
-=======
     String? addressName,
->>>>>>> checkout-address-label-fix
     DateTime? createdAt,
     String? trackingNumber,
     String? courier,
@@ -376,10 +364,7 @@ class OrderModel {
     deliveryMethod: deliveryMethod ?? this.deliveryMethod,
     shippingAddress: shippingAddress ?? this.shippingAddress,
     addressId: addressId ?? this.addressId,
-<<<<<<< HEAD
-=======
     addressName: addressName ?? this.addressName,
->>>>>>> checkout-address-label-fix
     createdAt: createdAt ?? this.createdAt,
     trackingNumber: trackingNumber ?? this.trackingNumber,
     courier: courier ?? this.courier,
