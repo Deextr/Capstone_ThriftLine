@@ -13,6 +13,20 @@ import '../../chat/data/conversation_service.dart';
 bool lookingForShowsEmpty({required bool isLoading, required int postCount}) =>
     !isLoading && postCount == 0;
 
+const _lookingForBucket = 'looking-for';
+
+/// Object key inside the `looking-for` bucket, or null if [url] is not ours.
+@visibleForTesting
+String? lookingForStoragePathFromPublicUrl(String? url) {
+  if (url == null || url.isEmpty) return null;
+  const marker = '/object/public/$_lookingForBucket/';
+  final start = url.indexOf(marker);
+  if (start < 0) return null;
+  final raw = url.substring(start + marker.length).split('?').first;
+  if (raw.isEmpty) return null;
+  return Uri.decodeComponent(raw);
+}
+
 class LookingForController extends ChangeNotifier {
   LookingForController({
     required SupabaseService supabase,
@@ -136,17 +150,11 @@ class LookingForController extends ChangeNotifier {
       String? imageUrl;
       if (referenceImageBytes != null && referenceImageBytes.isNotEmpty) {
         try {
-          final path = '${user.id}/$postId.jpg';
-          await _supabase.client.storage
-              .from('looking-for')
-              .uploadBinary(
-                path,
-                referenceImageBytes,
-                fileOptions: const FileOptions(contentType: 'image/jpeg'),
-              );
-          imageUrl = _supabase.client.storage
-              .from('looking-for')
-              .getPublicUrl(path);
+          imageUrl = await _uploadReferenceImage(
+            userId: user.id,
+            postId: postId,
+            bytes: referenceImageBytes,
+          );
         } catch (e) {
           debugPrint('LookingForController image upload error: $e');
           return 'Could not upload the reference image. Try again without it, or check storage.';
@@ -233,23 +241,24 @@ class LookingForController extends ChangeNotifier {
         categoryId = cat?['category_id'] as String?;
       } catch (_) {}
 
+      final current = await _supabase.client
+          .from('looking_for_posts')
+          .select('reference_image_url')
+          .eq('post_id', postId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+      final previousUrl = current?['reference_image_url'] as String?;
+
       String? imageUrl;
-      if (referenceImageBytes != null && referenceImageBytes.isNotEmpty) {
+      final replacing =
+          referenceImageBytes != null && referenceImageBytes.isNotEmpty;
+      if (replacing) {
         try {
-          final path = '${user.id}/$postId.jpg';
-          await _supabase.client.storage
-              .from('looking-for')
-              .uploadBinary(
-                path,
-                referenceImageBytes,
-                fileOptions: const FileOptions(
-                  contentType: 'image/jpeg',
-                  upsert: true,
-                ),
-              );
-          imageUrl = _supabase.client.storage
-              .from('looking-for')
-              .getPublicUrl(path);
+          imageUrl = await _uploadReferenceImage(
+            userId: user.id,
+            postId: postId,
+            bytes: referenceImageBytes,
+          );
         } catch (e) {
           debugPrint('LookingForController image update error: $e');
           return 'Could not upload the reference image.';
@@ -267,11 +276,15 @@ class LookingForController extends ChangeNotifier {
             'minimum_price': budgetMin,
             'maximum_price': budgetMax,
             'category_id': ?categoryId,
-            if (imageUrl != null || clearReferenceImage)
+            if (replacing || clearReferenceImage)
               'reference_image_url': imageUrl,
           })
           .eq('post_id', postId)
           .eq('user_id', user.id);
+
+      if (replacing || clearReferenceImage) {
+        await _deleteReferenceImage(previousUrl);
+      }
 
       return null;
     } catch (e) {
@@ -286,11 +299,18 @@ class LookingForController extends ChangeNotifier {
     final user = _auth.user;
     if (user == null) return 'Please sign in to delete this request.';
     try {
+      final row = await _supabase.client
+          .from('looking_for_posts')
+          .select('reference_image_url')
+          .eq('post_id', postId)
+          .eq('user_id', user.id)
+          .maybeSingle();
       await _supabase.client
           .from('looking_for_posts')
           .delete()
           .eq('post_id', postId)
           .eq('user_id', user.id);
+      await _deleteReferenceImage(row?['reference_image_url'] as String?);
       _posts = _posts.where((p) => p.id != postId).toList();
       notifyListeners();
       return null;
@@ -351,4 +371,30 @@ class LookingForController extends ChangeNotifier {
   }
 
   Future<void> refresh() => loadPosts();
+
+  Future<String> _uploadReferenceImage({
+    required String userId,
+    required String postId,
+    required Uint8List bytes,
+  }) async {
+    final path = '$userId/$postId/${const Uuid().v4()}.jpg';
+    await _supabase.client.storage
+        .from(_lookingForBucket)
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(contentType: 'image/jpeg'),
+        );
+    return _supabase.client.storage.from(_lookingForBucket).getPublicUrl(path);
+  }
+
+  Future<void> _deleteReferenceImage(String? publicUrl) async {
+    final path = lookingForStoragePathFromPublicUrl(publicUrl);
+    if (path == null) return;
+    try {
+      await _supabase.client.storage.from(_lookingForBucket).remove([path]);
+    } catch (e) {
+      debugPrint('LookingForController image delete error: $e');
+    }
+  }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_gradients.dart';
 
 /// Official ThriftLine mark, sized for auth screens over the video backdrop.
 class AuthBrandLogo extends StatelessWidget {
@@ -48,18 +49,7 @@ class AuthVideoScrim extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0x59000000),
-            Color(0x330D9488),
-            Color(0x73000000),
-          ],
-          stops: [0.0, 0.48, 1.0],
-        ),
-      ),
+      decoration: BoxDecoration(gradient: AppGradients.authScrim),
     );
   }
 }

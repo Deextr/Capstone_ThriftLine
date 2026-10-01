@@ -11,6 +11,7 @@ import '../../../../core/utils/validators.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../domain/legal_documents.dart';
+import '../../domain/login_rate_limiter.dart';
 import '../widgets/auth_branding.dart';
 import '../widgets/legal_consent_notice.dart';
 import '../widgets/login_video_background.dart';
@@ -28,15 +29,41 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
+  /// Whether the user has submitted the form at least once.
+  /// Validation errors only appear after the first submit attempt,
+  /// then update in real-time as the user types.
+  bool _submitted = false;
+
+  final LoginRateLimiter _rateLimiter = LoginRateLimiter();
+
+  @override
+  void initState() {
+    super.initState();
+    _rateLimiter.addListener(_onRateLimiterChanged);
+  }
+
   @override
   void dispose() {
+    _rateLimiter.removeListener(_onRateLimiterChanged);
+    _rateLimiter.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
+  void _onRateLimiterChanged() {
+    if (mounted) setState(() {});
+  }
+
   Future<void> _loginWithEmail() async {
+    // Mark that the user has attempted to submit so validation fires.
+    setState(() => _submitted = true);
     if (!_formKey.currentState!.validate()) return;
+
+    if (_rateLimiter.isLockedOut) {
+      showThriftSnackBar(context, _rateLimiter.lockoutMessage, isError: true);
+      return;
+    }
 
     final auth = context.read<AuthProvider>();
     final error = await auth.loginWithEmail(
@@ -46,9 +73,12 @@ class _LoginScreenState extends State<LoginScreen> {
     );
     if (!mounted) return;
     if (error != null) {
+      _rateLimiter.recordFailure();
       showThriftSnackBar(context, error, isError: true);
       return;
     }
+
+    _rateLimiter.recordSuccess();
     context.go(
       auth.isEmailOtpPending ? RouteNames.verifyEmailOtp : auth.homeRoute,
     );
@@ -72,6 +102,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final compact = screenHeight < 700;
     const fieldLabelColor = Colors.white;
 
+    final lockedOut = _rateLimiter.isLockedOut;
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
@@ -94,7 +126,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight -
+                        minHeight:
+                            constraints.maxHeight -
                             (compact
                                 ? AppConstants.spacingMd
                                 : AppConstants.spacingXl) -
@@ -102,6 +135,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       child: Form(
                         key: _formKey,
+                        autovalidateMode: _submitted
+                            ? AutovalidateMode.onUserInteraction
+                            : AutovalidateMode.disabled,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -143,6 +179,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               textAlign: TextAlign.center,
                             ),
                             SizedBox(height: compact ? 28 : 40),
+
+                            // ── Rate-limit lockout banner ──
+                            if (lockedOut) ...[
+                              _LockoutBanner(
+                                message: _rateLimiter.lockoutMessage,
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+
                             ThriftTextField(
                               label: 'Email',
                               hint: 'your@email.com',
@@ -173,17 +218,19 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             SizedBox(height: compact ? 20 : 24),
                             ThriftButton(
-                              label: 'Login',
-                              onPressed:
-                                  auth.isLoading ? null : _loginWithEmail,
+                              label: lockedOut ? 'Locked' : 'Login',
+                              onPressed: (auth.isLoading || lockedOut)
+                                  ? null
+                                  : _loginWithEmail,
                               isLoading: auth.isLoading,
                             ),
                             SizedBox(height: compact ? 16 : 24),
                             const _OrDivider(),
                             SizedBox(height: compact ? 16 : 24),
                             _GoogleSignInButton(
-                              onPressed:
-                                  auth.isLoading ? null : _loginWithGoogle,
+                              onPressed: auth.isLoading
+                                  ? null
+                                  : _loginWithGoogle,
                               isLoading: auth.isLoading,
                             ),
                             SizedBox(height: compact ? 20 : 24),
@@ -226,6 +273,47 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Lockout banner
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LockoutBanner extends StatelessWidget {
+  const _LockoutBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lock_clock, color: AppColors.error, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTypography.caption.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Or divider
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _OrDivider extends StatelessWidget {
   const _OrDivider();
 
@@ -249,6 +337,10 @@ class _OrDivider extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Google sign-in button
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _GoogleSignInButton extends StatelessWidget {
   const _GoogleSignInButton({this.onPressed, this.isLoading = false});

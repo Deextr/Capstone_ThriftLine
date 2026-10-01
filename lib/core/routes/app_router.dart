@@ -4,9 +4,9 @@ import 'package:provider/provider.dart';
 
 import '../../features/auth/domain/legal_documents.dart';
 import '../../features/auth/presentation/screens/legal_document_screen.dart';
+import '../../features/admin/controllers/admin_dashboard_controller.dart';
 import '../../features/admin/controllers/admin_disputes_controller.dart';
 import '../../features/admin/controllers/admin_reports_controller.dart';
-import '../../features/admin/controllers/admin_review_center_controller.dart';
 import '../../features/admin/controllers/admin_seller_applications_controller.dart';
 import '../../features/admin/presentation/screens/admin_dispute_detail_screen.dart';
 import '../../features/admin/presentation/screens/admin_disputes_queue_screen.dart';
@@ -21,9 +21,12 @@ import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/verify_email_otp_screen.dart';
 import '../../features/auth/presentation/screens/verify_phone_screen.dart';
 import '../../features/profile/presentation/screens/address_book_screen.dart';
+import '../../features/profile/presentation/screens/payment_methods_screen.dart';
+import '../../features/seller/controllers/seller_payout_method_controller.dart';
 import '../../features/buyer/presentation/screens/become_seller_screen.dart';
 import '../../features/buyer/presentation/screens/buyer_shell_screen.dart';
 import '../../features/buyer/presentation/screens/buy_now_screen.dart';
+import '../../features/buyer/presentation/screens/cart_screen.dart';
 import '../../features/buyer/presentation/screens/checkout_screen.dart';
 import '../../features/profile/controllers/seller_public_profile_controller.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
@@ -47,7 +50,10 @@ import '../../features/chat/controllers/chat_detail_controller.dart';
 import '../../features/chat/controllers/chat_list_controller.dart';
 import '../../features/chat/presentation/screens/chat_detail_screen.dart';
 import '../../features/chat/presentation/screens/chat_list_screen.dart';
+import '../../features/buyer/controllers/home_collection_controller.dart';
+import '../../features/buyer/controllers/home_controller.dart';
 import '../../features/buyer/controllers/looking_for_detail_controller.dart';
+import '../../features/buyer/presentation/screens/home_collection_screen.dart';
 import '../../features/buyer/presentation/screens/looking_for_detail_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
@@ -107,6 +113,13 @@ GoRouter createAppRouter({
 
       if (!appProvider.isOnboardingComplete && !isOnboarding) {
         return RouteNames.onboarding;
+      }
+
+      if (holdAuthScreenForTrustedDeviceCheck(
+        resolvingTrustedDevice: authProvider.isResolvingTrustedDevice,
+        location: location,
+      )) {
+        return null;
       }
 
       if (authProvider.isEmailOtpPending) {
@@ -205,6 +218,7 @@ GoRouter createAppRouter({
           child: const SearchScreen(),
         ),
       ),
+      ..._homeCollectionRoutes(),
       GoRoute(
         path: RouteNames.product,
         builder: (context, state) => ChangeNotifierProvider(
@@ -403,17 +417,26 @@ GoRouter createAppRouter({
           ),
         ),
       ),
+      GoRoute(path: RouteNames.cart, builder: (_, _) => const CartScreen()),
       GoRoute(
         path: RouteNames.checkout,
-        builder: (context, state) => ChangeNotifierProvider(
-          create: (context) => CheckoutController(
-            supabase: context.read<SupabaseService>(),
-            auth: context.read<AuthProvider>(),
-            cart: context.read<CartProvider>(),
-            buyNowProductId: state.uri.queryParameters['product'],
-          ),
-          child: const CheckoutScreen(),
-        ),
+        builder: (context, state) {
+          final selected = (state.uri.queryParameters['products'] ?? '')
+              .split(',')
+              .map((id) => id.trim())
+              .where((id) => id.isNotEmpty)
+              .toList();
+          return ChangeNotifierProvider(
+            create: (context) => CheckoutController(
+              supabase: context.read<SupabaseService>(),
+              auth: context.read<AuthProvider>(),
+              cart: context.read<CartProvider>(),
+              buyNowProductId: state.uri.queryParameters['product'],
+              selectedProductIds: selected,
+            ),
+            child: const CheckoutScreen(),
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.reportSeller,
@@ -482,10 +505,25 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: RouteNames.adminHome,
-        builder: (context, _) => ChangeNotifierProvider(
-          create: (context) => AdminReviewCenterController(
-            supabase: context.read<SupabaseService>(),
-          ),
+        builder: (context, _) => MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (context) => AdminDashboardController(
+                supabase: context.read<SupabaseService>(),
+                prefs: context.read<SharedPreferencesService>(),
+              ),
+            ),
+            ChangeNotifierProvider(
+              create: (context) => AdminReportsController(
+                supabase: context.read<SupabaseService>(),
+              ),
+            ),
+            ChangeNotifierProvider(
+              create: (context) => AdminSellerApplicationsController(
+                supabase: context.read<SupabaseService>(),
+              ),
+            ),
+          ],
           child: const AdminShellScreen(),
         ),
       ),
@@ -548,9 +586,46 @@ GoRouter createAppRouter({
         path: RouteNames.addresses,
         builder: (_, state) =>
             AddressBookScreen(currentAddressId: state.extra as String?),
+<<<<<<< HEAD
+=======
+      ),
+      GoRoute(
+        path: RouteNames.paymentMethods,
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => SellerPayoutMethodController(
+            supabase: context.read<SupabaseService>(),
+          ),
+          child: const PaymentMethodsScreen(),
+        ),
+>>>>>>> checkout-address-label-fix
       ),
     ],
     errorBuilder: (_, state) =>
         Scaffold(body: Center(child: Text('Page not found: ${state.uri}'))),
   );
+}
+
+List<GoRoute> _homeCollectionRoutes() {
+  GoRoute collection(String path, HomeCollectionType type) {
+    return GoRoute(
+      path: path,
+      builder: (context, _) => ChangeNotifierProvider(
+        create: (context) => HomeCollectionController(
+          supabase: context.read<SupabaseService>(),
+          type: type,
+        ),
+        child: HomeCollectionScreen(type: type),
+      ),
+    );
+  }
+
+  return [
+    collection(RouteNames.homeEndingSoon, HomeCollectionType.endingSoon),
+    collection(RouteNames.homeSuggested, HomeCollectionType.suggested),
+    collection(RouteNames.homeBidding, HomeCollectionType.bidding),
+    collection(
+      RouteNames.homeVerifiedSellers,
+      HomeCollectionType.verifiedSellers,
+    ),
+  ];
 }

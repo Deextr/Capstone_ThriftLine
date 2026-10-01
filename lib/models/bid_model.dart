@@ -14,6 +14,7 @@ class UserBid {
     this.auctionCurrentPrice,
     this.auctionIncrement,
     this.product,
+    this.paymentDueAt,
   });
 
   final String id;
@@ -27,6 +28,7 @@ class UserBid {
   final double? auctionCurrentPrice;
   final double? auctionIncrement;
   final ProductModel? product;
+  final DateTime? paymentDueAt;
 
   factory UserBid.fromSupabase(
     Map<String, dynamic> row, {
@@ -109,6 +111,9 @@ class UserBid {
           (auction['minimum_increment'] as num?)?.toDouble() ??
           (row['minimum_increment'] as num?)?.toDouble(),
       product: productModel,
+      paymentDueAt: row['payment_due_at'] != null
+          ? DateTime.tryParse(row['payment_due_at'] as String)
+          : null,
     );
   }
 
@@ -124,6 +129,7 @@ class UserBid {
     double? auctionCurrentPrice,
     double? auctionIncrement,
     ProductModel? product,
+    DateTime? paymentDueAt,
   }) => UserBid(
     id: id ?? this.id,
     productId: productId ?? this.productId,
@@ -136,6 +142,7 @@ class UserBid {
     auctionCurrentPrice: auctionCurrentPrice ?? this.auctionCurrentPrice,
     auctionIncrement: auctionIncrement ?? this.auctionIncrement,
     product: product ?? this.product,
+    paymentDueAt: paymentDueAt ?? this.paymentDueAt,
   );
 }
 

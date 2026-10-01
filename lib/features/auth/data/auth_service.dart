@@ -8,6 +8,7 @@ import '../domain/auth_error.dart';
 import '../domain/auth_user.dart';
 import '../domain/legal_documents.dart';
 import '../domain/signup_identity.dart';
+import '../domain/trusted_device.dart';
 import 'auth_result.dart';
 
 /// Handles all authentication operations against Supabase.
@@ -107,6 +108,9 @@ class AuthService {
   }
 
   /// Signs in with email and password.
+  ///
+  /// Password success still returns `requiresEmailOtp`. The caller may clear
+  /// that gate only after [isTrustedDevice] returns true for this user.
   Future<AuthResult> signInWithEmail({
     required String email,
     required String password,
@@ -280,8 +284,16 @@ class AuthService {
   ///
   /// Returns `null` if there is no active session.
   Future<AuthUser?> getCurrentUser() async {
-    final supabaseUser = _supabaseService.currentUser;
-    if (supabaseUser == null) return null;
+    final sessionUser = _supabaseService.currentUser;
+    if (sessionUser == null) return null;
+
+    var supabaseUser = sessionUser;
+    try {
+      final remoteUser = (await _auth.getUser()).user;
+      if (remoteUser != null) supabaseUser = remoteUser;
+    } catch (e) {
+      debugPrint('AuthService.getCurrentUser identity refresh: $e');
+    }
 
     final userRecord = await getUserRecord(supabaseUser.id);
     return hydrateUser(supabaseUser, userRecord);
@@ -319,6 +331,9 @@ class AuthService {
       profile,
       verification: verification,
       sellerProfile: sellerProfile,
+      sessionAmrMethods: sessionAmrMethodsFromAccessToken(
+        _supabaseService.currentSession?.accessToken,
+      ),
     );
   }
 
@@ -333,7 +348,9 @@ class AuthService {
       );
       return _functionError(response);
     } on FunctionException catch (e) {
-      debugPrint('AuthService.sendEmailOtp failed: ${e.reasonPhrase} ${e.details}');
+      debugPrint(
+        'AuthService.sendEmailOtp failed: ${e.reasonPhrase} ${e.details}',
+      );
       return _functionExceptionMessage(e) ??
           'We could not send the email. Please try again.';
     } catch (e) {
@@ -342,23 +359,73 @@ class AuthService {
     }
   }
 
+  /// Asks the server whether this install token is still trusted for the
+  /// signed-in user. Anything other than an explicit true stays untrusted.
+  ///
+  /// The token is sent only in this request body and is not written to logs.
+  Future<bool> isTrustedDevice({required String deviceToken}) async {
+    try {
+      final response = await _supabaseService.client.functions.invoke(
+        'check-trusted-device',
+        body: {'device_token': deviceToken},
+      );
+      final data = response.data;
+      if (response.status >= 400) return false;
+      return data is Map && data['trusted'] == true && data['error'] == null;
+    } on FunctionException catch (e) {
+      debugPrint('AuthService.isTrustedDevice failed: status=${e.status}');
+      return false;
+    } catch (_) {
+      debugPrint('AuthService.isTrustedDevice failed');
+      return false;
+    }
+  }
+
   /// Confirms the email code through the `verify-email-otp` Edge Function.
-  Future<String?> verifyEmailOtp({required String token}) async {
+  ///
+  /// [deviceToken] is optional. When it is present the server hashes it and
+  /// starts a 7-day trusted-device grant. A missing token still verifies the
+  /// code and leaves the device untrusted.
+  Future<String?> verifyEmailOtp({
+    required String token,
+    String? deviceToken,
+    String? platform,
+  }) async {
     try {
       final response = await _supabaseService.client.functions.invoke(
         'verify-email-otp',
-        body: {'token': token},
+        body: {
+          'token': token,
+          'device_token': ?deviceToken,
+          'platform': ?platform,
+        },
       );
       return _functionError(response);
     } on FunctionException catch (e) {
-      debugPrint(
-        'AuthService.verifyEmailOtp failed: ${e.reasonPhrase} ${e.details}',
-      );
+      debugPrint('AuthService.verifyEmailOtp failed: status=${e.status}');
       return _functionExceptionMessage(e) ??
           'Could not verify that code. Please try again.';
-    } catch (e) {
-      debugPrint('AuthService.verifyEmailOtp error: $e');
+    } catch (_) {
+      debugPrint('AuthService.verifyEmailOtp failed');
       return 'Could not verify that code. Please try again.';
+    }
+  }
+
+  /// Revokes this install for the signed-in user. Does not sign the user out.
+  Future<String?> revokeTrustedDevice({required String deviceToken}) async {
+    try {
+      final response = await _supabaseService.client.functions.invoke(
+        'revoke-trusted-device',
+        body: {'device_token': deviceToken},
+      );
+      return _functionError(response);
+    } on FunctionException catch (e) {
+      debugPrint('AuthService.revokeTrustedDevice failed: status=${e.status}');
+      return _functionExceptionMessage(e) ??
+          'Could not forget this device. Please try again.';
+    } catch (_) {
+      debugPrint('AuthService.revokeTrustedDevice failed');
+      return 'Could not forget this device. Please try again.';
     }
   }
 
@@ -374,7 +441,9 @@ class AuthService {
       );
       return _functionError(response);
     } on FunctionException catch (e) {
-      debugPrint('AuthService.sendPhoneOtp failed: ${e.reasonPhrase} ${e.details}');
+      debugPrint(
+        'AuthService.sendPhoneOtp failed: ${e.reasonPhrase} ${e.details}',
+      );
       return _functionExceptionMessage(e) ??
           'We could not send the SMS. Please try again.';
     } catch (e) {
@@ -395,7 +464,9 @@ class AuthService {
       );
       return _functionError(response);
     } on FunctionException catch (e) {
-      debugPrint('AuthService.verifyPhoneOtp failed: ${e.reasonPhrase} ${e.details}');
+      debugPrint(
+        'AuthService.verifyPhoneOtp failed: ${e.reasonPhrase} ${e.details}',
+      );
       return _functionExceptionMessage(e) ??
           'Could not verify that code. Please try again.';
     } catch (e) {
@@ -439,7 +510,8 @@ class AuthService {
   String? _extractAvatarUrlFromUser(User? user) {
     if (user == null) return null;
     final meta = user.userMetadata ?? {};
-    final url = meta['avatar_url'] as String? ??
+    final url =
+        meta['avatar_url'] as String? ??
         meta['picture'] as String? ??
         meta['avatar'] as String?;
     return (url != null && url.trim().isNotEmpty) ? url.trim() : null;

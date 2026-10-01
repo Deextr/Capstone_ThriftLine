@@ -58,6 +58,10 @@ class OrderModel {
     required this.deliveryMethod,
     required this.shippingAddress,
     this.addressId,
+<<<<<<< HEAD
+=======
+    this.addressName,
+>>>>>>> checkout-address-label-fix
     required this.createdAt,
     this.trackingNumber,
     this.courier,
@@ -72,6 +76,8 @@ class OrderModel {
     this.addressMissing = false,
     this.shipment,
     this.itemReturn,
+    this.paymentDueAt,
+    this.checkoutGroupId,
   });
 
   final String id;
@@ -93,6 +99,10 @@ class OrderModel {
   final DeliveryMethod deliveryMethod;
   final String shippingAddress;
   final String? addressId;
+<<<<<<< HEAD
+=======
+  final String? addressName;
+>>>>>>> checkout-address-label-fix
   final DateTime createdAt;
   final String? trackingNumber;
   final String? courier;
@@ -107,6 +117,17 @@ class OrderModel {
   final bool addressMissing;
   final ShipmentModel? shipment;
   final ReturnShipment? itemReturn;
+  final DateTime? paymentDueAt;
+  final String? checkoutGroupId;
+
+  bool get isAuctionObligation =>
+      (auctionId != null && auctionId!.isNotEmpty) || source == 'auction';
+
+  bool get isPaymentWindowOpen {
+    final due = paymentDueAt;
+    if (due == null) return needsBuyerPayment;
+    return needsBuyerPayment && due.isAfter(DateTime.now());
+  }
 
   bool get isRefundedSale => paymentStatus == 'refunded';
 
@@ -127,6 +148,9 @@ class OrderModel {
 
   /// Unpaid checkout the buyer can still finish. Not a completed purchase.
   bool get needsBuyerPayment => isPaymentPending && !isFailedCheckout;
+
+  /// Auction wins require payment. Abandoned fixed-price checkouts do not.
+  bool get showsAsAwaitingPayment => needsBuyerPayment && isAuctionObligation;
 
   bool get showsInPurchaseHistory => !isPaymentPending && !isFailedCheckout;
 
@@ -264,6 +288,12 @@ class OrderModel {
       deliveryMethod: DeliveryMethod.standard,
       shippingAddress: formatted,
       addressId: address is Map ? address['address_id'] as String? : null,
+<<<<<<< HEAD
+=======
+      addressName: address is Map
+          ? address['recipient_name'] as String?
+          : null,
+>>>>>>> checkout-address-label-fix
       createdAt: row['created_at'] != null
           ? DateTime.parse(row['created_at'] as String)
           : DateTime.now(),
@@ -279,6 +309,10 @@ class OrderModel {
       addressMissing: addressMissing,
       shipment: shipmentFromOrderRow(row),
       itemReturn: returnShipmentFromOrderRow(row),
+      paymentDueAt: row['payment_due_at'] != null
+          ? DateTime.tryParse(row['payment_due_at'] as String)
+          : null,
+      checkoutGroupId: row['checkout_group_id'] as String?,
     );
   }
 
@@ -302,6 +336,10 @@ class OrderModel {
     DeliveryMethod? deliveryMethod,
     String? shippingAddress,
     String? addressId,
+<<<<<<< HEAD
+=======
+    String? addressName,
+>>>>>>> checkout-address-label-fix
     DateTime? createdAt,
     String? trackingNumber,
     String? courier,
@@ -316,6 +354,8 @@ class OrderModel {
     bool? addressMissing,
     ShipmentModel? shipment,
     ReturnShipment? itemReturn,
+    DateTime? paymentDueAt,
+    String? checkoutGroupId,
   }) => OrderModel(
     id: id ?? this.id,
     orderNumber: orderNumber ?? this.orderNumber,
@@ -336,6 +376,10 @@ class OrderModel {
     deliveryMethod: deliveryMethod ?? this.deliveryMethod,
     shippingAddress: shippingAddress ?? this.shippingAddress,
     addressId: addressId ?? this.addressId,
+<<<<<<< HEAD
+=======
+    addressName: addressName ?? this.addressName,
+>>>>>>> checkout-address-label-fix
     createdAt: createdAt ?? this.createdAt,
     trackingNumber: trackingNumber ?? this.trackingNumber,
     courier: courier ?? this.courier,
@@ -350,6 +394,8 @@ class OrderModel {
     addressMissing: addressMissing ?? this.addressMissing,
     shipment: shipment ?? this.shipment,
     itemReturn: itemReturn ?? this.itemReturn,
+    paymentDueAt: paymentDueAt ?? this.paymentDueAt,
+    checkoutGroupId: checkoutGroupId ?? this.checkoutGroupId,
   );
 }
 

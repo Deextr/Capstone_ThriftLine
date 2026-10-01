@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/services/shared_preferences_service.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/curved_navigation_bar.dart';
@@ -33,8 +34,10 @@ class _BuyerShellScreenState extends State<BuyerShellScreen> {
     super.initState();
     _tabs = [
       ChangeNotifierProvider(
-        create: (context) =>
-            HomeController(supabase: context.read<SupabaseService>()),
+        create: (context) => HomeController(
+          supabase: context.read<SupabaseService>(),
+          prefs: context.read<SharedPreferencesService>(),
+        ),
         child: const BuyerHomeTab(),
       ),
       ChangeNotifierProvider(

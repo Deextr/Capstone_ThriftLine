@@ -1,0 +1,24 @@
+[33m63a07fd[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m fixed address, added indicator which address is currently being used
+[33m2220602[m[33m ([m[1;31morigin/dev[m[33m)[m feat: check out flow, terms and policy ui, addresses ui.
+[33m069ef10[m escrow-initial-dev
+[33mb6ae014[m phase 8, 9, 10:Admin account, seller dashboard, reviews and reports
+[33mfea07f1[m phase 5: Order checkout, no payment gateway yet.
+[33m4e7ad9a[m phase 2: Catalog working, messaging, lookin for tab working
+[33m6543b21[m Merge remote-tracking branch 'origin/dev' into rr
+[33m62c5b8c[m feat: add home controller, formatting utilities, and UI screens for buyer and seller features
+[33m59be17d[m feat: implement full application architecture including cart, bidding, profile, and listing management with Supabase backend
+[33m4963a37[m feat: scaffold full application architecture including buyer, seller, chat, and profile feature modules with supporting data models and Supabase schema.
+[33m0ef2f44[m email OTP working
+[33mc61f6d8[m enhanced become a seller
+[33m055121d[m SMS and Face Verification
+[33m18c5980[m feat(seller): implement product listing creation with form controller and profile reorganization
+[33m9d3dfcc[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m feat: implement core authentication system and reusable UI component library -add a register functionality -edit profile functionality -no otp yet for phone and email and avatar upload
+[33m61574f2[m google auth login backend
+[33mb28412a[m feat: implement seller trust score system, verification workflow, and safety reporting
+[33mf2a7913[m color change for the button finalized outline
+[33m8425e0a[m outline defense enhanced UI prototype
+[33m40caf45[m outline defense UI enhanced
+[33m4783081[m changes
+[33mce22d11[m modernize the UI: Dexter
+[33m06c16e3[m add sign up ui and become a seller
+[33m0198687[m First prototype functional

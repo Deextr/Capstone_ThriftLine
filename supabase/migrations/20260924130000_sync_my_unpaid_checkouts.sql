@@ -23,6 +23,7 @@ BEGIN
   END IF;
 
   PERFORM public.expire_unpaid_checkouts();
+  PERFORM public.expire_auction_payment_offers();
 
   RETURN jsonb_build_object('success', true);
 END;

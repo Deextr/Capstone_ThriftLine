@@ -127,7 +127,8 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
-                              minHeight: constraints.maxHeight -
+                              minHeight:
+                                  constraints.maxHeight -
                                   (compact ? 4 : AppConstants.spacingSm) -
                                   AppConstants.spacingLg,
                             ),

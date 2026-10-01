@@ -56,6 +56,26 @@ Edge Functions live in `../functions/send-email-otp` and
 `GMAIL_APP_PASSWORD`, and `OTP_PEPPER`. Keep Auth "Confirm email" off so
 signup returns a session before the OTP screen. See `../../docs/agile/email-otp.md`.
 
+## Trusted devices (email OTP skip)
+
+| File | Purpose |
+| --- | --- |
+| `20260928150000_trusted_devices.sql` | Hashed install tokens, 7-day expiry from database `now()`, no client access |
+
+Apply this after the email OTP migration. Then deploy:
+
+```bash
+supabase functions deploy verify-email-otp
+supabase functions deploy check-trusted-device
+supabase functions deploy revoke-trusted-device
+```
+
+`verify-email-otp` imports `../functions/_shared/trusted_device.ts`, so deploy
+it with the CLI (a Dashboard paste of `index.ts` alone will not bundle the
+shared file). The same `OTP_PEPPER` secret is required. The raw device token
+never goes in the database. Normal logout keeps the grant; "Log out and forget
+this device" revokes it.
+
 ## One email → one account
 
 | File | Purpose |
@@ -222,6 +242,38 @@ Apply this after the Phase 6 mandatory-payment file. It does not move money.
 | `20260924140000_fix_seller_earnings_snapshot.sql` | Fixes `seller_earnings_snapshot` so activity and payout lists aggregate without treating `item` as a table |
 
 Apply this after Phase 10. The dashboard card stays the same; only the RPC query changes.
+
+## Auction payment window
+
+| File | Purpose |
+| --- | --- |
+| `20260925120000_auction_payment_window.sql` | 12-hour winner payment, one second-bidder fallback, early end, relist, sold only after payment |
+
+Apply after Phase 6 payment and Phase 5 orders. `close_auctions` still settles ended auctions and now also expires unpaid winner offers.
+
+## Seller GCash payout method
+
+| File | Purpose |
+| --- | --- |
+| `20260925130000_seller_gcash_payout_method.sql` | Saved GCash destination; `request_seller_payout` requires it |
+
+Apply after Phase 10. Payouts stay recorded requests. `seller_payouts.status = requested` is unchanged.
+
+## Selected cart checkout
+
+| File | Purpose |
+| --- | --- |
+| `20260928120000_checkout_selected_cart.sql` | Checks out only the cart lines the buyer selected, using the same stock lock, order, and payment path as `checkout_cart` |
+
+Apply after mandatory payment. Buy Now still calls `checkout_cart` for one product. Checking out more than one selected cart line requires this function.
+
+## Orders per seller at checkout
+
+| File | Purpose |
+| --- | --- |
+| `20260928130000_checkout_orders_per_seller.sql` | Selected checkout keeps every shop; one order, shipping total, and later escrow per seller |
+
+Apply after `20260928120000_checkout_selected_cart.sql` if that file already ran. If it never finished, running only this file is enough because it replaces both functions. PayMongo stays one payment per order so escrow stays with the right seller.
 
 ## Conventions
 

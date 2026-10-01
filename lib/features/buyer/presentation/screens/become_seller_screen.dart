@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -12,13 +13,16 @@ import '../../../../features/auth/domain/auth_user.dart';
 import '../../../../features/seller/data/davao_barangay_service.dart';
 import '../../../../features/seller/data/seller_verification_service.dart';
 import '../../../../features/seller/domain/davao_barangay.dart';
+import '../../../../features/seller/domain/external_selling.dart';
 import '../../../../features/seller/domain/id_image_quality.dart';
 import '../../../../features/seller/domain/seller_address_draft.dart';
 import '../../../../features/seller/domain/seller_id_type.dart';
 import '../../../../features/seller/presentation/screens/id_capture_screen.dart';
 import '../../../../features/seller/presentation/screens/liveness_capture_screen.dart';
+import '../../../../features/seller/presentation/widgets/past_selling_step.dart';
 import '../../../../features/seller/presentation/widgets/davao_barangay_field.dart';
 import '../../../../features/seller/presentation/widgets/id_side_review_card.dart';
+import '../../../../features/seller/presentation/widgets/seller_id_type_list.dart';
 import '../../../../features/seller/presentation/widgets/terms_acceptance_note.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
@@ -45,20 +49,29 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   Uint8List? _idBackBytes;
   IdQualityResult? _frontQuality;
   IdQualityResult? _backQuality;
+  SellerIdType? _selectedIdType;
 
   bool _selfieUploaded = false;
   bool _submitting = false;
+  bool _addingHistory = false;
   int _currentStep = 0;
   LivenessResult? _liveness;
+  ClaimedSellingRange? _claimedRange;
+  final List<ExternalTransactionDraft> _externalTransactions = [];
 
-  bool get _idGateOpen =>
-      _idFrontBytes != null &&
-      _idBackBytes != null &&
-      IdCapturePair(front: _frontQuality, back: _backQuality).canProceed;
+  bool get _idGateOpen {
+    final type = _selectedIdType;
+    if (type == null || _idFrontBytes == null) return false;
+    return IdCapturePair(
+      front: _frontQuality,
+      back: _backQuality,
+    ).canProceed(requiresBack: type.requiresBackCapture);
+  }
 
   @override
   void initState() {
     super.initState();
+    unawaited(DavaoBarangayService.prefetch());
     _loadBarangays();
   }
 
@@ -71,21 +84,24 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   }
 
   Future<void> _loadBarangays({bool forceRefresh = false}) async {
-    setState(() {
-      _barangaysLoading = true;
-      _barangayError = null;
-    });
+    if (forceRefresh || _barangays.isEmpty) {
+      setState(() {
+        _barangaysLoading = true;
+        _barangayError = null;
+      });
+    }
     try {
       final list = await _barangayService.load(forceRefresh: forceRefresh);
       if (!mounted) return;
-      setState(() {
-        _barangays = list;
-        _barangaysLoading = false;
-        if (_selectedBarangay != null &&
-            !DavaoBarangay.isAllowedSelection(_selectedBarangay, list)) {
-          _selectedBarangay = null;
-        }
-      });
+      final wasLoading = _barangaysLoading || _barangays.isEmpty;
+      _barangays = list;
+      _barangaysLoading = false;
+      _barangayError = null;
+      if (_selectedBarangay != null &&
+          !DavaoBarangay.isAllowedSelection(_selectedBarangay, list)) {
+        _selectedBarangay = null;
+      }
+      if (wasLoading) setState(() {});
     } on DavaoBarangayException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -168,7 +184,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                           const SizedBox(width: 8),
                           _buildSegment(1, 'ID Capture'),
                           const SizedBox(width: 8),
-                          _buildSegment(2, 'Selfie'),
+                          _buildSegment(2, 'Face'),
+                          const SizedBox(width: 8),
+                          _buildSegment(3, 'History'),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -182,7 +200,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                             ),
                           ),
                           Text(
-                            'Step ${_currentStep + 1} of 3',
+                            'Step ${_currentStep + 1} of 4',
                             style: AppTypography.caption,
                           ),
                         ],
@@ -230,15 +248,61 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       );
     }
     if (_currentStep == 1) {
+      if (_idGateOpen) {
+        return ThriftButton(
+          label: 'Continue to selfie',
+          onPressed: _continueFromId,
+        );
+      }
+      final type = _selectedIdType;
       return ThriftButton(
-        label: 'Continue',
-        onPressed: _idGateOpen ? _continueFromId : null,
+        label: type == null ? 'Capture ID' : 'Capture ${type.label}',
+        onPressed: type == null ? null : _startIdCaptureFlow,
       );
     }
-    return ThriftButton(
-      label: 'Submit Application',
-      isLoading: _submitting,
-      onPressed: _submitting ? null : () => _submit(auth),
+    if (_currentStep == 2) {
+      if (_liveness?.passed == true) {
+        return ThriftButton(
+          label: 'Continue',
+          onPressed: () => setState(() => _currentStep = 3),
+        );
+      }
+      return ThriftButton(label: 'Take a selfie', onPressed: _startLiveness);
+    }
+    if (!_addingHistory) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ThriftButton(
+            label: 'Add past transactions',
+            onPressed: () => setState(() => _addingHistory = true),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _submitting
+                ? null
+                : () => _submit(auth, skipHistory: true),
+            child: const Text("I'm new to selling"),
+          ),
+        ],
+      );
+    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ThriftButton(
+          label: 'Submit application',
+          isLoading: _submitting,
+          onPressed: _submitting ? null : () => _submit(auth),
+        ),
+        const SizedBox(height: 4),
+        TextButton(
+          onPressed: _submitting
+              ? null
+              : () => _submit(auth, skipHistory: true),
+          child: const Text("I'm new to selling"),
+        ),
+      ],
     );
   }
 
@@ -247,9 +311,11 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       case 0:
         return 'Seller information & address';
       case 1:
-        return 'Capture your ID';
+        return _idGateOpen ? 'ID captured' : 'Choose an ID';
       case 2:
         return 'Take a selfie';
+      case 3:
+        return 'Past selling experience';
       default:
         return '';
     }
@@ -263,6 +329,15 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
         return _idCaptureStep();
       case 2:
         return _selfieStep();
+      case 3:
+        return PastSellingExperienceStep(
+          adding: _addingHistory,
+          claimedRange: _claimedRange,
+          transactions: _externalTransactions,
+          onClaimedRange: (range) => setState(() => _claimedRange = range),
+          onSave: _saveExternalTransaction,
+          onRemove: _removeExternalTransaction,
+        );
       default:
         return const SizedBox.shrink();
     }
@@ -387,49 +462,58 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   }
 
   Widget _idCaptureStep() {
+    final type = _selectedIdType;
     final pair = IdCapturePair(front: _frontQuality, back: _backQuality);
-    if (_idGateOpen) {
+    if (_idGateOpen && type != null) {
+      final aspect = IdCaptureGuide.aspectFor(type);
+      final frontTitle = type == SellerIdType.passport ? 'Photo page' : 'Front';
+      final needsBack = type.requiresBackCapture;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(type.label, style: AppTypography.subheading),
+          const SizedBox(height: 6),
           Text(
-            'Both sides of your ID passed the ID check.',
+            needsBack
+                ? 'Both sides are ready for review. This does not confirm the ID is genuine.'
+                : type == SellerIdType.passport
+                ? 'The photo page is ready for review. This does not confirm the passport is genuine.'
+                : 'The front is ready for review. This does not confirm the ID is genuine.',
             style: AppTypography.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 20),
           IdSideReviewCard(
-            title: 'Front ID',
+            title: frontTitle,
             bytes: _idFrontBytes,
             quality: _frontQuality,
             checking: false,
+            aspectRatio: aspect,
           ),
-          const SizedBox(height: 16),
-          IdSideReviewCard(
-            title: 'Back ID',
-            bytes: _idBackBytes,
-            quality: _backQuality,
-            checking: false,
-          ),
-          const SizedBox(height: 16),
-          ThriftButton(
-            label: 'Retake ID photos',
-            variant: ThriftButtonVariant.outline,
-            onPressed: _startIdCaptureFlow,
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
+          if (needsBack) ...[
+            const SizedBox(height: 16),
+            IdSideReviewCard(
+              title: 'Back',
+              bytes: _idBackBytes,
+              quality: _backQuality,
+              checking: false,
+              aspectRatio: aspect,
             ),
-            child: Text(
-              _idPairStatusMessage(pair),
-              style: AppTypography.body.copyWith(
-                color: AppColors.success,
-                fontWeight: FontWeight.w600,
-              ),
+          ],
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _startIdCaptureFlow,
+            child: Text(needsBack ? 'Retake photos' : 'Retake photo'),
+          ),
+          TextButton(
+            onPressed: _clearIdCapture,
+            child: const Text('Choose a different ID'),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _idPairStatusMessage(pair),
+            style: AppTypography.body.copyWith(
+              color: AppColors.success,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -440,48 +524,52 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Use one of the accepted IDs below. You will photograph the front, '
-          'then the back.',
+          'Select the government ID you\'ll use for verification.',
           style: AppTypography.body.copyWith(color: AppColors.textSecondary),
         ),
-        const SizedBox(height: 20),
-        Text('Accepted IDs', style: AppTypography.subheading),
-        const SizedBox(height: 12),
-        for (final type in SellerIdType.values) ...[
-          _acceptedIdRow(type.label),
-          const SizedBox(height: 8),
-        ],
         const SizedBox(height: 16),
-        ThriftButton(
-          label: 'Proceed to capture',
-          onPressed: _startIdCaptureFlow,
-        ),
+        SellerIdTypeList(selected: type, onSelected: _selectIdType),
+        if (type != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            _capturePlan(type),
+            style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+          ),
+        ],
       ],
     );
   }
 
-  Widget _acceptedIdRow(String label) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.check_circle_outline, color: AppColors.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
+  String _capturePlan(SellerIdType type) {
+    if (type == SellerIdType.passport) {
+      return 'You\'ll photograph the photo page.';
+    }
+    if (type.requiresBackCapture) {
+      return 'You\'ll photograph the front, then the back.';
+    }
+    return 'You\'ll photograph the front of the card.';
+  }
+
+  void _selectIdType(SellerIdType type) {
+    if (_selectedIdType == type) return;
+    setState(() {
+      _selectedIdType = type;
+      _clearIdBytes();
+    });
+  }
+
+  void _clearIdCapture() {
+    setState(() {
+      _selectedIdType = null;
+      _clearIdBytes();
+    });
+  }
+
+  void _clearIdBytes() {
+    _idFrontBytes = null;
+    _idBackBytes = null;
+    _frontQuality = null;
+    _backQuality = null;
   }
 
   Widget _selfieStep() {
@@ -1000,24 +1088,36 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   }
 
   String _idPairStatusMessage(IdCapturePair pair) {
-    if (pair.canProceed) {
-      return 'Both ID photos passed the quality check.';
+    final type = _selectedIdType;
+    final label = type?.label ?? 'ID';
+    final needsBack = type?.requiresBackCapture ?? true;
+    if (pair.canProceed(requiresBack: needsBack)) {
+      if (!needsBack && type == SellerIdType.passport) {
+        return 'ID image accepted for the photo page of your passport.';
+      }
+      if (!needsBack) {
+        return 'ID image accepted for the front of your $label.';
+      }
+      return 'ID image accepted for both sides of your $label.';
     }
-    if (_idFrontBytes == null || _idBackBytes == null) {
-      return 'Both front and back photos are required.';
+    if (_idFrontBytes == null || (needsBack && _idBackBytes == null)) {
+      return needsBack
+          ? 'Both sides are required.'
+          : 'A photo of your $label is required.';
     }
-    if (pair.front == null || pair.back == null) {
-      return 'Checking ID photos…';
+    if (pair.front == null || (needsBack && pair.back == null)) {
+      return 'Checking the photos…';
     }
-    if (pair.blockingIssue == IdQualityIssue.notId) {
-      return 'No ID detected on one of the photos. Place the ID in the frame and retake.';
-    }
-    return 'Retake the photo that did not pass before continuing.';
+    return pair.front?.message ??
+        pair.back?.message ??
+        'Retake the photo that did not pass.';
   }
 
   void _continueFromId() {
+    final type = _selectedIdType;
     final pair = IdCapturePair(front: _frontQuality, back: _backQuality);
-    if (!pair.canProceed) {
+    if (type == null ||
+        !pair.canProceed(requiresBack: type.requiresBackCapture)) {
       showThriftSnackBar(context, _idPairStatusMessage(pair));
       return;
     }
@@ -1025,8 +1125,13 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   }
 
   Future<void> _startIdCaptureFlow() async {
+    final type = _selectedIdType;
+    if (type == null) {
+      showThriftSnackBar(context, 'Choose an ID before capturing.');
+      return;
+    }
     final result = await Navigator.of(context).push<IdCaptureResult>(
-      MaterialPageRoute(builder: (_) => const IdCaptureScreen()),
+      MaterialPageRoute(builder: (_) => IdCaptureScreen(idType: type)),
     );
     if (!mounted || result == null) return;
 
@@ -1065,21 +1170,57 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     });
   }
 
-  Future<void> _submit(AuthProvider auth) async {
+  void _saveExternalTransaction(ExternalTransactionDraft draft) {
+    setState(() {
+      final index = _externalTransactions.indexWhere(
+        (item) => item.localId == draft.localId,
+      );
+      if (index >= 0) {
+        _externalTransactions[index] = draft;
+      } else if (_externalTransactions.length < kMaxExternalTransactions) {
+        _externalTransactions.add(draft);
+      }
+    });
+  }
+
+  void _removeExternalTransaction(String localId) {
+    setState(() {
+      _externalTransactions.removeWhere((item) => item.localId == localId);
+    });
+  }
+
+  Future<void> _submit(AuthProvider auth, {bool skipHistory = false}) async {
     final front = _idFrontBytes;
     final back = _idBackBytes;
     final liveness = _liveness;
     final pair = IdCapturePair(front: _frontQuality, back: _backQuality);
-    if (front == null || back == null || !pair.canProceed) {
+    final type = _selectedIdType;
+    final needsBack = type?.requiresBackCapture ?? true;
+    if (front == null ||
+        type == null ||
+        (needsBack && back == null) ||
+        !pair.canProceed(requiresBack: needsBack)) {
       showThriftSnackBar(
         context,
-        'Please complete ID capture and pass the quality check first.',
+        needsBack
+            ? 'Choose an ID and capture both sides before continuing.'
+            : 'Choose an ID and capture the required photo before continuing.',
       );
       setState(() => _currentStep = 1);
       return;
     }
     if (liveness == null || !liveness.passed) {
       showThriftSnackBar(context, 'Please complete the live face check first.');
+      setState(() => _currentStep = 2);
+      return;
+    }
+    final historyError = validateExternalHistory(
+      transactions: skipHistory ? const [] : _externalTransactions,
+      claimedRange: skipHistory ? null : _claimedRange,
+    );
+    if (historyError != null) {
+      showThriftSnackBar(context, historyError);
+      setState(() => _currentStep = 3);
       return;
     }
 
@@ -1107,11 +1248,16 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
         context.read<SupabaseService>(),
       ).submitApplication(
         address: address,
+        idType: type,
         idFrontBytes: front,
-        idBackBytes: back,
+        idBackBytes: needsBack ? back : null,
         selfieBytes: liveness.imageBytes,
         selfieFileName: liveness.fileName,
         liveness: liveness.challenges,
+        externalTransactions: skipHistory
+            ? const []
+            : List<ExternalTransactionDraft>.of(_externalTransactions),
+        claimedSellingRange: skipHistory ? null : _claimedRange,
       );
       await auth.reloadUser();
       if (mounted) {
@@ -1140,8 +1286,12 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       _idBackBytes = null;
       _frontQuality = null;
       _backQuality = null;
+      _selectedIdType = null;
       _selfieUploaded = false;
       _liveness = null;
+      _addingHistory = false;
+      _claimedRange = null;
+      _externalTransactions.clear();
       _storeNameCtrl.clear();
       _addressLine1Ctrl.clear();
       _addressLine2Ctrl.clear();

@@ -9,6 +9,7 @@ import '../../../core/routes/route_names.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../widgets/thrift_widgets.dart';
+import '../../auth/presentation/widgets/auth_widgets.dart';
 import '../presentation/widgets/switch_account_sheet.dart';
 import '../presentation/widgets/switchable_avatar.dart';
 
@@ -88,7 +89,7 @@ class SellerProfileTab extends StatelessWidget {
               _MenuItem(
                 icon: Icons.payment_outlined,
                 label: 'Payment Methods',
-                onTap: () => showThriftSnackBar(context, 'Coming soon'),
+                onTap: () => context.push(RouteNames.paymentMethods),
               ),
               _MenuItem(
                 icon: Icons.location_on_outlined,
@@ -114,10 +115,7 @@ class SellerProfileTab extends StatelessWidget {
               label: 'Logout',
               variant: ThriftButtonVariant.ghost,
               color: AppColors.error,
-              onPressed: () async {
-                await auth.logout();
-                if (context.mounted) context.go(RouteNames.login);
-              },
+              onPressed: () => confirmAndLogout(context),
             ),
           ),
           const SizedBox(height: 32),

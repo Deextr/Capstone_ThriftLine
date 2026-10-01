@@ -37,7 +37,9 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
 
   Future<void> _send() async {
     setState(() => _sending = true);
-    final error = await context.read<AuthProvider>().sendPhoneOtp(_phoneCtrl.text);
+    final error = await context.read<AuthProvider>().sendPhoneOtp(
+      _phoneCtrl.text,
+    );
     if (!mounted) return;
     setState(() {
       _sending = false;
@@ -53,9 +55,9 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
   Future<void> _verify() async {
     setState(() => _verifying = true);
     final error = await context.read<AuthProvider>().verifyPhoneOtp(
-          phone: _phoneCtrl.text,
-          token: _codeCtrl.text,
-        );
+      phone: _phoneCtrl.text,
+      token: _codeCtrl.text,
+    );
     if (!mounted) return;
     setState(() => _verifying = false);
     if (error != null) {
@@ -68,7 +70,8 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final verified = context.watch<AuthProvider>().user?.isPhoneVerified ?? false;
+    final verified =
+        context.watch<AuthProvider>().user?.isPhoneVerified ?? false;
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
@@ -93,7 +96,9 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
                   ),
                   child: Text(
                     'This account already has a verified Philippine number.',
-                    style: AppTypography.body.copyWith(color: AppColors.success),
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.success,
+                    ),
                   ),
                 ),
               Text(

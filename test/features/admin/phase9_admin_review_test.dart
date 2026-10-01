@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:thriftline/features/admin/data/admin_delivery_dispute.dart';
 import 'package:thriftline/features/admin/data/admin_review_rules.dart';
+import 'package:thriftline/features/admin/data/seller_application_rejection_reasons.dart';
 import 'package:thriftline/features/trust_safety/data/report_reasons.dart';
 import 'package:thriftline/models/community_report_model.dart';
 import 'package:thriftline/models/enums.dart';
@@ -45,6 +46,46 @@ void main() {
       expect(reportDecisionLabel('action_taken'), 'Action Taken');
       expect(reportDecisionLabel('resolved'), 'Resolved');
       expect(reportDecisionLabel('dismissed'), 'Dismissed');
+    });
+
+    test('classifies existing report reasons without inventing types', () {
+      expect(
+        isAdminOrderReport(category: 'item_not_as_described', orderId: null),
+        isTrue,
+      );
+      expect(
+        isAdminOrderReport(category: 'failure_to_ship', orderId: null),
+        isTrue,
+      );
+      expect(
+        isAdminOrderReport(category: 'harassment', orderId: null),
+        isFalse,
+      );
+      expect(
+        isAdminOrderReport(category: 'scam_or_fraud', orderId: null),
+        isFalse,
+      );
+      expect(
+        isAdminOrderReport(category: 'scam_or_fraud', orderId: 'order-1'),
+        isTrue,
+      );
+      expect(
+        adminReportKindOf(category: 'fake_identity', orderId: null),
+        'Community',
+      );
+      expect(
+        adminReportKindOf(category: 'fake_product', orderId: null),
+        'Order',
+      );
+    });
+
+    test('formats compact report ids and previews', () {
+      expect(
+        adminReportShortId('a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
+        'A1B2C3D4',
+      );
+      expect(adminReportPreview('Short note.'), 'Short note.');
+      expect(adminReportPreview('A' * 120).endsWith('…'), isTrue);
     });
   });
 
@@ -154,8 +195,20 @@ void main() {
       expect(verificationStatusLabel('rejected'), 'Rejected');
       expect(disputeStatusLabel('open'), 'Open');
       expect(disputeStatusLabel('resolved'), 'Resolved');
-      expect(adminQueueFilterLabel(AdminQueueFilter.open), 'Open');
-      expect(adminQueueFilterLabel(AdminQueueFilter.closed), 'Closed');
+      expect(adminQueueFilterLabel(AdminQueueFilter.open), 'Needs review');
+      expect(adminQueueFilterLabel(AdminQueueFilter.closed), 'Reviewed');
+      expect(adminQueueStatusLine(0, 'under review'), 'None waiting');
+      expect(adminQueueStatusLine(4, 'under review'), '4 under review');
+      expect(reportDecisionCta('resolved'), 'Resolve report');
+      expect(reportDecisionCta('dismissed'), 'Dismiss report');
+      expect(
+        adminReportActivityTitle('action_taken'),
+        'Action taken on a report',
+      );
+      expect(
+        adminApplicationActivityTitle('approved'),
+        'Seller application approved',
+      );
     });
 
     test('admin labels do not use emojis', () {
@@ -177,6 +230,48 @@ void main() {
           isFalse,
         );
       }
+    });
+  });
+
+  group('seller application rejection reasons', () {
+    test('includes common reasons and Others', () {
+      expect(kSellerApplicationRejectReasons.length, greaterThanOrEqualTo(6));
+      expect(
+        kSellerApplicationRejectReasons.any((reason) => reason.isOther),
+        isTrue,
+      );
+      expect(
+        kSellerApplicationRejectReasons.last.id,
+        kSellerApplicationRejectOtherId,
+      );
+    });
+
+    test('uses the selected common reason as the applicant message', () {
+      expect(
+        sellerRejectionReasonMessage(reasonId: 'name_mismatch'),
+        'The name on the ID does not match the shop or profile name.',
+      );
+    });
+
+    test('Others requires a specified note', () {
+      expect(
+        sellerRejectionReasonMessage(reasonId: kSellerApplicationRejectOtherId),
+        isNull,
+      );
+      expect(
+        sellerRejectionReasonMessage(
+          reasonId: kSellerApplicationRejectOtherId,
+          otherDetail: '   ',
+        ),
+        isNull,
+      );
+      expect(
+        sellerRejectionReasonMessage(
+          reasonId: kSellerApplicationRejectOtherId,
+          otherDetail: ' Shop photos are stock images. ',
+        ),
+        'Shop photos are stock images.',
+      );
     });
   });
 

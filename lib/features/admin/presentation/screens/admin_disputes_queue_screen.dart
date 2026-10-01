@@ -16,6 +16,7 @@ class AdminDisputesQueueScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AdminDisputesController>();
+    final open = controller.filter == AdminQueueFilter.open;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -29,16 +30,14 @@ class AdminDisputesQueueScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: AdminFilterBar(
-                  value: controller.filter,
-                  onChanged: (filter) =>
-                      context.read<AdminDisputesController>().setFilter(filter),
-                ),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: AdminFilterBar(
+                value: controller.filter,
+                onChanged: (filter) =>
+                    context.read<AdminDisputesController>().setFilter(filter),
               ),
             ),
             Expanded(
@@ -46,13 +45,7 @@ class AdminDisputesQueueScreen extends StatelessWidget {
                 color: AppColors.primary,
                 onRefresh: () => context.read<AdminDisputesController>().load(),
                 child: controller.isLoading
-                    ? ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: const [
-                          SizedBox(height: 120),
-                          Center(child: CircularProgressIndicator()),
-                        ],
-                      )
+                    ? const AdminQueueSkeleton()
                     : controller.errorMessage != null
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
@@ -69,52 +62,73 @@ class AdminDisputesQueueScreen extends StatelessWidget {
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: [
                           AdminEmptyState(
-                            title: controller.filter == AdminQueueFilter.open
+                            title: open
                                 ? 'No delivery problems waiting for review.'
                                 : 'No closed delivery problems yet.',
-                            message: controller.filter == AdminQueueFilter.open
+                            message: open
                                 ? 'Buyer delivery issues will appear here.'
                                 : 'Closed cases will appear here.',
                           ),
                         ],
                       )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
-                        itemCount: controller.disputes.length + 1,
-                        separatorBuilder: (_, _) => const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          if (index == 0) {
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: Text(
-                                controller.filter == AdminQueueFilter.open
-                                    ? '${controller.disputes.length} require review'
-                                    : '${controller.disputes.length} closed',
-                                style: AppTypography.caption,
-                              ),
-                            );
-                          }
-                          final dispute = controller.disputes[index - 1];
-                          return AdminQueueItem(
-                            title: dispute.reason.label,
-                            status: dispute.status,
-                            statusLabel: disputeStatusLabel(dispute.status),
-                            lines: [
-                              if (dispute.orderNumber != null)
-                                'Order #${dispute.orderNumber}',
-                              'Buyer: ${adminHandle(dispute.buyerUsername, dispute.buyerDisplayName)}',
-                            ],
-                            meta: formatCompactDate(dispute.createdAt),
-                            actionLabel: 'View case',
-                            onTap: () => _open(context, dispute.id),
-                          );
-                        },
+                    : ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                        children: [
+                          Text(
+                            adminQueueStatusLine(
+                              controller.disputes.length,
+                              open ? 'open' : 'closed',
+                            ),
+                            style: AppTypography.subheading,
+                          ),
+                          const SizedBox(height: 4),
+                          for (
+                            var i = 0;
+                            i < controller.disputes.length;
+                            i++
+                          ) ...[
+                            if (i > 0) const Divider(height: 1),
+                            _DisputeRow(index: i, open: open),
+                          ],
+                        ],
                       ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _DisputeRow extends StatelessWidget {
+  const _DisputeRow({required this.index, required this.open});
+
+  final int index;
+  final bool open;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<AdminDisputesController>();
+    final dispute = controller.disputes[index];
+    final seller = adminHandle(
+      dispute.sellerUsername,
+      dispute.sellerDisplayName,
+    );
+
+    return AdminQueueItem(
+      title: dispute.reason.label,
+      status: dispute.status,
+      statusLabel: disputeStatusLabel(dispute.status),
+      lines: [
+        if (dispute.orderNumber != null) 'Order #${dispute.orderNumber}',
+        'Buyer ${adminHandle(dispute.buyerUsername, dispute.buyerDisplayName)}',
+        if (seller != 'Member' && seller != 'Seller') 'Seller $seller',
+      ],
+      meta: formatCompactDate(dispute.createdAt),
+      actionLabel: open ? 'Review case' : 'View case',
+      onTap: () => _open(context, dispute.id),
     );
   }
 

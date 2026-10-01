@@ -9,15 +9,13 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/services/supabase_service.dart';
-import '../../../../core/utils/formatters.dart';
 import '../../../../models/address_model.dart';
-import '../../../../models/order_model.dart';
 import '../../../../providers/cart_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../profile/data/address_service.dart';
 import '../../controllers/buyer_orders_controller.dart';
-import '../../data/paymongo_checkout.dart';
-import '../widgets/pay_now_button.dart';
+import '../../../../widgets/empty_state.dart';
+import '../widgets/payment_checkout_body.dart';
 
 class PaymentProofScreen extends StatefulWidget {
   const PaymentProofScreen({super.key, required this.orderId});
@@ -37,9 +35,17 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
   Widget build(BuildContext context) {
     final controller = context.watch<BuyerOrdersController>();
     if (controller.isLoading && controller.order == null) {
-      return const Scaffold(
+      return Scaffold(
+        appBar: AppBar(title: const Text('Complete payment')),
         body: Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: AppColors.primary),
+              const SizedBox(height: 16),
+              Text('Loading your order…', style: AppTypography.body),
+            ],
+          ),
         ),
       );
     }
@@ -47,13 +53,18 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
     if (order == null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Payment'),
+          title: const Text('Complete payment'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go(RouteNames.checkout),
+            onPressed: () => context.go(RouteNames.cart),
           ),
         ),
-        body: Center(child: Text(controller.errorMessage ?? 'Order not found')),
+        body: ErrorState(
+          message:
+              controller.errorMessage ??
+              'We could not load this order. Check your connection and try again.',
+          onRetry: controller.load,
+        ),
       );
     }
 
@@ -84,7 +95,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                       ? 'Payment Expired'
                       : 'Payment Failed')
                 : pending
-                ? 'Payment'
+                ? 'Complete payment'
                 : 'Payment Successful',
           ),
           leading: IconButton(
@@ -95,7 +106,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                 return;
               }
               if (failed) {
-                context.go(RouteNames.checkout);
+                context.go(RouteNames.cart);
                 return;
               }
               context.go(RouteNames.orderConfirmFor(widget.orderId));
@@ -112,36 +123,31 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                     onReturnToCart: () async {
                       await context.read<CartProvider>().refresh();
                       if (context.mounted) {
-                        context.go(RouteNames.checkout);
+                        context.go(RouteNames.cart);
                       }
                     },
                     onTryAgain: () async {
                       await context.read<CartProvider>().refresh();
                       if (context.mounted) {
-                        context.go(RouteNames.checkout);
+                        context.go(RouteNames.cart);
                       }
                     },
                   )
                 : pending
-                ? _PendingPaymentBody(
+                ? PaymentCheckoutBody(
                     order: order,
-                    sellerName: order.sellerName,
-                    itemLabel: order.items.length > 1
-                        ? '${order.items.length} items from ${order.sellerName}'
-                        : order.productTitle,
-                    totalLabel: formatCurrency(order.total),
+                    groupOrders: controller.paymentGroup,
+                    paymentDueAt: order.paymentDueAt,
+                    windowOpen: order.isPaymentWindowOpen,
                     confirming: confirming,
                     selectedChannel: _selectedChannel,
                     isAbandoning: controller.isAbandoning,
                     isSavingAddress: controller.isSavingAddress,
                     returnLabel: (order.auctionId ?? '').isNotEmpty
                         ? 'Cancel payment'
-                        : 'Return to Cart',
+                        : 'Return to cart',
                     onSelectChannel: (channel) {
                       setState(() => _selectedChannel = channel);
-                    },
-                    onChangeMethod: () {
-                      setState(() => _selectedChannel = null);
                     },
                     onChangeAddress: () => _changeAddress(controller),
                     onReturnToCart: confirming
@@ -238,7 +244,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
         'Checkout cancelled. Items returned to your cart.',
       );
     }
-    context.go(isAuction ? RouteNames.buyerHome : RouteNames.checkout);
+    context.go(isAuction ? RouteNames.buyerHome : RouteNames.cart);
   }
 
   void _scheduleReturnHandling(bool returned, bool cancelled) {
@@ -259,7 +265,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
           context,
           'Checkout cancelled. Items returned to your cart.',
         );
-        context.go(isAuction ? RouteNames.buyerHome : RouteNames.checkout);
+        context.go(isAuction ? RouteNames.buyerHome : RouteNames.cart);
         return;
       }
       unawaited(controller.handlePaymongoAppReturn(cancelled: false));
@@ -276,6 +282,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
   }
 }
 
+<<<<<<< HEAD
 class _PendingPaymentBody extends StatelessWidget {
   const _PendingPaymentBody({
     required this.order,
@@ -544,6 +551,8 @@ class _MethodTile extends StatelessWidget {
   }
 }
 
+=======
+>>>>>>> checkout-address-label-fix
 class _FailedPaymentBody extends StatelessWidget {
   const _FailedPaymentBody({
     required this.channel,
@@ -655,23 +664,3 @@ class _PaidPaymentBody extends StatelessWidget {
   }
 }
 
-class _PaymentRow extends StatelessWidget {
-  const _PaymentRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: AppTypography.caption),
-          Text(value, style: AppTypography.body),
-        ],
-      ),
-    );
-  }
-}

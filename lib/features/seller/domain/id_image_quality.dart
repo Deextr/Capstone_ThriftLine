@@ -1,3 +1,5 @@
+import 'seller_id_type.dart';
+
 /// Practical ID-presence + photo-quality gate for seller ID captures.
 ///
 /// These checks reject obviously unusable photos. They do not prove that an
@@ -34,7 +36,7 @@ class IdQualityResult {
     : passed = true,
       severity = IdQualitySeverity.pass,
       issue = null,
-      message = 'Good quality';
+      message = 'ID image accepted';
 
   factory IdQualityResult.fail(
     IdQualityIssue issue, {
@@ -79,9 +81,8 @@ class IdQualityResult {
     IdQualityIssue.slightlySoft =>
       'Image may be blurry. Please hold your phone steady and retake the photo.',
     IdQualityIssue.blurry =>
-      'Image too blurry. Please hold your phone steady and retake the photo.',
-    IdQualityIssue.glare =>
-      'Too much glare detected. Please adjust the ID and try again.',
+      'Image is too blurry. Hold the ID steady and retake.',
+    IdQualityIssue.glare => 'Avoid glare on the ID.',
     IdQualityIssue.wrongSide =>
       'Wrong side detected. Please capture the requested side of your ID.',
     IdQualityIssue.wrongIdType =>
@@ -97,12 +98,19 @@ class IdCapturePair {
   final IdQualityResult? front;
   final IdQualityResult? back;
 
-  bool get canProceed =>
-      front != null && back != null && front!.passed && back!.passed;
+  /// [requiresBack] follows the selected document. A passport, UMID, or SSS
+  /// ID can proceed from the front photograph alone.
+  bool canProceed({bool requiresBack = true}) {
+    if (front == null || !front!.passed) return false;
+    if (!requiresBack) return true;
+    return back != null && back!.passed;
+  }
 
-  IdQualityIssue? get blockingIssue {
-    if (front == null || back == null) return IdQualityIssue.missing;
+  IdQualityIssue? blockingIssue({bool requiresBack = true}) {
+    if (front == null) return IdQualityIssue.missing;
     if (!front!.passed) return front!.issue;
+    if (!requiresBack) return null;
+    if (back == null) return IdQualityIssue.missing;
     if (!back!.passed) return back!.issue;
     return null;
   }
@@ -111,6 +119,13 @@ class IdCapturePair {
 /// On-screen ID-1 guide. Must stay in sync with [IdCaptureOverlay].
 class IdCaptureGuide {
   static const double cardAspect = 1.586;
+
+  /// ICAO TD3 passport data page (125 mm × 88 mm). Not an ID-1 card.
+  static const double passportPageAspect = 1.42;
+
+  static double aspectFor(SellerIdType type) =>
+      type == SellerIdType.passport ? passportPageAspect : cardAspect;
+
   static const double maxHeightFraction = 0.62;
   static const double maxWidthFraction = 0.92;
 
@@ -143,30 +158,46 @@ enum LiveIdStatus {
 }
 
 class LiveIdAssessment {
-  const LiveIdAssessment({required this.status, this.occupancy = 0});
+  const LiveIdAssessment({
+    required this.status,
+    this.occupancy = 0,
+    this.message,
+    this.geometry,
+  });
 
   const LiveIdAssessment.searching()
     : status = LiveIdStatus.searching,
-      occupancy = 0;
+      occupancy = 0,
+      message = null,
+      geometry = null;
 
   final LiveIdStatus status;
   final double occupancy;
 
+  /// One user-facing correction. Null falls back to [feedbackMessage].
+  final String? message;
+
+  /// Geometry of the guide crop, when this assessment came from luma.
+  final IdDocumentGeometry? geometry;
+
   bool get isAligned => status == LiveIdStatus.aligned;
 
   /// User-facing copy. Avoids internal metric names.
-  String get feedbackMessage => switch (status) {
-    LiveIdStatus.searching => 'Place your ID within the frame',
-    LiveIdStatus.tooDark => 'Improve the lighting.',
-    LiveIdStatus.tooFar => 'Move your ID closer.',
-    LiveIdStatus.poorlyFramed => 'Align the edges of your ID within the frame',
-    LiveIdStatus.notId =>
-      'No ID detected. Please place your ID inside the frame and try again.',
-    LiveIdStatus.blurry => 'Make sure the ID is clear and not blurry.',
-    LiveIdStatus.wrongSide =>
-      'Wrong side detected. Please show the requested side of your ID.',
-    LiveIdStatus.aligned => 'ID detected — hold steady',
-  };
+  String get feedbackMessage =>
+      message ??
+      switch (status) {
+        LiveIdStatus.searching => 'Place your ID within the frame',
+        LiveIdStatus.tooDark => 'Improve the lighting.',
+        LiveIdStatus.tooFar => 'Move your ID closer.',
+        LiveIdStatus.poorlyFramed =>
+          'Align the edges of your ID within the frame',
+        LiveIdStatus.notId =>
+          'No ID detected. Please place your ID inside the frame and try again.',
+        LiveIdStatus.blurry => 'Make sure the ID is clear and not blurry.',
+        LiveIdStatus.wrongSide =>
+          'Wrong side detected. Please show the requested side of your ID.',
+        LiveIdStatus.aligned => 'ID detected — hold steady',
+      };
 }
 
 /// Requires several consecutive valid, still frames before auto-capture.
@@ -254,6 +285,20 @@ class OverlayNormRect {
   double get width => _max(0, right - left);
   double get height => _max(0, bottom - top);
   double get area => width * height;
+
+  /// The same region after the image is turned clockwise [quarterTurns] times.
+  OverlayNormRect rotatedClockwise(int quarterTurns) {
+    var rect = this;
+    for (var i = 0; i < quarterTurns % 4; i++) {
+      rect = OverlayNormRect(
+        left: 1 - rect.bottom,
+        top: rect.left,
+        right: 1 - rect.top,
+        bottom: rect.right,
+      );
+    }
+    return rect;
+  }
 
   bool includesBlock({
     required double left,
@@ -353,24 +398,79 @@ class DocumentEvidence {
     return true;
   }
 
+  /// A browser, social app, or image-search page. Never a credential view.
+  ///
+  /// Applies to every ID type, including Digital National ID. A gallery
+  /// "Screenshot" label is not a hint here: a screenshot of the eGov
+  /// credential is a valid way to show the Digital National ID.
+  ///
+  /// The physical PhilID back prints `www.psa.gov.ph` as a return address.
+  /// That footer is removed before the browser check. Any other address,
+  /// including `https://`, is still a screen.
+  bool get looksLikeUnrelatedScreen {
+    if (!available || recognizedText.isEmpty) return false;
+    final text = _withoutPrintedPhilIdFooter(recognizedText);
+    const hints = [
+      'http://',
+      'https://',
+      'www.',
+      'facebook',
+      'instagram',
+      'youtube',
+      'tiktok',
+      'google images',
+    ];
+    for (final hint in hints) {
+      if (text.contains(hint)) return true;
+    }
+    return RegExp(r'\bgoogle\b').hasMatch(text);
+  }
+
+  /// A phone, tablet, or monitor showing an ID, when that is reliable.
+  ///
+  /// Laminated cards also glare. This does not treat glare alone as a screen,
+  /// and it cannot reliably reject a printed photocopy of an ID.
+  /// Physical IDs use this as a rejection. Digital National ID does not,
+  /// because that credential is shown on a screen; unrelated pages are
+  /// still rejected through [looksLikeUnrelatedScreen].
+  bool get looksLikeDisplayedImage {
+    if (!available) return false;
+    if (textCoverage >= IdImageMetrics.maxScreenTextCoverage) return true;
+    final text = _withoutPrintedPhilIdFooter(recognizedText);
+    const hints = ['http://', 'https://', 'www.', 'screenshot'];
+    for (final hint in hints) {
+      if (text.contains(hint) &&
+          (textCoverage >= 0.28 || alphanumericChars >= 48)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Official return line on the physical PhilID, not a browser address bar.
+  static String _withoutPrintedPhilIdFooter(String raw) {
+    final text = raw.toLowerCase();
+    return text.replaceAll(RegExp(r'www\.\s*psa\.\s*gov\.\s*ph'), ' ');
+  }
+
   /// Strong evidence this is a selfie or a phone screen — not a printed ID.
   ///
   /// Live capture must not treat a short OCR read (barcode, ID number) as a
   /// logo veto; ID backs often OCR as one or two blocks.
   bool get isConfidentNonDocument {
     if (!available) return false;
-    if (textCoverage >= IdImageMetrics.maxScreenTextCoverage) return true;
+    if (looksLikeDisplayedImage) return true;
     if (faceCoverage > IdImageMetrics.maxSelfieFaceCoverage) return true;
     return looksLikePaymentCard;
   }
 
   /// Payment-network copy is never a government ID, even if the card is ID-1.
+  ///
+  /// Short tokens use word boundaries so "Visayas" is not read as "visa".
   bool get looksLikePaymentCard {
     if (!available || recognizedText.isEmpty) return false;
     final text = recognizedText.toLowerCase();
-    const terms = [
-      'visa',
-      'mastercard',
+    const phrases = [
       'master card',
       'american express',
       'unionpay',
@@ -378,10 +478,12 @@ class DocumentEvidence {
       'debit card',
       'credit card',
     ];
-    for (final term in terms) {
+    for (final term in phrases) {
       if (text.contains(term)) return true;
     }
-    if (RegExp(r'\bamex\b').hasMatch(text)) return true;
+    for (final term in ['visa', 'mastercard', 'amex']) {
+      if (RegExp('\\b$term\\b').hasMatch(text)) return true;
+    }
     return false;
   }
 }
@@ -423,6 +525,10 @@ class IdImageMetrics {
   static const int minInWindowChars = 8;
   static const int minInWindowBlocks = 2;
   static const double minFrontFaceCoverage = 0.04;
+
+  /// The eGov Digital National ID photo is about 4% of the card, and the
+  /// face box is smaller still once the phone showing it sits in the guide.
+  static const double minDisplayedFaceCoverage = 0.008;
   static const double maxFrontFaceCoverage = 0.38;
   static const double maxSelfieFaceCoverage = 0.42;
   static const double highOccupancy = 0.85;
@@ -433,6 +539,12 @@ class IdImageMetrics {
   static const int glareLuma = 248;
   static const double maxGlareFraction = 0.12;
 
+  /// A phone screen emits pure white, so clipped pixels are not reflections.
+  /// The eGov Digital National ID back is ~30% white around its QR even in a
+  /// clean screenshot. Only a mostly blown-out photo is rejected; a real
+  /// reflection washes out the text and fails the OCR profile instead.
+  static const double maxDisplayedGlareFraction = 0.60;
+
   static IdQualityResult evaluate({
     required List<int> luma,
     required int width,
@@ -441,6 +553,7 @@ class IdImageMetrics {
     required int sourceHeight,
     DocumentEvidence evidence = const DocumentEvidence.unknown(),
     bool requireIdPhoto = false,
+    bool allowDisplayedDocument = false,
   }) {
     if (luma.isEmpty || width < 8 || height < 8) {
       return IdQualityResult.fail(IdQualityIssue.missing);
@@ -500,6 +613,7 @@ class IdImageMetrics {
       geometry,
       evidence,
       requireIdPhoto: requireIdPhoto,
+      allowDisplayedDocument: allowDisplayedDocument,
     )) {
       return IdQualityResult.fail(IdQualityIssue.notId, debug: debug);
     }
@@ -511,7 +625,7 @@ class IdImageMetrics {
     if (geometry.occupancy >= highOccupancy &&
         geometry.borderScore < minCardBorderScore &&
         geometry.bandCount < 2 &&
-        evidence.faceCoverage < minFrontFaceCoverage &&
+        evidence.faceCoverage < _minPortrait(allowDisplayedDocument) &&
         geometry.moduleScore < liveMinModuleScore) {
       return IdQualityResult.fail(IdQualityIssue.notId, debug: debug);
     }
@@ -520,7 +634,10 @@ class IdImageMetrics {
     }
 
     final glare = _glareFraction(cropLuma);
-    if (glare >= maxGlareFraction) {
+    final maxGlare = allowDisplayedDocument
+        ? maxDisplayedGlareFraction
+        : maxGlareFraction;
+    if (glare >= maxGlare) {
       return IdQualityResult.fail(IdQualityIssue.glare, debug: debug);
     }
 
@@ -551,12 +668,13 @@ class IdImageMetrics {
     required List<int> luma,
     required int width,
     required int height,
+    double cardAspect = IdCaptureGuide.cardAspect,
   }) {
     if (luma.isEmpty || width < 8 || height < 8) {
       return const LiveIdAssessment.searching();
     }
 
-    final window = centerCardWindow(width, height);
+    final window = centerCardWindow(width, height, aspect: cardAspect);
     final crop = extractWindow(luma, width, height, window);
     final stats = _lumaStats(crop.luma);
     final geometry = measureGeometry(
@@ -585,11 +703,13 @@ class IdImageMetrics {
         return LiveIdAssessment(
           status: LiveIdStatus.aligned,
           occupancy: geometry.occupancy,
+          geometry: geometry,
         );
       }
       return LiveIdAssessment(
         status: LiveIdStatus.blurry,
         occupancy: geometry.occupancy,
+        geometry: geometry,
       );
     }
 
@@ -597,29 +717,34 @@ class IdImageMetrics {
       return LiveIdAssessment(
         status: LiveIdStatus.searching,
         occupancy: geometry.occupancy,
+        geometry: geometry,
       );
     }
     if (!lightingOk) {
       return LiveIdAssessment(
         status: LiveIdStatus.tooDark,
         occupancy: geometry.occupancy,
+        geometry: geometry,
       );
     }
     if (!filled) {
       return LiveIdAssessment(
         status: LiveIdStatus.tooFar,
         occupancy: geometry.occupancy,
+        geometry: geometry,
       );
     }
     if (geometry.poorlyFramed || !geometry.cardLikeAspect) {
       return LiveIdAssessment(
         status: LiveIdStatus.poorlyFramed,
         occupancy: geometry.occupancy,
+        geometry: geometry,
       );
     }
     return LiveIdAssessment(
       status: LiveIdStatus.notId,
       occupancy: geometry.occupancy,
+      geometry: geometry,
     );
   }
 
@@ -729,14 +854,19 @@ class IdImageMetrics {
     return (mean: mean, stddev: variance <= 0 ? 0.0 : _sqrt(variance));
   }
 
-  /// Center ID-1 window matching the on-screen capture overlay.
-  static IdCardWindow centerCardWindow(int width, int height) {
+  /// Center guide window matching the on-screen capture overlay.
+  static IdCardWindow centerCardWindow(
+    int width,
+    int height, {
+    double aspect = IdCaptureGuide.cardAspect,
+  }) {
+    final safeAspect = aspect <= 0 ? IdCaptureGuide.cardAspect : aspect;
     var holeH = (height * IdCaptureGuide.maxHeightFraction).round();
-    var holeW = (holeH * IdCaptureGuide.cardAspect).round();
+    var holeW = (holeH * safeAspect).round();
     final maxW = (width * IdCaptureGuide.maxWidthFraction).round();
     if (holeW > maxW) {
       holeW = maxW;
-      holeH = (holeW / IdCaptureGuide.cardAspect).round();
+      holeH = (holeW / safeAspect).round();
     }
     holeW = holeW.clamp(8, width);
     holeH = holeH.clamp(8, height);
@@ -747,13 +877,33 @@ class IdImageMetrics {
 
   /// Overlay hole for a portrait camera still, or the full frame when the
   /// photo is already cropped to a landscape ID.
-  static IdCardWindow documentWindow(List<int> luma, int width, int height) {
-    final guide = centerCardWindow(width, height);
+  static OverlayNormRect guideOverlay({
+    required int width,
+    required int height,
+    double aspect = IdCaptureGuide.cardAspect,
+  }) {
+    if (width < 8 || height < 8) return OverlayNormRect.full;
+    return centerCardWindow(
+      width,
+      height,
+      aspect: aspect,
+    ).toNormalized(width, height);
+  }
+
+  static IdCardWindow documentWindow(
+    List<int> luma,
+    int width,
+    int height, {
+    double aspect = IdCaptureGuide.cardAspect,
+  }) {
+    final guide = centerCardWindow(width, height, aspect: aspect);
     if (width < 16 || height < 16 || luma.length < width * height) {
       return guide;
     }
-    final aspect = width / height;
-    if (aspect < liveMinAspect || aspect > liveMaxAspect) return guide;
+    final imageAspect = width / height;
+    if (imageAspect < liveMinAspect || imageAspect > liveMaxAspect) {
+      return guide;
+    }
     final stats = _lumaStats(luma);
     final geometry = measureGeometry(luma, width, height, stats.mean);
     // Saved captures are already an ID-1 crop. A QR on the back can make the
@@ -770,8 +920,9 @@ class IdImageMetrics {
     required int imageWidth,
     required int imageHeight,
     IdDocumentGeometry? overlayGeometry,
+    double aspect = IdCaptureGuide.cardAspect,
   }) {
-    final overlay = centerCardWindow(imageWidth, imageHeight);
+    final overlay = centerCardWindow(imageWidth, imageHeight, aspect: aspect);
     final g = overlayGeometry;
     if (g == null || g.maxX <= g.minX || g.maxY <= g.minY) {
       return overlay;
@@ -826,6 +977,7 @@ class IdImageMetrics {
     IdDocumentGeometry geometry,
     DocumentEvidence evidence, {
     required bool requireIdPhoto,
+    bool allowDisplayedDocument = false,
   }) {
     if (evidence.available && evidence.faceCoverage > maxSelfieFaceCoverage) {
       return false;
@@ -841,14 +993,17 @@ class IdImageMetrics {
       return _hasPrintedCardStructure(geometry);
     }
 
-    if (evidence.textCoverage >= maxScreenTextCoverage) return false;
+    if (!allowDisplayedDocument &&
+        evidence.textCoverage >= maxScreenTextCoverage) {
+      return false;
+    }
     if (evidence.looksLikePaymentCard) return false;
 
     final hasText =
         evidence.alphanumericChars >= minInWindowChars &&
         evidence.blockCount >= minInWindowBlocks;
     final hasPortrait =
-        evidence.faceCoverage >= minFrontFaceCoverage &&
+        evidence.faceCoverage >= _minPortrait(allowDisplayedDocument) &&
         evidence.faceCoverage <= maxFrontFaceCoverage;
     final qrGuide =
         geometry.moduleScore >= liveMinModuleScore &&
@@ -861,11 +1016,25 @@ class IdImageMetrics {
         geometry.frameLight >= liveMinLightFraction;
 
     if (hasText) {
-      if (!geometry.cardLikeAspect && !qrGuide) return false;
+      // PhilID and eGov backs put a large QR beside a short text column.
+      // That code scores above the ordinary text range and can leave fewer
+      // than two text bands. The QR is not itself an ID; the caller still
+      // has to match the selected document.
+      final codeBesideText =
+          !requireIdPhoto &&
+          geometry.moduleScore > liveMaxModuleScore &&
+          geometry.moduleScore < 0.97 &&
+          (geometry.cardLikeAspect || geometry.occupancy >= 0.75);
+      if (!geometry.cardLikeAspect && !qrGuide && !codeBesideText) {
+        return false;
+      }
       if (requireIdPhoto) {
         return hasPortrait || geometry.bandCount >= 3 || qrGuide;
       }
-      return geometry.bandCount >= 2 || hasPortrait || qrGuide;
+      return geometry.bandCount >= 2 ||
+          hasPortrait ||
+          qrGuide ||
+          codeBesideText;
     }
 
     if (requireIdPhoto && hasPortrait && _hasPrintedCardStructure(geometry)) {
@@ -877,6 +1046,9 @@ class IdImageMetrics {
     // ML Kit ran. Empty OCR without a portrait or QR is not an ID.
     return false;
   }
+
+  static double _minPortrait(bool displayedDocument) =>
+      displayedDocument ? minDisplayedFaceCoverage : minFrontFaceCoverage;
 
   /// Independent card cues used for live auto-capture and OCR-less fallback.
   /// Occupancy/aspect alone is not enough — a mouse can fill the frame.
@@ -925,7 +1097,18 @@ class IdImageMetrics {
       geometry.bandCount >= liveMinBands;
 
   static bool _looksLikePrintedCardLive(IdDocumentGeometry geometry) {
-    if (geometry.poorlyFramed) return false;
+    // A PhilID back is a light ID-1 card with a large QR. That code scores
+    // above ordinary text bands and can leave fewer than three text rows.
+    // Scores near 1.0 are a solid checkerboard with no quiet text column.
+    // This only opens the OCR check.
+    final denseCodeOnLightCard =
+        geometry.moduleScore > liveMaxModuleScore &&
+        geometry.moduleScore < 0.97 &&
+        geometry.frameMean >= liveMinInteriorMean &&
+        geometry.frameLight >= liveMinLightFraction &&
+        geometry.occupancy >= 0.62 &&
+        (geometry.cardLikeAspect || geometry.occupancy >= 0.75);
+    if (geometry.poorlyFramed && !denseCodeOnLightCard) return false;
 
     final lightGuide =
         geometry.frameMean >= liveMinInteriorMean &&
@@ -938,7 +1121,8 @@ class IdImageMetrics {
     final printed =
         geometry.bandCount >= liveMinBands ||
         (geometry.moduleScore >= liveMinModuleScore &&
-            geometry.moduleScore <= liveMaxModuleScore);
+            geometry.moduleScore <= liveMaxModuleScore) ||
+        denseCodeOnLightCard;
     if (!printed) return false;
 
     final landscapeCard =
@@ -951,7 +1135,9 @@ class IdImageMetrics {
         geometry.moduleScore >= liveMinModuleScore &&
         geometry.moduleScore <= liveMaxModuleScore &&
         (geometry.occupancy >= 0.22 || geometry.bandCount >= 1);
-    if (!landscapeCard && !printedInGuide) return false;
+    if (!landscapeCard && !printedInGuide && !denseCodeOnLightCard) {
+      return false;
+    }
 
     if (geometry.cornerFill < liveMinCornerFill &&
         !_lightPrintedBands(geometry) &&

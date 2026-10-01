@@ -39,3 +39,9 @@ String? stockShortageMessage({
   }
   return null;
 }
+
+/// Auctions are bid-only. Only fixed-price listings go in the shopping cart.
+bool listingUsesShoppingCart(SellingType sellingType) {
+  return sellingType == SellingType.fixedPrice ||
+      sellingType == SellingType.both;
+}

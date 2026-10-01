@@ -12,11 +12,13 @@ class CountdownTimer extends StatefulWidget {
     required this.endTime,
     this.style,
     this.onExpired,
+    this.format = formatCountdown,
   });
 
   final DateTime endTime;
   final TextStyle? style;
   final VoidCallback? onExpired;
+  final String Function(Duration remaining) format;
 
   @override
   State<CountdownTimer> createState() => _CountdownTimerState();
@@ -78,7 +80,7 @@ class _CountdownTimerState extends State<CountdownTimer>
   @override
   Widget build(BuildContext context) {
     return Text(
-      formatCountdown(_remaining),
+      widget.format(_remaining),
       style:
           widget.style ??
           AppTypography.caption.copyWith(

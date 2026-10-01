@@ -40,8 +40,9 @@ WITH checks AS (
             AND column_name = 'trust_score') LIKE '80%',
          '20260818020000'
 
-  UNION ALL SELECT 7, 'no user still shows as Banned (<40)',
-         (SELECT count(*) FROM public.users WHERE trust_score < 40) = 0,
+  UNION ALL SELECT 7, 'trust_score stays inside 0-100',
+         (SELECT count(*) FROM public.users
+          WHERE trust_score < 0 OR trust_score > 100) = 0,
          '20260818020000'
 
   UNION ALL SELECT 8, 'all 11 categories present',

@@ -11,6 +11,7 @@ import '../../../../widgets/product_card.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../trust_safety/data/review_rules.dart';
 import '../../controllers/my_shop_controller.dart';
+import '../widgets/seller_trust_criterion_scores.dart';
 
 class MyShopScreen extends StatelessWidget {
   const MyShopScreen({super.key});
@@ -138,9 +139,19 @@ class MyShopScreen extends StatelessWidget {
                     if (user != null)
                       SellerTrustBadge(
                         trustScore: user.trustScore,
+                        trustLevel: user.trustLevel,
                         isVerified: user.isVerified,
                         shopName: user.shopName ?? user.name,
                       ),
+                    if (user?.trustBreakdown != null) ...[
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: SellerTrustCriterionScores(
+                          breakdown: user!.trustBreakdown!,
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 16),
 
@@ -247,21 +258,29 @@ class MyShopScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppConstants.spacingMd,
                   ),
-                  child: GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 0.65,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final textScale = MediaQuery.textScalerOf(
+                        context,
+                      ).scale(1);
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: ProductCard.gridDelegateFor(
+                          maxWidth: constraints.maxWidth,
+                          horizontalPadding: 0,
+                          compact: true,
+                          textScale: textScale,
                         ),
-                    itemCount: products.length,
-                    itemBuilder: (_, i) => ProductCard(
-                      product: products[i],
-                      onTap: () => context.push('/product/${products[i].id}'),
-                    ),
+                        itemCount: products.length,
+                        itemBuilder: (_, i) => ProductCard(
+                          product: products[i],
+                          compact: true,
+                          onTap: () =>
+                              context.push('/product/${products[i].id}'),
+                        ),
+                      );
+                    },
                   ),
                 ),
 

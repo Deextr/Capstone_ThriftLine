@@ -7,6 +7,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/ph_phone.dart';
 import '../../../../models/enums.dart';
+import '../../../../widgets/keyboard_safe.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/seller_orders_controller.dart';
 
@@ -120,75 +121,73 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
           onPressed: () => context.pop(),
         ),
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(AppConstants.spacingMd),
-          children: [
-            Text('Freelance / Local Rider', style: AppTypography.subheading),
-            Text(
-              'Seller Arranged · ${order == null ? '' : '#${order.orderNumber}'}',
-              style: AppTypography.caption,
-            ),
-            const SizedBox(height: 16),
-            ThriftTextField(
-              label: 'Rider name',
-              hint: 'Juan Dela Cruz',
-              controller: _name,
-              error: _nameError,
-            ),
-            const SizedBox(height: 12),
-            ThriftTextField(
-              label: 'Phone number',
-              hint: '09171234567',
-              controller: _phone,
-              keyboardType: TextInputType.phone,
-              error: _phoneError,
-            ),
-            const SizedBox(height: 12),
-            Text('Vehicle type', style: AppTypography.label),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final vehicle in DeliveryVehicleType.values)
-                  ChoiceChip(
-                    label: Text(vehicle.label),
-                    selected: _vehicle == vehicle,
-                    selectedColor: AppColors.primaryLight,
-                    onSelected: (_) => setState(() => _vehicle = vehicle),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ThriftTextField(
-              label: 'Plate number (optional)',
-              hint: 'ABC 1234',
-              controller: _plate,
-            ),
-            const SizedBox(height: 12),
-            ThriftTextField(
-              label: 'Estimated delivery (optional)',
-              hint: _estimated == null
-                  ? 'Choose date and time'
-                  : _estimated.toString(),
-              readOnly: true,
-              onTap: _pickEstimated,
-            ),
-            const SizedBox(height: 12),
-            ThriftTextField(
-              label: 'Delivery notes (optional)',
-              hint: 'Meet at the gate, call on arrival…',
-              controller: _notes,
-              maxLines: 3,
-            ),
-            const SizedBox(height: 24),
-            ThriftButton(
-              label: controller.isUpdatingDelivery ? 'Saving…' : 'Save rider',
-              onPressed: controller.isUpdatingDelivery ? null : _submit,
-            ),
-          ],
+      body: KeyboardSafeForm(
+        padding: const EdgeInsets.all(AppConstants.spacingMd),
+        action: ThriftButton(
+          label: controller.isUpdatingDelivery ? 'Saving…' : 'Save rider',
+          onPressed: controller.isUpdatingDelivery ? null : _submit,
         ),
+        children: [
+          Text('Freelance / Local Rider', style: AppTypography.subheading),
+          Text(
+            'Seller Arranged · ${order == null ? '' : '#${order.orderNumber}'}',
+            style: AppTypography.caption,
+          ),
+          const SizedBox(height: 16),
+          ThriftTextField(
+            label: 'Rider name',
+            hint: 'Juan Dela Cruz',
+            controller: _name,
+            error: _nameError,
+          ),
+          const SizedBox(height: 12),
+          ThriftTextField(
+            label: 'Phone number',
+            hint: '09171234567',
+            controller: _phone,
+            keyboardType: TextInputType.phone,
+            error: _phoneError,
+          ),
+          const SizedBox(height: 12),
+          Text('Vehicle type', style: AppTypography.label),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final vehicle in DeliveryVehicleType.values)
+                ChoiceChip(
+                  label: Text(vehicle.label),
+                  selected: _vehicle == vehicle,
+                  selectedColor: AppColors.primaryLight,
+                  onSelected: (_) => setState(() => _vehicle = vehicle),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ThriftTextField(
+            label: 'Plate number (optional)',
+            hint: 'ABC 1234',
+            controller: _plate,
+          ),
+          const SizedBox(height: 12),
+          ThriftTextField(
+            label: 'Estimated delivery (optional)',
+            hint: _estimated == null
+                ? 'Choose date and time'
+                : _estimated.toString(),
+            readOnly: true,
+            onTap: _pickEstimated,
+          ),
+          const SizedBox(height: 12),
+          ThriftTextField(
+            label: 'Delivery notes (optional)',
+            hint: 'Meet at the gate, call on arrival…',
+            controller: _notes,
+            maxLines: 3,
+          ),
+          const SizedBox(height: 12),
+        ],
       ),
     );
   }

@@ -1,39 +1,109 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/extensions.dart';
 import '../../../../providers/auth_provider.dart';
+import '../../domain/trusted_device.dart';
 
-/// Shows a confirmation dialog and logs the user out on confirm.
+enum LogoutChoice { cancel, logout, forgetDevice }
+
+/// Confirms logout.
+///
+/// Email/password accounts see the 7-day trusted-device options.
+/// Google Sign-In never uses that email code, so those accounts get a
+/// simple confirmation.
 Future<void> confirmAndLogout(BuildContext context) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Log out'),
-      content: const Text('Are you sure you want to log out of Thriftline?'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Log out'),
-        ),
-      ],
-    ),
+  final auth = context.read<AuthProvider>();
+  final emailPassword = showEmailTrustedDeviceLogout(
+    usesEmailPasswordAuth: auth.usesEmailPasswordAuth,
+  );
+  debugPrint(
+    'Logout: trustedDeviceOptions=$emailPassword '
+    'identities=${auth.user?.authIdentityProviders} '
+    'buyerSellerMode=${auth.activeAccount.name}',
   );
 
-  if (confirmed != true || !context.mounted) return;
+  final choice = await showDialog<LogoutChoice>(
+    context: context,
+    builder: (context) {
+      if (!emailPassword) {
+        return AlertDialog(
+          title: const Text('Log out'),
+          content: const Text(
+            'Are you sure you want to log out of ThriftLine? '
+            'You will sign in with Google again next time.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(LogoutChoice.cancel),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(LogoutChoice.logout),
+              child: const Text('Log out'),
+            ),
+          ],
+        );
+      }
 
-  await context.read<AuthProvider>().logout();
+      return AlertDialog(
+        title: const Text('Log out'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Logging out keeps this phone trusted until 7 days after the last '
+              'email code. You still need your password next time, and the code '
+              'can be skipped while that trust is valid.',
+            ),
+            const SizedBox(height: AppConstants.spacingLg),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(LogoutChoice.logout),
+              child: const Text('Log out'),
+            ),
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(context).pop(LogoutChoice.forgetDevice),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Log out and forget this device'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(LogoutChoice.cancel),
+            child: const Text('Cancel'),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (choice == null || choice == LogoutChoice.cancel || !context.mounted) {
+    return;
+  }
+
+  final error = await context.read<AuthProvider>().logout(
+    forgetDevice: choice == LogoutChoice.forgetDevice,
+  );
 
   if (!context.mounted) return;
+  if (error != null) {
+    context.showSnackBar(error, isError: true);
+    return;
+  }
 
-  context.showSnackBar('You have been logged out.');
+  context.showSnackBar(
+    choice == LogoutChoice.forgetDevice
+        ? 'Logged out. This phone will ask for an email code next time.'
+        : 'You have been logged out.',
+  );
   context.go(RouteNames.login);
 }
 

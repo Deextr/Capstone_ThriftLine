@@ -2,9 +2,12 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 
+import '../domain/id_document_classification.dart';
 import '../domain/id_image_quality.dart';
+import '../domain/seller_id_type.dart';
 import 'id_bitmap_luma.dart';
 import 'id_document_evidence_reader.dart';
+import 'id_photo_cropper.dart';
 
 /// Decodes a captured ID photo and runs document-presence + quality checks.
 class IdImageQualityAnalyzer {
@@ -13,9 +16,79 @@ class IdImageQualityAnalyzer {
 
   final IdDocumentEvidenceReader _evidenceReader;
 
+  /// Clockwise quarter turns tried for an ID shown on a screen. The eGov app
+  /// draws the card sideways, so the phone may be held at any angle.
+  static const List<int> screenQuarterTurns = [0, 2, 1, 3];
+
+  /// [analyze], retried at other orientations for [SellerIdType.presentedOnScreen]
+  /// when the read fails for a reason a turn can fix. Returns the photo in
+  /// the orientation that passed so review and upload stay upright.
+  Future<({Uint8List bytes, IdQualityResult quality, int quarterTurns})>
+  analyzeOriented(
+    Uint8List bytes, {
+    required SellerIdType expectedType,
+    required IdCaptureSide expectedSide,
+    bool requireIdPhoto = false,
+    bool sessionTypeConfirmed = false,
+    int preferredQuarterTurns = 0,
+  }) async {
+    final order = expectedType.presentedOnScreen
+        ? [
+            preferredQuarterTurns % 4,
+            ...screenQuarterTurns.where((t) => t != preferredQuarterTurns % 4),
+          ]
+        : const [0];
+
+    ({Uint8List bytes, IdQualityResult quality, int quarterTurns})? best;
+    for (final turns in order) {
+      final candidate = await IdPhotoCropper.rotateClockwise(bytes, turns);
+      if (candidate == null) continue;
+      final quality = await analyze(
+        candidate,
+        requireIdPhoto: requireIdPhoto,
+        expectedType: expectedType,
+        expectedSide: expectedSide,
+        sessionTypeConfirmed: sessionTypeConfirmed,
+      );
+      final attempt = (bytes: candidate, quality: quality, quarterTurns: turns);
+      if (quality.passed) return attempt;
+      if (best == null) {
+        best = attempt;
+        if (!_turnMayHelp(quality.issue)) break;
+      } else if (_confidence(quality.issue) > _confidence(best.quality.issue)) {
+        best = attempt;
+      }
+    }
+    return best ??
+        (
+          bytes: bytes,
+          quality: IdQualityResult.fail(IdQualityIssue.uncertain),
+          quarterTurns: 0,
+        );
+  }
+
+  /// Blur, lighting, and framing look the same at every orientation.
+  static bool _turnMayHelp(IdQualityIssue? issue) => switch (issue) {
+    IdQualityIssue.notId ||
+    IdQualityIssue.uncertain ||
+    IdQualityIssue.wrongIdType ||
+    IdQualityIssue.wrongSide => true,
+    _ => false,
+  };
+
+  /// A confident read at any orientation beats "not recognized".
+  static int _confidence(IdQualityIssue? issue) => switch (issue) {
+    IdQualityIssue.wrongSide => 2,
+    IdQualityIssue.wrongIdType => 1,
+    _ => 0,
+  };
+
   Future<IdQualityResult> analyze(
     Uint8List? bytes, {
     bool requireIdPhoto = false,
+    SellerIdType? expectedType,
+    IdCaptureSide? expectedSide,
+    bool sessionTypeConfirmed = false,
   }) async {
     if (bytes == null || bytes.isEmpty) {
       return IdQualityResult.fail(IdQualityIssue.missing);
@@ -62,6 +135,12 @@ class IdImageQualityAnalyzer {
         }
       }
 
+      final geometry = IdImageMetrics.measureGeometry(
+        crop.luma,
+        crop.width,
+        crop.height,
+        mean,
+      );
       final quality = IdImageMetrics.evaluate(
         luma: sampled.luma,
         width: sampled.width,
@@ -70,18 +149,30 @@ class IdImageQualityAnalyzer {
         sourceHeight: sampled.nativeHeight,
         evidence: evidence,
         requireIdPhoto: requireIdPhoto,
+        allowDisplayedDocument: expectedType?.presentedOnScreen ?? false,
       );
+      final gated = expectedType == null || expectedSide == null
+          ? quality
+          : IdDocumentClassifier.apply(
+              quality: quality,
+              evidence: evidence,
+              geometry: geometry,
+              expectedType: expectedType,
+              expectedSide: expectedSide,
+              sessionTypeConfirmed: sessionTypeConfirmed,
+            );
       if (kDebugMode) {
         debugPrint(
-          'ID_CAPTURE jpeg id=${quality.passed ? 'yes' : 'no'} '
-          'issue=${quality.issue?.name ?? 'none'} '
-          'ocrOn=${evidence.available} '
-          'ocrChars=${evidence.alphanumericChars} '
-          'face=${evidence.faceCoverage.toStringAsFixed(2)} '
-          'debug=${quality.debug ?? ''}',
+          'ID_CAPTURE jpeg id=${gated.passed ? 'yes' : 'no'} '
+          'issue=${gated.issue?.name ?? 'none'} '
+          'expected_type=${expectedType?.storageValue ?? 'none'} '
+          'expected_side=${expectedSide?.name ?? 'none'} '
+          'ocr_on=${evidence.available} '
+          'ocr_chars=${evidence.alphanumericChars} '
+          'face=${evidence.faceCoverage.toStringAsFixed(2)}',
         );
       }
-      return quality;
+      return gated;
     } catch (_) {
       return IdQualityResult.fail(IdQualityIssue.notId);
     } finally {

@@ -3,25 +3,37 @@ import 'package:thriftline/features/seller/domain/seller_id_type.dart';
 
 void main() {
   group('SellerIdType', () {
-    test('exposes only the five allowed labels', () {
-      expect(
-        SellerIdType.values.map((type) => type.label).toList(),
-        [
-          'National ID',
-          "Driver's License",
-          'Passport',
-          'SSS ID',
-          'UMID ID',
-        ],
-      );
+    test('exposes only the six allowed labels', () {
+      expect(SellerIdType.values.map((type) => type.label).toList(), [
+        'National ID',
+        'Digital National ID',
+        "Driver's License",
+        'Passport',
+        'SSS ID',
+        'UMID',
+      ]);
     });
 
     test('does not include Voter\'s ID, PhilHealth ID, or Student ID', () {
-      final labels = SellerIdType.values.map((type) => type.label.toLowerCase());
+      final labels = SellerIdType.values.map(
+        (type) => type.label.toLowerCase(),
+      );
       expect(labels.any((label) => label.contains('voter')), isFalse);
       expect(labels.any((label) => label.contains('philhealth')), isFalse);
       expect(labels.any((label) => label.contains('student')), isFalse);
     });
+
+    test(
+      'only PhilID, Digital National ID, and a license need a back photo',
+      () {
+        expect(SellerIdType.nationalId.requiresBackCapture, isTrue);
+        expect(SellerIdType.digitalNationalId.requiresBackCapture, isTrue);
+        expect(SellerIdType.driversLicense.requiresBackCapture, isTrue);
+        expect(SellerIdType.passport.requiresBackCapture, isFalse);
+        expect(SellerIdType.sssId.requiresBackCapture, isFalse);
+        expect(SellerIdType.umidId.requiresBackCapture, isFalse);
+      },
+    );
 
     test('parses allowed storage values', () {
       expect(SellerIdType.tryParse('national_id'), SellerIdType.nationalId);
@@ -30,7 +42,10 @@ void main() {
     });
 
     test('does not treat unspecified storage as a user-selected type', () {
-      expect(SellerIdType.tryParse(SellerIdType.unspecifiedStorageValue), isNull);
+      expect(
+        SellerIdType.tryParse(SellerIdType.unspecifiedStorageValue),
+        isNull,
+      );
     });
 
     test('rejects prohibited and unknown types', () {

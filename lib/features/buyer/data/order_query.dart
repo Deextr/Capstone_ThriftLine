@@ -95,8 +95,39 @@ Future<void> syncMyUnpaidCheckouts(SupabaseService supabase) async {
   }
 }
 
+/// Restores abandoned fixed-price checkouts to the cart.
+/// Do not call this on the payment screen — it would cancel the open checkout.
+Future<void> restoreAbandonedFixedPriceCheckouts(
+  SupabaseService supabase,
+) async {
+  try {
+    await supabase.client.rpc('restore_my_unpaid_fixed_price_checkouts');
+  } catch (e) {
+    debugPrint('restore_my_unpaid_fixed_price_checkouts error: $e');
+  }
+}
+
 List<OrderModel> buyerAwaitingPayment(Iterable<OrderModel> orders) {
-  return orders.where((order) => order.needsBuyerPayment).toList();
+  return orders.where((order) => order.showsAsAwaitingPayment).toList();
+}
+
+Future<List<OrderModel>> fetchOrdersForCheckoutGroup(
+  SupabaseService supabase,
+  String checkoutGroupId, {
+  String? buyerId,
+}) async {
+  var query = supabase.client
+      .from('orders')
+      .select(kOrderSelect)
+      .eq('checkout_group_id', checkoutGroupId);
+  if (buyerId != null && buyerId.isNotEmpty) {
+    query = query.eq('buyer_id', buyerId);
+  }
+  final rows = await query.order('created_at', ascending: true);
+  return hydrateOrders(
+    supabase,
+    (rows as List<dynamic>).map((r) => r as Map<String, dynamic>).toList(),
+  );
 }
 
 Future<List<OrderModel>> fetchOrdersForBuyer(

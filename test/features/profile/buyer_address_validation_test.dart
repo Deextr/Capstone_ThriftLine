@@ -21,6 +21,29 @@ void main() {
   });
 
   group('buyerAddressFormError', () {
+    test('rejects invalid phone contact formats', () {
+      expect(
+        buyerAddressFormError(
+          recipientName: 'Juan',
+          phoneNumber: '9171234567',
+          streetAddress: '123 Street',
+          barangay: agdao,
+          allowedBarangays: [agdao],
+        ),
+        'Enter a valid 11-digit mobile number starting with 09.',
+      );
+      expect(
+        buyerAddressFormError(
+          recipientName: 'Juan',
+          phoneNumber: '0917-123-4567',
+          streetAddress: '123 Street',
+          barangay: agdao,
+          allowedBarangays: [agdao],
+        ),
+        'Enter a valid 11-digit mobile number starting with 09.',
+      );
+    });
+
     test('requires name, phone, street, and a loaded Davao barangay', () {
       expect(
         buyerAddressFormError(

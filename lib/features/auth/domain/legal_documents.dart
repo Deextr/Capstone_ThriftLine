@@ -111,8 +111,7 @@ abstract final class LegalDocuments {
   static const LegalDocument privacy = LegalDocument(
     type: LegalDocumentType.privacy,
     title: 'Privacy Policy',
-    summary:
-        'How ThriftLine collects, uses, and protects your personal data.',
+    summary: 'How ThriftLine collects, uses, and protects your personal data.',
     sections: [
       LegalSection(
         heading: '1. Data Privacy Notice',
@@ -250,13 +249,12 @@ abstract final class LegalDocuments {
     ],
   );
 
-  static LegalDocument byType(LegalDocumentType type) =>
-      switch (type) {
-        LegalDocumentType.terms => terms,
-        LegalDocumentType.privacy => privacy,
-        LegalDocumentType.about => about,
-        LegalDocumentType.faq => faq,
-      };
+  static LegalDocument byType(LegalDocumentType type) => switch (type) {
+    LegalDocumentType.terms => terms,
+    LegalDocumentType.privacy => privacy,
+    LegalDocumentType.about => about,
+    LegalDocumentType.faq => faq,
+  };
 }
 
 /// A user's explicit acceptance of the Terms and Conditions and the Privacy

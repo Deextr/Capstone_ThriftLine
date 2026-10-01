@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/stock_limits.dart';
+import '../data/cart_shop_group.dart';
 import '../data/checkout_totals.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/address_model.dart';
@@ -18,10 +19,15 @@ class CheckoutController extends ChangeNotifier {
     required CartProvider cart,
     AddressService? addresses,
     this.buyNowProductId,
+    List<String> selectedProductIds = const [],
   }) : _supabase = supabase,
        _auth = auth,
        _cart = cart,
-       _addresses = addresses ?? AddressService(supabase) {
+       _addresses = addresses ?? AddressService(supabase),
+       _initialSelectedIds = selectedProductIds
+           .map((id) => id.trim())
+           .where((id) => id.isNotEmpty)
+           .toList() {
     _initSelection();
     load();
   }
@@ -31,6 +37,7 @@ class CheckoutController extends ChangeNotifier {
   final CartProvider _cart;
   final AddressService _addresses;
   final String? buyNowProductId;
+  final List<String> _initialSelectedIds;
 
   List<AddressModel> _addressBook = [];
   AddressModel? _selectedAddress;
@@ -49,6 +56,9 @@ class CheckoutController extends ChangeNotifier {
   bool get isCancellingCheckout => _isCancellingCheckout;
   String? get errorMessage => _errorMessage;
   bool get hasAddress => _selectedAddress != null;
+
+  bool get hasValidDeliveryPhone =>
+      _selectedAddress?.hasValidPhoneContact ?? false;
   Set<String> get selectedProductIds => Set.unmodifiable(_selectedProductIds);
 
   String? get scopedProductId {
@@ -68,6 +78,8 @@ class CheckoutController extends ChangeNotifier {
 
   /// Kept for compatibility — returns all cart items available for checkout.
   List<CartItem> get checkoutItems => allCartItems;
+
+  List<CartShopGroup> get checkoutShops => groupCartItemsByShop(selectedItems);
 
   /// Cart items grouped by seller ID.
   Map<String, List<CartItem>> get itemsBySeller {
@@ -93,8 +105,9 @@ class CheckoutController extends ChangeNotifier {
   }
 
   /// The list of items currently checked for payment.
-  List<CartItem> get selectedItems =>
-      allCartItems.where((i) => _selectedProductIds.contains(i.product.id)).toList();
+  List<CartItem> get selectedItems => allCartItems
+      .where((i) => _selectedProductIds.contains(i.product.id))
+      .toList();
 
   int get selectedCount => selectedItems.length;
 
@@ -104,22 +117,24 @@ class CheckoutController extends ChangeNotifier {
   double get subtotal =>
       selectedItems.fold(0.0, (sum, item) => sum + item.subtotal);
 
-  double get shippingFee =>
-      selectedItems.isEmpty ? 0 : kCheckoutShippingPerSeller;
+  double get shippingFee => checkoutShippingFee(
+    checkoutSellerCount(selectedItems.map((item) => item.product.sellerId)),
+  );
 
   double get platformFee => checkoutPlatformFee(subtotal);
 
   double get total => checkoutTotal(
-        subtotal: subtotal,
-        shippingFee: shippingFee,
-        platformFee: platformFee,
-      );
+    subtotal: subtotal,
+    shippingFee: shippingFee,
+    platformFee: platformFee,
+  );
 
   bool get hasUnpaidCheckouts => _awaitingPayment.isNotEmpty;
 
   bool get canSubmit =>
       selectedItems.isNotEmpty &&
       hasAddress &&
+      hasValidDeliveryPhone &&
       !_isSubmitting &&
       !hasUnpaidCheckouts;
 
@@ -138,11 +153,6 @@ class CheckoutController extends ChangeNotifier {
     if (_selectedProductIds.contains(productId)) {
       _selectedProductIds.remove(productId);
     } else {
-      final currentSeller = selectedSellerId;
-      if (currentSeller != null && currentSeller != item.product.sellerId) {
-        // Orders are placed per seller — switch selection to this seller
-        _selectedProductIds.clear();
-      }
       _selectedProductIds.add(productId);
     }
     _errorMessage = null;
@@ -151,19 +161,20 @@ class CheckoutController extends ChangeNotifier {
 
   /// Selects or deselects all items for a given seller.
   void toggleSellerSelection(String sellerId) {
-    final sellerItems =
-        allCartItems.where((i) => i.product.sellerId == sellerId).toList();
+    final sellerItems = allCartItems
+        .where((i) => i.product.sellerId == sellerId)
+        .toList();
     if (sellerItems.isEmpty) return;
 
-    final allSelected =
-        sellerItems.every((i) => _selectedProductIds.contains(i.product.id));
+    final allSelected = sellerItems.every(
+      (i) => _selectedProductIds.contains(i.product.id),
+    );
 
     if (allSelected) {
       for (final i in sellerItems) {
         _selectedProductIds.remove(i.product.id);
       }
     } else {
-      _selectedProductIds.clear();
       for (final i in sellerItems) {
         _selectedProductIds.add(i.product.id);
       }
@@ -185,6 +196,12 @@ class CheckoutController extends ChangeNotifier {
     // Retain only IDs that are still in the cart
     final availableIds = allCartItems.map((i) => i.product.id).toSet();
     _selectedProductIds.removeWhere((id) => !availableIds.contains(id));
+
+    if (_selectedProductIds.isEmpty && _initialSelectedIds.isNotEmpty) {
+      for (final id in _initialSelectedIds) {
+        if (availableIds.contains(id)) _selectedProductIds.add(id);
+      }
+    }
 
     // If nothing currently selected and cart has items:
     if (_selectedProductIds.isEmpty && allCartItems.isNotEmpty) {
@@ -208,6 +225,7 @@ class CheckoutController extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
+      await restoreAbandonedFixedPriceCheckouts(_supabase);
       await syncMyUnpaidCheckouts(_supabase);
       await _cart.refresh();
       await _loadAwaitingPayment();
@@ -245,6 +263,23 @@ class CheckoutController extends ChangeNotifier {
 
   void selectAddress(AddressModel address) {
     _selectedAddress = address;
+    notifyListeners();
+  }
+
+  Future<void> reloadAddresses() async {
+    try {
+      _addressBook = await _addresses.listMine();
+      _selectedAddress = _addressBook.isEmpty
+          ? null
+          : _addressBook.firstWhere(
+              (a) => a.isDefault,
+              orElse: () => _addressBook.first,
+            );
+      _errorMessage = null;
+    } catch (e) {
+      debugPrint('CheckoutController.reloadAddresses error: $e');
+      _errorMessage = 'Could not load your delivery addresses.';
+    }
     notifyListeners();
   }
 
@@ -316,6 +351,13 @@ class CheckoutController extends ChangeNotifier {
         error: 'Add a delivery address before checkout.',
       );
     }
+    if (!address.hasValidPhoneContact) {
+      const error =
+          'Update the phone contact on your delivery address '
+          '(09XXXXXXXXX) before checkout.';
+      _errorMessage = error;
+      return (orderId: null, count: 0, error: error);
+    }
     if (_isSubmitting) {
       return (
         orderId: null,
@@ -324,8 +366,7 @@ class CheckoutController extends ChangeNotifier {
       );
     }
 
-    final items = selectedItems;
-    if (items.isEmpty) {
+    if (selectedItems.isEmpty) {
       const error = 'Please check at least one item to check out.';
       _errorMessage = error;
       return (orderId: null, count: 0, error: error);
@@ -338,7 +379,7 @@ class CheckoutController extends ChangeNotifier {
       await _loadAwaitingPayment();
       if (_awaitingPayment.isNotEmpty) {
         const error =
-            'You have an unpaid checkout. Pay or cancel it before placing a new order.';
+            'You have an auction win that still needs payment. Pay that first.';
         _errorMessage = error;
         return (orderId: null, count: 0, error: error);
       }
@@ -365,13 +406,17 @@ class CheckoutController extends ChangeNotifier {
       }
 
       final params = <String, dynamic>{'p_address_id': address.id};
-      if (currentSelected.length == 1) {
-        params['p_product_id'] = currentSelected.first.product.id;
+      final ids = currentSelected.map((item) => item.product.id).toList();
+      final multiShop = groupCartItemsByShop(currentSelected).length > 1;
+      if (ids.length > 1 || multiShop) {
+        params['p_product_ids'] = ids;
+      } else if (ids.length == 1) {
+        params['p_product_id'] = ids.first;
       }
-      final rpcRes = await _supabase.client.rpc(
-        'checkout_cart',
-        params: params,
-      );
+      final rpcName = (ids.length > 1 || multiShop)
+          ? 'checkout_selected_cart'
+          : 'checkout_cart';
+      final rpcRes = await _supabase.client.rpc(rpcName, params: params);
       if (!supabaseRpcSuccess(rpcRes)) {
         final error = supabaseRpcError(
           rpcRes,

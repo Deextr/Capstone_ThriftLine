@@ -57,6 +57,31 @@ class IdCameraInputImage {
     }
   }
 
+  /// The same frame read after [quarterTurns] extra clockwise turns.
+  ///
+  /// A phone showing a Digital National ID may be held sideways or upside
+  /// down, which ML Kit text recognition does not correct by itself.
+  static InputImage? turned(InputImage input, int quarterTurns) {
+    final turns = quarterTurns % 4;
+    if (turns == 0) return input;
+    final bytes = input.bytes;
+    final metadata = input.metadata;
+    if (bytes == null || metadata == null) return null;
+    final rotation = InputImageRotationValue.fromRawValue(
+      (metadata.rotation.rawValue + turns * 90) % 360,
+    );
+    if (rotation == null) return null;
+    return InputImage.fromBytes(
+      bytes: bytes,
+      metadata: InputImageMetadata(
+        size: metadata.size,
+        rotation: rotation,
+        format: metadata.format,
+        bytesPerRow: metadata.bytesPerRow,
+      ),
+    );
+  }
+
   static Uint8List _copiedBytes(CameraImage image) {
     if (image.planes.length == 1) {
       return Uint8List.fromList(image.planes.first.bytes);

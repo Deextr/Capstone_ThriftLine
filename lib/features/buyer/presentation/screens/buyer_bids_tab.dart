@@ -17,6 +17,7 @@ import '../../../../widgets/bid_card.dart';
 import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/buyer_bids_controller.dart';
+import '../widgets/payment_deadline_text.dart';
 
 class BuyerBidsTab extends StatefulWidget {
   const BuyerBidsTab({super.key});
@@ -235,14 +236,21 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
           Widget cardContent;
 
           if (tab == BidTab.won) {
+            final isExpired = bid.paymentDueAt != null &&
+                bid.paymentDueAt!.isBefore(DateTime.now());
+
             cardContent = ThriftCard(
               padding: EdgeInsets.zero,
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.05),
+                  color: isExpired
+                      ? AppColors.surfaceVariant.withValues(alpha: 0.3)
+                      : AppColors.success.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(AppConstants.radiusLg),
                   border: Border.all(
-                    color: AppColors.success.withValues(alpha: 0.2),
+                    color: isExpired
+                        ? AppColors.border
+                        : AppColors.success.withValues(alpha: 0.2),
                   ),
                 ),
                 padding: const EdgeInsets.all(AppConstants.spacingMd),
@@ -298,11 +306,19 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'You won this auction!',
+                                isExpired
+                                    ? 'Payment window expired. Order cancelled.'
+                                    : 'You won this auction. Payment is unpaid.',
                                 style: AppTypography.caption.copyWith(
-                                  color: AppColors.success,
+                                  color: isExpired
+                                      ? AppColors.textSecondary
+                                      : AppColors.success,
                                 ),
                               ),
+                              if (bid.paymentDueAt != null) ...[
+                                const SizedBox(height: 4),
+                                PaymentDeadlineText(due: bid.paymentDueAt!),
+                              ],
                             ],
                           ),
                         ),
@@ -310,31 +326,32 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                     ),
                     const SizedBox(height: 12),
                     ThriftButton(
-                      label: 'View order',
-                      onPressed: () async {
-                        final auctionId = bid.auctionId;
-                        if (auctionId == null || auctionId.isEmpty) {
-                          showThriftSnackBar(
-                            context,
-                            'This win has no auction yet. Pull to refresh.',
-                            isError: true,
-                          );
-                          return;
-                        }
-                        final orderId = await bidsCtrl.orderIdForWonAuction(
-                          auctionId,
-                        );
-                        if (!mounted) return;
-                        if (orderId == null) {
-                          showThriftSnackBar(
-                            context,
-                            'Your pending order is not ready yet. Pull to refresh.',
-                            isError: true,
-                          );
-                          return;
-                        }
-                        context.push(RouteNames.paymentForOrder(orderId));
-                      },
+                      label: isExpired ? 'Payment expired' : 'Pay now',
+                      onPressed: isExpired
+                          ? null
+                          : () async {
+                              final auctionId = bid.auctionId;
+                              if (auctionId == null || auctionId.isEmpty) {
+                                showThriftSnackBar(
+                                  context,
+                                  'This win has no auction yet. Pull to refresh.',
+                                  isError: true,
+                                );
+                                return;
+                              }
+                              final orderId = await bidsCtrl
+                                  .orderIdForWonAuction(auctionId);
+                              if (!mounted) return;
+                              if (orderId == null) {
+                                showThriftSnackBar(
+                                  context,
+                                  'Your pending order is not ready yet. Pull to refresh.',
+                                  isError: true,
+                                );
+                                return;
+                              }
+                              context.push(RouteNames.paymentForOrder(orderId));
+                            },
                     ),
                   ],
                 ),

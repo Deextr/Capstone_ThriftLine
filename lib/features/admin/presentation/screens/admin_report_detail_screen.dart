@@ -24,7 +24,7 @@ class AdminReportDetailScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Report'),
+        title: const Text('Report details'),
         leading: IconButton(
           tooltip: 'Back',
           icon: const Icon(Icons.arrow_back),
@@ -33,79 +33,125 @@ class AdminReportDetailScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: controller.isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const AdminDetailSkeleton()
             : report == null
             ? AdminErrorState(
-                message: controller.errorMessage ?? 'Report not found.',
+                message:
+                    controller.errorMessage ?? 'Unable to load this report.',
                 onRetry: () => context.read<AdminReportsController>().load(),
               )
             : ListView(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
                 children: [
-                  AdminStatusChip(
-                    status: report.status,
-                    label: reportStatusLabel(report.status),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: AdminStatusChip(
+                      status: report.status,
+                      label: reportStatusLabel(report.status),
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   Text(
                     reportReasonLabel(report.category),
                     style: AppTypography.heading,
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
-                    formatCompactDate(report.createdAt),
+                    '${adminReportKindOf(category: report.category, orderId: report.orderId)} report · #${adminReportShortId(report.id)}',
                     style: AppTypography.caption,
                   ),
-                  const SizedBox(height: 28),
-                  AdminPersonBlock(
-                    label: 'Reported user',
-                    name: report.reportedDisplayName,
-                    handle: adminHandle(
-                      report.reportedUsername,
-                      report.reportedDisplayName,
-                    ),
-                    role: accountRoleLabel(report.reportedRole),
-                    shopName: report.reportedShopName,
-                  ),
-                  AdminPersonBlock(
-                    label: 'Reported by',
-                    name: report.reporterDisplayName,
-                    handle: adminHandle(
-                      report.reporterUsername,
-                      report.reporterDisplayName,
-                    ),
-                    role: accountRoleLabel(report.reporterRole),
+                  const SizedBox(height: 20),
+                  AdminDetailBlock(
+                    label: 'Report information',
+                    children: [
+                      AdminKeyValueRow(
+                        label: 'Report ID',
+                        value: '#${adminReportShortId(report.id)}',
+                      ),
+                      AdminKeyValueRow(
+                        label: 'Type',
+                        value: adminReportKindOf(
+                          category: report.category,
+                          orderId: report.orderId,
+                        ),
+                      ),
+                      AdminKeyValueRow(
+                        label: 'Reason',
+                        value: reportReasonLabel(report.category),
+                      ),
+                      AdminKeyValueRow(
+                        label: 'Submitted',
+                        value: formatFullDate(report.createdAt),
+                      ),
+                      AdminKeyValueRow(
+                        label: 'Status',
+                        value: reportStatusLabel(report.status),
+                      ),
+                    ],
                   ),
                   AdminDetailBlock(
-                    label: 'What happened',
-                    children: [Text(report.details, style: AppTypography.body)],
+                    label: 'People involved',
+                    children: [
+                      AdminPersonBlock(
+                        embedded: true,
+                        label: 'Reporter',
+                        name: report.reporterDisplayName,
+                        handle: adminHandle(
+                          report.reporterUsername,
+                          report.reporterDisplayName,
+                        ),
+                        role: accountRoleLabel(report.reporterRole),
+                      ),
+                      const SizedBox(height: 16),
+                      AdminPersonBlock(
+                        embedded: true,
+                        label: 'Reported user',
+                        name: report.reportedDisplayName,
+                        handle: adminHandle(
+                          report.reportedUsername,
+                          report.reportedDisplayName,
+                        ),
+                        role: accountRoleLabel(report.reportedRole),
+                        shopName: report.reportedShopName,
+                      ),
+                    ],
                   ),
                   if (report.orderId != null)
                     AdminDetailBlock(
-                      label: 'Related order',
+                      label: 'Order information',
                       children: [
-                        Text(
-                          order != null
-                              ? 'Order #${order.orderNumber}'
+                        AdminKeyValueRow(
+                          label: 'Order',
+                          value: order != null
+                              ? '#${order.orderNumber}'
                               : report.orderNumber == null
                               ? 'Related order'
-                              : 'Order #${report.orderNumber}',
-                          style: AppTypography.subheading,
+                              : '#${report.orderNumber}',
                         ),
                         if ((order?.productTitle ?? report.orderTitle)
                                 ?.isNotEmpty ==
                             true)
-                          Text(
-                            order?.productTitle ?? report.orderTitle!,
-                            style: AppTypography.body,
+                          AdminKeyValueRow(
+                            label: 'Item',
+                            value: order?.productTitle ?? report.orderTitle!,
                           ),
                         if (order != null)
-                          Text(
-                            '${orderStatusLabel(order.status)} · ${formatCompactDate(order.createdAt)}',
-                            style: AppTypography.caption,
+                          AdminKeyValueRow(
+                            label: 'Order status',
+                            value:
+                                '${orderStatusLabel(order.status)} · ${formatFullDate(order.createdAt)}',
+                          ),
+                        if (order != null)
+                          AdminKeyValueRow(
+                            label: 'Amount',
+                            value: formatCurrency(order.total),
                           ),
                       ],
                     ),
+                  AdminDetailBlock(
+                    label: 'Description',
+                    children: [Text(report.details, style: AppTypography.body)],
+                  ),
                   AdminDetailBlock(
                     label: 'Evidence',
                     children: [
@@ -122,12 +168,22 @@ class AdminReportDetailScreen extends StatelessWidget {
                     _DecisionForm(controller: controller)
                   else
                     AdminDetailBlock(
-                      label: 'Admin response',
+                      label: 'Admin action / Resolution',
                       children: [
+                        AdminKeyValueRow(
+                          label: 'Decision',
+                          value: reportStatusLabel(report.status),
+                        ),
+                        if (report.resolvedAt != null)
+                          AdminKeyValueRow(
+                            label: 'Resolved',
+                            value: formatFullDate(report.resolvedAt!),
+                          ),
+                        const SizedBox(height: 4),
                         Text(
                           report.adminResponse?.trim().isNotEmpty == true
                               ? report.adminResponse!.trim()
-                              : 'No written response was saved.',
+                              : 'No response was saved.',
                           style: AppTypography.body,
                         ),
                       ],
@@ -150,20 +206,15 @@ class _DecisionForm extends StatelessWidget {
         ? null
         : adminResponseError(controller.response);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final selected = controller.decision;
+
+    return AdminDecisionSection(
+      title: 'Admin action / Resolution',
       children: [
-        AdminSectionLabel('Admin decision'),
-        const SizedBox(height: 8),
-        Text(
-          'Choose a decision, write a response the reporter will see, then confirm.',
-          style: AppTypography.body.copyWith(color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 8),
         for (final decision in kAdminReportDecisions)
           AdminDecisionOption(
             value: decision,
-            groupValue: controller.decision,
+            groupValue: selected,
             onChanged: controller.isSaving
                 ? (_) {}
                 : context.read<AdminReportsController>().setDecision,
@@ -171,12 +222,13 @@ class _DecisionForm extends StatelessWidget {
         const SizedBox(height: 12),
         ThriftTextField(
           label: 'Response to reporter',
-          hint: 'Write a short explanation for the reporter.',
+          hint: 'The reporter will see this.',
           controller: controller.responseController,
           maxLines: 4,
           error: responseError,
           onChanged: context.read<AdminReportsController>().setResponse,
         ),
+        const SizedBox(height: 4),
         Align(
           alignment: Alignment.centerRight,
           child: Text(
@@ -186,7 +238,9 @@ class _DecisionForm extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         ThriftButton(
-          label: 'Confirm decision',
+          label: selected == null
+              ? 'Save decision'
+              : reportDecisionCta(selected),
           isLoading: controller.isSaving,
           onPressed: controller.canSubmitDecision
               ? () => _confirm(context)
@@ -203,18 +257,18 @@ class _DecisionForm extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Record this decision?'),
-        content: Text(
-          'The reporter will see "${reportDecisionLabel(selected)}" and your response. This does not ban the reported user or change payments.',
+        title: Text('${reportDecisionLabel(selected)}?'),
+        content: const Text(
+          'The reporter will see this decision and your response. This does not ban the reported user or change payments.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: const Text('Go back'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Confirm'),
+            child: Text(reportDecisionCta(selected)),
           ),
         ],
       ),

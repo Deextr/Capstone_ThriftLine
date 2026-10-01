@@ -7,10 +7,17 @@ import 'package:supabase_flutter/supabase_flutter.dart'
 import '../core/services/shared_preferences_service.dart';
 import '../features/auth/data/auth_service.dart';
 import '../features/auth/data/auth_result.dart';
+import '../features/auth/data/trusted_device_store.dart';
 import '../features/auth/domain/account_mode.dart';
 import '../features/auth/domain/auth_user.dart';
 import '../features/auth/domain/legal_documents.dart';
+import '../features/auth/domain/trusted_device.dart';
 import '../models/enums.dart';
+
+/// TEMPORARY: skips the email OTP step on login and sign-up.
+/// Only takes effect in debug builds. Set to false to restore OTP.
+const bool kBypassEmailOtp = true;
+bool get _bypassOtp => kDebugMode && kBypassEmailOtp;
 
 /// Router-facing gate: a restored session is not enough while email OTP is
 /// still outstanding.
@@ -24,15 +31,21 @@ bool authIsFullyAuthenticated({
 /// Wraps [AuthService] (Supabase) and caches minimal session data
 /// in [SharedPreferencesService] for fast cold-start restoration.
 class AuthProvider extends ChangeNotifier {
-  AuthProvider(this._prefs, this._authService);
+  AuthProvider(
+    this._prefs,
+    this._authService, {
+    TrustedDeviceStore? trustedDevices,
+  }) : _trustedDevices = trustedDevices ?? TrustedDeviceStore(_prefs);
 
   final SharedPreferencesService _prefs;
   final AuthService _authService;
+  final TrustedDeviceStore _trustedDevices;
 
   AuthUser? _user;
   bool _isLoading = false;
   bool _isInitialized = false;
   bool _emailOtpPending = false;
+  bool _resolvingTrustedDevice = false;
   AccountMode _activeAccount = AccountMode.buyer;
 
   StreamSubscription? _authSubscription;
@@ -42,6 +55,28 @@ class AuthProvider extends ChangeNotifier {
   bool get isInitialized => _isInitialized;
   bool get isAuthenticated => _user != null;
   bool get isEmailOtpPending => _emailOtpPending;
+
+  /// Current session used email/password — not Gmail, not Buyer/Seller mode.
+  ///
+  /// Computed from the live GoTrue session (JWT `amr` + identities) so a
+  /// Buyer ↔ Seller switch cannot keep a stale trusted-device flag.
+  bool get usesEmailPasswordAuth {
+    final session = _authService.currentSession;
+    return authSessionUsesEmailPassword(
+      lastAuthProvider: lastAuthProviderFromAppMetadata(
+        session?.user.appMetadata,
+      ),
+      identityProviders: <String>{
+        ...?_user?.authIdentityProviders,
+        ...?session?.user.identities?.map((i) => i.provider),
+      },
+      amrMethods: sessionAmrMethodsFromAccessToken(session?.accessToken),
+    );
+  }
+
+  /// True while email/password sign-in is waiting on the trusted-device check.
+  /// The router stays on the login screen until this clears.
+  bool get isResolvingTrustedDevice => _resolvingTrustedDevice;
 
   /// Session exists and the email OTP step is not still outstanding.
   bool get isFullyAuthenticated => authIsFullyAuthenticated(
@@ -96,7 +131,10 @@ class AuthProvider extends ChangeNotifier {
       final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         _user = currentUser;
-        _emailOtpPending = _prefs.isEmailOtpPending;
+        // TEMP: with the OTP bypass on, also clear any stale pending flag so
+        // the router doesn't get stuck on the OTP gate.
+        _emailOtpPending = _bypassOtp ? false : _prefs.isEmailOtpPending;
+        if (_bypassOtp) await _prefs.setEmailOtpPending(false);
         _syncActiveAccount(currentUser, restoreFromPrefs: true);
         await _saveSession(currentUser);
       } else {
@@ -158,31 +196,56 @@ class AuthProvider extends ChangeNotifier {
     required LegalConsent consent,
   }) async {
     _isLoading = true;
+    _resolvingTrustedDevice = true;
     await _setEmailOtpPending(true);
     notifyListeners();
 
-    final result = await _authService.signInWithEmail(
-      email: email,
-      password: password,
-      consent: consent,
-    );
+    try {
+      final result = await _authService.signInWithEmail(
+        email: email,
+        password: password,
+        consent: consent,
+      );
 
-    if (!result.success) {
-      await _setEmailOtpPending(false);
+      if (!result.success || result.user == null) {
+        await _setEmailOtpPending(false);
+        return result.errorMessage ?? 'Sign-in failed. Please try again.';
+      }
+
+      _user = result.user;
+      _syncActiveAccount(_user!, restoreFromPrefs: true);
+      await _saveSession(_user!);
+
+      var serverTrusted = false;
+      try {
+        final deviceToken = await _trustedDevices.currentToken();
+        serverTrusted = await _authService.isTrustedDevice(
+          deviceToken: deviceToken,
+        );
+      } catch (_) {
+        debugPrint('AuthProvider.loginWithEmail trusted-device check failed');
+        serverTrusted = false;
+      }
+
+      // TEMP: _bypassOtp forces the skip (debug builds only).
+      final skipOtp =
+          _bypassOtp ||
+          shouldSkipEmailOtp(
+            passwordAccepted: true,
+            serverTrusted: serverTrusted,
+          );
+      if (skipOtp) {
+        await _setEmailOtpPending(false);
+      } else {
+        await _setEmailOtpPending(true);
+        await sendEmailOtp();
+      }
+      return null;
+    } finally {
+      _resolvingTrustedDevice = false;
       _isLoading = false;
       notifyListeners();
-      return result.errorMessage;
     }
-
-    _user = result.user;
-    _syncActiveAccount(_user!, restoreFromPrefs: true);
-    await _saveSession(_user!);
-    await _setEmailOtpPending(true);
-
-    _isLoading = false;
-    notifyListeners();
-    await sendEmailOtp();
-    return null;
   }
 
   /// Signs in with Google after the user has accepted the legal documents.
@@ -249,6 +312,9 @@ class AuthProvider extends ChangeNotifier {
       return AuthResult.failure('Something went wrong. Please try again.');
     }
 
+    // TEMP: with the OTP bypass on, sign-up never enters the OTP step.
+    final needsOtp = result.requiresEmailOtp && !_bypassOtp;
+
     if (result.requiresEmailVerification) {
       // Supabase withheld the session pending confirmation, so the app must
       // not treat the account as signed in.
@@ -259,7 +325,7 @@ class AuthProvider extends ChangeNotifier {
       if (_user != null) {
         _syncActiveAccount(_user!, restoreFromPrefs: true);
         await _saveSession(_user!);
-        if (result.requiresEmailOtp) {
+        if (needsOtp) {
           await _setEmailOtpPending(true);
         }
       }
@@ -267,7 +333,7 @@ class AuthProvider extends ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
-    if (result.requiresEmailOtp && _user != null) {
+    if (needsOtp && _user != null) {
       await sendEmailOtp();
     }
     return result;
@@ -278,7 +344,18 @@ class AuthProvider extends ChangeNotifier {
   // ─────────────────────────────────────────────────────────────────────────
 
   /// Clears the session and logs the user out.
-  Future<void> logout() async {
+  ///
+  /// A normal logout keeps the trusted-device grant, so the next email
+  /// sign-in on this install can skip OTP until the server expiry.
+  /// [forgetDevice] revokes that grant first and replaces the local token.
+  /// If revocation fails, the session stays signed in.
+  Future<String?> logout({bool forgetDevice = false}) async {
+    final revokeTrust = forgetDevice && usesEmailPasswordAuth;
+    if (revokeTrust) {
+      final error = await _forgetTrustedDevice();
+      if (error != null) return error;
+    }
+
     _isLoading = true;
     notifyListeners();
 
@@ -290,6 +367,29 @@ class AuthProvider extends ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
+    return null;
+  }
+
+  Future<String?> _forgetTrustedDevice() async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final existing = await _trustedDevices.storedToken();
+      if (existing != null) {
+        final error = await _authService.revokeTrustedDevice(
+          deviceToken: existing,
+        );
+        if (error != null) return error;
+      }
+      await _trustedDevices.rotate();
+      return null;
+    } catch (_) {
+      debugPrint('AuthProvider.logout forget device failed');
+      return 'Could not forget this device. Please try again.';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -356,9 +456,22 @@ class AuthProvider extends ChangeNotifier {
     return _authService.sendEmailOtp();
   }
 
-  /// Confirms the email code, then clears the pending-OTP gate.
+  /// Confirms the email code, registers this install when a token is
+  /// available, then clears the pending-OTP gate.
   Future<String?> verifyEmailOtp({required String token}) async {
-    final error = await _authService.verifyEmailOtp(token: token);
+    String? deviceToken;
+    try {
+      deviceToken = await _trustedDevices.currentToken();
+    } catch (_) {
+      debugPrint('AuthProvider.verifyEmailOtp device token unavailable');
+    }
+    final error = await _authService.verifyEmailOtp(
+      token: token,
+      deviceToken: deviceToken,
+      platform: deviceToken == null
+          ? null
+          : trustedDevicePlatformLabel(defaultTargetPlatform),
+    );
     if (error == null) await _setEmailOtpPending(false);
     return error;
   }

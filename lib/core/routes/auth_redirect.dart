@@ -1,5 +1,16 @@
 import 'route_names.dart';
 
+/// Stay on login/signup until the server answers the trusted-device check.
+/// The pending flag is set before that answer so a crash cannot skip OTP,
+/// and it must not open the OTP screen during the check.
+bool holdAuthScreenForTrustedDeviceCheck({
+  required bool resolvingTrustedDevice,
+  required String location,
+}) {
+  if (!resolvingTrustedDevice) return false;
+  return location == RouteNames.login || location == RouteNames.signup;
+}
+
 /// When email OTP is marked pending but there is no session yet, keep the
 /// user on signup/login so a rejected registration can show its error.
 /// Any other location goes to login.

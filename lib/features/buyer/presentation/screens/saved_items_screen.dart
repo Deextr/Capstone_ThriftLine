@@ -182,30 +182,33 @@ class SavedItemsScreen extends StatelessWidget {
       );
     }
 
-    return CustomScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 14,
-              crossAxisSpacing: 14,
-              childAspectRatio: 0.62,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final textScale = MediaQuery.textScalerOf(context).scale(1);
+        return CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              sliver: SliverGrid(
+                gridDelegate: ProductCard.gridDelegateFor(
+                  maxWidth: constraints.maxWidth,
+                  compact: true,
+                  textScale: textScale,
+                ),
+                delegate: SliverChildBuilderDelegate((_, i) {
+                  final product = saved[i];
+                  return ProductCard(
+                    product: product,
+                    compact: true,
+                    onTap: () => context.push('/product/${product.id}'),
+                  );
+                }, childCount: saved.length),
+              ),
             ),
-            delegate: SliverChildBuilderDelegate((_, i) {
-              final product = saved[i];
-              return ProductCard(
-                product: product,
-                onTap: () => context.push('/product/${product.id}'),
-                onSellerTap: () =>
-                    context.push('/seller-profile/${product.sellerUsername}'),
-              );
-            }, childCount: saved.length),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 }

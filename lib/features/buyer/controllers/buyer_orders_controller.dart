@@ -7,9 +7,11 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/ph_phone.dart';
 import '../../../core/utils/supabase_rpc.dart';
+import '../../../models/address_model.dart';
 import '../../../models/order_model.dart';
 import '../../../models/review_model.dart';
 import '../../../providers/auth_provider.dart';
+import '../../profile/data/address_service.dart';
 import '../../trust_safety/data/review_query.dart';
 import '../data/order_query.dart';
 import '../data/paymongo_checkout.dart';
@@ -36,6 +38,7 @@ class BuyerOrdersController extends ChangeNotifier {
 
   List<OrderModel> _orders = [];
   OrderModel? _order;
+  List<OrderModel> _paymentGroup = [];
   Map<String, ReviewModel> _myReviews = {};
   bool _isLoading = true;
   bool _isSavingAddress = false;
@@ -54,6 +57,14 @@ class BuyerOrdersController extends ChangeNotifier {
   List<OrderModel> get orders => _orders;
   List<OrderModel> get awaitingPayment => buyerAwaitingPayment(_orders);
   OrderModel? get order => _order;
+  List<OrderModel> get paymentGroup {
+    if (_paymentGroup.isNotEmpty) return List.unmodifiable(_paymentGroup);
+    final current = _order;
+    return current == null ? const [] : [current];
+  }
+
+  double get paymentGroupTotal =>
+      paymentGroup.fold<double>(0, (sum, order) => sum + order.total);
   ReviewModel? reviewFor(String orderId) => _myReviews[orderId];
   bool get isLoading => _isLoading;
   bool get isSavingAddress => _isSavingAddress;
@@ -71,6 +82,7 @@ class BuyerOrdersController extends ChangeNotifier {
     if (myId == null) {
       _orders = [];
       _order = null;
+      _paymentGroup = [];
       _myReviews = {};
       _isLoading = false;
       _notify();
@@ -83,7 +95,10 @@ class BuyerOrdersController extends ChangeNotifier {
     }
     try {
       unawaited(_completeExpiredInspections());
-      await syncMyUnpaidCheckouts(_supabase);
+      if (orderId == null) {
+        await restoreAbandonedFixedPriceCheckouts(_supabase);
+        await syncMyUnpaidCheckouts(_supabase);
+      }
       if (orderId != null) {
         _order = await fetchOrderById(_supabase, orderId!, buyerId: myId);
         if (_order != null && _order!.needsBuyerPayment) {
@@ -91,7 +106,11 @@ class BuyerOrdersController extends ChangeNotifier {
         }
         if (_order == null) {
           _errorMessage = 'Order not found.';
-        } else if (!_order!.needsBuyerPayment) {
+          _paymentGroup = [];
+        } else {
+          await _loadPaymentGroup(myId);
+        }
+        if (_order != null && !_order!.needsBuyerPayment) {
           _isConfirmingPayment = false;
           if (_order!.isFailedCheckout) {
             _unsuccessfulOutcome = _order!.isExpiredCheckout
@@ -122,6 +141,19 @@ class BuyerOrdersController extends ChangeNotifier {
     _isSavingAddress = true;
     _notify();
     try {
+      final book = await AddressService(_supabase).listMine();
+      AddressModel? saved;
+      for (final row in book) {
+        if (row.id == addressId) {
+          saved = row;
+          break;
+        }
+      }
+      if (saved == null) return 'Address not found.';
+      if (!saved.hasValidPhoneContact) {
+        return 'Enter a valid 11-digit mobile number starting with 09. '
+            'Edit this delivery address and try again.';
+      }
       final rpcRes = await _supabase.client.rpc(
         'set_order_address',
         params: {'p_order_id': id, 'p_address_id': addressId},
@@ -245,6 +277,30 @@ class BuyerOrdersController extends ChangeNotifier {
     if (_disposed || orderId == null) return;
     if (_isConfirmingPayment && _order?.needsBuyerPayment == true) {
       await handlePaymongoAppReturn(cancelled: false);
+    }
+  }
+
+  Future<void> _loadPaymentGroup(String buyerId) async {
+    final current = _order;
+    final groupId = current?.checkoutGroupId;
+    if (current == null) {
+      _paymentGroup = [];
+      return;
+    }
+    if (groupId == null || groupId.isEmpty) {
+      _paymentGroup = [current];
+      return;
+    }
+    try {
+      final group = await fetchOrdersForCheckoutGroup(
+        _supabase,
+        groupId,
+        buyerId: buyerId,
+      );
+      _paymentGroup = group.isEmpty ? [current] : group;
+    } catch (e) {
+      debugPrint('BuyerOrdersController._loadPaymentGroup error: $e');
+      _paymentGroup = [current];
     }
   }
 

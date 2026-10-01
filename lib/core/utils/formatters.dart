@@ -34,6 +34,9 @@ String formatCompactDate(DateTime dateTime, {DateTime? now}) {
   return DateFormat('MMM d').format(local);
 }
 
+String formatFullDate(DateTime dateTime) =>
+    DateFormat('MMM d, yyyy').format(dateTime.toLocal());
+
 String formatRelativeTime(DateTime dateTime) {
   final diff = DateTime.now().difference(dateTime);
   if (diff.inMinutes < 1) return 'Just now';
@@ -41,6 +44,20 @@ String formatRelativeTime(DateTime dateTime) {
   if (diff.inHours < 24) return '${diff.inHours}h ago';
   if (diff.inDays < 7) return '${diff.inDays}d ago';
   return DateFormat('MMM d').format(dateTime);
+}
+
+String formatPaymentDeadline(DateTime due, {DateTime? now}) {
+  final clock = DateFormat('MMM d, h:mm a').format(due.toLocal());
+  final left = due.difference(now ?? DateTime.now());
+  if (left.isNegative || left.inSeconds <= 0) {
+    return 'Payment window ended $clock';
+  }
+  final hours = left.inHours;
+  final minutes = left.inMinutes.remainder(60);
+  if (hours > 0) return 'Pay by $clock ($hours h ${minutes} m left)';
+  final seconds = left.inSeconds.remainder(60);
+  if (minutes > 0) return 'Pay by $clock ($minutes m ${seconds} s left)';
+  return 'Pay by $clock (${left.inSeconds} s left)';
 }
 
 String formatCountdown(Duration remaining) {
@@ -52,4 +69,16 @@ String formatCountdown(Duration remaining) {
     return '${days}d $hours:$minutes';
   }
   return '$hours:$minutes';
+}
+
+/// Product-card auction label, e.g. `21h 22m`.
+String formatReadableCountdown(Duration remaining) {
+  if (remaining.isNegative || remaining.inSeconds <= 0) return 'Ended';
+  final days = remaining.inDays;
+  final hours = remaining.inHours;
+  final minutes = remaining.inMinutes.remainder(60);
+  if (days > 0) return '${days}d ${hours % 24}h ${minutes}m';
+  if (hours > 0) return '${hours}h ${minutes}m';
+  if (minutes > 0) return '${minutes}m';
+  return '${remaining.inSeconds}s';
 }

@@ -15,6 +15,7 @@ class IdSideReviewCard extends StatelessWidget {
     required this.checking,
     this.onCapture,
     this.actionLabel,
+    this.aspectRatio = IdCaptureGuide.cardAspect,
   });
 
   final String title;
@@ -23,6 +24,7 @@ class IdSideReviewCard extends StatelessWidget {
   final bool checking;
   final VoidCallback? onCapture;
   final String? actionLabel;
+  final double aspectRatio;
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +55,7 @@ class IdSideReviewCard extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: AspectRatio(
-              aspectRatio: 1.6,
+              aspectRatio: aspectRatio,
               child: bytes == null
                   ? ColoredBox(
                       color: AppColors.primaryLight.withValues(alpha: 0.4),

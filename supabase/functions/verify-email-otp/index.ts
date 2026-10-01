@@ -1,4 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  hashDeviceToken,
+  isDeviceToken,
+  trustedPlatform,
+} from "../_shared/trusted_device.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -96,6 +101,23 @@ Deno.serve(async (req) => {
       .from("email_otp_challenges")
       .update({ consumed_at: new Date().toISOString() })
       .eq("challenge_id", challenge.challenge_id);
+
+    const deviceToken = body.device_token;
+    if (isDeviceToken(deviceToken)) {
+      try {
+        const deviceHash = await hashDeviceToken(userData.user.id, deviceToken);
+        const { error: trustError } = await service.rpc("register_trusted_device", {
+          p_user_id: userData.user.id,
+          p_device_token_hash: deviceHash,
+          p_platform: trustedPlatform(body.platform),
+        });
+        if (trustError) {
+          console.error("verify-email-otp trust registration failed");
+        }
+      } catch (_trustError) {
+        console.error("verify-email-otp trust registration failed");
+      }
+    }
 
     return json(200, { ok: true });
   } catch (error) {

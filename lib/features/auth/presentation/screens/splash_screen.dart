@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/theme/app_gradients.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../providers/app_provider.dart';
 import '../../../../providers/auth_provider.dart';
@@ -68,15 +69,13 @@ class _SplashScreenState extends State<SplashScreen>
         curve: const Interval(0.42, 0.85, curve: Curves.easeOut),
       ),
     );
-    _textSlide = Tween<Offset>(
-      begin: const Offset(0.0, 0.6),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _introController,
-        curve: const Interval(0.42, 0.85, curve: Curves.easeOut),
-      ),
-    );
+    _textSlide = Tween<Offset>(begin: const Offset(0.0, 0.6), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _introController,
+            curve: const Interval(0.42, 0.85, curve: Curves.easeOut),
+          ),
+        );
 
     // ── Pulse controller: continuous subtle breathe ──
     _pulseController = AnimationController(
@@ -138,18 +137,7 @@ class _SplashScreenState extends State<SplashScreen>
     return Scaffold(
       body: Container(
         // ── Dark-teal → lighter-teal gradient background ──────────────────
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF065F56), // very dark teal
-              Color(0xFF0D9488), // AppColors.primary
-              Color(0xFF14B8A6), // lighter teal
-            ],
-            stops: [0.0, 0.55, 1.0],
-          ),
-        ),
+        decoration: const BoxDecoration(gradient: AppGradients.heroGradient),
         child: SafeArea(
           child: Stack(
             children: [
@@ -176,8 +164,10 @@ class _SplashScreenState extends State<SplashScreen>
                   children: [
                     // Logo with intro + pulse animation stacked
                     AnimatedBuilder(
-                      animation:
-                          Listenable.merge([_introController, _pulseController]),
+                      animation: Listenable.merge([
+                        _introController,
+                        _pulseController,
+                      ]),
                       builder: (_, child) {
                         return Opacity(
                           opacity: _logoOpacity.value,
@@ -247,8 +237,9 @@ class _SplashScreenState extends State<SplashScreen>
                           child: LinearProgressIndicator(
                             value: _progressValue.value,
                             minHeight: 2.5,
-                            backgroundColor:
-                                Colors.white.withValues(alpha: 0.20),
+                            backgroundColor: Colors.white.withValues(
+                              alpha: 0.20,
+                            ),
                             valueColor: const AlwaysStoppedAnimation<Color>(
                               Colors.white,
                             ),
