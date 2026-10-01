@@ -11,7 +11,9 @@ abstract final class SupabaseConfig {
   /// Initializes the Supabase SDK using credentials from the `.env` file.
   ///
   /// Must be called after `dotenv.load()` and before `runApp()`.
-  static Future<void> initialize() async {
+  static Future<void> initialize({
+    bool Function(Uri uri)? detectSessionInUriPredicate,
+  }) async {
     if (_initialized) return;
 
     final url = dotenv.env['SUPABASE_URL'];
@@ -30,7 +32,13 @@ abstract final class SupabaseConfig {
       );
     }
 
-    await Supabase.initialize(url: url, publishableKey: anonKey);
+    await Supabase.initialize(
+      url: url,
+      publishableKey: anonKey,
+      authOptions: FlutterAuthClientOptions(
+        detectSessionInUriPredicate: detectSessionInUriPredicate,
+      ),
+    );
     _initialized = true;
   }
 

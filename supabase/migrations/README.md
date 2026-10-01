@@ -116,13 +116,17 @@ supabase functions deploy send-password-reset --no-verify-jwt
 ```
 
 The email contains Supabase's HTTPS `action_link` (clickable in Gmail). After
-verification, Auth redirects to `thriftline://reset-password` with the recovery
-session; the app handles that via `getSessionFromUrl` / `AuthChangeEvent.passwordRecovery`.
-Add `thriftline://reset-password` under **Authentication → URL Configuration →
-Redirect URLs** so the redirect is allowed. Do not put custom-scheme URLs in
-the email body — clients render them as plain text. The function never returns
-the recovery link to the Flutter client. Google-only accounts do not receive
-a link, so a password is not attached to them.
+verification, Auth redirects to `password-recovery-return`, which opens the app
+with session tokens in the query string (Android drops URL fragments). Deploy
+`password-recovery-return` with JWT verification off.
+
+Add both redirect URLs under **Authentication → URL Configuration → Redirect URLs**:
+
+- `https://<project-ref>.supabase.co/functions/v1/password-recovery-return`
+- `thriftline://reset-password`
+
+Do not put custom-scheme URLs in the email body. Google-only accounts do not
+receive a link.
 
 ## Seed data
 
