@@ -165,10 +165,10 @@ class HomeController extends ChangeNotifier {
           limit: 30,
           listingType: 'auction',
         );
-        bidding = hydrateCatalogProducts(rows, const {})
-            .where(isLiveBuyerHomeListing)
-            .take(16)
-            .toList();
+        bidding = hydrateCatalogProducts(
+          rows,
+          const {},
+        ).where(isLiveBuyerHomeListing).take(16).toList();
       } catch (e) {
         debugPrint('HomeController bidding: $e');
         anyOffline = anyOffline || isHomeOfflineError(e);

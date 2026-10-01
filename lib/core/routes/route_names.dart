@@ -47,6 +47,9 @@ abstract final class RouteNames {
   static const String trackOrders = '/track-orders';
   static const String trackOrder = '/track-order/:orderId';
   static String trackOrderFor(String orderId) => '/track-order/$orderId';
+  static const String orderDeliveryReport = '/orders/:orderId/report-problem';
+  static String orderDeliveryReportFor(String orderId) =>
+      '/orders/$orderId/report-problem';
   static const String addListing = '/add-listing';
   static const String editListing = '/edit-listing/:id';
   static const String sellerOrder = '/seller-order/:id';

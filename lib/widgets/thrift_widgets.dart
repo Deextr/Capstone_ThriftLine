@@ -196,6 +196,7 @@ class ThriftTextField extends StatefulWidget {
     this.validator,
     this.labelColor,
     this.autovalidateMode,
+    this.onSubmitted,
   });
 
   final String? label;
@@ -216,6 +217,7 @@ class ThriftTextField extends StatefulWidget {
   final String? Function(String?)? validator;
   final Color? labelColor;
   final AutovalidateMode? autovalidateMode;
+  final ValueChanged<String>? onSubmitted;
 
   @override
   State<ThriftTextField> createState() => _ThriftTextFieldState();
@@ -255,6 +257,7 @@ class _ThriftTextFieldState extends State<ThriftTextField> {
           controller: widget.controller,
           obscureText: widget.obscureText,
           onChanged: widget.onChanged,
+          onFieldSubmitted: widget.onSubmitted,
           keyboardType: widget.keyboardType,
           inputFormatters: widget.inputFormatters,
           maxLines: widget.maxLines,

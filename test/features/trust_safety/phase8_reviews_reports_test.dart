@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:thriftline/features/trust_safety/data/delivery_report_mapping.dart';
 import 'package:thriftline/features/trust_safety/data/report_reasons.dart';
 import 'package:thriftline/features/trust_safety/data/review_rules.dart';
 import 'package:thriftline/models/community_report_model.dart';
@@ -156,6 +157,22 @@ void main() {
         isNull,
       );
       expect(reportDetailsError('a' * 2001), isNotNull);
+    });
+
+    test('requires one to three evidence photos', () {
+      expect(kReportEvidenceMinCount, 1);
+      expect(kReportEvidenceMaxCount, 3);
+    });
+
+    test('maps delivery dispute reasons to report categories', () {
+      expect(
+        deliveryDisputeReportCategory(DeliveryDisputeReason.damagedItem),
+        'item_not_as_described',
+      );
+      expect(
+        deliveryDisputeReportCategory(DeliveryDisputeReason.wrongItem),
+        'fake_product',
+      );
     });
 
     test('accepts only photo evidence names', () {

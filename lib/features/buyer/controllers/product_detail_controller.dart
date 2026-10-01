@@ -131,17 +131,14 @@ class ProductDetailController extends ChangeNotifier {
   }
 
   /// Order status for the viewer's auction order (e.g. 'pending', 'cancelled').
-  String? get auctionOrderStatus =>
-      _auctionOrder?['order_status'] as String?;
+  String? get auctionOrderStatus => _auctionOrder?['order_status'] as String?;
 
   /// Current bid round (incremented on each relist).
   int get bidRound => (_auction?['bid_round'] as num?)?.toInt() ?? 1;
 
   /// Auction starting price (used to pre-fill the relist form).
   double get auctionStartingPrice =>
-      (_auction?['starting_price'] as num?)?.toDouble() ??
-      _product?.price ??
-      0;
+      (_auction?['starting_price'] as num?)?.toDouble() ?? _product?.price ?? 0;
 
   /// Auction minimum increment (used to pre-fill the relist form).
   double get auctionMinimumIncrement =>
@@ -204,8 +201,7 @@ class ProductDetailController extends ChangeNotifier {
   bool get isViewerExpiredWinner {
     final uid = _auth.user?.id;
     if (uid == null || !isAuction || isAuctionActive) return false;
-    return _auction?['winner_id'] == uid &&
-        auctionOrderStatus == 'cancelled';
+    return _auction?['winner_id'] == uid && auctionOrderStatus == 'cancelled';
   }
 
   bool get hasNoWinner {
@@ -425,8 +421,7 @@ class ProductDetailController extends ChangeNotifier {
       if (_auction != null && _product != null) {
         final auctionId = _auction!['auction_id'] as String;
 
-        final currentRound =
-            (_auction!['bid_round'] as num?)?.toInt() ?? 1;
+        final currentRound = (_auction!['bid_round'] as num?)?.toInt() ?? 1;
 
         final bidsResponse = await _supabase.client
             .from('bids')

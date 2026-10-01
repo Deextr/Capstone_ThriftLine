@@ -85,10 +85,7 @@ class PaymentCheckoutBody extends StatelessWidget {
                 const SizedBox(height: 10),
                 for (var i = 0; i < _orders.length; i++) ...[
                   if (i > 0) const SizedBox(height: 10),
-                  _OrderItemsCard(
-                    order: _orders[i],
-                    showShopHeader: shops > 1,
-                  ),
+                  _OrderItemsCard(order: _orders[i], showShopHeader: shops > 1),
                 ],
                 const SizedBox(height: 16),
                 _PaymentAddressSection(
@@ -160,7 +157,9 @@ class _SectionLabel extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             subtitle!,
-            style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ],
@@ -199,7 +198,9 @@ class _ConfirmingBanner extends StatelessWidget {
               children: [
                 Text(
                   'Confirming payment',
-                  style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
+                  style: AppTypography.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -426,10 +427,7 @@ class _PaymentAddressSection extends StatelessWidget {
                 ),
               ),
             if (order.buyerName.isNotEmpty) const SizedBox(height: 2),
-            Text(
-              addressText,
-              style: AppTypography.body.copyWith(fontSize: 13),
-            ),
+            Text(addressText, style: AppTypography.body.copyWith(fontSize: 13)),
           ] else
             Text(
               'Add a delivery address before you pay.',
@@ -462,10 +460,7 @@ class _PaymentTotalsCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       child: Column(
         children: [
-          _SummaryLine(
-            label: 'Subtotal',
-            value: formatCurrency(subtotal),
-          ),
+          _SummaryLine(label: 'Subtotal', value: formatCurrency(subtotal)),
           const SizedBox(height: 8),
           _SummaryLine(
             label: shopCount > 1
@@ -521,7 +516,9 @@ class _SummaryLine extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
         Text(value, style: AppTypography.body),
@@ -612,7 +609,9 @@ class _PaymentMethodOption extends StatelessWidget {
                 ),
                 child: Icon(
                   icon,
-                  color: selected ? AppColors.primaryDark : AppColors.textSecondary,
+                  color: selected
+                      ? AppColors.primaryDark
+                      : AppColors.textSecondary,
                 ),
               ),
               const SizedBox(width: 12),
@@ -687,7 +686,9 @@ class _PaymentStickyBar extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.border.withValues(alpha: 0.8))),
+        border: Border(
+          top: BorderSide(color: AppColors.border.withValues(alpha: 0.8)),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -742,10 +743,7 @@ class _PaymentStickyBar extends StatelessWidget {
                 onPressed: onChangeAddress,
               )
             else if (!windowOpen)
-              const ThriftButton(
-                label: 'Payment window ended',
-                onPressed: null,
-              )
+              const ThriftButton(label: 'Payment window ended', onPressed: null)
             else if (selectedChannel == null)
               const ThriftButton(
                 label: 'Select a payment method',

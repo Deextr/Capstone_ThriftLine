@@ -54,8 +54,7 @@ class ProductCard extends StatefulWidget {
     return (available - gridSpacing * (count - 1)) / count;
   }
 
-  static double cardHeightFor(double cardWidth) =>
-      cardWidth / imageAspectRatio;
+  static double cardHeightFor(double cardWidth) => cardWidth / imageAspectRatio;
 
   static double gridChildAspectRatio({
     required double cardWidth,
@@ -115,11 +114,14 @@ class _ProductCardState extends State<ProductCard>
     final savedItems = context.watch<SavedItemsProvider>();
     final saved = savedItems.isSaved(widget.product.id);
     final compact = widget.compact;
-    final isAuction = widget.product.sellingType == SellingType.auction;
-    final popularity = !isAuction
+    final isLiveAuction = widget.product.hasActiveBid;
+    final popularity = !isLiveAuction
         ? formatCartPopularity(widget.cartAddCount ?? 0)
         : null;
-    final showTimer = widget.showCountdown && widget.product.bidEndTime != null;
+    final showTimer =
+        widget.showCountdown &&
+        isLiveAuction &&
+        widget.product.bidEndTime != null;
 
     return AnimatedScale(
       scale: _isPressed ? 0.97 : 1.0,
@@ -184,12 +186,21 @@ class _ProductCardState extends State<ProductCard>
                         ),
                       ),
                     ),
-                    if (showTimer)
+                    if (isLiveAuction)
                       Positioned(
                         top: 8,
                         left: 8,
-                        child: _CountdownPill(
-                          endTime: widget.product.bidEndTime!,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const _AuctionListingBadge(),
+                            if (showTimer) ...[
+                              const SizedBox(height: 6),
+                              _CountdownPill(
+                                endTime: widget.product.bidEndTime!,
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     Positioned(
@@ -516,6 +527,37 @@ class _CartPopularityBadge extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AuctionListingBadge extends StatelessWidget {
+  const _AuctionListingBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.gavel_rounded, size: 13, color: AppColors.primaryLight),
+          const SizedBox(width: 4),
+          Text(
+            'Bidding',
+            style: AppTypography.caption.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
+            ),
+          ),
+        ],
       ),
     );
   }

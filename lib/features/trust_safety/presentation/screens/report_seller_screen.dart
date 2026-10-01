@@ -8,6 +8,7 @@ import '../../../../core/routes/route_names.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/report_user_controller.dart';
 import '../../data/report_reasons.dart';
+import '../widgets/report_evidence_section.dart';
 
 class ReportSellerScreen extends StatefulWidget {
   const ReportSellerScreen({super.key});
@@ -42,6 +43,7 @@ class _ReportSellerScreenState extends State<ReportSellerScreen> {
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         backgroundColor: AppColors.background,
+        resizeToAvoidBottomInset: true,
         appBar: AppBar(
           title: const Text('Report a member'),
           leading: IconButton(
@@ -142,22 +144,30 @@ class _ReportSellerScreenState extends State<ReportSellerScreen> {
                             _OrderPicker(controller: controller),
                           ],
                           const SizedBox(height: 20),
-                          Text(
-                            'Photo evidence (optional)',
-                            style: AppTypography.subheading,
+                          ReportEvidenceSection(
+                            evidence: controller.evidence,
+                            evidenceError: controller.evidenceError,
+                            required: true,
+                            onAddGallery: () => context
+                                .read<ReportUserController>()
+                                .addEvidenceFromGallery(),
+                            onAddCamera: () => context
+                                .read<ReportUserController>()
+                                .addEvidenceFromCamera(),
+                            onRemove: (i) => context
+                                .read<ReportUserController>()
+                                .removeEvidence(i),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Up to 4 photos. JPG, PNG, or WebP. 5 MB each.',
-                            style: AppTypography.caption,
-                          ),
-                          const SizedBox(height: 12),
-                          _EvidenceRow(controller: controller),
                         ],
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                      padding: EdgeInsets.fromLTRB(
+                        20,
+                        8,
+                        20,
+                        16 + MediaQuery.viewInsetsOf(context).bottom,
+                      ),
                       child: ThriftButton(
                         label: 'Submit Report',
                         color: AppColors.error,
@@ -181,7 +191,10 @@ class _ReportSellerScreenState extends State<ReportSellerScreen> {
       showThriftSnackBar(context, error, isError: true);
       return;
     }
-    showThriftSnackBar(context, 'Report submitted');
+    showThriftSnackBar(
+      context,
+      'Report submitted. You can track it under My Reports.',
+    );
     context.pushReplacement(RouteNames.myReports);
   }
 }
@@ -276,7 +289,12 @@ class _ReasonTile extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text(reason.description, style: AppTypography.caption),
+                      Text(
+                        reason.description,
+                        style: AppTypography.caption,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),
@@ -361,76 +379,6 @@ class _OrderOption extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _EvidenceRow extends StatelessWidget {
-  const _EvidenceRow({required this.controller});
-
-  final ReportUserController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        for (var i = 0; i < controller.evidence.length; i++)
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.memory(
-                  controller.evidence[i].bytes,
-                  width: 72,
-                  height: 72,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              Positioned(
-                top: -6,
-                right: -6,
-                child: IconButton.filled(
-                  visualDensity: VisualDensity.compact,
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.textPrimary,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(24, 24),
-                    padding: EdgeInsets.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  iconSize: 14,
-                  onPressed: () =>
-                      context.read<ReportUserController>().removeEvidence(i),
-                  icon: const Icon(Icons.close),
-                ),
-              ),
-            ],
-          ),
-        if (controller.evidence.length < kReportEvidenceMaxCount)
-          InkWell(
-            onTap: () async {
-              final error = await context
-                  .read<ReportUserController>()
-                  .addEvidence();
-              if (!context.mounted || error == null) return;
-              showThriftSnackBar(context, error, isError: true);
-            },
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: const Icon(Icons.add_a_photo_outlined, size: 22),
-            ),
-          ),
-      ],
     );
   }
 }

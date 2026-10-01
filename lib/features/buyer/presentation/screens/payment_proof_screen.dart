@@ -281,6 +281,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
     });
   }
 }
+
 class _FailedPaymentBody extends StatelessWidget {
   const _FailedPaymentBody({
     required this.channel,
@@ -391,4 +392,3 @@ class _PaidPaymentBody extends StatelessWidget {
     );
   }
 }
-

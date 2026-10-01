@@ -79,6 +79,8 @@ import '../../features/trust_safety/presentation/screens/leave_review_screen.dar
 import '../../features/trust_safety/presentation/screens/my_reports_screen.dart';
 import '../../features/trust_safety/presentation/screens/report_appeal_screen.dart';
 import '../../features/trust_safety/presentation/screens/report_detail_screen.dart';
+import '../../features/trust_safety/controllers/order_delivery_report_controller.dart';
+import '../../features/trust_safety/presentation/screens/order_delivery_report_screen.dart';
 import '../../features/trust_safety/presentation/screens/report_seller_screen.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -308,6 +310,17 @@ GoRouter createAppRouter({
             orderId: state.pathParameters['orderId'],
           ),
           child: OrderTrackingScreen(orderId: state.pathParameters['orderId']!),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.orderDeliveryReport,
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => OrderDeliveryReportController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+            orderId: state.pathParameters['orderId']!,
+          ),
+          child: const OrderDeliveryReportScreen(),
         ),
       ),
       GoRoute(
