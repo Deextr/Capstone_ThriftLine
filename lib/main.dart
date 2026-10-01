@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'app/app.dart';
 import 'core/config/supabase_config.dart';
 import 'core/routes/app_router.dart';
+import 'core/routes/password_recovery_coordinator.dart';
 import 'core/routes/paymongo_return_coordinator.dart';
 import 'core/services/shared_preferences_service.dart';
 import 'core/services/supabase_service.dart';
@@ -47,24 +49,31 @@ Future<void> main() async {
   final paymongoReturn = PaymongoReturnCoordinator();
   await attachPaymongoReturnLinks(paymongoReturn);
 
+  final passwordRecovery = PasswordRecoveryCoordinator();
+  await attachPasswordRecoveryLinks(passwordRecovery);
+
   final router = createAppRouter(
     authProvider: authProvider,
     appProvider: appProvider,
     paymongoReturn: paymongoReturn,
+    passwordRecovery: passwordRecovery,
   );
 
   runApp(
-    ThriftlineApp(
-      prefs: prefs,
-      router: router,
-      authProvider: authProvider,
-      appProvider: appProvider,
-      dataProvider: dataProvider,
-      notificationsProvider: notificationsProvider,
-      settingsProvider: settingsProvider,
-      savedItemsProvider: savedItemsProvider,
-      cartProvider: cartProvider,
-      supabaseService: supabaseService,
+    ChangeNotifierProvider<PasswordRecoveryCoordinator>.value(
+      value: passwordRecovery,
+      child: ThriftlineApp(
+        prefs: prefs,
+        router: router,
+        authProvider: authProvider,
+        appProvider: appProvider,
+        dataProvider: dataProvider,
+        notificationsProvider: notificationsProvider,
+        settingsProvider: settingsProvider,
+        savedItemsProvider: savedItemsProvider,
+        cartProvider: cartProvider,
+        supabaseService: supabaseService,
+      ),
     ),
   );
 }

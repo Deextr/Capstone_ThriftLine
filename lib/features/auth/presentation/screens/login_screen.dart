@@ -216,7 +216,30 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                             ),
-                            SizedBox(height: compact ? 20 : 24),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: lockedOut
+                                    ? null
+                                    : () =>
+                                          context.go(RouteNames.forgotPassword),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.primaryLight,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 4,
+                                  ),
+                                ),
+                                child: Text(
+                                  'Forgot password?',
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.primaryLight,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: compact ? 12 : 16),
                             ThriftButton(
                               label: lockedOut ? 'Locked' : 'Login',
                               onPressed: (auth.isLoading || lockedOut)
