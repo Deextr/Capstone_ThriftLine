@@ -225,6 +225,7 @@ class CheckoutController extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
+      await restoreAbandonedFixedPriceCheckouts(_supabase);
       await syncMyUnpaidCheckouts(_supabase);
       await _cart.refresh();
       await _loadAwaitingPayment();
