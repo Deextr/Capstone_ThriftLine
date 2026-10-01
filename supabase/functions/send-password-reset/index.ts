@@ -26,12 +26,73 @@ function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function escapeHtml(value: string): string {
+function escapeHtmlText(value: string): string {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+/** Safe for double-quoted href attributes on https recovery URLs. */
+function escapeHtmlAttr(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+}
+
+const BRAND_PRIMARY = "#0D9488";
+const BRAND_TEXT = "#0F172A";
+const BRAND_MUTED = "#64748B";
+
+function buildRecoveryEmailHtml(recoveryUrl: string): string {
+  const href = escapeHtmlAttr(recoveryUrl);
+  const linkText = escapeHtmlText(recoveryUrl);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F8FAFC;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F8FAFC;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:480px;background:#FFFFFF;border-radius:12px;border:1px solid #E2E8F0;">
+        <tr><td style="padding:32px 28px;">
+          <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:${BRAND_TEXT};">ThriftLine</p>
+          <p style="margin:0 0 20px;font-size:16px;line-height:1.5;color:${BRAND_TEXT};">
+            You requested to reset your ThriftLine password.
+          </p>
+          <p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:${BRAND_MUTED};">
+            Click the button below to create a new password. Open this email on the phone where ThriftLine is installed.
+          </p>
+          <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 28px;">
+            <tr><td style="border-radius:8px;background:${BRAND_PRIMARY};">
+              <a href="${href}" target="_blank" rel="noopener noreferrer"
+                 style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:8px;">
+                Choose a New Password
+              </a>
+            </td></tr>
+          </table>
+          <p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:${BRAND_MUTED};">
+            This password reset link will expire according to the configured recovery token validity period.
+            If you did not request a password reset, you can safely ignore this email.
+          </p>
+          <p style="margin:0;font-size:12px;line-height:1.5;color:${BRAND_MUTED};">
+            If the button does not work, copy and paste this link into your browser:<br/>
+            <a href="${href}" style="color:${BRAND_PRIMARY};word-break:break-all;">${linkText}</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+function buildRecoveryEmailText(recoveryUrl: string): string {
+  return (
+    "You requested to reset your ThriftLine password.\n\n" +
+    "Open this link on your phone to choose a new password:\n" +
+    `${recoveryUrl}\n\n` +
+    "This link expires soon and can only be used once. " +
+    "If you did not request a password reset, you can safely ignore this email."
+  );
 }
 
 async function sha256Hex(value: string): Promise<string> {
@@ -42,7 +103,7 @@ async function sha256Hex(value: string): Promise<string> {
     .join("");
 }
 
-async function sendRecoveryEmail(to: string, link: string): Promise<void> {
+async function sendRecoveryEmail(to: string, recoveryUrl: string): Promise<void> {
   const username = Deno.env.get("GMAIL_USER") ?? "";
   const password = Deno.env.get("GMAIL_APP_PASSWORD") ?? "";
   if (!username.trim() || !password.trim()) {
@@ -58,24 +119,14 @@ async function sendRecoveryEmail(to: string, link: string): Promise<void> {
     },
   });
 
-  const text =
-    "You asked to reset your ThriftLine password.\n\n" +
-    `Open this link on your phone:\n${link}\n\n` +
-    "The link expires soon and can only be used once. " +
-    "If you did not ask for this, you can ignore this email.";
-
-  const safeLink = escapeHtml(link);
-  const html =
-    "<p>You asked to reset your ThriftLine password.</p>" +
-    `<p><a href="${safeLink}">Choose a new password</a></p>` +
-    "<p>The link expires soon and can only be used once. " +
-    "If you did not ask for this, you can ignore this email.</p>";
+  const text = buildRecoveryEmailText(recoveryUrl);
+  const html = buildRecoveryEmailHtml(recoveryUrl);
 
   try {
     await client.send({
       from: `ThriftLine <${username}>`,
       to,
-      subject: "Reset your ThriftLine password",
+      subject: "Reset Your ThriftLine Password",
       content: text,
       html,
     });
@@ -157,13 +208,13 @@ Deno.serve(async (req) => {
     .generateLink({
       type: "recovery",
       email,
+      options: { redirectTo: RECOVERY_REDIRECT },
     });
 
-  const hashedToken = linkData?.properties?.hashed_token ?? "";
-  const appLink = hashedToken
-    ? `${RECOVERY_REDIRECT}?token_hash=${encodeURIComponent(hashedToken)}&type=recovery`
-    : "";
-  if (linkError || !appLink) {
+  // Gmail and most clients strip non-http(s) href values. Use Supabase's HTTPS
+  // verify URL; after verification Auth redirects to thriftline://reset-password.
+  const recoveryUrl = linkData?.properties?.action_link ?? "";
+  if (linkError || !recoveryUrl.startsWith("https://")) {
     const code = linkError && "code" in linkError
       ? String(linkError.code ?? "")
       : "";
@@ -180,7 +231,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    await sendRecoveryEmail(email, appLink);
+    await sendRecoveryEmail(email, recoveryUrl);
   } catch {
     console.error("send-password-reset smtp failed");
     return json(500, {
