@@ -167,7 +167,6 @@ BEGIN
   END IF;
 
   PERFORM public.expire_unpaid_checkouts();
-  PERFORM public.restore_my_unpaid_fixed_price_checkouts();
   PERFORM public.expire_auction_payment_offers();
   PERFORM public.close_auctions();
 

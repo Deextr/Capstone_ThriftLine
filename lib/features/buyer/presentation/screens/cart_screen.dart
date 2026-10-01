@@ -38,6 +38,7 @@ class _CartScreenState extends State<CartScreen> {
 
   Future<void> _reload() async {
     final supabase = context.read<SupabaseService>();
+    await restoreAbandonedFixedPriceCheckouts(supabase);
     await syncMyUnpaidCheckouts(supabase);
     if (!mounted) return;
     final cart = context.read<CartProvider>();

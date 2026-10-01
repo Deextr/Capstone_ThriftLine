@@ -95,7 +95,10 @@ class BuyerOrdersController extends ChangeNotifier {
     }
     try {
       unawaited(_completeExpiredInspections());
-      await syncMyUnpaidCheckouts(_supabase);
+      if (orderId == null) {
+        await restoreAbandonedFixedPriceCheckouts(_supabase);
+        await syncMyUnpaidCheckouts(_supabase);
+      }
       if (orderId != null) {
         _order = await fetchOrderById(_supabase, orderId!, buyerId: myId);
         if (_order != null && _order!.needsBuyerPayment) {
