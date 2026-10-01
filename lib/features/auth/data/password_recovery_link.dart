@@ -33,5 +33,38 @@ abstract final class PasswordRecoveryLink {
     return false;
   }
 
+  /// Session tokens on a recovery deep link (query or fragment).
+  static bool hasRecoveryCallbackParams(Uri uri) {
+    if (!isRecoveryUri(uri)) return false;
+    final fromFragment = Uri.splitQueryString(uri.fragment);
+    const keys = ['access_token', 'code', 'token_hash', 'type'];
+    for (final key in keys) {
+      if (uri.queryParameters.containsKey(key) ||
+          fromFragment.containsKey(key)) {
+        return true;
+      }
+    }
+    return uri.toString().contains('#access_token=') ||
+        uri.toString().contains('?access_token=') ||
+        uri.toString().contains('token_hash=');
+  }
+
+  /// Android often drops the URI fragment; merge hash into query for GoTrue.
+  static Uri normalizeCallbackUri(Uri uri) {
+    if (!isRecoveryUri(uri)) return uri;
+    final merged = <String, String>{...uri.queryParameters};
+    if (uri.fragment.isNotEmpty) {
+      merged.addAll(Uri.splitQueryString(uri.fragment));
+    } else {
+      final raw = uri.toString();
+      final hashIndex = raw.indexOf('#');
+      if (hashIndex >= 0) {
+        merged.addAll(Uri.splitQueryString(raw.substring(hashIndex + 1)));
+      }
+    }
+    if (merged.isEmpty) return uri;
+    return uri.replace(queryParameters: merged, fragment: '');
+  }
+
   static String get resetPasswordRoute => RouteNames.resetPassword;
 }

@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'app/app.dart';
 import 'core/config/supabase_config.dart';
 import 'core/routes/app_router.dart';
+import 'core/routes/deep_link_dispatch.dart';
 import 'core/routes/password_recovery_coordinator.dart';
 import 'core/routes/paymongo_return_coordinator.dart';
 import 'core/services/shared_preferences_service.dart';
@@ -31,7 +32,9 @@ Future<void> main() async {
   await dotenv.load(fileName: '.env');
 
   // Initialize Supabase SDK.
-  await SupabaseConfig.initialize();
+  await SupabaseConfig.initialize(
+    detectSessionInUriPredicate: isSupabaseAuthDeepLink,
+  );
 
   final prefs = await SharedPreferencesService.init();
   final supabaseService = SupabaseService();
@@ -47,10 +50,11 @@ Future<void> main() async {
   await authProvider.init();
 
   final paymongoReturn = PaymongoReturnCoordinator();
-  await attachPaymongoReturnLinks(paymongoReturn);
-
   final passwordRecovery = PasswordRecoveryCoordinator();
-  await attachPasswordRecoveryLinks(passwordRecovery);
+  await attachAppDeepLinks(
+    paymongoReturn: paymongoReturn,
+    passwordRecovery: passwordRecovery,
+  );
 
   final router = createAppRouter(
     authProvider: authProvider,

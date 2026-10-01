@@ -1,4 +1,3 @@
-import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../features/buyer/data/paymongo_return_link.dart';
@@ -25,20 +24,3 @@ class PaymongoReturnCoordinator extends ChangeNotifier {
   }
 }
 
-Future<void> attachPaymongoReturnLinks(
-  PaymongoReturnCoordinator coordinator,
-) async {
-  final appLinks = AppLinks();
-  try {
-    final initial = await appLinks.getInitialLink();
-    if (initial != null) coordinator.accept(initial);
-  } catch (e) {
-    debugPrint('PayMongo initial return link error: $e');
-  }
-  appLinks.uriLinkStream.listen(
-    coordinator.accept,
-    onError: (Object e) {
-      debugPrint('PayMongo return link stream error: $e');
-    },
-  );
-}

@@ -1,8 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
-// Must match PasswordRecoveryLink.redirectUrl and the Auth redirect allow list.
-const RECOVERY_REDIRECT = "thriftline://reset-password";
+// HTTPS bounce page (Gmail → verify → bounce → app). Also allow
+// thriftline://reset-password in the Auth redirect URL list.
+function recoveryBounceUrl(): string {
+  const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/$/, "");
+  if (!base) return "";
+  return `${base}/functions/v1/password-recovery-return`;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -204,11 +209,20 @@ Deno.serve(async (req) => {
     return json(200, { ok: true });
   }
 
+  const bounceUrl = recoveryBounceUrl();
+  if (!bounceUrl.startsWith("https://")) {
+    console.error("send-password-reset bounce URL is not configured");
+    return json(500, {
+      error:
+        "We could not send the reset email right now. Please try again in a moment.",
+    });
+  }
+
   const { data: linkData, error: linkError } = await service.auth.admin
     .generateLink({
       type: "recovery",
       email,
-      options: { redirectTo: RECOVERY_REDIRECT },
+      options: { redirectTo: bounceUrl },
     });
 
   // Gmail and most clients strip non-http(s) href values. Use Supabase's HTTPS

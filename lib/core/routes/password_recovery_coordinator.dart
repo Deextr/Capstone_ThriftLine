@@ -1,4 +1,3 @@
-import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -19,10 +18,16 @@ class PasswordRecoveryCoordinator extends ChangeNotifier {
   }
 
   Future<void> accept(Uri uri) async {
-    if (!PasswordRecoveryLink.isRecoveryUri(uri)) return;
+    if (!PasswordRecoveryLink.isRecoveryUri(uri) &&
+        !PasswordRecoveryLink.hasRecoveryCallbackParams(uri)) {
+      return;
+    }
+    final callback = PasswordRecoveryLink.normalizeCallbackUri(uri);
     try {
-      final tokenHash = PasswordRecoveryLink.recoveryTokenHash(uri);
-      if (tokenHash != null) {
+      final tokenHash = PasswordRecoveryLink.recoveryTokenHash(callback);
+      if (tokenHash != null &&
+          !callback.queryParameters.containsKey('access_token') &&
+          !callback.queryParameters.containsKey('code')) {
         final response = await SupabaseConfig.client.auth.verifyOTP(
           type: OtpType.recovery,
           tokenHash: tokenHash,
@@ -35,7 +40,7 @@ class PasswordRecoveryCoordinator extends ChangeNotifier {
           return;
         }
       } else {
-        await SupabaseConfig.client.auth.getSessionFromUrl(uri);
+        await SupabaseConfig.client.auth.getSessionFromUrl(callback);
       }
       _linkError = null;
     } on AuthException catch (e) {
@@ -70,22 +75,4 @@ String _recoveryLinkErrorMessage(AuthException e) {
   }
   return 'This reset link is invalid or has expired. '
       'Request a new one from the login screen.';
-}
-
-Future<void> attachPasswordRecoveryLinks(
-  PasswordRecoveryCoordinator coordinator,
-) async {
-  final appLinks = AppLinks();
-  try {
-    final initial = await appLinks.getInitialLink();
-    if (initial != null) await coordinator.accept(initial);
-  } catch (e) {
-    debugPrint('Password recovery initial link error: $e');
-  }
-  appLinks.uriLinkStream.listen(
-    (uri) => coordinator.accept(uri),
-    onError: (Object e) {
-      debugPrint('Password recovery link stream error: $e');
-    },
-  );
 }

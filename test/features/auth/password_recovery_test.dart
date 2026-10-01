@@ -7,6 +7,16 @@ import 'package:thriftline/features/buyer/data/paymongo_return_link.dart';
 
 void main() {
   group('PasswordRecoveryLink', () {
+    test('merges fragment tokens into query for Android intents', () {
+      final uri = Uri.parse(
+        'thriftline://reset-password#access_token=abc&type=recovery',
+      );
+      final normalized = PasswordRecoveryLink.normalizeCallbackUri(uri);
+      expect(normalized.queryParameters['access_token'], 'abc');
+      expect(normalized.queryParameters['type'], 'recovery');
+      expect(normalized.fragment, isEmpty);
+    });
+
     test('reads the recovery token hash from the app deep link', () {
       final uri = Uri.parse(
         '${PasswordRecoveryLink.redirectUrl}?token_hash=abc123&type=recovery',
