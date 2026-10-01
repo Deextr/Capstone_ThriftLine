@@ -20,18 +20,18 @@ import '../widgets/id_capture_overlay.dart';
 class IdCaptureResult {
   const IdCaptureResult({
     required this.frontBytes,
-    required this.backBytes,
+    this.backBytes,
     required this.frontQuality,
-    required this.backQuality,
+    this.backQuality,
   });
 
   final Uint8List frontBytes;
-  final Uint8List backBytes;
+  final Uint8List? backBytes;
   final IdQualityResult frontQuality;
-  final IdQualityResult backQuality;
+  final IdQualityResult? backQuality;
 }
 
-/// Camera capture + on-device review for both sides of one selected ID.
+/// Camera capture and review for the sides the selected ID actually uses.
 ///
 /// Live luma only decides whether the frame is worth a document check.
 /// The frame turns valid after the selected type and side agree, and the
@@ -81,17 +81,22 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
 
   double get _aspect => IdCaptureGuide.aspectFor(widget.idType);
 
-  bool get _isPassport => widget.idType == SellerIdType.passport;
+  bool get _needsBack => widget.idType.requiresBackCapture;
 
   String get _sideInstruction {
-    if (_isPassport) {
-      return _side == IdCaptureSide.front
-          ? 'Capture the photo page'
-          : 'Capture the other page';
+    if (widget.idType == SellerIdType.passport) {
+      return 'Capture the photo page';
     }
+    if (!_needsBack) return 'Capture the front';
     return _side == IdCaptureSide.front
         ? 'Capture the front'
         : 'Capture the back';
+  }
+
+  String get _sideNoun {
+    if (widget.idType == SellerIdType.passport) return 'photo page';
+    if (!_needsBack) return 'front';
+    return _side == IdCaptureSide.front ? 'front' : 'back';
   }
 
   bool get _reviewing => _preview != null && !_validating;
@@ -561,6 +566,12 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
     }
 
     if (_side == IdCaptureSide.front) {
+      if (!_needsBack) {
+        Navigator.of(
+          context,
+        ).pop(IdCaptureResult(frontBytes: bytes, frontQuality: quality));
+        return;
+      }
       _stability.reset();
       _resetTextConfirm();
       setState(() {
@@ -618,9 +629,7 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
 
   void _showHelp() {
     final label = widget.idType.label;
-    final sideCopy = _isPassport
-        ? (_side == IdCaptureSide.front ? 'photo page' : 'other page')
-        : (_side == IdCaptureSide.front ? 'front' : 'back');
+    final sideCopy = _sideNoun;
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
@@ -634,6 +643,14 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
                     'brightness up, hold steady, and avoid glare.\n\n'
                     'This check does not prove the ID is genuine. ThriftLine '
                     'still reviews your application.'
+              : widget.idType == SellerIdType.passport
+              ? 'Place the photo page of your passport inside the frame so '
+                    'the edges, photo, and details are visible. Hold it still. '
+                    'The photo is taken automatically when it matches this '
+                    'page and is clear.\n\n'
+                    'Use a well-lit area and avoid glare. A photo of a screen '
+                    'is not accepted. This check does not prove the passport '
+                    'is genuine — ThriftLine still reviews your application.'
               : 'Place the $sideCopy of your $label inside the frame so the edges '
                     'are visible. Hold it still. The photo is taken automatically when '
                     'it matches this ID and is clear.\n\n'
@@ -797,9 +814,7 @@ class _IdCaptureScreenState extends State<IdCaptureScreen> {
   }
 
   Widget _buildReview() {
-    final sideWord = _isPassport
-        ? (_side == IdCaptureSide.front ? 'photo page' : 'other page')
-        : (_side == IdCaptureSide.front ? 'front' : 'back');
+    final sideWord = _sideNoun;
     return SafeArea(
       child: Column(
         children: [

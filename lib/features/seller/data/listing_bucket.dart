@@ -70,3 +70,20 @@ bool canRelistAuction(ListingSnapshot listing) {
   return listing.listingType == 'auction' &&
       listingBucketFor(listing) == ListingBucket.inactive;
 }
+
+/// Seller can offer item to the next-highest bidder if the auction ended,
+/// payment was not completed, and there were multiple bids.
+bool canOfferToNextBidder(ListingSnapshot listing) {
+  if (listing.listingType != 'auction') return false;
+  if (listing.auctionStatus != 'ended') return false;
+  if (listing.productStatus == 'sold' || listing.paymentStatus == 'paid') {
+    return false;
+  }
+  final windowOpen =
+      listing.paymentDueAt != null &&
+      listing.paymentDueAt!.isAfter(listing.now);
+  if (windowOpen && listing.orderStatus == 'pending') {
+    return false;
+  }
+  return listing.bidCount >= 2;
+}

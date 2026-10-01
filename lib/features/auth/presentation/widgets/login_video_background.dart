@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_gradients.dart';
 
 /// Full-screen looping MP4 used behind the Login and Sign Up UI.
 ///
@@ -119,16 +119,7 @@ class _StaticFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.primaryDark,
-            Color(0xFF0F172A),
-          ],
-        ),
-      ),
+      decoration: BoxDecoration(gradient: AppGradients.heroGradient),
     );
   }
 }

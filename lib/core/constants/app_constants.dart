@@ -20,6 +20,7 @@ abstract final class AppConstants {
   static const String keyActiveAccountUserId = 'active_account_user_id';
   static const String keyRecentSearchesPrefix = 'recent_searches_';
   static const String keyBuyerHomeCache = 'buyer_home_feed_cache';
+  static const String keyAdminDashboardCache = 'admin_dashboard_snapshot';
 
   // Breakpoints (mobile-first)
   static const double breakpointTablet = 600;

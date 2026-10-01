@@ -14,6 +14,11 @@ import '../features/auth/domain/legal_documents.dart';
 import '../features/auth/domain/trusted_device.dart';
 import '../models/enums.dart';
 
+/// TEMPORARY: skips the email OTP step on login and sign-up.
+/// Only takes effect in debug builds. Set to false to restore OTP.
+const bool kBypassEmailOtp = true;
+bool get _bypassOtp => kDebugMode && kBypassEmailOtp;
+
 /// Router-facing gate: a restored session is not enough while email OTP is
 /// still outstanding.
 bool authIsFullyAuthenticated({
@@ -51,8 +56,23 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _user != null;
   bool get isEmailOtpPending => _emailOtpPending;
 
-  /// Email/password identity, not “the address is Gmail”.
-  bool get usesEmailPasswordAuth => _user?.usesEmailPasswordAuth ?? false;
+  /// Current session used email/password — not Gmail, not Buyer/Seller mode.
+  ///
+  /// Computed from the live GoTrue session (JWT `amr` + identities) so a
+  /// Buyer ↔ Seller switch cannot keep a stale trusted-device flag.
+  bool get usesEmailPasswordAuth {
+    final session = _authService.currentSession;
+    return authSessionUsesEmailPassword(
+      lastAuthProvider: lastAuthProviderFromAppMetadata(
+        session?.user.appMetadata,
+      ),
+      identityProviders: <String>{
+        ...?_user?.authIdentityProviders,
+        ...?session?.user.identities?.map((i) => i.provider),
+      },
+      amrMethods: sessionAmrMethodsFromAccessToken(session?.accessToken),
+    );
+  }
 
   /// True while email/password sign-in is waiting on the trusted-device check.
   /// The router stays on the login screen until this clears.
@@ -111,7 +131,10 @@ class AuthProvider extends ChangeNotifier {
       final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         _user = currentUser;
-        _emailOtpPending = _prefs.isEmailOtpPending;
+        // TEMP: with the OTP bypass on, also clear any stale pending flag so
+        // the router doesn't get stuck on the OTP gate.
+        _emailOtpPending = _bypassOtp ? false : _prefs.isEmailOtpPending;
+        if (_bypassOtp) await _prefs.setEmailOtpPending(false);
         _syncActiveAccount(currentUser, restoreFromPrefs: true);
         await _saveSession(currentUser);
       } else {
@@ -204,10 +227,13 @@ class AuthProvider extends ChangeNotifier {
         serverTrusted = false;
       }
 
-      final skipOtp = shouldSkipEmailOtp(
-        passwordAccepted: true,
-        serverTrusted: serverTrusted,
-      );
+      // TEMP: _bypassOtp forces the skip (debug builds only).
+      final skipOtp =
+          _bypassOtp ||
+          shouldSkipEmailOtp(
+            passwordAccepted: true,
+            serverTrusted: serverTrusted,
+          );
       if (skipOtp) {
         await _setEmailOtpPending(false);
       } else {
@@ -286,6 +312,9 @@ class AuthProvider extends ChangeNotifier {
       return AuthResult.failure('Something went wrong. Please try again.');
     }
 
+    // TEMP: with the OTP bypass on, sign-up never enters the OTP step.
+    final needsOtp = result.requiresEmailOtp && !_bypassOtp;
+
     if (result.requiresEmailVerification) {
       // Supabase withheld the session pending confirmation, so the app must
       // not treat the account as signed in.
@@ -296,7 +325,7 @@ class AuthProvider extends ChangeNotifier {
       if (_user != null) {
         _syncActiveAccount(_user!, restoreFromPrefs: true);
         await _saveSession(_user!);
-        if (result.requiresEmailOtp) {
+        if (needsOtp) {
           await _setEmailOtpPending(true);
         }
       }
@@ -304,7 +333,7 @@ class AuthProvider extends ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
-    if (result.requiresEmailOtp && _user != null) {
+    if (needsOtp && _user != null) {
       await sendEmailOtp();
     }
     return result;
@@ -321,7 +350,8 @@ class AuthProvider extends ChangeNotifier {
   /// [forgetDevice] revokes that grant first and replaces the local token.
   /// If revocation fails, the session stays signed in.
   Future<String?> logout({bool forgetDevice = false}) async {
-    if (forgetDevice) {
+    final revokeTrust = forgetDevice && usesEmailPasswordAuth;
+    if (revokeTrust) {
       final error = await _forgetTrustedDevice();
       if (error != null) return error;
     }

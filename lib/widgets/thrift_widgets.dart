@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import '../core/constants/app_colors.dart';
 import '../core/constants/app_constants.dart';
 import '../core/constants/app_typography.dart';
+import '../core/theme/app_gradients.dart';
+import '../core/utils/seller_trust.dart';
 
 enum ThriftButtonVariant { primary, secondary, outline, ghost }
 
@@ -57,19 +59,26 @@ class ThriftButton extends StatelessWidget {
           );
 
     final btn = switch (variant) {
-      ThriftButtonVariant.primary => ElevatedButton(
-        onPressed: isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color ?? AppColors.primary,
-          foregroundColor: Colors.white,
-          minimumSize: Size(expand ? double.infinity : 0, 48),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 0,
-        ),
-        child: child,
-      ),
+      ThriftButtonVariant.primary =>
+        color == null
+            ? _GradientButton(
+                onPressed: isLoading ? null : onPressed,
+                expand: expand,
+                child: child,
+              )
+            : ElevatedButton(
+                onPressed: isLoading ? null : onPressed,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: color,
+                  foregroundColor: Colors.white,
+                  minimumSize: Size(expand ? double.infinity : 0, 48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                child: child,
+              ),
       ThriftButtonVariant.secondary => ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
@@ -115,6 +124,57 @@ class ThriftButton extends StatelessWidget {
       : Colors.white;
 }
 
+class _GradientButton extends StatelessWidget {
+  const _GradientButton({
+    required this.onPressed,
+    required this.expand,
+    required this.child,
+  });
+
+  final VoidCallback? onPressed;
+  final bool expand;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: enabled ? AppGradients.buttonGradient : null,
+        color: enabled ? null : AppColors.primary.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: enabled ? AppGradients.emphasisShadow : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(12),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: 48,
+              minWidth: expand ? double.infinity : 0,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.center,
+                child: DefaultTextStyle.merge(
+                  style: const TextStyle(color: Colors.white),
+                  child: IconTheme.merge(
+                    data: const IconThemeData(color: Colors.white),
+                    child: child,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class ThriftTextField extends StatefulWidget {
   const ThriftTextField({
     super.key,
@@ -135,6 +195,7 @@ class ThriftTextField extends StatefulWidget {
     this.autofocus = false,
     this.validator,
     this.labelColor,
+    this.autovalidateMode,
   });
 
   final String? label;
@@ -154,6 +215,7 @@ class ThriftTextField extends StatefulWidget {
   final bool autofocus;
   final String? Function(String?)? validator;
   final Color? labelColor;
+  final AutovalidateMode? autovalidateMode;
 
   @override
   State<ThriftTextField> createState() => _ThriftTextFieldState();
@@ -201,9 +263,11 @@ class _ThriftTextFieldState extends State<ThriftTextField> {
           autofocus: widget.autofocus,
           validator: widget.validator,
           scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-          autovalidateMode: widget.validator != null
-              ? AutovalidateMode.onUserInteraction
-              : AutovalidateMode.disabled,
+          autovalidateMode:
+              widget.autovalidateMode ??
+              (widget.validator != null
+                  ? AutovalidateMode.onUserInteraction
+                  : AutovalidateMode.disabled),
           decoration: InputDecoration(
             hintText: widget.hint,
             prefixIcon: widget.icon != null
@@ -538,7 +602,7 @@ const List<TrustClassificationData> trustClassifications = [
     color: Color(0xFF0D9488), // Teal
     icon: Icons.verified_user_rounded,
     description:
-        'Outstanding fulfillment speed, near-zero complaints, and highly rated items.',
+        '90–100. The strongest mix of verification, completed orders, ratings, and confirmed reports.',
   ),
   TrustClassificationData(
     label: 'Trusted Seller',
@@ -547,16 +611,16 @@ const List<TrustClassificationData> trustClassifications = [
     color: Color(0xFF10B981), // Emerald/Green
     icon: Icons.shield_rounded,
     description:
-        'Consistently positive reviews, reliable shipping, and accurate descriptions.',
+        '75–89. A stronger mix of verification, completed orders, ratings, and few confirmed reports.',
   ),
   TrustClassificationData(
-    label: 'Developing Seller',
+    label: 'New Seller',
     minScore: 60,
     maxScore: 74,
     color: Color(0xFFF59E0B), // Amber
     icon: Icons.trending_up_rounded,
     description:
-        'Newer shop building community presence or has minor feedback history.',
+        '60–74. A newer shop, including a verified seller without a long sales history.',
   ),
   TrustClassificationData(
     label: 'Under Review',
@@ -565,7 +629,7 @@ const List<TrustClassificationData> trustClassifications = [
     color: Color(0xFFF97316), // Orange
     icon: Icons.gpp_maybe_rounded,
     description:
-        'Undergoing audit due to reports, high cancellation rate, or low ratings.',
+        '40–59. The score is in the review range. This label does not suspend the account.',
   ),
   TrustClassificationData(
     label: 'Banned',
@@ -574,7 +638,7 @@ const List<TrustClassificationData> trustClassifications = [
     color: Color(0xFFEF4444), // Red
     icon: Icons.gpp_bad_rounded,
     description:
-        'Accounts suspended due to serious policy violations or scam complaints.',
+        'Below 40. This is a trust label. It does not suspend the account.',
   ),
 ];
 
@@ -584,18 +648,21 @@ class SellerTrustBadge extends StatelessWidget {
     required this.trustScore,
     required this.isVerified,
     required this.shopName,
+    this.trustLevel,
     this.showNumericScore = true,
   });
 
   final int trustScore;
   final bool isVerified;
   final String shopName;
+  final String? trustLevel;
   final bool showNumericScore;
 
   @override
   Widget build(BuildContext context) {
+    final label = resolveTrustLabel(score: trustScore, storedLevel: trustLevel);
     final current = trustClassifications.firstWhere(
-      (c) => trustScore >= c.minScore && trustScore <= c.maxScore,
+      (c) => c.label == label,
       orElse: () => trustClassifications.last,
     );
 
@@ -675,18 +742,18 @@ class SellerTrustBadge extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                'How we ensure ThriftLine remains a safe community',
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
               const SizedBox(height: 20),
               Expanded(
                 child: ListView(
                   controller: scrollController,
                   children: [
+                    Text(
+                      'Saved on the server from identity verification, completed orders, ratings on completed orders, and reports an admin confirmed.',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -784,13 +851,7 @@ class SellerTrustBadge extends StatelessWidget {
                           ),
                           const Divider(height: 24, thickness: 1),
                           Text(
-                            showNumericScore
-                                ? (isVerified
-                                      ? '$shopName is a verified seller and currently rated as a ${current.label} based on their positive community feedback, fulfillment efficiency, and safety compliance.'
-                                      : '$shopName is currently classified as a ${current.label} with a trust score of $trustScore/100.')
-                                : (isVerified
-                                      ? '$shopName is a verified ${current.label} based on community feedback, fulfillment, and safety compliance.'
-                                      : '$shopName is currently classified as a ${current.label}.'),
+                            '$shopName is classified as a ${current.label} with a trust score of $trustScore/100. Only completed orders, reviews on completed orders, and reports an admin confirmed are counted.',
                             style: AppTypography.body.copyWith(
                               fontSize: 13,
                               height: 1.4,

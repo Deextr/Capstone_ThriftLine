@@ -11,6 +11,7 @@ import '../../../../widgets/product_card.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../trust_safety/data/review_rules.dart';
 import '../../controllers/my_shop_controller.dart';
+import '../widgets/seller_trust_criterion_scores.dart';
 
 class MyShopScreen extends StatelessWidget {
   const MyShopScreen({super.key});
@@ -138,9 +139,19 @@ class MyShopScreen extends StatelessWidget {
                     if (user != null)
                       SellerTrustBadge(
                         trustScore: user.trustScore,
+                        trustLevel: user.trustLevel,
                         isVerified: user.isVerified,
                         shopName: user.shopName ?? user.name,
                       ),
+                    if (user?.trustBreakdown != null) ...[
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: SellerTrustCriterionScores(
+                          breakdown: user!.trustBreakdown!,
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 16),
 

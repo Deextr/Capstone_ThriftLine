@@ -302,19 +302,128 @@ void main() {
         IdDocumentClassifier.rejection(
           evidence: const DocumentEvidence(
             available: true,
-            alphanumericChars: 22,
-            blockCount: 3,
+            alphanumericChars: 120,
+            blockCount: 8,
             faceCoverage: 0,
-            textCoverage: 0.22,
-            recognizedText: 'philsys this is to certify qr code',
+            textCoverage: 0.4,
+            recognizedText:
+                'araw ng pagkakaloob/date of issue 10 february 2022 '
+                'kasarian/sex female uri ng dugo/blood type unknown '
+                'kalagayang sibil/marital status married '
+                'lugar ng kapanganakan/place of birth davao '
+                'if found, please return to the nearest psa office '
+                'www.psa.gov.ph',
           ),
-          geometry: _card(moduleScore: 0.4, portrait: 0),
+          geometry: _card(moduleScore: 0.84, portrait: 0),
           expectedType: SellerIdType.nationalId,
           expectedSide: IdCaptureSide.back,
+          sessionTypeConfirmed: true,
         ),
         isNull,
       );
     });
+
+    test('the printed PSA address does not make the PhilID back a screen', () {
+      final live = IdDocumentClassifier.confirmLive(
+        luma: LiveIdAssessment(
+          status: LiveIdStatus.aligned,
+          occupancy: 0.8,
+          geometry: _card(moduleScore: 0.84, portrait: 0),
+        ),
+        evidence: const DocumentEvidence(
+          available: true,
+          alphanumericChars: 90,
+          blockCount: 6,
+          textCoverage: 0.4,
+          recognizedText:
+              'date of issue 10 february 2022 sex female blood type unknown '
+              'marital status married place of birth davao www.psa.gov.ph',
+        ),
+        expectedType: SellerIdType.nationalId,
+        expectedSide: IdCaptureSide.back,
+        sessionTypeConfirmed: true,
+      );
+      expect(live.isAligned, isTrue);
+      expect(live.message, isNot(contains('screen')));
+    });
+
+    test('bold PhilID back values beside the QR are accepted', () {
+      expect(
+        IdDocumentClassifier.rejection(
+          evidence: const DocumentEvidence(
+            available: true,
+            alphanumericChars: 48,
+            blockCount: 5,
+            recognizedText: '10 february 2022 female unknown married',
+          ),
+          geometry: _card(moduleScore: 0.84, portrait: 0),
+          expectedType: SellerIdType.nationalId,
+          expectedSide: IdCaptureSide.back,
+          sessionTypeConfirmed: true,
+        ),
+        isNull,
+      );
+    });
+
+    test('a QR code alone is not a National ID back', () {
+      final result = IdDocumentClassifier.rejection(
+        evidence: const DocumentEvidence(
+          available: true,
+          alphanumericChars: 8,
+          blockCount: 1,
+          recognizedText: 'qr code',
+        ),
+        geometry: _card(moduleScore: 0.9, portrait: 0),
+        expectedType: SellerIdType.nationalId,
+        expectedSide: IdCaptureSide.back,
+        sessionTypeConfirmed: true,
+      );
+      expect(result, isNotNull);
+      expect(result!.passed, isFalse);
+    });
+
+    test('demographic words without the physical card marker are rejected', () {
+      final result = IdDocumentClassifier.rejection(
+        evidence: const DocumentEvidence(
+          available: true,
+          alphanumericChars: 80,
+          blockCount: 6,
+          recognizedText:
+              'kasarian sex female uri ng dugo blood type unknown '
+              'kalagayang sibil marital status single '
+              'lugar ng kapanganakan place of birth davao',
+        ),
+        geometry: _card(moduleScore: 0.9, portrait: 0),
+        expectedType: SellerIdType.nationalId,
+        expectedSide: IdCaptureSide.back,
+        sessionTypeConfirmed: true,
+      );
+      expect(result, isNotNull);
+      expect(result!.issue, isNot(IdQualityIssue.wrongSide));
+    });
+
+    test(
+      'a browser address is still rejected on the National ID back step',
+      () {
+        final result = IdDocumentClassifier.rejection(
+          evidence: const DocumentEvidence(
+            available: true,
+            alphanumericChars: 80,
+            blockCount: 6,
+            textCoverage: 0.4,
+            recognizedText:
+                'https://www.example.com date of issue sex female '
+                'blood type marital status place of birth',
+          ),
+          geometry: _card(moduleScore: 0.84, portrait: 0),
+          expectedType: SellerIdType.nationalId,
+          expectedSide: IdCaptureSide.back,
+          sessionTypeConfirmed: true,
+        );
+        expect(result!.issue, IdQualityIssue.notId);
+        expect(result.message, contains('screen'));
+      },
+    );
 
     test('PhilSys back without a title is allowed after a confirmed front', () {
       expect(

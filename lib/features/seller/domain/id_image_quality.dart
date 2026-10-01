@@ -98,12 +98,19 @@ class IdCapturePair {
   final IdQualityResult? front;
   final IdQualityResult? back;
 
-  bool get canProceed =>
-      front != null && back != null && front!.passed && back!.passed;
+  /// [requiresBack] follows the selected document. A passport, UMID, or SSS
+  /// ID can proceed from the front photograph alone.
+  bool canProceed({bool requiresBack = true}) {
+    if (front == null || !front!.passed) return false;
+    if (!requiresBack) return true;
+    return back != null && back!.passed;
+  }
 
-  IdQualityIssue? get blockingIssue {
-    if (front == null || back == null) return IdQualityIssue.missing;
+  IdQualityIssue? blockingIssue({bool requiresBack = true}) {
+    if (front == null) return IdQualityIssue.missing;
     if (!front!.passed) return front!.issue;
+    if (!requiresBack) return null;
+    if (back == null) return IdQualityIssue.missing;
     if (!back!.passed) return back!.issue;
     return null;
   }
@@ -396,9 +403,13 @@ class DocumentEvidence {
   /// Applies to every ID type, including Digital National ID. A gallery
   /// "Screenshot" label is not a hint here: a screenshot of the eGov
   /// credential is a valid way to show the Digital National ID.
+  ///
+  /// The physical PhilID back prints `www.psa.gov.ph` as a return address.
+  /// That footer is removed before the browser check. Any other address,
+  /// including `https://`, is still a screen.
   bool get looksLikeUnrelatedScreen {
     if (!available || recognizedText.isEmpty) return false;
-    final text = recognizedText.toLowerCase();
+    final text = _withoutPrintedPhilIdFooter(recognizedText);
     const hints = [
       'http://',
       'https://',
@@ -425,7 +436,7 @@ class DocumentEvidence {
   bool get looksLikeDisplayedImage {
     if (!available) return false;
     if (textCoverage >= IdImageMetrics.maxScreenTextCoverage) return true;
-    final text = recognizedText.toLowerCase();
+    final text = _withoutPrintedPhilIdFooter(recognizedText);
     const hints = ['http://', 'https://', 'www.', 'screenshot'];
     for (final hint in hints) {
       if (text.contains(hint) &&
@@ -434,6 +445,12 @@ class DocumentEvidence {
       }
     }
     return false;
+  }
+
+  /// Official return line on the physical PhilID, not a browser address bar.
+  static String _withoutPrintedPhilIdFooter(String raw) {
+    final text = raw.toLowerCase();
+    return text.replaceAll(RegExp(r'www\.\s*psa\.\s*gov\.\s*ph'), ' ');
   }
 
   /// Strong evidence this is a selfie or a phone screen — not a printed ID.
@@ -999,18 +1016,25 @@ class IdImageMetrics {
         geometry.frameLight >= liveMinLightFraction;
 
     if (hasText) {
-      if (!geometry.cardLikeAspect && !qrGuide) return false;
+      // PhilID and eGov backs put a large QR beside a short text column.
+      // That code scores above the ordinary text range and can leave fewer
+      // than two text bands. The QR is not itself an ID; the caller still
+      // has to match the selected document.
+      final codeBesideText =
+          !requireIdPhoto &&
+          geometry.moduleScore > liveMaxModuleScore &&
+          geometry.moduleScore < 0.97 &&
+          (geometry.cardLikeAspect || geometry.occupancy >= 0.75);
+      if (!geometry.cardLikeAspect && !qrGuide && !codeBesideText) {
+        return false;
+      }
       if (requireIdPhoto) {
         return hasPortrait || geometry.bandCount >= 3 || qrGuide;
       }
-      // The eGov Digital National ID back is mostly one large QR, which
-      // drowns out text bands. OCR text plus that code is enough there.
-      final displayedCodeBack =
-          allowDisplayedDocument && denseQr && geometry.cardLikeAspect;
       return geometry.bandCount >= 2 ||
           hasPortrait ||
           qrGuide ||
-          displayedCodeBack;
+          codeBesideText;
     }
 
     if (requireIdPhoto && hasPortrait && _hasPrintedCardStructure(geometry)) {
@@ -1073,7 +1097,18 @@ class IdImageMetrics {
       geometry.bandCount >= liveMinBands;
 
   static bool _looksLikePrintedCardLive(IdDocumentGeometry geometry) {
-    if (geometry.poorlyFramed) return false;
+    // A PhilID back is a light ID-1 card with a large QR. That code scores
+    // above ordinary text bands and can leave fewer than three text rows.
+    // Scores near 1.0 are a solid checkerboard with no quiet text column.
+    // This only opens the OCR check.
+    final denseCodeOnLightCard =
+        geometry.moduleScore > liveMaxModuleScore &&
+        geometry.moduleScore < 0.97 &&
+        geometry.frameMean >= liveMinInteriorMean &&
+        geometry.frameLight >= liveMinLightFraction &&
+        geometry.occupancy >= 0.62 &&
+        (geometry.cardLikeAspect || geometry.occupancy >= 0.75);
+    if (geometry.poorlyFramed && !denseCodeOnLightCard) return false;
 
     final lightGuide =
         geometry.frameMean >= liveMinInteriorMean &&
@@ -1086,7 +1121,8 @@ class IdImageMetrics {
     final printed =
         geometry.bandCount >= liveMinBands ||
         (geometry.moduleScore >= liveMinModuleScore &&
-            geometry.moduleScore <= liveMaxModuleScore);
+            geometry.moduleScore <= liveMaxModuleScore) ||
+        denseCodeOnLightCard;
     if (!printed) return false;
 
     final landscapeCard =
@@ -1099,7 +1135,9 @@ class IdImageMetrics {
         geometry.moduleScore >= liveMinModuleScore &&
         geometry.moduleScore <= liveMaxModuleScore &&
         (geometry.occupancy >= 0.22 || geometry.bandCount >= 1);
-    if (!landscapeCard && !printedInGuide) return false;
+    if (!landscapeCard && !printedInGuide && !denseCodeOnLightCard) {
+      return false;
+    }
 
     if (geometry.cornerFill < liveMinCornerFill &&
         !_lightPrintedBands(geometry) &&

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -43,6 +45,117 @@ void main() {
       expect(
         showEmailTrustedDeviceLogout(usesEmailPasswordAuth: false),
         isFalse,
+      );
+    });
+  });
+
+  group('authSessionUsesEmailPassword', () {
+    test('does not treat a companion email identity as password login', () {
+      expect(
+        authSessionUsesEmailPassword(
+          lastAuthProvider: 'email',
+          identityProviders: const ['google', 'email'],
+        ),
+        isFalse,
+      );
+      expect(
+        authSessionUsesEmailPassword(
+          lastAuthProvider: 'google',
+          identityProviders: const ['google', 'email'],
+        ),
+        isFalse,
+      );
+    });
+
+    test('JWT oauth AMR is Google Sign-In even if metadata says email', () {
+      expect(
+        authSessionUsesEmailPassword(
+          lastAuthProvider: 'email',
+          identityProviders: const ['email'],
+          amrMethods: const ['oauth'],
+        ),
+        isFalse,
+      );
+    });
+
+    test('JWT password AMR is email login even when Google is also linked', () {
+      expect(
+        authSessionUsesEmailPassword(
+          lastAuthProvider: 'google',
+          identityProviders: const ['email', 'google'],
+          amrMethods: const ['password'],
+        ),
+        isTrue,
+      );
+    });
+
+    test('does not treat Gmail as Google when the session is email-only', () {
+      expect(
+        authSessionUsesEmailPassword(
+          lastAuthProvider: 'email',
+          identityProviders: const ['email'],
+        ),
+        isTrue,
+      );
+    });
+
+    test('falls back to identities when last provider is missing', () {
+      expect(
+        authSessionUsesEmailPassword(
+          lastAuthProvider: null,
+          identityProviders: const ['google', 'email'],
+        ),
+        isFalse,
+      );
+      expect(
+        authSessionUsesEmailPassword(
+          lastAuthProvider: null,
+          identityProviders: const ['email'],
+        ),
+        isTrue,
+      );
+    });
+  });
+
+  group('sessionAmrMethodsFromAccessToken', () {
+    test('reads amr methods from a JWT payload', () {
+      final payload = base64Url
+          .encode(
+            utf8.encode(
+              jsonEncode({
+                'amr': [
+                  {'method': 'oauth', 'timestamp': 1},
+                ],
+              }),
+            ),
+          )
+          .replaceAll('=', '');
+      expect(sessionAmrMethodsFromAccessToken('header.$payload.sig'), [
+        'oauth',
+      ]);
+    });
+  });
+
+  group('lastAuthProviderFromAppMetadata', () {
+    test('reads the current provider, then a single providers entry', () {
+      expect(
+        lastAuthProviderFromAppMetadata({
+          'provider': 'google',
+          'providers': ['google', 'email'],
+        }),
+        'google',
+      );
+      expect(
+        lastAuthProviderFromAppMetadata({
+          'providers': ['email'],
+        }),
+        'email',
+      );
+      expect(
+        lastAuthProviderFromAppMetadata({
+          'providers': ['email', 'google'],
+        }),
+        isNull,
       );
     });
   });

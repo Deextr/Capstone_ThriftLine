@@ -23,6 +23,18 @@ void main() {
       expect(labels.any((label) => label.contains('student')), isFalse);
     });
 
+    test(
+      'only PhilID, Digital National ID, and a license need a back photo',
+      () {
+        expect(SellerIdType.nationalId.requiresBackCapture, isTrue);
+        expect(SellerIdType.digitalNationalId.requiresBackCapture, isTrue);
+        expect(SellerIdType.driversLicense.requiresBackCapture, isTrue);
+        expect(SellerIdType.passport.requiresBackCapture, isFalse);
+        expect(SellerIdType.sssId.requiresBackCapture, isFalse);
+        expect(SellerIdType.umidId.requiresBackCapture, isFalse);
+      },
+    );
+
     test('parses allowed storage values', () {
       expect(SellerIdType.tryParse('national_id'), SellerIdType.nationalId);
       expect(SellerIdType.tryParse('Driver\'s License'), isNull);

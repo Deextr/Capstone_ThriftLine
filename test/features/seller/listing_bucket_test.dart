@@ -97,4 +97,33 @@ void main() {
     );
     expect(listingBucketFor(listing), ListingBucket.active);
   });
+
+  test('ended auction with unpaid winner and multiple bids allows offer to next bidder', () {
+    final listing = auction(
+      orderStatus: 'cancelled',
+      bidCount: 3,
+    );
+    expect(canOfferToNextBidder(listing), isTrue);
+    expect(canRelistAuction(listing), isTrue);
+  });
+
+  test('ended auction with only 1 bid does not allow offer to next bidder', () {
+    final listing = auction(
+      orderStatus: 'cancelled',
+      bidCount: 1,
+    );
+    expect(canOfferToNextBidder(listing), isFalse);
+    expect(canRelistAuction(listing), isTrue);
+  });
+
+  test('ended auction while payment window is open does not allow offer to next bidder yet', () {
+    final listing = auction(
+      winnerId: 'first',
+      orderStatus: 'pending',
+      paymentStatus: 'pending',
+      paymentDueAt: now.add(const Duration(hours: 6)),
+      bidCount: 2,
+    );
+    expect(canOfferToNextBidder(listing), isFalse);
+  });
 }

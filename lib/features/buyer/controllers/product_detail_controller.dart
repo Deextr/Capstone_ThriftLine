@@ -37,6 +37,7 @@ class ProductDetailController extends ChangeNotifier {
   ProductModel? _product;
   Map<String, dynamic>? _auction;
   List<Map<String, dynamic>> _bids = [];
+  Map<String, dynamic>? _auctionOrder;
   bool _isLoading = true;
   String? _errorMessage;
   RealtimeChannel? _auctionChannel;
@@ -116,6 +117,40 @@ class ProductDetailController extends ChangeNotifier {
 
   String? get auctionId => _auction?['auction_id'] as String?;
 
+  /// The payment deadline for the viewer's won-auction order.
+  DateTime? get paymentDueAt {
+    final raw = _auctionOrder?['payment_due_at'] as String?;
+    return raw != null ? DateTime.tryParse(raw) : null;
+  }
+
+  /// Whether the viewer's payment window has expired.
+  bool get isPaymentExpired {
+    final due = paymentDueAt;
+    if (due == null) return false;
+    return due.isBefore(DateTime.now());
+  }
+
+  /// Order status for the viewer's auction order (e.g. 'pending', 'cancelled').
+  String? get auctionOrderStatus =>
+      _auctionOrder?['order_status'] as String?;
+
+  /// Current bid round (incremented on each relist).
+  int get bidRound => (_auction?['bid_round'] as num?)?.toInt() ?? 1;
+
+  /// Auction starting price (used to pre-fill the relist form).
+  double get auctionStartingPrice =>
+      (_auction?['starting_price'] as num?)?.toDouble() ??
+      _product?.price ??
+      0;
+
+  /// Auction minimum increment (used to pre-fill the relist form).
+  double get auctionMinimumIncrement =>
+      (_auction?['minimum_increment'] as num?)?.toDouble() ?? 20;
+
+  /// Auction duration in days (used to pre-fill the relist form).
+  int get auctionDurationDays =>
+      (_auction?['duration_days'] as num?)?.toInt() ?? 3;
+
   /// Seller may close only while bidding is still open and someone has bid.
   bool get canEndAuctionEarly =>
       isOwnListing && isAuctionActive && bidCount > 0;
@@ -155,19 +190,152 @@ class ProductDetailController extends ChangeNotifier {
     return _bids.first['bidder_id'] == uid;
   }
 
+  bool get isViewerWinner {
+    final uid = _auth.user?.id;
+    if (uid == null || !isAuction || isAuctionActive) return false;
+    if (_auction?['winner_id'] != uid) return false;
+    // If the order was cancelled (payment expired), the viewer is no longer
+    // considered a winner who can proceed to checkout.
+    if (auctionOrderStatus == 'cancelled') return false;
+    return true;
+  }
+
+  /// Whether the viewer won the auction but their payment window expired.
+  bool get isViewerExpiredWinner {
+    final uid = _auth.user?.id;
+    if (uid == null || !isAuction || isAuctionActive) return false;
+    return _auction?['winner_id'] == uid &&
+        auctionOrderStatus == 'cancelled';
+  }
+
+  bool get hasNoWinner {
+    if (!isAuction || isAuctionActive) return false;
+    final winnerId = _auction?['winner_id'] as String?;
+    return winnerId == null || winnerId.isEmpty || _bids.isEmpty;
+  }
+
+  bool get canOfferToNextBidder {
+    if (!isOwnListing || !isAuction || isAuctionActive) return false;
+    if (_product?.status == ProductStatus.sold) return false;
+    return _bids.length >= 2;
+  }
+
+  bool isViewerBid(Map<String, dynamic> bid) {
+    final uid = _auth.user?.id;
+    return uid != null && bid['bidder_id'] == uid;
+  }
+
   String? get viewerAuctionStatus {
     if (!isAuction) return null;
     final uid = _auth.user?.id;
     if (uid == null) return null;
     final hasBid = _bids.any((b) => b['bidder_id'] == uid);
     if (!isAuctionActive) {
-      if (_auction?['winner_id'] == uid) return 'You won this auction';
+      if (isViewerExpiredWinner) {
+        return 'Payment window expired — Item no longer available';
+      }
+      if (isViewerWinner) {
+        final due = paymentDueAt;
+        if (due != null) {
+          final diff = due.difference(DateTime.now());
+          if (!diff.isNegative) {
+            final hours = diff.inHours;
+            final mins = diff.inMinutes % 60;
+            return 'You won! Pay within ${hours}h ${mins}m';
+          }
+        }
+        return 'You won this auction';
+      }
+      if (hasNoWinner) return 'Auction ended — No winner';
       if (hasBid) return 'You did not win this auction';
       return 'Auction ended';
     }
     if (!hasBid) return null;
-    if (isViewerLeading) return "You're leading";
+    if (isViewerLeading) return "You're leading (Highest bidder)";
     return "You've been outbid";
+  }
+
+  Future<String?> getWonAuctionOrderId() async {
+    final aid = auctionId;
+    final uid = _auth.user?.id;
+    if (aid == null || uid == null) return null;
+    try {
+      final row = await _supabase.client
+          .from('orders')
+          .select('order_id')
+          .eq('auction_id', aid)
+          .eq('buyer_id', uid)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      if (row != null && row['order_id'] != null) {
+        return row['order_id'] as String;
+      }
+      final rpcRes = await _supabase.client.rpc(
+        'ensure_auction_order',
+        params: {'p_auction_id': aid},
+      );
+      if (rpcRes != null) return rpcRes.toString();
+    } catch (e) {
+      debugPrint('ProductDetailController.getWonAuctionOrderId error: $e');
+    }
+    return null;
+  }
+
+  Future<String?> offerToNextBidder() async {
+    final aid = auctionId;
+    if (aid == null) return 'Auction not found.';
+    try {
+      final result = await _supabase.client.rpc(
+        'offer_auction_to_next_bidder',
+        params: {'p_auction_id': aid},
+      );
+      if (!supabaseRpcSuccess(result)) {
+        return supabaseRpcError(
+          result,
+          fallback: 'Could not send offer to next bidder.',
+        );
+      }
+      await _loadAuctionData();
+      notifyListeners();
+      return null;
+    } catch (e) {
+      debugPrint('ProductDetailController.offerToNextBidder error: $e');
+      return 'Could not send offer to next bidder.';
+    }
+  }
+
+  Future<String?> relistAuction(
+    int days, {
+    double? startingPrice,
+    double? minimumIncrement,
+  }) async {
+    if (_productId.isEmpty) return 'Product not found.';
+    try {
+      final params = <String, dynamic>{
+        'p_product_id': _productId,
+        'p_duration_days': days,
+      };
+      if (startingPrice != null) params['p_starting_price'] = startingPrice;
+      if (minimumIncrement != null) {
+        params['p_minimum_increment'] = minimumIncrement;
+      }
+      final result = await _supabase.client.rpc(
+        'relist_unsold_auction',
+        params: params,
+      );
+      if (!supabaseRpcSuccess(result)) {
+        return supabaseRpcError(
+          result,
+          fallback: 'Could not relist this auction.',
+        );
+      }
+      await _loadProduct();
+      return null;
+    } catch (e) {
+      debugPrint('ProductDetailController.relistAuction error: $e');
+      return 'Could not relist this auction.';
+    }
   }
 
   Future<void> _loadProduct() async {
@@ -257,6 +425,9 @@ class ProductDetailController extends ChangeNotifier {
       if (_auction != null && _product != null) {
         final auctionId = _auction!['auction_id'] as String;
 
+        final currentRound =
+            (_auction!['bid_round'] as num?)?.toInt() ?? 1;
+
         final bidsResponse = await _supabase.client
             .from('bids')
             .select('''
@@ -268,6 +439,7 @@ class ProductDetailController extends ChangeNotifier {
               )
             ''')
             .eq('auction_id', auctionId)
+            .eq('bid_round', currentRound)
             .order('bid_amount', ascending: false);
 
         _bids = List<Map<String, dynamic>>.from(
@@ -299,6 +471,23 @@ class ProductDetailController extends ChangeNotifier {
               )
               .toList(),
         );
+
+        // Load the current viewer's auction order to check payment status
+        final uid = _auth.user?.id;
+        if (uid != null) {
+          try {
+            _auctionOrder = await _supabase.client
+                .from('orders')
+                .select('order_id, order_status, payment_due_at')
+                .eq('auction_id', auctionId)
+                .eq('buyer_id', uid)
+                .order('created_at', ascending: false)
+                .limit(1)
+                .maybeSingle();
+          } catch (e) {
+            debugPrint('_loadAuctionData order query: $e');
+          }
+        }
       }
     } catch (e) {
       debugPrint('ProductDetailController._loadAuctionData error: $e');
@@ -376,6 +565,10 @@ class ProductDetailController extends ChangeNotifier {
 
     if (_product?.sellerId != null && _product!.sellerId == userId) {
       return 'Sellers cannot bid on their own listings.';
+    }
+
+    if (isViewerLeading) {
+      return 'You are already the highest bidder.';
     }
 
     final minBid = minimumNextBid;

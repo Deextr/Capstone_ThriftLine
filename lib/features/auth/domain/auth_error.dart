@@ -10,12 +10,10 @@ class GoTrueErrorInfo {
   final String message;
 }
 
-GoTrueErrorInfo parseGoTrueError({
-  String? code,
-  required String message,
-}) {
-  var resolvedCode =
-      (code == null || code.isEmpty || code == '-') ? null : code;
+GoTrueErrorInfo parseGoTrueError({String? code, required String message}) {
+  var resolvedCode = (code == null || code.isEmpty || code == '-')
+      ? null
+      : code;
   var resolvedMessage = message;
   final trimmed = message.trim();
   if (trimmed.startsWith('{')) {

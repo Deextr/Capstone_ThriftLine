@@ -236,14 +236,21 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
           Widget cardContent;
 
           if (tab == BidTab.won) {
+            final isExpired = bid.paymentDueAt != null &&
+                bid.paymentDueAt!.isBefore(DateTime.now());
+
             cardContent = ThriftCard(
               padding: EdgeInsets.zero,
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.05),
+                  color: isExpired
+                      ? AppColors.surfaceVariant.withValues(alpha: 0.3)
+                      : AppColors.success.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(AppConstants.radiusLg),
                   border: Border.all(
-                    color: AppColors.success.withValues(alpha: 0.2),
+                    color: isExpired
+                        ? AppColors.border
+                        : AppColors.success.withValues(alpha: 0.2),
                   ),
                 ),
                 padding: const EdgeInsets.all(AppConstants.spacingMd),
@@ -299,9 +306,13 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'You won this auction. Payment is unpaid.',
+                                isExpired
+                                    ? 'Payment window expired. Order cancelled.'
+                                    : 'You won this auction. Payment is unpaid.',
                                 style: AppTypography.caption.copyWith(
-                                  color: AppColors.success,
+                                  color: isExpired
+                                      ? AppColors.textSecondary
+                                      : AppColors.success,
                                 ),
                               ),
                               if (bid.paymentDueAt != null) ...[
@@ -315,10 +326,8 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                     ),
                     const SizedBox(height: 12),
                     ThriftButton(
-                      label: 'Pay now',
-                      onPressed:
-                          bid.paymentDueAt != null &&
-                              !bid.paymentDueAt!.isAfter(DateTime.now())
+                      label: isExpired ? 'Payment expired' : 'Pay now',
+                      onPressed: isExpired
                           ? null
                           : () async {
                               final auctionId = bid.auctionId;

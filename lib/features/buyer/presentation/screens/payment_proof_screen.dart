@@ -128,7 +128,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
                     order: order,
                     sellerName: order.sellerName,
                     itemLabel: order.items.length > 1
-                        ? '${order.items.length} items from ${order.sellerName}'
+                          ? '${order.items.length} items from ${order.sellerName}'
                         : order.productTitle,
                     totalLabel: formatCurrency(order.total),
                     paymentDueAt: order.paymentDueAt,
@@ -262,7 +262,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
           context,
           'Checkout cancelled. Items returned to your cart.',
         );
-        context.go(isAuction ? RouteNames.buyerHome : RouteNames.checkout);
+        context.go(isAuction ? RouteNames.buyerHome : RouteNames.cart);
         return;
       }
       unawaited(controller.handlePaymongoAppReturn(cancelled: false));

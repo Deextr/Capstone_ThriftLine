@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/theme/app_gradients.dart';
 
 class OnboardingIndicator extends StatelessWidget {
   const OnboardingIndicator({
@@ -18,7 +19,6 @@ class OnboardingIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final active = activeColor ?? Theme.of(context).colorScheme.primary;
     final inactive = inactiveColor ?? Theme.of(context).colorScheme.outline;
 
     return Row(
@@ -32,7 +32,10 @@ class OnboardingIndicator extends StatelessWidget {
           width: isActive ? 28 : 8,
           height: 8,
           decoration: BoxDecoration(
-            color: isActive ? active : inactive.withValues(alpha: 0.5),
+            gradient: isActive && activeColor == null
+                ? AppGradients.buttonGradient
+                : null,
+            color: isActive ? activeColor : inactive.withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(AppConstants.radiusSm),
           ),
         );

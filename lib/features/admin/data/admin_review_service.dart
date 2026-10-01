@@ -189,22 +189,28 @@ class AdminReviewService {
   }
 
   Future<List<CommunityReportModel>> listReports({
-    required AdminQueueFilter filter,
+    required AdminReportListFilter filter,
+    DateTime? from,
+    DateTime? toExclusive,
   }) async {
     var query = _supabase.client
         .from('reports')
         .select(
           '*, report_evidence(report_evidence_id, file_path, created_at)',
         );
-    if (filter == AdminQueueFilter.open) {
-      query = query.eq('status', kAdminReportOpenStatus);
-    } else {
-      query = query.inFilter('status', kAdminReportClosedStatuses);
+    final statuses = adminReportListFilterStatuses(filter);
+    if (statuses != null && statuses.length == 1) {
+      query = query.eq('status', statuses.first);
+    } else if (statuses != null) {
+      query = query.inFilter('status', statuses);
     }
-    final rows = await query.order(
-      'created_at',
-      ascending: filter == AdminQueueFilter.open,
-    );
+    if (from != null) {
+      query = query.gte('created_at', from.toUtc().toIso8601String());
+    }
+    if (toExclusive != null) {
+      query = query.lt('created_at', toExclusive.toUtc().toIso8601String());
+    }
+    final rows = await query.order('created_at', ascending: false);
     return _mapReports(
       (rows as List<dynamic>)
           .map((row) => row as Map<String, dynamic>)

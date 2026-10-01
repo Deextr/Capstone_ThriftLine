@@ -4,6 +4,8 @@ import '../../../core/services/supabase_service.dart';
 import '../../../models/community_report_model.dart';
 import '../../../models/order_model.dart';
 import '../../buyer/data/order_query.dart';
+import '../../trust_safety/data/report_reasons.dart';
+import '../data/admin_dashboard_models.dart';
 import '../data/admin_review_rules.dart';
 import '../data/admin_review_service.dart';
 
@@ -18,7 +20,10 @@ class AdminReportsController extends ChangeNotifier {
   final AdminReviewService _service;
   final String? reportId;
 
-  AdminQueueFilter _filter = AdminQueueFilter.open;
+  AdminReportListFilter _filter = AdminReportListFilter.all;
+  AdminReportKind _kind = AdminReportKind.all;
+  AdminReportSort _sort = AdminReportSort.newest;
+  AdminDateWindow? _dateWindow;
   List<CommunityReportModel> _reports = const [];
   CommunityReportModel? _report;
   OrderModel? _relatedOrder;
@@ -26,9 +31,13 @@ class AdminReportsController extends ChangeNotifier {
   bool _isSaving = false;
   String? _errorMessage;
   String? _decision;
+  final TextEditingController searchController = TextEditingController();
   final TextEditingController responseController = TextEditingController();
 
-  AdminQueueFilter get filter => _filter;
+  AdminReportListFilter get filter => _filter;
+  AdminReportKind get kind => _kind;
+  AdminReportSort get sort => _sort;
+  AdminDateWindow? get dateWindow => _dateWindow;
   List<CommunityReportModel> get reports => _reports;
   CommunityReportModel? get report => _report;
   OrderModel? get relatedOrder => _relatedOrder;
@@ -36,6 +45,7 @@ class AdminReportsController extends ChangeNotifier {
   bool get isSaving => _isSaving;
   String? get errorMessage => _errorMessage;
   String? get decision => _decision;
+  String get searchQuery => searchController.text;
   String get response => responseController.text;
   bool get canSubmitDecision =>
       _report != null &&
@@ -44,15 +54,99 @@ class AdminReportsController extends ChangeNotifier {
       adminResponseError(response) == null &&
       !_isSaving;
 
+  bool get hasActiveListFilters =>
+      _filter != AdminReportListFilter.all ||
+      _kind != AdminReportKind.all ||
+      _dateWindow != null ||
+      searchQuery.trim().isNotEmpty;
+
+  int get totalCount => _reports.length;
+  int get underReviewCount =>
+      _reports.where((item) => item.status == kAdminReportOpenStatus).length;
+  int get resolvedCount =>
+      _reports.where((item) => item.status == 'resolved').length;
+  int get closedCount => _reports
+      .where(
+        (item) => item.status == 'action_taken' || item.status == 'dismissed',
+      )
+      .length;
+
+  List<CommunityReportModel> get visibleReports {
+    final query = searchQuery.trim().toLowerCase();
+    final statuses = adminReportListFilterStatuses(_filter);
+    final filtered = _reports.where((report) {
+      final isOrder = isAdminOrderReport(
+        category: report.category,
+        orderId: report.orderId,
+      );
+      if (_kind == AdminReportKind.community && isOrder) return false;
+      if (_kind == AdminReportKind.order && !isOrder) return false;
+      if (statuses != null && !statuses.contains(report.status)) return false;
+      if (query.isEmpty) return true;
+      final haystack = [
+        adminReportShortId(report.id),
+        report.id,
+        reportReasonLabel(report.category),
+        adminHandle(report.reporterUsername, report.reporterDisplayName),
+        adminHandle(report.reportedUsername, report.reportedDisplayName),
+        report.reporterDisplayName,
+        report.reportedDisplayName,
+        report.orderNumber ?? '',
+        report.details,
+      ].join(' ').toLowerCase();
+      return haystack.contains(query);
+    }).toList();
+
+    filtered.sort((a, b) {
+      final comparison = a.createdAt.compareTo(b.createdAt);
+      return _sort == AdminReportSort.newest ? -comparison : comparison;
+    });
+    return filtered;
+  }
+
+  bool matchesKind(CommunityReportModel report) {
+    final isOrder = isAdminOrderReport(
+      category: report.category,
+      orderId: report.orderId,
+    );
+    return switch (_kind) {
+      AdminReportKind.all => true,
+      AdminReportKind.community => !isOrder,
+      AdminReportKind.order => isOrder,
+    };
+  }
+
   @override
   void dispose() {
+    searchController.dispose();
     responseController.dispose();
     super.dispose();
   }
 
-  void setFilter(AdminQueueFilter value) {
+  void setFilter(AdminReportListFilter value) {
     if (_filter == value) return;
     _filter = value;
+    notifyListeners();
+  }
+
+  void setKind(AdminReportKind value) {
+    if (_kind == value) return;
+    _kind = value;
+    notifyListeners();
+  }
+
+  void setSort(AdminReportSort value) {
+    if (_sort == value) return;
+    _sort = value;
+    notifyListeners();
+  }
+
+  void setSearch(String _) {
+    notifyListeners();
+  }
+
+  void setDateWindow(AdminDateWindow? value) {
+    _dateWindow = value;
     load();
   }
 
@@ -89,7 +183,11 @@ class AdminReportsController extends ChangeNotifier {
           responseController.text = saved;
         }
       } else {
-        _reports = await _service.listReports(filter: _filter);
+        _reports = await _service.listReports(
+          filter: AdminReportListFilter.all,
+          from: _dateWindow?.from,
+          toExclusive: _dateWindow?.toExclusive,
+        );
       }
     } catch (e) {
       debugPrint('AdminReportsController.load error: $e');
@@ -97,7 +195,7 @@ class AdminReportsController extends ChangeNotifier {
       _report = null;
       _relatedOrder = null;
       _errorMessage = reportId == null
-          ? 'Unable to load community reports.'
+          ? 'Unable to load reports.'
           : 'Unable to load this report.';
     } finally {
       _isLoading = false;

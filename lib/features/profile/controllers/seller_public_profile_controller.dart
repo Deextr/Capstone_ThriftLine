@@ -129,7 +129,7 @@ class SellerPublicProfileController extends ChangeNotifier {
           userRow = await _supabase.client
               .from('users')
               .select(
-                'user_id, username, full_name, avatar, role, trust_score, rating_average, rating_count, bio, location, created_at',
+                'user_id, username, full_name, avatar, role, trust_score, trust_level, rating_average, rating_count, bio, location, created_at',
               )
               .eq('username', _username)
               .maybeSingle();

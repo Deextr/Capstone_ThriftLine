@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -17,8 +18,14 @@ enum LogoutChoice { cancel, logout, forgetDevice }
 /// Google Sign-In never uses that email code, so those accounts get a
 /// simple confirmation.
 Future<void> confirmAndLogout(BuildContext context) async {
+  final auth = context.read<AuthProvider>();
   final emailPassword = showEmailTrustedDeviceLogout(
-    usesEmailPasswordAuth: context.read<AuthProvider>().usesEmailPasswordAuth,
+    usesEmailPasswordAuth: auth.usesEmailPasswordAuth,
+  );
+  debugPrint(
+    'Logout: trustedDeviceOptions=$emailPassword '
+    'identities=${auth.user?.authIdentityProviders} '
+    'buyerSellerMode=${auth.activeAccount.name}',
   );
 
   final choice = await showDialog<LogoutChoice>(

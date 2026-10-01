@@ -2,7 +2,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../data/admin_review_rules.dart';
@@ -317,13 +320,52 @@ class AdminDetailBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 28),
-      child: Column(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AdminSectionLabel(label),
+              const SizedBox(height: 10),
+              ...children,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class AdminKeyValueRow extends StatelessWidget {
+  const AdminKeyValueRow({super.key, required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AdminSectionLabel(label),
-          const SizedBox(height: 8),
-          ...children,
+          SizedBox(
+            width: 108,
+            child: Text(label, style: AppTypography.caption),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: AppTypography.body.copyWith(fontSize: 13),
+            ),
+          ),
         ],
       ),
     );
@@ -394,7 +436,7 @@ class AdminFilterBar extends StatelessWidget {
       runSpacing: 4,
       children: [
         for (final filter in AdminQueueFilter.values)
-          _FilterChoice(
+          AdminUnderlineFilter(
             label: adminQueueFilterLabel(filter),
             selected: filter == value,
             onTap: () => onChanged(filter),
@@ -404,8 +446,9 @@ class AdminFilterBar extends StatelessWidget {
   }
 }
 
-class _FilterChoice extends StatelessWidget {
-  const _FilterChoice({
+class AdminUnderlineFilter extends StatelessWidget {
+  const AdminUnderlineFilter({
+    super.key,
     required this.label,
     required this.selected,
     required this.onTap,
@@ -430,6 +473,8 @@ class _FilterChoice extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             child: DecoratedBox(
               decoration: BoxDecoration(
+                gradient: selected ? AppGradients.primaryGradientLight : null,
+                borderRadius: BorderRadius.circular(8),
                 border: Border(
                   bottom: BorderSide(
                     color: selected ? AppColors.primary : Colors.transparent,
@@ -712,6 +757,191 @@ class AdminDecisionOption extends StatelessWidget {
       hint: reportDecisionHint(value),
       selected: value == groupValue,
       onTap: () => onChanged(value),
+    );
+  }
+}
+
+class AdminReportCard extends StatelessWidget {
+  const AdminReportCard({
+    super.key,
+    required this.reporterName,
+    required this.reporterRole,
+    required this.reportedName,
+    required this.reportedRole,
+    required this.reason,
+    required this.status,
+    required this.statusLabel,
+    required this.createdAt,
+    required this.onView,
+    this.reportId,
+    this.kindLabel,
+    this.preview,
+    this.orderNumber,
+  });
+
+  final String reporterName;
+  final String reporterRole;
+  final String reportedName;
+  final String reportedRole;
+  final String reason;
+  final String status;
+  final String statusLabel;
+  final DateTime createdAt;
+  final String? reportId;
+  final String? kindLabel;
+  final String? preview;
+  final String? orderNumber;
+  final VoidCallback onView;
+
+  Color get _accent => switch (status) {
+    'under_review' => AppColors.warning,
+    'resolved' || 'action_taken' => AppColors.success,
+    'dismissed' => AppColors.textHint,
+    _ => AppColors.border,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      elevation: 0,
+      shadowColor: Colors.black.withValues(alpha: 0.04),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      child: InkWell(
+        onTap: onView,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 4,
+                decoration: BoxDecoration(
+                  color: _accent,
+                  borderRadius: const BorderRadius.horizontal(
+                    left: Radius.circular(AppConstants.radiusMd),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                if (reportId != null && reportId!.isNotEmpty)
+                                  Text(
+                                    '#${adminReportShortId(reportId!)}',
+                                    style: AppTypography.caption.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                if (kindLabel != null && kindLabel!.isNotEmpty)
+                                  Text(
+                                    kindLabel!,
+                                    style: AppTypography.caption.copyWith(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          AdminStatusChip(status: status, label: statusLabel),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        reason,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.subheading,
+                      ),
+                      if (preview != null && preview!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          preview!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.body.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      _ReportMetaLine(
+                        label: 'Reporter',
+                        value: '$reporterName · $reporterRole',
+                      ),
+                      _ReportMetaLine(
+                        label: 'Reported',
+                        value: '$reportedName · $reportedRole',
+                      ),
+                      if (orderNumber != null && orderNumber!.isNotEmpty)
+                        _ReportMetaLine(label: 'Order', value: '#$orderNumber'),
+                      _ReportMetaLine(
+                        label: 'Date',
+                        value: formatFullDate(createdAt),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'View report',
+                        style: AppTypography.label.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReportMetaLine extends StatelessWidget {
+  const _ReportMetaLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 72, child: Text(label, style: AppTypography.caption)),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.body.copyWith(fontSize: 13),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

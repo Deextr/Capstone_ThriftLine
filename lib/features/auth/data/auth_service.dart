@@ -8,6 +8,7 @@ import '../domain/auth_error.dart';
 import '../domain/auth_user.dart';
 import '../domain/legal_documents.dart';
 import '../domain/signup_identity.dart';
+import '../domain/trusted_device.dart';
 import 'auth_result.dart';
 
 /// Handles all authentication operations against Supabase.
@@ -283,8 +284,16 @@ class AuthService {
   ///
   /// Returns `null` if there is no active session.
   Future<AuthUser?> getCurrentUser() async {
-    final supabaseUser = _supabaseService.currentUser;
-    if (supabaseUser == null) return null;
+    final sessionUser = _supabaseService.currentUser;
+    if (sessionUser == null) return null;
+
+    var supabaseUser = sessionUser;
+    try {
+      final remoteUser = (await _auth.getUser()).user;
+      if (remoteUser != null) supabaseUser = remoteUser;
+    } catch (e) {
+      debugPrint('AuthService.getCurrentUser identity refresh: $e');
+    }
 
     final userRecord = await getUserRecord(supabaseUser.id);
     return hydrateUser(supabaseUser, userRecord);
@@ -322,6 +331,9 @@ class AuthService {
       profile,
       verification: verification,
       sellerProfile: sellerProfile,
+      sessionAmrMethods: sessionAmrMethodsFromAccessToken(
+        _supabaseService.currentSession?.accessToken,
+      ),
     );
   }
 

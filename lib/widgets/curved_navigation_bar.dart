@@ -1,9 +1,8 @@
-
-
 import 'package:flutter/material.dart';
 
 import '../core/constants/app_colors.dart';
 import '../core/constants/app_typography.dart';
+import '../core/theme/app_gradients.dart';
 
 /// Data class representing a single item in the [CurvedNavigationBar].
 class CurvedNavItem {
@@ -72,13 +71,16 @@ class _CurvedNavigationBarState extends State<CurvedNavigationBar>
       duration: const Duration(milliseconds: 400),
       vsync: this,
     );
-    _positionAnimation = Tween<double>(
-      begin: widget.selectedIndex.toDouble(),
-      end: widget.selectedIndex.toDouble(),
-    ).animate(CurvedAnimation(
-      parent: _positionController,
-      curve: Curves.easeInOutCubic,
-    ));
+    _positionAnimation =
+        Tween<double>(
+          begin: widget.selectedIndex.toDouble(),
+          end: widget.selectedIndex.toDouble(),
+        ).animate(
+          CurvedAnimation(
+            parent: _positionController,
+            curve: Curves.easeInOutCubic,
+          ),
+        );
 
     // Controls the floating circle bounce (scale + translate)
     _floatController = AnimationController(
@@ -97,13 +99,16 @@ class _CurvedNavigationBarState extends State<CurvedNavigationBar>
 
     if (oldWidget.selectedIndex != widget.selectedIndex) {
       // Animate the notch position
-      _positionAnimation = Tween<double>(
-        begin: oldWidget.selectedIndex.toDouble(),
-        end: widget.selectedIndex.toDouble(),
-      ).animate(CurvedAnimation(
-        parent: _positionController,
-        curve: Curves.easeInOutCubic,
-      ));
+      _positionAnimation =
+          Tween<double>(
+            begin: oldWidget.selectedIndex.toDouble(),
+            end: widget.selectedIndex.toDouble(),
+          ).animate(
+            CurvedAnimation(
+              parent: _positionController,
+              curve: Curves.easeInOutCubic,
+            ),
+          );
       _positionController.forward(from: 0.0);
 
       // Bounce the floating icon
@@ -153,7 +158,7 @@ class _CurvedNavigationBarState extends State<CurvedNavigationBar>
                     notchCenterX: centerX,
                     notchRadius: _notchRadius,
                     notchMargin: _notchMargin,
-                    color: AppColors.primary,
+                    gradient: AppGradients.navBarGradient,
                     shadowColor: AppColors.primaryDark.withValues(alpha: 0.35),
                   ),
                 );
@@ -286,10 +291,10 @@ class _FloatingIcon extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: AppColors.primaryDark,
+          gradient: AppGradients.primaryGradientDark,
           boxShadow: [
             BoxShadow(
-              color: AppColors.primaryDark.withValues(alpha: 0.45),
+              color: AppColors.primaryDark.withValues(alpha: 0.4),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -305,10 +310,7 @@ class _FloatingIcon extends StatelessWidget {
 // Bar icon (inactive state — white icon on colored bar)
 // ---------------------------------------------------------------------------
 class _BarIcon extends StatelessWidget {
-  const _BarIcon({
-    required this.item,
-    required this.iconSize,
-  });
+  const _BarIcon({required this.item, required this.iconSize});
 
   final CurvedNavItem item;
   final double iconSize;
@@ -359,20 +361,20 @@ class _CurvedNavBarPainter extends CustomPainter {
     required this.notchCenterX,
     required this.notchRadius,
     required this.notchMargin,
-    required this.color,
+    required this.gradient,
     required this.shadowColor,
   });
 
   final double notchCenterX;
   final double notchRadius;
   final double notchMargin;
-  final Color color;
+  final LinearGradient gradient;
   final Color shadowColor;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = color
+      ..shader = gradient.createShader(Offset.zero & size)
       ..style = PaintingStyle.fill;
 
     final shadowPaint = Paint()
@@ -396,14 +398,20 @@ class _CurvedNavBarPainter extends CustomPainter {
 
     // Draw the concave notch
     path.cubicTo(
-      notchCenterX - r * 0.55, 0,
-      notchCenterX - r * 0.4, notchDepth,
-      notchCenterX, notchDepth,
+      notchCenterX - r * 0.55,
+      0,
+      notchCenterX - r * 0.4,
+      notchDepth,
+      notchCenterX,
+      notchDepth,
     );
     path.cubicTo(
-      notchCenterX + r * 0.4, notchDepth,
-      notchCenterX + r * 0.55, 0,
-      notchRight, 0,
+      notchCenterX + r * 0.4,
+      notchDepth,
+      notchCenterX + r * 0.55,
+      0,
+      notchRight,
+      0,
     );
 
     // Continue to top-right
@@ -422,6 +430,6 @@ class _CurvedNavBarPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _CurvedNavBarPainter oldDelegate) =>
       notchCenterX != oldDelegate.notchCenterX ||
-      color != oldDelegate.color ||
+      gradient != oldDelegate.gradient ||
       notchRadius != oldDelegate.notchRadius;
 }

@@ -16,6 +16,14 @@ import '../widgets/awaiting_payment_tile.dart';
 class CheckoutScreen extends StatelessWidget {
   const CheckoutScreen({super.key});
 
+  void _handleBack(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(RouteNames.cart);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     context.watch<CartProvider>();
@@ -24,71 +32,78 @@ class CheckoutScreen extends StatelessWidget {
     final awaiting = checkout.awaitingPayment;
     final itemsBySeller = checkout.itemsBySeller;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: AppColors.textPrimary,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _handleBack(context);
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.surface,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              color: AppColors.textPrimary,
+            ),
+            onPressed: () => _handleBack(context),
           ),
-          onPressed: () => context.pop(),
+          title: Column(
+            children: [
+              Text(
+                'Checkout',
+                style: AppTypography.heading.copyWith(fontSize: 18),
+              ),
+              Text(
+                '${allItems.length} ${allItems.length == 1 ? 'item' : 'items'} in cart',
+                style: AppTypography.caption.copyWith(fontSize: 11),
+              ),
+            ],
+          ),
+          centerTitle: true,
         ),
-        title: Column(
-          children: [
-            Text(
-              'Checkout',
-              style: AppTypography.heading.copyWith(fontSize: 18),
-            ),
-            Text(
-              '${allItems.length} ${allItems.length == 1 ? 'item' : 'items'} in cart',
-              style: AppTypography.caption.copyWith(fontSize: 11),
-            ),
-          ],
-        ),
-        centerTitle: true,
-      ),
-      body: checkout.isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            )
-          : allItems.isEmpty
-          ? _EmptyCartState(awaiting: awaiting)
-          : Column(
-              children: [
-                if (awaiting.isNotEmpty)
-                  _AwaitingPaymentBanner(awaiting: awaiting),
-                if (itemsBySeller.keys.length > 1)
-                  _MultiSellerNotice(sellerCount: itemsBySeller.keys.length),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    children: [
-                      for (final entry in itemsBySeller.entries) ...[
-                        _SellerGroupHeader(
-                          sellerId: entry.key,
-                          items: entry.value,
-                          checkout: checkout,
-                        ),
-                        for (int i = 0; i < entry.value.length; i++)
-                          _CartItemCard(
-                            item: entry.value[i],
-                            isSelected: checkout.isSelected(entry.value[i].product.id),
-                            onToggleSelect: () => checkout.toggleItemSelection(entry.value[i].product.id),
-                            isLast: i == entry.value.length - 1,
+        body: checkout.isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              )
+            : allItems.isEmpty
+            ? _EmptyCartState(awaiting: awaiting)
+            : Column(
+                children: [
+                  if (awaiting.isNotEmpty)
+                    _AwaitingPaymentBanner(awaiting: awaiting),
+                  if (itemsBySeller.keys.length > 1)
+                    _MultiSellerNotice(sellerCount: itemsBySeller.keys.length),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      children: [
+                        for (final entry in itemsBySeller.entries) ...[
+                          _SellerGroupHeader(
+                            sellerId: entry.key,
+                            items: entry.value,
+                            checkout: checkout,
                           ),
+                          for (int i = 0; i < entry.value.length; i++)
+                            _CartItemCard(
+                              item: entry.value[i],
+                              isSelected: checkout.isSelected(entry.value[i].product.id),
+                              onToggleSelect: () => checkout.toggleItemSelection(entry.value[i].product.id),
+                              isLast: i == entry.value.length - 1,
+                            ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-      bottomNavigationBar: allItems.isEmpty
-          ? null
-          : const _CheckoutBottomBar(),
+                ],
+              ),
+        bottomNavigationBar: allItems.isEmpty
+            ? null
+            : const _CheckoutBottomBar(),
+      ),
     );
   }
 }

@@ -34,6 +34,9 @@ String formatCompactDate(DateTime dateTime, {DateTime? now}) {
   return DateFormat('MMM d').format(local);
 }
 
+String formatFullDate(DateTime dateTime) =>
+    DateFormat('MMM d, yyyy').format(dateTime.toLocal());
+
 String formatRelativeTime(DateTime dateTime) {
   final diff = DateTime.now().difference(dateTime);
   if (diff.inMinutes < 1) return 'Just now';

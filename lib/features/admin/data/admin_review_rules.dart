@@ -24,6 +24,53 @@ const int kAdminSignedUrlSeconds = 3600;
 
 enum AdminQueueFilter { open, closed }
 
+enum AdminReportListFilter { all, underReview, resolved, closed }
+
+enum AdminReportKind { all, community, order }
+
+enum AdminReportSort { newest, oldest }
+
+/// Reasons that describe an item or fulfillment problem even without an order.
+const Set<String> kAdminOrderLinkedReasons = {
+  'fake_product',
+  'counterfeit_item',
+  'failure_to_ship',
+  'item_not_as_described',
+};
+
+bool isAdminOrderReport({required String category, String? orderId}) {
+  if (orderId != null && orderId.trim().isNotEmpty) return true;
+  return kAdminOrderLinkedReasons.contains(category);
+}
+
+String adminReportKindLabel(AdminReportKind kind) => switch (kind) {
+  AdminReportKind.all => 'All Reports',
+  AdminReportKind.community => 'Community',
+  AdminReportKind.order => 'Orders',
+};
+
+String adminReportKindOf({required String category, String? orderId}) =>
+    isAdminOrderReport(category: category, orderId: orderId)
+    ? 'Order'
+    : 'Community';
+
+String adminReportSortLabel(AdminReportSort sort) => switch (sort) {
+  AdminReportSort.newest => 'Newest',
+  AdminReportSort.oldest => 'Oldest',
+};
+
+String adminReportShortId(String id) {
+  final compact = id.replaceAll('-', '');
+  if (compact.length < 8) return compact.toUpperCase();
+  return compact.substring(0, 8).toUpperCase();
+}
+
+String adminReportPreview(String details, {int maxLength = 90}) {
+  final trimmed = details.trim().replaceAll(RegExp(r'\s+'), ' ');
+  if (trimmed.length <= maxLength) return trimmed;
+  return '${trimmed.substring(0, maxLength).trimRight()}…';
+}
+
 bool isOpenReportStatus(String status) => status == kAdminReportOpenStatus;
 
 bool canDecideReport(String status) => status == kAdminReportOpenStatus;
@@ -39,6 +86,22 @@ String adminQueueFilterLabel(AdminQueueFilter filter) => switch (filter) {
   AdminQueueFilter.open => 'Needs review',
   AdminQueueFilter.closed => 'Reviewed',
 };
+
+String adminReportListFilterLabel(AdminReportListFilter filter) =>
+    switch (filter) {
+      AdminReportListFilter.all => 'All',
+      AdminReportListFilter.underReview => 'Under Review',
+      AdminReportListFilter.resolved => 'Resolved',
+      AdminReportListFilter.closed => 'Closed',
+    };
+
+List<String>? adminReportListFilterStatuses(AdminReportListFilter filter) =>
+    switch (filter) {
+      AdminReportListFilter.all => null,
+      AdminReportListFilter.underReview => [kAdminReportOpenStatus],
+      AdminReportListFilter.resolved => ['resolved'],
+      AdminReportListFilter.closed => ['action_taken', 'dismissed'],
+    };
 
 /// Compact queue count. [state] is the human status, such as "under review".
 String adminQueueStatusLine(int count, String state) {
@@ -126,9 +189,15 @@ String? adminDisputeNoteError(String value) {
 
 BadgeVariant adminStatusBadgeVariant(String status) => switch (status) {
   'under_review' || 'pending' || 'open' => BadgeVariant.warning,
-  'action_taken' || 'resolved' || 'approved' => BadgeVariant.success,
-  'dismissed' => BadgeVariant.neutral,
-  'rejected' => BadgeVariant.error,
+  'action_taken' ||
+  'resolved' ||
+  'approved' ||
+  'paid' ||
+  'shipped' ||
+  'delivered' ||
+  'completed' => BadgeVariant.success,
+  'dismissed' || 'cancelled' => BadgeVariant.neutral,
+  'rejected' || 'disputed' => BadgeVariant.error,
   _ => BadgeVariant.neutral,
 };
 

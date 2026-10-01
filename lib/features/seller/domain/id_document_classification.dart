@@ -142,8 +142,8 @@ class IdDocumentClassifier {
   /// Returns a failing [IdQualityResult] when the still must not be accepted.
   ///
   /// [sessionTypeConfirmed] is true after a validated front of [expectedType]
-  /// in this session. PhilSys / UMID backs often omit the title line, but a
-  /// different ID is still rejected.
+  /// in this session. A reverse side can omit the title printed on the front,
+  /// but a different ID is still rejected.
   ///
   /// [live] relaxes only the Digital National ID profile. See [confirmLive].
   static IdQualityResult? rejection({
@@ -338,6 +338,15 @@ class IdDocumentClassifier {
     final frontFields = _termHits(normalized, _frontIdentityTerms);
     final reverseFields = _termHits(normalized, _backTermsFor(expectedType));
 
+    if (expectedType == SellerIdType.nationalId &&
+        _physicalNationalBackMatches(
+          text: normalized,
+          evidence: evidence,
+          geometry: geometry,
+        )) {
+      return IdSideDecision.back;
+    }
+
     if (expectedType == SellerIdType.passport && mrz && reverseFields == 0) {
       return IdSideDecision.front;
     }
@@ -465,6 +474,13 @@ class IdDocumentClassifier {
     required IdDocumentGeometry geometry,
     required bool sessionTypeConfirmed,
   }) {
+    if (expectedType == SellerIdType.nationalId) {
+      return _physicalNationalBackMatches(
+        text: text,
+        evidence: evidence,
+        geometry: geometry,
+      );
+    }
     if (_hasIdPortrait(evidence)) return false;
     final hits = _termHits(text, _backTermsFor(expectedType));
     final hinted = _typeScore(text, expectedType) >= 1;
@@ -633,6 +649,63 @@ class IdDocumentClassifier {
     return demographics >= 1 && sessionTypeConfirmed && code;
   }
 
+  /// Physical PhilID back: sex, blood type, marital status, and place of
+  /// birth, plus either the issue-date / PSA return line or that line's
+  /// printed date beside the QR. The card does not repeat the front title.
+  /// A QR with no demographic block is not this side, and the eGov back is
+  /// not this side because it has no issue date and no PSA return line.
+  static bool _physicalNationalBackMatches({
+    required String text,
+    required DocumentEvidence evidence,
+    required IdDocumentGeometry geometry,
+  }) {
+    if (_hasIdPortrait(evidence, SellerIdType.nationalId) &&
+        _termHits(text, _frontIdentityTerms) >= 2) {
+      return false;
+    }
+    final groups = _groupHits(text, _physicalBackDemographicGroups);
+    final labeled = _physicalBackMarker(text);
+    final machine = _hasMachineCode(geometry, text);
+    final dated = _hasDayMonthYear(text) || _hasWrittenDate(text);
+    if (groups >= 3 && labeled) return true;
+    if (groups >= 2 && labeled && machine) return true;
+    if (groups >= 3 && dated && machine) return true;
+    return false;
+  }
+
+  static int _groupHits(String text, List<List<String>> groups) {
+    var hits = 0;
+    for (final group in groups) {
+      if (_termHits(text, group) > 0) hits++;
+    }
+    return hits;
+  }
+
+  static bool _physicalBackMarker(String text) {
+    const markers = [
+      'date of issue',
+      'date issued',
+      'araw ng pagkakaloob',
+      'pagkakaloob',
+      'psa office',
+      'psa gov',
+    ];
+    for (final marker in markers) {
+      if (marker.contains(' ')) {
+        if (text.contains(marker)) return true;
+      } else if (_hasTerm(text, marker)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Bold issue date on the physical card, printed day-first: "10 February 2022".
+  static bool _hasDayMonthYear(String text) => RegExp(
+    r'\b\d{1,2} (jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]* '
+    r'(19|20)\d{2}\b',
+  ).hasMatch(text);
+
   static bool _hasWrittenDate(String text) => RegExp(
     r'\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]* '
     r'\d{1,2} (19|20)\d{2}\b',
@@ -794,11 +867,34 @@ class IdDocumentClassifier {
 
   static const List<String> _nationalIdBackTerms = [
     'blood type',
+    'uri ng dugo',
     'marital status',
+    'kalagayang sibil',
     'place of birth',
+    'lugar ng kapanganakan',
     'date issued',
     'date of issue',
+    'araw ng pagkakaloob',
+    'kasarian',
+    'psa office',
     'this is to certify',
+  ];
+
+  /// One entry per field on the physical PhilID back. English and Filipino
+  /// labels for the same field count once. Bold values are included because
+  /// the small bilingual labels are easier for OCR to miss.
+  static const List<List<String>> _physicalBackDemographicGroups = [
+    ['sex', 'kasarian', 'male', 'female'],
+    ['blood type', 'uri ng dugo', 'unknown'],
+    [
+      'marital status',
+      'kalagayang sibil',
+      'single',
+      'married',
+      'widowed',
+      'separated',
+    ],
+    ['place of birth', 'lugar ng kapanganakan'],
   ];
 
   /// "Digital ID Number" is printed on the front of the eGov card, not here.
