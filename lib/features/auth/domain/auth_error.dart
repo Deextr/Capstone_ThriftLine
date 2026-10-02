@@ -48,6 +48,11 @@ bool isOauthAccountSignupBlocked(GoTrueErrorInfo info) {
 /// collapsed so logs and gateway errors are not shown to the user.
 String passwordResetUiMessage(String? serverError) {
   final msg = (serverError ?? '').toLowerCase();
+  if (msg.contains('human verification') ||
+      msg.contains('verification failed') ||
+      msg.contains('verification expired')) {
+    return serverError!.trim();
+  }
   if (msg.contains('too many') || msg.contains('wait a moment')) {
     return 'Too many reset emails requested. Please wait a moment and '
         'try again.';
@@ -57,6 +62,39 @@ String passwordResetUiMessage(String? serverError) {
   }
   return 'We could not send the reset email right now. '
       'Please try again in a moment.';
+}
+
+/// Maps `sign-in-with-email` Edge Function codes to user-facing copy.
+String emailLoginUiMessage({String? code, String? serverError}) {
+  final normalizedCode = code?.toLowerCase().trim();
+  switch (normalizedCode) {
+    case 'invalid_credentials':
+      return 'Invalid email or password. Please try again.';
+    case 'turnstile_required':
+      return 'Complete human verification before signing in.';
+    case 'turnstile_failed':
+      return serverError?.trim().isNotEmpty == true
+          ? serverError!.trim()
+          : 'Human verification failed. Please try again.';
+    case 'rate_limited':
+      return serverError?.trim().isNotEmpty == true
+          ? serverError!.trim()
+          : 'Too many attempts. Please wait a moment and try again.';
+    case 'unavailable':
+      return 'Sign-in is temporarily unavailable. Please try again.';
+  }
+
+  final msg = (serverError ?? '').toLowerCase();
+  if (msg.contains('invalid email or password')) {
+    return 'Invalid email or password. Please try again.';
+  }
+  if (msg.contains('verification')) {
+    return serverError!.trim();
+  }
+  if (msg.contains('too many')) {
+    return serverError!.trim();
+  }
+  return 'Something went wrong. Please try again.';
 }
 
 bool isExistingAccountAuthError(GoTrueErrorInfo info) {

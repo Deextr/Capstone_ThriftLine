@@ -4,6 +4,7 @@ import 'package:thriftline/core/routes/route_names.dart';
 import 'package:thriftline/core/utils/validators.dart';
 import 'package:thriftline/features/auth/data/password_recovery_link.dart';
 import 'package:thriftline/features/buyer/data/paymongo_return_link.dart';
+import 'package:thriftline/providers/auth_provider.dart';
 
 void main() {
   group('PasswordRecoveryLink', () {
@@ -30,6 +31,24 @@ void main() {
       );
     });
 
+    test('recognizes the Storage open page as a recovery link', () {
+      final uri = Uri.parse(
+        'https://zakorrcmmswwzfihmcji.supabase.co/storage/v1/object/public/'
+        'app-links/open-thriftline.html?token_hash=abc123&type=recovery',
+      );
+      expect(PasswordRecoveryLink.isRecoveryUri(uri), isTrue);
+      expect(PasswordRecoveryLink.recoveryTokenHash(uri), 'abc123');
+    });
+
+    test('recognizes the HTTPS bounce URL as a recovery link', () {
+      final uri = Uri.parse(
+        'https://zakorrcmmswwzfihmcji.supabase.co/functions/v1/'
+        'password-recovery-return?token_hash=abc123&type=recovery',
+      );
+      expect(PasswordRecoveryLink.isRecoveryUri(uri), isTrue);
+      expect(PasswordRecoveryLink.recoveryTokenHash(uri), 'abc123');
+    });
+
     test('recognizes the app reset-password deep link', () {
       final uri = Uri.parse(
         '${PasswordRecoveryLink.redirectUrl}?code=test-code',
@@ -42,6 +61,43 @@ void main() {
         '$kPaymongoAppScheme://$kPaymongoReturnHost?status=success&order_id=11111111-1111-4111-8111-111111111111',
       );
       expect(PasswordRecoveryLink.isRecoveryUri(uri), isFalse);
+    });
+  });
+
+  group('password recovery session lifecycle', () {
+    test('does not persist normal login cache during recovery', () {
+      expect(
+        shouldPersistAuthSession(
+          passwordRecoveryActive: true,
+          passwordRecoveryPending: false,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldPersistAuthSession(
+          passwordRecoveryActive: false,
+          passwordRecoveryPending: true,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldPersistAuthSession(
+          passwordRecoveryActive: false,
+          passwordRecoveryPending: false,
+        ),
+        isTrue,
+      );
+    });
+
+    test('cold start discards abandoned recovery when flag is set', () {
+      expect(
+        shouldDiscardRecoverySessionOnStartup(passwordRecoveryPending: true),
+        isTrue,
+      );
+      expect(
+        shouldDiscardRecoverySessionOnStartup(passwordRecoveryPending: false),
+        isFalse,
+      );
     });
   });
 

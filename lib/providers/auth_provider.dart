@@ -11,6 +11,7 @@ import '../features/auth/data/trusted_device_store.dart';
 import '../features/auth/domain/account_mode.dart';
 import '../features/auth/domain/auth_user.dart';
 import '../features/auth/domain/legal_documents.dart';
+import '../features/auth/domain/phone_otp.dart';
 import '../features/auth/domain/trusted_device.dart';
 import '../models/enums.dart';
 
@@ -25,6 +26,18 @@ bool authIsFullyAuthenticated({
   required bool hasSession,
   required bool emailOtpPending,
 }) => hasSession && !emailOtpPending;
+
+/// Recovery sessions must not write ThriftLine's normal login cache.
+@visibleForTesting
+bool shouldPersistAuthSession({
+  required bool passwordRecoveryActive,
+  required bool passwordRecoveryPending,
+}) => !passwordRecoveryActive && !passwordRecoveryPending;
+
+@visibleForTesting
+bool shouldDiscardRecoverySessionOnStartup({
+  required bool passwordRecoveryPending,
+}) => passwordRecoveryPending;
 
 /// Manages authentication state, session persistence, and role detection.
 ///
@@ -133,6 +146,12 @@ class AuthProvider extends ChangeNotifier {
   /// Called once at app startup from `main()`.
   Future<void> init() async {
     try {
+      if (shouldDiscardRecoverySessionOnStartup(
+        passwordRecoveryPending: _prefs.isPasswordRecoveryPending,
+      )) {
+        await _terminatePasswordRecoverySession(clearPendingFlag: true);
+      }
+
       // Supabase SDK automatically restores the session from secure storage.
       final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
@@ -172,8 +191,7 @@ class AuthProvider extends ChangeNotifier {
       await _clearSession();
       notifyListeners();
     } else if (authEvent == AuthChangeEvent.passwordRecovery) {
-      _passwordRecoveryActive = true;
-      await _setEmailOtpPending(false);
+      await _activatePasswordRecovery();
       if (_authService.currentSession == null) return;
       final currentUser = await _authService.getCurrentUser();
       if (currentUser == null || _authService.currentSession == null) return;
@@ -187,6 +205,23 @@ class AuthProvider extends ChangeNotifier {
       if (_authService.currentSession == null) return;
       final currentUser = await _authService.getCurrentUser();
       if (currentUser == null || _authService.currentSession == null) return;
+
+      final recoveryInProgress =
+          _passwordRecoveryActive || _prefs.isPasswordRecoveryPending;
+      if (recoveryInProgress) {
+        await _activatePasswordRecovery();
+        _user = currentUser;
+        notifyListeners();
+        return;
+      }
+
+      if (!shouldPersistAuthSession(
+        passwordRecoveryActive: _passwordRecoveryActive,
+        passwordRecoveryPending: _prefs.isPasswordRecoveryPending,
+      )) {
+        return;
+      }
+
       _user = currentUser;
       _syncActiveAccount(
         currentUser,
@@ -209,6 +244,7 @@ class AuthProvider extends ChangeNotifier {
     required String email,
     required String password,
     required LegalConsent consent,
+    required String turnstileToken,
   }) async {
     _isLoading = true;
     _resolvingTrustedDevice = true;
@@ -220,6 +256,7 @@ class AuthProvider extends ChangeNotifier {
         email: email,
         password: password,
         consent: consent,
+        turnstileToken: turnstileToken,
       );
 
       if (!result.success || result.user == null) {
@@ -267,11 +304,17 @@ class AuthProvider extends ChangeNotifier {
   ///
   /// Returns an error message on failure, or `null` on success.
   /// Sends a password reset email. Does not reveal whether the address exists.
-  Future<String?> requestPasswordReset({required String email}) async {
+  Future<String?> requestPasswordReset({
+    required String email,
+    required String turnstileToken,
+  }) async {
     _isLoading = true;
     notifyListeners();
     try {
-      return await _authService.requestPasswordReset(email: email);
+      return await _authService.requestPasswordReset(
+        email: email,
+        turnstileToken: turnstileToken,
+      );
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -289,12 +332,7 @@ class AuthProvider extends ChangeNotifier {
       );
       if (error != null) return error;
 
-      _passwordRecoveryActive = false;
-      await _authService.signOut();
-      _user = null;
-      _emailOtpPending = false;
-      _activeAccount = AccountMode.buyer;
-      await _clearSession();
+      await _terminatePasswordRecoverySession(clearPendingFlag: true);
       return null;
     } finally {
       _isLoading = false;
@@ -302,10 +340,51 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  void clearPasswordRecoveryState() {
-    if (!_passwordRecoveryActive) return;
-    _passwordRecoveryActive = false;
+  /// Called as soon as a recovery deep link is accepted (before OTP exchange).
+  Future<void> markPasswordRecoveryPending() => _activatePasswordRecovery();
+
+  /// Abandons recovery: signs out Supabase and clears recovery flags/cache.
+  Future<void> cancelPasswordRecovery() async {
+    if (!_passwordRecoveryActive && !_prefs.isPasswordRecoveryPending) {
+      return;
+    }
+    await _terminatePasswordRecoverySession(clearPendingFlag: true);
     notifyListeners();
+  }
+
+  /// Clears recovery flags when link exchange failed before a session existed.
+  Future<void> abandonPasswordRecoveryLinkAttempt() async {
+    if (_authService.currentSession != null) {
+      await cancelPasswordRecovery();
+      return;
+    }
+    _passwordRecoveryActive = false;
+    await _setPasswordRecoveryPending(false);
+    notifyListeners();
+  }
+
+  Future<void> _activatePasswordRecovery() async {
+    _passwordRecoveryActive = true;
+    await _setEmailOtpPending(false);
+    await _setPasswordRecoveryPending(true);
+  }
+
+  Future<void> _setPasswordRecoveryPending(bool value) async {
+    await _prefs.setPasswordRecoveryPending(value);
+  }
+
+  Future<void> _terminatePasswordRecoverySession({
+    required bool clearPendingFlag,
+  }) async {
+    _passwordRecoveryActive = false;
+    if (clearPendingFlag) {
+      await _setPasswordRecoveryPending(false);
+    }
+    await _authService.signOut();
+    _user = null;
+    _emailOtpPending = false;
+    _activeAccount = AccountMode.buyer;
+    await _clearSession();
   }
 
   Future<String?> loginWithGoogle({required LegalConsent consent}) async {
@@ -533,19 +612,22 @@ class AuthProvider extends ChangeNotifier {
     return error;
   }
 
-  /// Sends a phone OTP through the server-side iProgSMS function.
-  Future<String?> sendPhoneOtp(String phone) {
+  /// Sends a phone OTP through the server-side FMCSMS function.
+  Future<PhoneOtpResult> sendPhoneOtp(String phone) {
     return _authService.sendPhoneOtp(phone);
   }
 
   /// Confirms the SMS code, then reloads the profile so `isPhoneVerified` updates.
-  Future<String?> verifyPhoneOtp({
+  Future<PhoneOtpResult> verifyPhoneOtp({
     required String phone,
     required String token,
   }) async {
-    final error = await _authService.verifyPhoneOtp(phone: phone, token: token);
-    if (error == null) await reloadUser();
-    return error;
+    final result = await _authService.verifyPhoneOtp(
+      phone: phone,
+      token: token,
+    );
+    if (result.isOk) await reloadUser();
+    return result;
   }
 
   /// Lets a rejected applicant fill the form again. The rejected row stays

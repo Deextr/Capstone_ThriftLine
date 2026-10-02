@@ -6,7 +6,18 @@ import '../config/supabase_config.dart';
 
 /// Parses password-recovery deep links and exchanges them for a recovery session.
 class PasswordRecoveryCoordinator extends ChangeNotifier {
+  PasswordRecoveryCoordinator({
+    Future<void> Function()? onRecoveryLinkAccepted,
+    Future<void> Function()? onRecoveryLinkFailed,
+  }) : _onRecoveryLinkAccepted = onRecoveryLinkAccepted,
+       _onRecoveryLinkFailed = onRecoveryLinkFailed;
+
+  final Future<void> Function()? _onRecoveryLinkAccepted;
+  final Future<void> Function()? _onRecoveryLinkFailed;
+
   String? _linkError;
+  bool _busy = false;
+  bool _sessionReady = false;
 
   /// User-facing error when the recovery link is invalid or expired.
   String? get linkError => _linkError;
@@ -22,7 +33,16 @@ class PasswordRecoveryCoordinator extends ChangeNotifier {
         !PasswordRecoveryLink.hasRecoveryCallbackParams(uri)) {
       return;
     }
+    if (_busy || _sessionReady) return;
+    _busy = true;
+    await _onRecoveryLinkAccepted?.call();
     final callback = PasswordRecoveryLink.normalizeCallbackUri(uri);
+    debugPrint(
+      'Password recovery accept: token_hash='
+      '${PasswordRecoveryLink.recoveryTokenHash(callback) != null} '
+      'code=${callback.queryParameters.containsKey('code')} '
+      'access_token=${callback.queryParameters.containsKey('access_token')}',
+    );
     try {
       final tokenHash = PasswordRecoveryLink.recoveryTokenHash(callback);
       if (tokenHash != null &&
@@ -42,20 +62,32 @@ class PasswordRecoveryCoordinator extends ChangeNotifier {
       } else {
         await SupabaseConfig.client.auth.getSessionFromUrl(callback);
       }
+      _sessionReady = true;
       _linkError = null;
     } on AuthException catch (e) {
       debugPrint(
-        'Password recovery link failed: '
-        'code=${e.code} status=${e.statusCode} "${e.message}"',
+        'Password recovery link failed: code=${e.code} status=${e.statusCode}',
       );
       _linkError = _recoveryLinkErrorMessage(e);
     } catch (e, stackTrace) {
-      debugPrint('Password recovery link unexpected error: $e');
+      debugPrint('Password recovery link failed');
       debugPrintStack(stackTrace: stackTrace);
       _linkError =
           'This reset link is invalid or has expired. '
           'Request a new one from the login screen.';
+    } finally {
+      _busy = false;
+      if (_linkError != null && !_sessionReady) {
+        await _onRecoveryLinkFailed?.call();
+      }
     }
+    notifyListeners();
+  }
+
+  void resetForNewAttempt() {
+    _sessionReady = false;
+    _linkError = null;
+    _busy = false;
     notifyListeners();
   }
 }

@@ -60,6 +60,12 @@ class SharedPreferencesService {
   Future<bool> setEmailOtpPending(bool value) =>
       _prefs.setBool(AppConstants.keyEmailOtpPending, value);
 
+  bool get isPasswordRecoveryPending =>
+      _prefs.getBool(AppConstants.keyPasswordRecoveryPending) ?? false;
+
+  Future<bool> setPasswordRecoveryPending(bool value) =>
+      _prefs.setBool(AppConstants.keyPasswordRecoveryPending, value);
+
   /// Pairs with the secure-storage device token. Not a credential.
   /// Kept across logout so the same install can stay trusted.
   String? get deviceTrustInstallId =>
@@ -119,6 +125,7 @@ class SharedPreferencesService {
     await remove(AppConstants.keyUserId);
     await remove(AppConstants.keyDisplayName);
     await remove(AppConstants.keyEmailOtpPending);
+    await remove(AppConstants.keyPasswordRecoveryPending);
   }
 
   // Generic helpers

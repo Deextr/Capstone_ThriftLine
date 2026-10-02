@@ -9,6 +9,7 @@ bool holdAuthScreenForTrustedDeviceCheck({
 }) {
   if (!resolvingTrustedDevice) return false;
   return location == RouteNames.login ||
+      location == RouteNames.emailLogin ||
       location == RouteNames.signup ||
       location == RouteNames.forgotPassword;
 }
@@ -31,6 +32,7 @@ String? passwordRecoveryWorkspaceRedirect({
 /// Routes reachable without a full session (login, signup, password recovery).
 bool isPublicAuthRoute(String location) {
   return location == RouteNames.login ||
+      location == RouteNames.emailLogin ||
       location == RouteNames.signup ||
       isPasswordRecoveryAuthRoute(location);
 }
@@ -44,7 +46,9 @@ String? unauthenticatedEmailOtpRedirect({
   required bool emailOtpPending,
 }) {
   if (!emailOtpPending || isAuthenticated) return null;
-  if (location == RouteNames.signup || location == RouteNames.login) {
+  if (location == RouteNames.signup ||
+      location == RouteNames.login ||
+      location == RouteNames.emailLogin) {
     return null;
   }
   return RouteNames.login;

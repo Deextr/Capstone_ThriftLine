@@ -50,7 +50,10 @@ Future<void> main() async {
   await authProvider.init();
 
   final paymongoReturn = PaymongoReturnCoordinator();
-  final passwordRecovery = PasswordRecoveryCoordinator();
+  final passwordRecovery = PasswordRecoveryCoordinator(
+    onRecoveryLinkAccepted: authProvider.markPasswordRecoveryPending,
+    onRecoveryLinkFailed: authProvider.abandonPasswordRecoveryLinkAttempt,
+  );
   await attachAppDeepLinks(
     paymongoReturn: paymongoReturn,
     passwordRecovery: passwordRecovery,

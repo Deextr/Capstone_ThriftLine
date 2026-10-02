@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application
-        android:label="thriftline"
+        android:label="ThriftLine"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -45,6 +45,26 @@
                     android:scheme="thriftline"
                     android:host="reset-password"/>
             </intent-filter>
+            <!-- Gmail often opens the HTTPS bounce URL in a WebView. Chrome
+                 and the system can still deliver this URL to the app. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="zakorrcmmswwzfihmcji.supabase.co"
+                    android:pathPrefix="/functions/v1/password-recovery-return"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="zakorrcmmswwzfihmcji.supabase.co"
+                    android:pathPrefix="/storage/v1/object/public/app-links/"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
@@ -71,6 +91,10 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="thriftline" />
         </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />

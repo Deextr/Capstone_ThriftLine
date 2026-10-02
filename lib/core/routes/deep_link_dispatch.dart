@@ -37,6 +37,12 @@ Future<void> attachAppDeepLinks({
 
   Future<void> dispatch(Uri? uri) async {
     if (uri == null) return;
+    debugPrint(
+      'App deep link received: scheme=${uri.scheme} host=${uri.host} '
+      'recovery=${PasswordRecoveryLink.isRecoveryUri(uri)} '
+      'token_hash=${uri.queryParameters.containsKey('token_hash')} '
+      'paymongo=${PaymongoReturnLink.tryParse(uri) != null}',
+    );
     if (PaymongoReturnLink.tryParse(uri) != null) {
       paymongoReturn.accept(uri);
       return;

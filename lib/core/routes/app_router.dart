@@ -21,6 +21,7 @@ import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/auth/presentation/screens/signup_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/verify_email_otp_screen.dart';
+import '../../features/auth/controllers/phone_verification_controller.dart';
 import '../../features/auth/presentation/screens/verify_phone_screen.dart';
 import '../../features/profile/presentation/screens/address_book_screen.dart';
 import '../../features/profile/presentation/screens/payment_methods_screen.dart';
@@ -58,7 +59,6 @@ import '../../features/buyer/controllers/looking_for_detail_controller.dart';
 import '../../features/buyer/presentation/screens/home_collection_screen.dart';
 import '../../features/buyer/presentation/screens/looking_for_detail_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
-import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/seller/controllers/add_listing_controller.dart';
 import '../../features/seller/controllers/edit_listing_controller.dart';
 import '../../features/seller/presentation/screens/add_listing_screen.dart';
@@ -121,10 +121,6 @@ GoRouter createAppRouter({
       // The legal documents must stay reachable at every stage, including
       // while the user is deciding whether to consent.
       if (isLegal) return null;
-
-      if (!appProvider.isOnboardingComplete && !isOnboarding) {
-        return RouteNames.onboarding;
-      }
 
       if (holdAuthScreenForTrustedDeviceCheck(
         resolvingTrustedDevice: authProvider.isResolvingTrustedDevice,
@@ -196,9 +192,13 @@ GoRouter createAppRouter({
       GoRoute(path: RouteNames.splash, builder: (_, _) => const SplashScreen()),
       GoRoute(
         path: RouteNames.onboarding,
-        builder: (_, _) => const OnboardingScreen(),
+        redirect: (_, _) => RouteNames.login,
       ),
       GoRoute(path: RouteNames.login, builder: (_, _) => const LoginScreen()),
+      GoRoute(
+        path: RouteNames.emailLogin,
+        redirect: (_, _) => '${RouteNames.login}?email=1',
+      ),
       GoRoute(path: RouteNames.signup, builder: (_, _) => const SignupScreen()),
       GoRoute(
         path: RouteNames.forgotPassword,
@@ -644,7 +644,13 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: RouteNames.verifyPhone,
-        builder: (_, _) => const VerifyPhoneScreen(),
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => PhoneVerificationController(
+            auth: context.read<AuthProvider>(),
+            initialPhone: context.read<AuthProvider>().user?.phone,
+          ),
+          child: const VerifyPhoneScreen(),
+        ),
       ),
       GoRoute(
         path: RouteNames.addresses,

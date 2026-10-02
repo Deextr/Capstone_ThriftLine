@@ -11,6 +11,7 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../widgets/auth_branding.dart';
 import '../widgets/login_video_background.dart';
+import '../widgets/turnstile_challenge.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -22,8 +23,10 @@ class ForgotPasswordScreen extends StatefulWidget {
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+  final _turnstileKey = GlobalKey<TurnstileChallengeState>();
   bool _submitted = false;
   bool _emailSent = false;
+  String? _turnstileToken;
 
   @override
   void dispose() {
@@ -31,16 +34,33 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
+  void _clearTurnstile() {
+    setState(() => _turnstileToken = null);
+    _turnstileKey.currentState?.reset();
+  }
+
   Future<void> _submit() async {
     setState(() => _submitted = true);
     if (!_formKey.currentState!.validate()) return;
 
+    final token = _turnstileToken?.trim();
+    if (token == null || token.isEmpty) {
+      showThriftSnackBar(
+        context,
+        'Complete human verification before requesting a reset email.',
+        isError: true,
+      );
+      return;
+    }
+
     final auth = context.read<AuthProvider>();
     final error = await auth.requestPasswordReset(
       email: _emailController.text.trim(),
+      turnstileToken: token,
     );
     if (!mounted) return;
     if (error != null) {
+      _clearTurnstile();
       showThriftSnackBar(context, error, isError: true);
       return;
     }
@@ -53,6 +73,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final screenHeight = MediaQuery.sizeOf(context).height;
     final compact = screenHeight < 700;
     const fieldLabelColor = Colors.white;
+    final canSubmit =
+        !auth.isLoading && (_turnstileToken?.isNotEmpty ?? false);
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -71,7 +93,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     alignment: Alignment.centerLeft,
                     child: IconButton(
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => context.go(RouteNames.login),
+                      onPressed: () => context.go(RouteNames.emailLogin),
                     ),
                   ),
                   Expanded(
@@ -143,18 +165,31 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                           validator: Validators.email,
                                           labelColor: fieldLabelColor,
                                         ),
+                                        const SizedBox(height: 16),
+                                        TurnstileChallenge(
+                                          key: _turnstileKey,
+                                          action: 'password_reset',
+                                          onToken: (token) => setState(
+                                            () => _turnstileToken = token,
+                                          ),
+                                          onError: (_) => setState(
+                                            () => _turnstileToken = null,
+                                          ),
+                                          onExpired: () => setState(
+                                            () => _turnstileToken = null,
+                                          ),
+                                        ),
                                         SizedBox(height: compact ? 20 : 24),
                                         ThriftButton(
                                           label: 'Send reset link',
-                                          onPressed: auth.isLoading
-                                              ? null
-                                              : _submit,
+                                          onPressed: canSubmit ? _submit : null,
                                           isLoading: auth.isLoading,
                                         ),
                                         const SizedBox(height: 20),
                                         GestureDetector(
-                                          onTap: () =>
-                                              context.go(RouteNames.login),
+                                          onTap: () => context.go(
+                                            RouteNames.emailLogin,
+                                          ),
                                           child: Text(
                                             'Back to login',
                                             style: AppTypography.body.copyWith(

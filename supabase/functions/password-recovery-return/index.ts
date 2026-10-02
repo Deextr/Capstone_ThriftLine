@@ -1,17 +1,16 @@
-const APP_PACKAGE = "com.example.thriftline";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
 
-/**
- * After /auth/v1/verify, GoTrue redirects here with session tokens in the URL
- * hash. Gmail's browser cannot open thriftline:// directly (blank tab). This
- * page moves tokens into query parameters and opens the app via intent:// so
- * Android passes them to Flutter (fragments are often dropped on intents).
- */
+function readRecoveryParams(url: URL): { tokenHash: string; type: string } {
+  const tokenHash = (url.searchParams.get("token_hash") ?? "").trim();
+  const type = (url.searchParams.get("type") ?? "recovery").trim() ||
+    "recovery";
+  return { tokenHash, type };
+}
+
 Deno.serve((req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -20,58 +19,45 @@ Deno.serve((req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Opening ThriftLine</title>
-</head>
-<body style="margin:0;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#F8FAFC;color:#0F172A;">
-  <div style="max-width:420px;margin:48px auto;padding:24px;text-align:center;">
-    <p style="font-size:18px;font-weight:600;">Opening ThriftLine…</p>
-    <p style="font-size:14px;color:#64748B;line-height:1.5;">
-      Return to the app to choose a new password.
-    </p>
-    <p id="fallback" style="display:none;margin-top:24px;">
-      <a id="open-app" href="#" style="color:#0D9488;font-weight:600;">Open ThriftLine</a>
-    </p>
-  </div>
-  <script>
-(function () {
-  var hash = (window.location.hash || "").replace(/^#/, "");
-  var search = (window.location.search || "").replace(/^\\?/, "");
-  var paramString = hash || search;
-  if (!paramString) {
-    document.body.insertAdjacentHTML("beforeend",
-      '<p style="text-align:center;color:#64748B;">This link is invalid or has expired. Request a new reset email from the app.</p>');
-    return;
-  }
-  var appUrl = "thriftline://reset-password?" + paramString;
-  var intentUrl =
-    "intent://reset-password?" + paramString +
-    "#Intent;scheme=thriftline;package=${APP_PACKAGE};end";
-  try { window.location.replace(intentUrl); } catch (e) {}
-  setTimeout(function () {
-    try { window.location.replace(appUrl); } catch (e) {}
-  }, 150);
-  setTimeout(function () {
-    var link = document.getElementById("open-app");
-    var fb = document.getElementById("fallback");
-    if (link) link.href = appUrl;
-    if (fb) fb.style.display = "block";
-  }, 900);
-})();
-  </script>
-</body>
-</html>`;
+  const { tokenHash, type } = readRecoveryParams(new URL(req.url));
+  const hasToken = tokenHash.length > 0;
+  console.log(
+    `password-recovery-return method=${req.method} has_token_hash=${hasToken} type=${type}`,
+  );
 
-  return new Response(req.method === "HEAD" ? null : html, {
-    status: 200,
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "no-store",
+  if (!hasToken) {
+    const body =
+      "This password reset link is invalid or has expired. Please request a new password reset email from the ThriftLine app.\n";
+    return new Response(req.method === "HEAD" ? null : body, {
+      status: 400,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+
+  const paramString = new URLSearchParams({
+    token_hash: tokenHash,
+    type,
+  }).toString();
+  const appUrl = `thriftline://reset-password?${paramString}`;
+
+  // 200 + Refresh (not 302). A 302 to a custom scheme is followed by Gmail
+  // and shown as a blank page; the gateway also strips 302 bodies.
+  return new Response(
+    req.method === "HEAD"
+      ? null
+      : "Opening ThriftLine...\n\nIf the app does not open, go back to the email and tap Open ThriftLine.\n",
+    {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+        Refresh: `0;url=${appUrl}`,
+      },
     },
-  });
+  );
 });

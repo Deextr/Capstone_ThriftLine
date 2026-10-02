@@ -8,6 +8,7 @@ import '../../../core/utils/validators.dart';
 import '../domain/auth_error.dart';
 import '../domain/auth_user.dart';
 import '../domain/legal_documents.dart';
+import '../domain/phone_otp.dart';
 import '../domain/signup_identity.dart';
 import '../domain/trusted_device.dart';
 import 'auth_result.dart';
@@ -122,29 +123,79 @@ class AuthService {
     required String email,
     required String password,
     required LegalConsent consent,
+    required String turnstileToken,
   }) async {
     try {
-      final response = await _auth.signInWithPassword(
-        email: email,
-        password: password,
+      final response = await _supabaseService.client.functions.invoke(
+        'sign-in-with-email',
+        body: {
+          'email': email.trim(),
+          'password': password,
+          'turnstile_token': turnstileToken.trim(),
+        },
       );
 
-      final supabaseUser = response.user;
-      if (supabaseUser == null) {
-        return AuthResult.failure('Sign-in failed. Please try again.');
+      final data = response.data;
+      if (data is Map) {
+        final code = data['code']?.toString();
+        final serverError = data['error']?.toString();
+        if (serverError != null && serverError.isNotEmpty) {
+          return AuthResult.failure(
+            emailLoginUiMessage(code: code, serverError: serverError),
+          );
+        }
+        if (response.status >= 400) {
+          return AuthResult.failure(emailLoginUiMessage(code: code));
+        }
+
+        final session = data['session'];
+        if (session is! Map) {
+          return AuthResult.failure('Sign-in failed. Please try again.');
+        }
+        final accessToken = session['access_token']?.toString() ?? '';
+        final refreshToken = session['refresh_token']?.toString() ?? '';
+        if (accessToken.isEmpty || refreshToken.isEmpty) {
+          return AuthResult.failure('Sign-in failed. Please try again.');
+        }
+
+        final authResponse = await _auth.setSession(
+          refreshToken,
+          accessToken: accessToken,
+        );
+
+        final supabaseUser = authResponse.user;
+        if (supabaseUser == null) {
+          return AuthResult.failure('Sign-in failed. Please try again.');
+        }
+
+        await recordConsent(consent);
+
+        await _refreshProviderAvatar(
+          userId: supabaseUser.id,
+          avatarUrl: _extractAvatarUrlFromUser(supabaseUser),
+        );
+
+        final userRecord = await getUserRecord(supabaseUser.id);
+        return AuthResult.success(
+          await hydrateUser(supabaseUser, userRecord),
+          requiresEmailOtp: true,
+        );
       }
 
-      await recordConsent(consent);
-
-      await _refreshProviderAvatar(
-        userId: supabaseUser.id,
-        avatarUrl: _extractAvatarUrlFromUser(supabaseUser),
-      );
-
-      final userRecord = await getUserRecord(supabaseUser.id);
-      return AuthResult.success(
-        await hydrateUser(supabaseUser, userRecord),
-        requiresEmailOtp: true,
+      if (response.status >= 400) {
+        debugPrint(
+          'AuthService.signInWithEmail failed: status=${response.status}',
+        );
+        return AuthResult.failure(emailLoginUiMessage());
+      }
+      return AuthResult.failure('Sign-in failed. Please try again.');
+    } on FunctionException catch (e) {
+      debugPrint('AuthService.signInWithEmail failed: status=${e.status}');
+      return AuthResult.failure(
+        emailLoginUiMessage(
+          code: _functionExceptionCode(e),
+          serverError: _functionExceptionMessage(e),
+        ),
       );
     } on AuthException catch (e) {
       debugPrint('AuthService.signInWithEmail failed: ${_describe(e)}');
@@ -161,11 +212,17 @@ class AuthService {
   /// response when the address is missing or belongs only to Google, so the
   /// UI cannot tell those cases apart. Delivery and rate-limit failures are
   /// the only errors shown.
-  Future<String?> requestPasswordReset({required String email}) async {
+  Future<String?> requestPasswordReset({
+    required String email,
+    required String turnstileToken,
+  }) async {
     try {
       final response = await _supabaseService.client.functions.invoke(
         'send-password-reset',
-        body: {'email': email.trim()},
+        body: {
+          'email': email.trim(),
+          'turnstile_token': turnstileToken.trim(),
+        },
       );
       final data = response.data;
       if (data is Map && data['error'] != null) {
@@ -498,29 +555,33 @@ class AuthService {
 
   /// Sends a 6-digit SMS code through the `send-phone-otp` Edge Function.
   ///
-  /// The iProgSMS token never leaves the server. Returns an error message
-  /// on failure, or `null` on success.
-  Future<String?> sendPhoneOtp(String phone) async {
+  /// The FMCSMS API key never leaves the server.
+  Future<PhoneOtpResult> sendPhoneOtp(String phone) async {
     try {
       final response = await _supabaseService.client.functions.invoke(
         'send-phone-otp',
         body: {'phone': phone},
       );
-      return _functionError(response);
-    } on FunctionException catch (e) {
-      debugPrint(
-        'AuthService.sendPhoneOtp failed: ${e.reasonPhrase} ${e.details}',
+      return _phoneOtpResult(
+        response,
+        fallback: 'We could not send the verification code. Please try again.',
       );
-      return _functionExceptionMessage(e) ??
-          'We could not send the SMS. Please try again.';
+    } on FunctionException catch (e) {
+      debugPrint('AuthService.sendPhoneOtp failed: ${e.reasonPhrase}');
+      return _phoneOtpFromException(
+        e,
+        fallback: 'We could not send the verification code. Please try again.',
+      );
     } catch (e) {
       debugPrint('AuthService.sendPhoneOtp error: $e');
-      return 'We could not send the SMS. Please try again.';
+      return const PhoneOtpResult.failure(
+        'We could not send the verification code. Check your connection and try again.',
+      );
     }
   }
 
   /// Confirms the SMS code through the `verify-phone-otp` Edge Function.
-  Future<String?> verifyPhoneOtp({
+  Future<PhoneOtpResult> verifyPhoneOtp({
     required String phone,
     required String token,
   }) async {
@@ -529,16 +590,21 @@ class AuthService {
         'verify-phone-otp',
         body: {'phone': phone, 'token': token},
       );
-      return _functionError(response);
-    } on FunctionException catch (e) {
-      debugPrint(
-        'AuthService.verifyPhoneOtp failed: ${e.reasonPhrase} ${e.details}',
+      return _phoneOtpResult(
+        response,
+        fallback: 'Could not verify that code. Please try again.',
       );
-      return _functionExceptionMessage(e) ??
-          'Could not verify that code. Please try again.';
+    } on FunctionException catch (e) {
+      debugPrint('AuthService.verifyPhoneOtp failed: ${e.reasonPhrase}');
+      return _phoneOtpFromException(
+        e,
+        fallback: 'Could not verify that code. Please try again.',
+      );
     } catch (e) {
       debugPrint('AuthService.verifyPhoneOtp error: $e');
-      return 'Could not verify that code. Please try again.';
+      return const PhoneOtpResult.failure(
+        'Could not verify that code. Check your connection and try again.',
+      );
     }
   }
 
@@ -562,6 +628,65 @@ class AuthService {
       return details;
     }
     return e.reasonPhrase;
+  }
+
+  String? _functionExceptionCode(FunctionException e) {
+    final details = e.details;
+    if (details is Map && details['code'] != null) {
+      return details['code'].toString();
+    }
+    return null;
+  }
+
+  PhoneOtpResult _phoneOtpResult(
+    FunctionResponse response, {
+    required String fallback,
+  }) {
+    return _phoneOtpFromData(
+      response.data,
+      status: response.status,
+      fallback: fallback,
+    );
+  }
+
+  PhoneOtpResult _phoneOtpFromException(
+    FunctionException e, {
+    required String fallback,
+  }) {
+    return _phoneOtpFromData(e.details, status: e.status, fallback: fallback);
+  }
+
+  PhoneOtpResult _phoneOtpFromData(
+    Object? data, {
+    required int status,
+    required String fallback,
+  }) {
+    if (data is Map) {
+      final error = data['error']?.toString();
+      final code = data['code']?.toString();
+      final retry = _asInt(data['retry_after_seconds']);
+      if (error != null && error.isNotEmpty) {
+        return PhoneOtpResult.failure(
+          error,
+          code: code,
+          retryAfterSeconds: retry,
+        );
+      }
+      if (status < 400) {
+        return PhoneOtpResult.success(retryAfterSeconds: retry ?? 60);
+      }
+    }
+    if (data is String && data.trim().isNotEmpty && status >= 400) {
+      return PhoneOtpResult.failure(data);
+    }
+    if (status >= 400) return PhoneOtpResult.failure(fallback);
+    return PhoneOtpResult.success(retryAfterSeconds: 60);
+  }
+
+  int? _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
   }
 
   /// Stream of auth state changes for reactive updates.
@@ -641,6 +766,8 @@ class AuthService {
             'try again.';
       case 'over_request_rate_limit':
         return 'Too many attempts. Please wait a moment and try again.';
+      case 'captcha_failed':
+        return 'Human verification failed. Please try again.';
       case 'weak_password':
         return 'Password must be at least 6 characters.';
     }

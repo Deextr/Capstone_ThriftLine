@@ -2,6 +2,8 @@ import '../../../core/routes/route_names.dart';
 
 const kThriftlineAppScheme = 'thriftline';
 const kPasswordRecoveryHost = 'reset-password';
+const kPasswordRecoveryReturnPath = 'password-recovery-return';
+const kPasswordRecoveryOpenPage = 'open-thriftline';
 
 /// Deep link Supabase uses to return users into the app after email reset.
 abstract final class PasswordRecoveryLink {
@@ -27,7 +29,9 @@ abstract final class PasswordRecoveryLink {
       return true;
     }
     if ((scheme == 'https' || scheme == 'http') &&
-        path.contains(kPasswordRecoveryHost)) {
+        (path.contains(kPasswordRecoveryHost) ||
+            path.contains(kPasswordRecoveryReturnPath) ||
+            path.contains(kPasswordRecoveryOpenPage))) {
       return true;
     }
     return false;

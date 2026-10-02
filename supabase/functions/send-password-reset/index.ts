@@ -1,8 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { clientIp } from "../_shared/phone_otp.ts";
+import { THRIFTLINE_ANDROID_PACKAGE } from "../_shared/thriftline_android.ts";
+import {
+  turnstileUserMessage,
+  verifyTurnstileToken,
+} from "../_shared/turnstile.ts";
 
-// HTTPS bounce page (Gmail → verify → bounce → app). Also allow
-// thriftline://reset-password in the Auth redirect URL list.
+// HTTPS is required so Gmail keeps the button clickable. The function then
+// Refresh-redirects to thriftline://reset-password. Do not use target=_blank.
 function recoveryBounceUrl(): string {
   const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/$/, "");
   if (!base) return "";
@@ -31,15 +37,7 @@ function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function escapeHtmlText(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-/** Safe for double-quoted href attributes on https recovery URLs. */
+/** Safe for double-quoted href attributes. */
 function escapeHtmlAttr(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
 }
@@ -48,9 +46,9 @@ const BRAND_PRIMARY = "#0D9488";
 const BRAND_TEXT = "#0F172A";
 const BRAND_MUTED = "#64748B";
 
-function buildRecoveryEmailHtml(recoveryUrl: string): string {
-  const href = escapeHtmlAttr(recoveryUrl);
-  const linkText = escapeHtmlText(recoveryUrl);
+function buildRecoveryEmailHtml(httpsUrl: string, openAppUrl: string): string {
+  const httpsHref = escapeHtmlAttr(httpsUrl);
+  const openHref = escapeHtmlAttr(openAppUrl);
   return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -64,23 +62,22 @@ function buildRecoveryEmailHtml(recoveryUrl: string): string {
             You requested to reset your ThriftLine password.
           </p>
           <p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:${BRAND_MUTED};">
-            Click the button below to create a new password. Open this email on the phone where ThriftLine is installed.
+            Tap the button on the phone where ThriftLine is installed. The app should open so you can choose a new password.
           </p>
-          <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 28px;">
+          <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 16px;">
             <tr><td style="border-radius:8px;background:${BRAND_PRIMARY};">
-              <a href="${href}" target="_blank" rel="noopener noreferrer"
+              <a href="${httpsHref}"
                  style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:8px;">
                 Choose a New Password
               </a>
             </td></tr>
           </table>
-          <p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:${BRAND_MUTED};">
-            This password reset link will expire according to the configured recovery token validity period.
-            If you did not request a password reset, you can safely ignore this email.
+          <p style="margin:0 0 20px;font-size:13px;">
+            <a href="${openHref}" style="color:${BRAND_PRIMARY};font-weight:600;">Open ThriftLine</a>
           </p>
-          <p style="margin:0;font-size:12px;line-height:1.5;color:${BRAND_MUTED};">
-            If the button does not work, copy and paste this link into your browser:<br/>
-            <a href="${href}" style="color:${BRAND_PRIMARY};word-break:break-all;">${linkText}</a>
+          <p style="margin:0;font-size:13px;line-height:1.5;color:${BRAND_MUTED};">
+            This password reset link expires soon and can only be used once.
+            If you did not request a password reset, you can safely ignore this email.
           </p>
         </td></tr>
       </table>
@@ -90,11 +87,13 @@ function buildRecoveryEmailHtml(recoveryUrl: string): string {
 </html>`;
 }
 
-function buildRecoveryEmailText(recoveryUrl: string): string {
+function buildRecoveryEmailText(httpsUrl: string, openAppUrl: string): string {
   return (
     "You requested to reset your ThriftLine password.\n\n" +
-    "Open this link on your phone to choose a new password:\n" +
-    `${recoveryUrl}\n\n` +
+    "On the phone where ThriftLine is installed, open this link:\n" +
+    `${httpsUrl}\n\n` +
+    "Or open ThriftLine directly:\n" +
+    `${openAppUrl}\n\n` +
     "This link expires soon and can only be used once. " +
     "If you did not request a password reset, you can safely ignore this email."
   );
@@ -108,7 +107,11 @@ async function sha256Hex(value: string): Promise<string> {
     .join("");
 }
 
-async function sendRecoveryEmail(to: string, recoveryUrl: string): Promise<void> {
+async function sendRecoveryEmail(
+  to: string,
+  httpsUrl: string,
+  openAppUrl: string,
+): Promise<void> {
   const username = Deno.env.get("GMAIL_USER") ?? "";
   const password = Deno.env.get("GMAIL_APP_PASSWORD") ?? "";
   if (!username.trim() || !password.trim()) {
@@ -124,8 +127,8 @@ async function sendRecoveryEmail(to: string, recoveryUrl: string): Promise<void>
     },
   });
 
-  const text = buildRecoveryEmailText(recoveryUrl);
-  const html = buildRecoveryEmailHtml(recoveryUrl);
+  const text = buildRecoveryEmailText(httpsUrl, openAppUrl);
+  const html = buildRecoveryEmailHtml(httpsUrl, openAppUrl);
 
   try {
     await client.send({
@@ -149,17 +152,37 @@ Deno.serve(async (req) => {
   }
 
   let email = "";
+  let turnstileToken = "";
   try {
     const body = await req.json();
     email = normalizeEmail(
       typeof body?.email === "string" ? body.email : "",
     );
+    turnstileToken = typeof body?.turnstile_token === "string"
+      ? body.turnstile_token
+      : typeof body?.captcha_token === "string"
+      ? body.captcha_token
+      : "";
   } catch {
     return json(400, { error: "Enter a valid email address." });
   }
 
   if (!isEmail(email)) {
     return json(400, { error: "Enter a valid email address." });
+  }
+
+  if (!turnstileToken.trim()) {
+    return json(400, {
+      error: "Complete human verification before requesting a reset email.",
+    });
+  }
+
+  const remoteIp = clientIp(req);
+  const turnstile = await verifyTurnstileToken(turnstileToken, remoteIp, {
+    expectedAction: "password_reset",
+  });
+  if (!turnstile.success) {
+    return json(403, { error: turnstileUserMessage(turnstile["error-codes"]) });
   }
 
   const service = createClient(
@@ -222,13 +245,21 @@ Deno.serve(async (req) => {
     .generateLink({
       type: "recovery",
       email,
-      options: { redirectTo: bounceUrl },
+      options: { redirectTo: "thriftline://reset-password" },
     });
 
-  // Gmail and most clients strip non-http(s) href values. Use Supabase's HTTPS
-  // verify URL; after verification Auth redirects to thriftline://reset-password.
-  const recoveryUrl = linkData?.properties?.action_link ?? "";
-  if (linkError || !recoveryUrl.startsWith("https://")) {
+  const hashedToken = (linkData?.properties?.hashed_token ?? "").trim();
+  const query = hashedToken
+    ? new URLSearchParams({
+      token_hash: hashedToken,
+      type: "recovery",
+    }).toString()
+    : "";
+  const recoveryUrl = query ? `${bounceUrl}?${query}` : "";
+  const openAppUrl = query
+    ? `intent://reset-password?${query}#Intent;scheme=thriftline;package=${THRIFTLINE_ANDROID_PACKAGE};end`
+    : "";
+  if (linkError || !recoveryUrl.startsWith("https://") || !openAppUrl) {
     const code = linkError && "code" in linkError
       ? String(linkError.code ?? "")
       : "";
@@ -245,7 +276,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    await sendRecoveryEmail(email, recoveryUrl);
+    await sendRecoveryEmail(email, recoveryUrl, openAppUrl);
   } catch {
     console.error("send-password-reset smtp failed");
     return json(500, {
