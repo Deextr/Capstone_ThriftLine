@@ -72,6 +72,7 @@ abstract final class RouteNames {
   static const String settings = '/settings';
   static const String purchaseHistory = '/purchase-history';
   static const String savedItems = '/saved-items';
+  static const String followingShops = '/following-shops';
   static const String becomeSeller = '/become-seller';
   static const String sellerProfile = '/seller-profile/:username';
   static const String cart = '/cart';

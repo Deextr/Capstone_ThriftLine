@@ -165,7 +165,14 @@ class MyShopScreen extends StatelessWidget {
                         const _Divider(),
                         _StatColumn(value: '$followers', label: 'Followers'),
                         const _Divider(),
-                        _StatColumn(value: '$following', label: 'Following'),
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => context.push(RouteNames.followingShops),
+                          child: _StatColumn(
+                            value: '$following',
+                            label: 'Following',
+                          ),
+                        ),
                       ],
                     ),
 

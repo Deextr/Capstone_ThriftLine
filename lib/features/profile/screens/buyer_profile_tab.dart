@@ -14,7 +14,9 @@ import '../../auth/presentation/widgets/auth_widgets.dart';
 import '../../buyer/controllers/buyer_orders_controller.dart';
 import '../../buyer/data/buyer_purchase_category.dart';
 import '../../../models/review_model.dart';
+import '../../../providers/following_shops_provider.dart';
 import '../../trust_safety/data/buyer_to_rate_buckets.dart';
+import '../presentation/widgets/following_shops_preview.dart';
 import '../presentation/widgets/switch_account_sheet.dart';
 import '../presentation/widgets/switchable_avatar.dart';
 
@@ -26,6 +28,7 @@ class BuyerProfileTab extends StatelessWidget {
     final auth = context.watch<AuthProvider>();
     final data = context.watch<DataProvider>();
     final buyerOrders = context.watch<BuyerOrdersController>();
+    final followingProvider = context.watch<FollowingShopsProvider>();
     final user = auth.user;
 
     final myPurchasesCount = buyerOrders.orders
@@ -40,6 +43,7 @@ class BuyerProfileTab extends StatelessWidget {
       buyerOrders.orders,
       myReviews,
     ).length;
+    final followingCount = followingProvider.followingCount;
 
     return SafeArea(
       child: ListView(
@@ -78,7 +82,19 @@ class BuyerProfileTab extends StatelessWidget {
                 label: 'Saved Items',
                 onTap: () => context.push(RouteNames.savedItems),
               ),
+              _MenuItem(
+                icon: Icons.storefront_outlined,
+                label: followingCount > 0
+                    ? 'Following Shops ($followingCount)'
+                    : 'Following Shops',
+                onTap: () => context.push(RouteNames.followingShops),
+              ),
             ],
+          ),
+          FollowingShopsPreview(
+            followedShops: followingProvider.followedShops,
+            isLoading: followingProvider.isLoading,
+            onViewAll: () => context.push(RouteNames.followingShops),
           ),
           _SectionCard(
             title: 'Account & Settings',

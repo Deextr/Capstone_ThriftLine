@@ -97,6 +97,11 @@ class SellerProfileTab extends StatelessWidget {
                 onTap: () => context.push(RouteNames.addresses),
               ),
               _MenuItem(
+                icon: Icons.storefront_outlined,
+                label: 'Following Shops',
+                onTap: () => context.push(RouteNames.followingShops),
+              ),
+              _MenuItem(
                 icon: Icons.settings_outlined,
                 label: 'Settings',
                 onTap: () => context.push(RouteNames.settings),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -6,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/ph_phone.dart';
+import '../../../../core/utils/validators.dart';
 import '../../../../models/enums.dart';
 import '../../../../widgets/keyboard_safe.dart';
 import '../../../../widgets/thrift_widgets.dart';
@@ -29,6 +31,7 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
   DateTime? _estimated;
   String? _nameError;
   String? _phoneError;
+  String? _plateError;
 
   @override
   void initState() {
@@ -81,21 +84,24 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
   }
 
   Future<void> _submit() async {
-    final nameError = _name.text.trim().isEmpty
-        ? 'Enter the rider name.'
-        : null;
+    final nameError = Validators.riderName(_name.text);
     final phoneError = phMobileValidationError(_phone.text);
+    final plateTrimmed = _plate.text.trim();
+    final plateError = plateTrimmed.isEmpty
+        ? 'Enter the plate number.'
+        : null;
     setState(() {
       _nameError = nameError;
       _phoneError = phoneError;
+      _plateError = plateError;
     });
-    if (nameError != null || phoneError != null) return;
+    if (nameError != null || phoneError != null || plateError != null) return;
 
     final error = await context.read<SellerOrdersController>().assignRider(
-      riderName: _name.text.trim(),
+      riderName: Validators.normalizeFullName(_name.text),
       riderPhone: _phone.text.trim(),
       vehicleType: _vehicle.dbValue,
-      plateNumber: _plate.text.trim().isEmpty ? null : _plate.text.trim(),
+      plateNumber: plateTrimmed,
       estimatedDeliveryAt: _estimated,
       deliveryNotes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
     );
@@ -139,6 +145,11 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
             hint: 'Juan Dela Cruz',
             controller: _name,
             error: _nameError,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(
+                Validators.fullNameInputCharacters,
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           ThriftTextField(
@@ -166,9 +177,10 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
           ),
           const SizedBox(height: 12),
           ThriftTextField(
-            label: 'Plate number (optional)',
+            label: 'Plate number',
             hint: 'ABC 1234',
             controller: _plate,
+            error: _plateError,
           ),
           const SizedBox(height: 12),
           ThriftTextField(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -6,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/ph_phone.dart';
+import '../../../../core/utils/validators.dart';
 import '../../../../models/enums.dart';
 import '../../../../widgets/keyboard_safe.dart';
 import '../../../../widgets/thrift_widgets.dart';
@@ -81,9 +83,7 @@ class _ArrangeReturnScreenState extends State<ArrangeReturnScreen> {
   }
 
   Future<void> _submit() async {
-    final nameError = _name.text.trim().isEmpty
-        ? 'Enter the rider name.'
-        : null;
+    final nameError = Validators.riderName(_name.text);
     final phoneError = phMobileValidationError(_phone.text);
     setState(() {
       _nameError = nameError;
@@ -94,7 +94,7 @@ class _ArrangeReturnScreenState extends State<ArrangeReturnScreen> {
     final error = await context
         .read<SellerOrdersController>()
         .arrangeReturnRider(
-          riderName: _name.text.trim(),
+          riderName: Validators.normalizeFullName(_name.text),
           riderPhone: _phone.text.trim(),
           vehicleType: _vehicle.dbValue,
           plateNumber: _plate.text.trim().isEmpty ? null : _plate.text.trim(),
@@ -155,6 +155,11 @@ class _ArrangeReturnScreenState extends State<ArrangeReturnScreen> {
             hint: 'Juan Dela Cruz',
             controller: _name,
             error: _nameError,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(
+                Validators.fullNameInputCharacters,
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           ThriftTextField(

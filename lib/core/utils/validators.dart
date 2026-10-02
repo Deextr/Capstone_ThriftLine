@@ -5,6 +5,11 @@ abstract final class Validators {
   static const fullNameInvalidMessage =
       'Full name can only include letters, spaces, hyphens, and apostrophes.';
 
+  static const riderNameRequiredMessage = 'Enter the rider name.';
+
+  static const riderNameInvalidMessage =
+      'Rider name can only include letters, spaces, hyphens, and apostrophes.';
+
   /// Letters (any language), spaces, hyphens, and apostrophes between name parts.
   static final RegExp _fullNamePattern = RegExp(
     r"^(?:\p{L}+(?:['\u2019\-]\p{L}+)*)(?:\s+(?:\p{L}+(?:['\u2019\-]\p{L}+)*))*$",
@@ -48,6 +53,17 @@ abstract final class Validators {
     final normalized = normalizeFullName(raw);
     if (!_fullNamePattern.hasMatch(normalized)) {
       return fullNameInvalidMessage;
+    }
+    return null;
+  }
+
+  static String? riderName(String? value) {
+    final raw = value ?? '';
+    if (raw.trim().isEmpty) return riderNameRequiredMessage;
+
+    final normalized = normalizeFullName(raw);
+    if (!_fullNamePattern.hasMatch(normalized)) {
+      return riderNameInvalidMessage;
     }
     return null;
   }

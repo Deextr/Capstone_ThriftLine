@@ -16,6 +16,7 @@ import 'providers/app_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/data_provider.dart';
+import 'providers/following_shops_provider.dart';
 import 'providers/notifications_provider.dart';
 import 'providers/saved_items_provider.dart';
 import 'providers/settings_provider.dart';
@@ -45,6 +46,7 @@ Future<void> main() async {
   final notificationsProvider = NotificationsProvider(supabaseService);
   final settingsProvider = SettingsProvider(supabaseService);
   final savedItemsProvider = SavedItemsProvider(supabaseService);
+  final followingShopsProvider = FollowingShopsProvider(supabaseService);
   final cartProvider = CartProvider(supabaseService);
 
   await authProvider.init();
@@ -78,6 +80,7 @@ Future<void> main() async {
         notificationsProvider: notificationsProvider,
         settingsProvider: settingsProvider,
         savedItemsProvider: savedItemsProvider,
+        followingShopsProvider: followingShopsProvider,
         cartProvider: cartProvider,
         supabaseService: supabaseService,
       ),

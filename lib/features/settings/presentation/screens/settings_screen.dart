@@ -6,7 +6,6 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
-import '../../../../providers/auth_provider.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../auth/domain/legal_documents.dart';
@@ -25,7 +24,6 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>().settings;
-    final user = context.watch<AuthProvider>().user;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -71,26 +69,6 @@ class SettingsScreen extends StatelessWidget {
                   title: Text('Language', style: AppTypography.body),
                   subtitle: Text('English', style: AppTypography.caption),
                   trailing: const Icon(Icons.chevron_right, size: 20),
-                ),
-                ListTile(
-                  title: Text('Phone number', style: AppTypography.body),
-                  subtitle: Text(
-                    user?.isPhoneVerified == true
-                        ? (user?.phone ?? 'Verified')
-                        : 'Not verified',
-                    style: AppTypography.caption,
-                  ),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: () => context.push(RouteNames.verifyPhone),
-                ),
-                ListTile(
-                  title: Text('Addresses', style: AppTypography.body),
-                  subtitle: Text(
-                    'Delivery addresses for checkout',
-                    style: AppTypography.caption,
-                  ),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: () => context.push(RouteNames.addresses),
                 ),
               ],
             ),
