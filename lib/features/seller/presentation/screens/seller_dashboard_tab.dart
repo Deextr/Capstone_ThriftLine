@@ -41,7 +41,7 @@ class SellerDashboardTab extends StatelessWidget {
         .where((order) => order.isSellerVisible)
         .take(2)
         .toList();
-    final requests = looking.posts.take(2).toList();
+    final requests = looking.browsePosts.take(2).toList();
 
     return ColoredBox(
       color: AppColors.background,
@@ -196,8 +196,8 @@ String _greetingText(AuthUser? user) {
   final timeOfDay = hour < 12
       ? 'Good morning'
       : hour < 18
-          ? 'Good afternoon'
-          : 'Good evening';
+      ? 'Good afternoon'
+      : 'Good evening';
   final name = shortPersonName(user?.name ?? '');
   if (name.isNotEmpty) {
     return '$timeOfDay, $name';

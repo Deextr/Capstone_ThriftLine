@@ -1,3 +1,4 @@
+import '../../features/admin/data/admin_review_rules.dart';
 import '../../features/auth/domain/legal_documents.dart';
 
 abstract final class RouteNames {
@@ -46,7 +47,8 @@ abstract final class RouteNames {
   }
 
   static const String myPurchases = '/my-purchases';
-  static String myPurchasesTab(String queryValue) => '$myPurchases?tab=$queryValue';
+  static String myPurchasesTab(String queryValue) =>
+      '$myPurchases?tab=$queryValue';
   static const String trackOrders = '/track-orders';
   static const String trackOrder = '/track-order/:orderId';
   static String trackOrderFor(String orderId) => '/track-order/$orderId';
@@ -137,13 +139,22 @@ abstract final class RouteNames {
   static const String adminApplications = '/admin/applications';
   static const String adminReview = '/admin/review/:id';
   static const String adminReports = '/admin/reports';
+  static const String adminReportsQueue = '/admin/reports/queue/:kind';
   static const String adminReportDetail = '/admin/reports/:id';
   static const String adminDisputes = '/admin/disputes';
   static const String adminDisputeDetail = '/admin/disputes/:id';
+  static const String adminLookingForReport = '/admin/looking-for-reports/:id';
+  static const String adminDisabledAccounts = '/admin/disabled-accounts';
 
   static String adminReviewFor(String id) => '/admin/review/$id';
   static String adminReportDetailFor(String id) => '/admin/reports/$id';
+
+  static String adminReportsQueueFor(AdminReportKind kind) =>
+      '/admin/reports/queue/${adminReportQueuePathSegment(kind)}';
   static String adminDisputeDetailFor(String id) => '/admin/disputes/$id';
+
+  static String adminLookingForReportFor(String id) =>
+      '/admin/looking-for-reports/$id';
   static const String verifyPhone = '/verify-phone';
   static const String verifyEmailOtp = '/verify-email-otp';
   static const String addresses = '/addresses';

@@ -15,6 +15,7 @@ import '../../../trust_safety/presentation/widgets/order_review_cta.dart';
 import '../../controllers/seller_orders_controller.dart';
 import '../../../buyer/presentation/widgets/item_return_panel.dart';
 import '../widgets/delivery_pin_entry.dart';
+import '../widgets/record_delivery_problem_sheet.dart';
 
 class SellerOrderDetailScreen extends StatelessWidget {
   const SellerOrderDetailScreen({super.key, required this.orderId});
@@ -175,9 +176,7 @@ class SellerOrderDetailScreen extends StatelessWidget {
                   buyerView: false,
                   isBusy: controller.isUpdatingDelivery,
                   onArrange: () async {
-                    await context.push(
-                      RouteNames.arrangeReturnFor(order.id),
-                    );
+                    await context.push(RouteNames.arrangeReturnFor(order.id));
                     if (!context.mounted) return;
                     await context.read<SellerOrdersController>().load(
                       showSpinner: false,
@@ -215,6 +214,17 @@ class SellerOrderDetailScreen extends StatelessWidget {
                     ],
                     const SizedBox(height: 16),
                     DeliveryTimeline(order: order),
+                    if (order.shipment != null &&
+                        !order.shipment!.canEditRider &&
+                        order.shipment!.hasRider) ...[
+                      Text(
+                        'Rider details are locked while delivery is in progress.',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     if (order.shipment?.isOutForDelivery == true) ...[
                       Text(
                         'Do not instruct your rider to leave the parcel without obtaining the buyer\'s Delivery PIN.',
@@ -320,25 +330,14 @@ class SellerOrderDetailScreen extends StatelessWidget {
   }
 
   Future<void> _recordFailure(BuildContext context) async {
-    final reason = await showModalBottomSheet<DeliveryFailureReason>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final reason in DeliveryFailureReason.values)
-              ListTile(
-                title: Text(reason.label),
-                onTap: () => Navigator.pop(context, reason),
-              ),
-          ],
-        ),
-      ),
-    );
-    if (reason == null || !context.mounted) return;
+    final selection = await RecordDeliveryProblemSheet.show(context);
+    if (selection == null || !context.mounted) return;
     final error = await context
         .read<SellerOrdersController>()
-        .markDeliveryFailed(reason.dbValue);
+        .markDeliveryFailed(
+          reason: selection.reason.dbValue,
+          details: selection.details,
+        );
     if (!context.mounted) return;
     showThriftSnackBar(
       context,

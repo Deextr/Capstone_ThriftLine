@@ -11,7 +11,9 @@ import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../chat/presentation/widgets/share_looking_for_sheet.dart';
 import '../../controllers/looking_for_controller.dart';
+import '../../domain/looking_for_lifecycle.dart';
 import '../widgets/create_looking_for_sheet.dart';
+import '../widgets/report_looking_for_sheet.dart';
 
 class BuyerLookingForTab extends StatefulWidget {
   const BuyerLookingForTab({super.key, this.sellerWorkspace = false});
@@ -37,7 +39,10 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
   void initState() {
     super.initState();
     if (!widget.sellerWorkspace) {
-      _tab = TabController(length: 2, vsync: this);
+      _tab = TabController(length: 3, vsync: this);
+      _tab!.addListener(() {
+        if (!_tab!.indexIsChanging && mounted) setState(() {});
+      });
     }
   }
 
@@ -47,8 +52,19 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
     super.dispose();
   }
 
+  bool get _showingBrowse => widget.sellerWorkspace || (_tab?.index ?? 0) == 0;
+
   Future<void> _openCreateSheet() async {
     final looking = context.read<LookingForController>();
+    if (looking.isPostingRestricted) {
+      showThriftSnackBar(
+        context,
+        looking.postingRestrictionMessage ??
+            "You can't post Looking For requests right now.",
+        isError: true,
+      );
+      return;
+    }
     final created = await CreateLookingForSheet.show(
       context,
       controller: looking,
@@ -56,7 +72,7 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
     if (!created || !mounted) return;
     await looking.refresh();
     if (!mounted) return;
-    showThriftSnackBar(context, 'Request posted successfully!');
+    showThriftSnackBar(context, 'Request posted.');
   }
 
   Future<void> _openPost(LookingForModel post) async {
@@ -103,12 +119,45 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
     showThriftSnackBar(context, 'Request updated.');
   }
 
+  Future<void> _repost(LookingForModel post) async {
+    final looking = context.read<LookingForController>();
+    final saved = await CreateLookingForSheet.show(
+      context,
+      controller: looking,
+      existing: post,
+      repost: true,
+    );
+    if (!saved || !mounted) return;
+    await looking.refresh();
+    if (!mounted) return;
+    _tab?.animateTo(1);
+    showThriftSnackBar(context, 'Request posted again.');
+  }
+
+  Future<void> _report(LookingForModel post) async {
+    final choice = await ReportLookingForSheet.show(context);
+    if (choice == null || !mounted) return;
+    final error = await context.read<LookingForController>().reportPost(
+      postId: post.id,
+      reason: choice.reason,
+      details: choice.details,
+    );
+    if (!mounted) return;
+    if (error != null) {
+      showThriftSnackBar(context, error, isError: true);
+      return;
+    }
+    showThriftSnackBar(context, 'Report sent. An admin will review it.');
+  }
+
   Future<void> _delete(LookingForModel post) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete this request?'),
-        content: const Text('This cannot be undone.'),
+        title: const Text('Delete request?'),
+        content: const Text(
+          'This will remove this Looking For request from your list.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -130,14 +179,15 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
       showThriftSnackBar(context, error, isError: true);
       return;
     }
-    showThriftSnackBar(context, 'Request deleted.');
+    showThriftSnackBar(context, 'Request removed from your list.');
   }
 
   @override
   Widget build(BuildContext context) {
     final looking = context.watch<LookingForController>();
-    final myPosts = _applyFilter(looking.myPosts);
-    final browsePosts = _applyFilter(looking.posts);
+    final browsePosts = _applyFilter(looking.browsePosts);
+    final activePosts = _applyFilter(looking.myActivePosts);
+    final inactivePosts = looking.myInactivePosts;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -147,76 +197,82 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
           bottom: false,
           child: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) {
+              final notice = widget.sellerWorkspace
+                  ? null
+                  : looking.postingRestrictionMessage;
+              final filterHeight = _showingBrowse ? 52.0 : 0.0;
+              final tabHeight = widget.sellerWorkspace ? 0.0 : 48.0;
+              final noticeHeight = notice == null ? 0.0 : 48.0;
               return [
                 SliverAppBar(
                   floating: true,
                   pinned: true,
-                  snap: false,
                   title: Text(
                     widget.sellerWorkspace ? 'Buyer Requests' : 'Looking For',
                     style: AppTypography.heading,
                   ),
                   backgroundColor: AppColors.surface,
-                  elevation: innerBoxIsScrolled ? 4 : 0,
+                  elevation: innerBoxIsScrolled ? 1 : 0,
                   bottom: PreferredSize(
                     preferredSize: Size.fromHeight(
-                      widget.sellerWorkspace ? 56 : 112,
+                      filterHeight + tabHeight + noticeHeight,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
+                        if (notice != null)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                            child: Text(
+                              notice,
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
                           ),
-                          child: Row(
-                            children: _filters.map((filter) {
-                              final isSelected = _selectedFilter == filter;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: FilterChip(
-                                  label: Text(
-                                    filter,
-                                    style: TextStyle(
+                        if (_showingBrowse)
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                            child: Row(
+                              children: _filters.map((filter) {
+                                final isSelected = _selectedFilter == filter;
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: FilterChip(
+                                    label: Text(filter),
+                                    selected: isSelected,
+                                    onSelected: (_) {
+                                      setState(() => _selectedFilter = filter);
+                                    },
+                                    visualDensity: VisualDensity.compact,
+                                    selectedColor: AppColors.primaryLight,
+                                    checkmarkColor: AppColors.primaryDark,
+                                    labelStyle: TextStyle(
                                       color: isSelected
-                                          ? Colors.white
+                                          ? AppColors.primaryDark
                                           : AppColors.textPrimary,
                                       fontWeight: isSelected
                                           ? FontWeight.w600
-                                          : FontWeight.normal,
+                                          : FontWeight.w500,
                                     ),
                                   ),
-                                  selected: isSelected,
-                                  onSelected: (_) {
-                                    setState(() => _selectedFilter = filter);
-                                  },
-                                  backgroundColor: AppColors.surface,
-                                  selectedColor: AppColors.primary,
-                                  checkmarkColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20),
-                                    side: BorderSide(
-                                      color: isSelected
-                                          ? AppColors.primary
-                                          : AppColors.border,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
+                                );
+                              }).toList(),
+                            ),
                           ),
-                        ),
                         if (!widget.sellerWorkspace && _tab != null)
                           TabBar(
                             controller: _tab,
-                            labelColor: AppColors.primary,
+                            isScrollable: true,
+                            tabAlignment: TabAlignment.start,
+                            labelColor: AppColors.primaryDark,
                             indicatorColor: AppColors.primary,
                             unselectedLabelColor: AppColors.textSecondary,
                             tabs: const [
                               Tab(text: 'Browse Requests'),
-                              Tab(text: 'My Requests'),
+                              Tab(text: 'My Active Requests'),
+                              Tab(text: 'Inactive Requests'),
                             ],
                           ),
                       ],
@@ -229,8 +285,8 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
                 ? _buildList(
                     looking,
                     browsePosts,
+                    section: _LookingSection.browse,
                     showRespond: true,
-                    showShare: false,
                   )
                 : TabBarView(
                     controller: _tab,
@@ -238,15 +294,19 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
                       _buildList(
                         looking,
                         browsePosts,
-                        showRespond: false,
+                        section: _LookingSection.browse,
                         showShare: true,
                       ),
                       _buildList(
                         looking,
-                        myPosts,
-                        showRespond: false,
+                        activePosts,
+                        section: _LookingSection.active,
                         showShare: true,
-                        isMyTab: true,
+                      ),
+                      _buildList(
+                        looking,
+                        inactivePosts,
+                        section: _LookingSection.inactive,
                       ),
                     ],
                   ),
@@ -260,10 +320,12 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
                   return Padding(
                     padding: EdgeInsets.only(bottom: 80.0 + bottomInset),
                     child: FloatingActionButton.extended(
-                      onPressed: _openCreateSheet,
+                      onPressed: looking.isPostingRestricted
+                          ? null
+                          : _openCreateSheet,
                       icon: const Icon(Icons.edit),
                       label: const Text(
-                        'Post Request',
+                        'Post a request',
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                       backgroundColor: AppColors.primary,
@@ -290,9 +352,9 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
   Widget _buildList(
     LookingForController looking,
     List<LookingForModel> posts, {
-    required bool showRespond,
-    required bool showShare,
-    bool isMyTab = false,
+    required _LookingSection section,
+    bool showRespond = false,
+    bool showShare = false,
   }) {
     if (looking.isLoading && looking.posts.isEmpty) {
       return const Center(
@@ -309,21 +371,7 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
       isLoading: looking.isLoading,
       postCount: posts.length,
     )) {
-      return EmptyState(
-        icon: Icons.post_add,
-        title: widget.sellerWorkspace
-            ? 'No buyer requests yet'
-            : isMyTab
-            ? 'You have not posted a request'
-            : 'No requests found',
-        message: widget.sellerWorkspace
-            ? 'When buyers post what they are looking for, they will show up here.'
-            : isMyTab
-            ? 'Post a request so sellers can help you find the item.'
-            : 'Be the first to post what you are looking for!',
-        actionLabel: widget.sellerWorkspace ? null : 'Post a Request',
-        onAction: widget.sellerWorkspace ? null : _openCreateSheet,
-      );
+      return _empty(section);
     }
 
     final me = looking.auth.user?.id;
@@ -331,25 +379,71 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
     return RefreshIndicator(
       onRefresh: looking.refresh,
       color: AppColors.primary,
-      child: ListView.builder(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, 96.0 + bottomInset),
+      child: ListView.separated(
+        padding: EdgeInsets.fromLTRB(0, 8, 0, 96.0 + bottomInset),
         itemCount: posts.length,
+        separatorBuilder: (_, _) =>
+            const Divider(height: 1, color: AppColors.border),
         itemBuilder: (_, i) {
           final post = posts[i];
           final isOwn = me != null && me == post.buyerId;
+          final ownerSection =
+              !widget.sellerWorkspace &&
+              (section == _LookingSection.active ||
+                  section == _LookingSection.inactive);
           return LookingForCard(
             post: post,
-            showShare: showShare,
-            showRespondButton: showRespond && !isOwn,
-            showOwnerActions: isOwn && !widget.sellerWorkspace,
+            showShare: showShare && post.showInBrowse,
+            showRespondButton: showRespond && !isOwn && post.showInBrowse,
+            showOwnerActions: ownerSection && isOwn,
+            showReport: !isOwn && post.showInBrowse,
             onTap: () => _openPost(post),
             onShare: () => _share(post),
             onRespond: () => _iHaveThis(post),
             onEdit: () => _edit(post),
             onDelete: () => _delete(post),
+            onRepost: () => _repost(post),
+            onReport: () => _report(post),
           );
         },
       ),
     );
   }
+
+  Widget _empty(_LookingSection section) {
+    final restricted = context.read<LookingForController>().isPostingRestricted;
+    return switch (section) {
+      _LookingSection.browse => EmptyState(
+        icon: Icons.search,
+        title: widget.sellerWorkspace
+            ? 'No buyer requests yet'
+            : 'No requests right now',
+        message: widget.sellerWorkspace
+            ? 'When buyers post what they are looking for, they will show up here.'
+            : 'Active requests from buyers will show up here.',
+        actionLabel: widget.sellerWorkspace || restricted
+            ? null
+            : 'Post a request',
+        onAction: widget.sellerWorkspace || restricted
+            ? null
+            : _openCreateSheet,
+      ),
+      _LookingSection.active => EmptyState(
+        icon: Icons.post_add_outlined,
+        title: "You don't have any active requests.",
+        message: restricted
+            ? context.read<LookingForController>().postingRestrictionMessage!
+            : 'Post a request so sellers can help you find it.',
+        actionLabel: restricted ? null : 'Post a request',
+        onAction: restricted ? null : _openCreateSheet,
+      ),
+      _LookingSection.inactive => const EmptyState(
+        icon: Icons.history,
+        title: 'No inactive requests yet.',
+        message: 'Expired requests will appear here.',
+      ),
+    };
+  }
 }
+
+enum _LookingSection { browse, active, inactive }

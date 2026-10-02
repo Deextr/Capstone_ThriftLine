@@ -58,7 +58,10 @@ class DavaoBarangayField extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
                 const SizedBox(width: 12),
-                Text('Loading Davao City barangays…', style: AppTypography.body),
+                Text(
+                  'Loading Davao City barangays…',
+                  style: AppTypography.body,
+                ),
               ],
             ),
           )
@@ -69,12 +72,17 @@ class DavaoBarangayField extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.error.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.error.withValues(alpha: 0.35)),
+              border: Border.all(
+                color: AppColors.error.withValues(alpha: 0.35),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(error!, style: AppTypography.body.copyWith(color: AppColors.error)),
+                Text(
+                  error!,
+                  style: AppTypography.body.copyWith(color: AppColors.error),
+                ),
                 const SizedBox(height: 8),
                 ThriftButton(
                   label: 'Retry',
@@ -122,10 +130,16 @@ class DavaoBarangayField extends StatelessWidget {
                   color: AppColors.textHint,
                   size: 20,
                 ),
-                suffixIcon: const Icon(Icons.keyboard_arrow_down, color: AppColors.textHint),
+                suffixIcon: const Icon(
+                  Icons.keyboard_arrow_down,
+                  color: AppColors.textHint,
+                ),
                 filled: true,
                 fillColor: AppColors.surface,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: AppColors.border),
@@ -138,7 +152,9 @@ class DavaoBarangayField extends StatelessWidget {
               child: Text(
                 selected?.name ?? 'Select barangay',
                 style: AppTypography.body.copyWith(
-                  color: selected == null ? AppColors.textHint : AppColors.textPrimary,
+                  color: selected == null
+                      ? AppColors.textHint
+                      : AppColors.textPrimary,
                 ),
               ),
             ),
@@ -182,8 +198,8 @@ class _BarangaySheetState extends State<_BarangaySheet> {
     final filtered = q.isEmpty
         ? widget.barangays
         : widget.barangays
-            .where((b) => b.name.toLowerCase().contains(q))
-            .toList();
+              .where((b) => b.name.toLowerCase().contains(q))
+              .toList();
 
     return SafeArea(
       child: SizedBox(
@@ -193,7 +209,10 @@ class _BarangaySheetState extends State<_BarangaySheet> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text('Davao City barangays', style: AppTypography.subheading),
+              child: Text(
+                'Davao City barangays',
+                style: AppTypography.subheading,
+              ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -213,7 +232,9 @@ class _BarangaySheetState extends State<_BarangaySheet> {
                   ? Center(
                       child: Text(
                         'No matching Davao City barangay.',
-                        style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                        style: AppTypography.body.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     )
                   : ListView.builder(

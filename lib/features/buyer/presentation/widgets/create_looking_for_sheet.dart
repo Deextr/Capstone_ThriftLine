@@ -17,23 +17,29 @@ class CreateLookingForSheet extends StatefulWidget {
     super.key,
     required this.controller,
     this.existing,
+    this.repost = false,
   });
 
   final LookingForController controller;
   final LookingForModel? existing;
+  final bool repost;
 
   static Future<bool> show(
     BuildContext context, {
     required LookingForController controller,
     LookingForModel? existing,
+    bool repost = false,
   }) async {
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useRootNavigator: true,
       backgroundColor: Colors.transparent,
-      builder: (_) =>
-          CreateLookingForSheet(controller: controller, existing: existing),
+      builder: (_) => CreateLookingForSheet(
+        controller: controller,
+        existing: existing,
+        repost: repost,
+      ),
     );
     return created == true;
   }
@@ -55,7 +61,8 @@ class _CreateLookingForSheetState extends State<CreateLookingForSheet> {
   String? _existingImageUrl;
   bool _clearedImage = false;
   bool _submitting = false;
-  bool get _isEditing => widget.existing != null;
+  bool get _isEditing => widget.existing != null && !widget.repost;
+  bool get _isRepost => widget.repost && widget.existing != null;
 
   @override
   void initState() {
@@ -119,7 +126,19 @@ class _CreateLookingForSheetState extends State<CreateLookingForSheet> {
   Future<void> _submit() async {
     if (_submitting) return;
     setState(() => _submitting = true);
-    final error = _isEditing
+    final error = _isRepost
+        ? await widget.controller.repostPost(
+            sourcePostId: widget.existing!.id,
+            title: _nameCtrl.text,
+            description: _descCtrl.text,
+            category: _category,
+            budgetMin: double.tryParse(_minCtrl.text) ?? 0,
+            budgetMax: double.tryParse(_maxCtrl.text) ?? 0,
+            size: _sizeCtrl.text,
+            referenceImageBytes: _imageBytes,
+            clearReferenceImage: _clearedImage && _imageBytes == null,
+          )
+        : _isEditing
         ? await widget.controller.updatePost(
             postId: widget.existing!.id,
             title: _nameCtrl.text,
@@ -197,7 +216,11 @@ class _CreateLookingForSheetState extends State<CreateLookingForSheet> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    _isEditing ? 'Edit Request' : 'Create Request',
+                    _isRepost
+                        ? 'Repost request'
+                        : _isEditing
+                        ? 'Edit Request'
+                        : 'Create Request',
                     style: AppTypography.heading,
                   ),
                   IconButton(
@@ -328,8 +351,16 @@ class _CreateLookingForSheetState extends State<CreateLookingForSheet> {
                   const SizedBox(height: 40),
                   ThriftButton(
                     label: _submitting
-                        ? (_isEditing ? 'Saving…' : 'Posting…')
-                        : (_isEditing ? 'Save Changes' : 'Post Request'),
+                        ? (_isRepost
+                              ? 'Posting again…'
+                              : _isEditing
+                              ? 'Saving…'
+                              : 'Posting…')
+                        : (_isRepost
+                              ? 'Post again'
+                              : _isEditing
+                              ? 'Save Changes'
+                              : 'Post Request'),
                     onPressed: _submitting ? null : _submit,
                   ),
                   const SizedBox(height: 20),

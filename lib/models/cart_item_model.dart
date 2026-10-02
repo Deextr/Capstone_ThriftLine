@@ -35,7 +35,8 @@ class CartItemModel {
   bool get isAuction =>
       product != null &&
       (product!.sellingType == SellingType.auction ||
-          (product!.sellingType == SellingType.both && !product!.buyNowEnabled));
+          (product!.sellingType == SellingType.both &&
+              !product!.buyNowEnabled));
 
   CartItemModel copyWith({
     String? id,
@@ -67,8 +68,9 @@ class CartItemModel {
       final sellerId = productRaw['seller_id'] as String?;
       product = ProductModel.fromSupabase(
         productRaw,
-        sellerProfile:
-            sellerId != null && sellerProfilesMap != null ? sellerProfilesMap[sellerId] : null,
+        sellerProfile: sellerId != null && sellerProfilesMap != null
+            ? sellerProfilesMap[sellerId]
+            : null,
       );
     }
 
@@ -88,11 +90,11 @@ class CartItemModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'cart_item_id': id,
-        'user_id': userId,
-        'product_id': productId,
-        'quantity': quantity,
-        if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
-        if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
-      };
+    'cart_item_id': id,
+    'user_id': userId,
+    'product_id': productId,
+    'quantity': quantity,
+    if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
+    if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
+  };
 }

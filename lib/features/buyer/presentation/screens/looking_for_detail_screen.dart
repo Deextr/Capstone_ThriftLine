@@ -9,7 +9,9 @@ import '../../../../widgets/looking_for_card.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../chat/presentation/widgets/share_looking_for_sheet.dart';
 import '../../controllers/looking_for_detail_controller.dart';
+import '../../domain/looking_for_lifecycle.dart';
 import '../widgets/create_looking_for_sheet.dart';
+import '../widgets/report_looking_for_sheet.dart';
 
 class LookingForDetailScreen extends StatelessWidget {
   const LookingForDetailScreen({super.key});
@@ -44,15 +46,21 @@ class LookingForDetailScreen extends StatelessWidget {
               children: [
                 LookingForCard(
                   post: post,
-                  showShare: !controller.isSellerWorkspace,
+                  compact: false,
+                  showShare: !controller.isSellerWorkspace && post.showInBrowse,
                   showRespondButton:
-                      controller.isSellerWorkspace && !controller.isOwner,
+                      controller.isSellerWorkspace &&
+                      !controller.isOwner &&
+                      post.showInBrowse,
                   showOwnerActions:
                       controller.isOwner && !controller.isSellerWorkspace,
+                  showReport: !controller.isOwner && post.showInBrowse,
                   onShare: () => _share(context, controller),
                   onRespond: () => _iHaveThis(context, controller),
                   onEdit: () => _edit(context, controller),
                   onDelete: () => _delete(context, controller),
+                  onRepost: () => _repost(context, controller),
+                  onReport: () => _report(context, controller),
                 ),
               ],
             ),
@@ -114,8 +122,10 @@ class LookingForDetailScreen extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete this request?'),
-        content: const Text('This cannot be undone.'),
+        title: const Text('Delete request?'),
+        content: const Text(
+          'This will remove this Looking For request from your list.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -135,7 +145,46 @@ class LookingForDetailScreen extends StatelessWidget {
       showThriftSnackBar(context, error, isError: true);
       return;
     }
-    showThriftSnackBar(context, 'Request deleted.');
+    showThriftSnackBar(context, 'Request removed from your list.');
     context.pop();
+  }
+
+  Future<void> _repost(
+    BuildContext context,
+    LookingForDetailController controller,
+  ) async {
+    final post = controller.post;
+    if (post == null || !post.canRepost) return;
+    final saved = await CreateLookingForSheet.show(
+      context,
+      controller: controller.looking,
+      existing: post,
+      repost: true,
+    );
+    if (!saved || !context.mounted) return;
+    await controller.load();
+    if (!context.mounted) return;
+    showThriftSnackBar(context, 'Request posted again.');
+  }
+
+  Future<void> _report(
+    BuildContext context,
+    LookingForDetailController controller,
+  ) async {
+    final post = controller.post;
+    if (post == null) return;
+    final choice = await ReportLookingForSheet.show(context);
+    if (choice == null || !context.mounted) return;
+    final error = await controller.looking.reportPost(
+      postId: post.id,
+      reason: choice.reason,
+      details: choice.details,
+    );
+    if (!context.mounted) return;
+    if (error != null) {
+      showThriftSnackBar(context, error, isError: true);
+      return;
+    }
+    showThriftSnackBar(context, 'Report sent. An admin will review it.');
   }
 }

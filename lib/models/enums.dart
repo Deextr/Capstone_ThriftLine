@@ -214,6 +214,13 @@ enum DeliveryStatus {
       this == DeliveryStatus.outForDelivery ||
       this == DeliveryStatus.awaitingDeliveryVerification;
 
+  /// Rider identity may be edited only before the parcel is out for delivery.
+  bool get allowsRiderUpdates =>
+      this == DeliveryStatus.sellerPreparing ||
+      this == DeliveryStatus.riderAssigned ||
+      this == DeliveryStatus.readyForPickup ||
+      this == DeliveryStatus.pickedUp;
+
   bool get isInspecting =>
       this == DeliveryStatus.deliveryVerified ||
       this == DeliveryStatus.inspectionPeriod;

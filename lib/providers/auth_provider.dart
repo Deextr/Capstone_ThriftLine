@@ -154,7 +154,7 @@ class AuthProvider extends ChangeNotifier {
 
       // Supabase SDK automatically restores the session from secure storage.
       final currentUser = await _authService.getCurrentUser();
-      if (currentUser != null) {
+      if (currentUser != null && !currentUser.isPermanentlyDisabled) {
         _user = currentUser;
         // TEMP: with the OTP bypass on, also clear any stale pending flag so
         // the router doesn't get stuck on the OTP gate.
@@ -163,6 +163,9 @@ class AuthProvider extends ChangeNotifier {
         _syncActiveAccount(currentUser, restoreFromPrefs: true);
         await _saveSession(currentUser);
       } else {
+        if (currentUser != null) {
+          await _authService.signOut();
+        }
         await _clearSession();
       }
     } catch (e) {
@@ -195,6 +198,10 @@ class AuthProvider extends ChangeNotifier {
       if (_authService.currentSession == null) return;
       final currentUser = await _authService.getCurrentUser();
       if (currentUser == null || _authService.currentSession == null) return;
+      if (currentUser.isPermanentlyDisabled) {
+        await _authService.signOut();
+        return;
+      }
       _user = currentUser;
       notifyListeners();
     } else if (authEvent == AuthChangeEvent.signedIn ||
@@ -205,6 +212,14 @@ class AuthProvider extends ChangeNotifier {
       if (_authService.currentSession == null) return;
       final currentUser = await _authService.getCurrentUser();
       if (currentUser == null || _authService.currentSession == null) return;
+
+      if (currentUser.isPermanentlyDisabled) {
+        await _authService.signOut();
+        _user = null;
+        await _clearSession();
+        notifyListeners();
+        return;
+      }
 
       final recoveryInProgress =
           _passwordRecoveryActive || _prefs.isPasswordRecoveryPending;
@@ -262,6 +277,12 @@ class AuthProvider extends ChangeNotifier {
       if (!result.success || result.user == null) {
         await _setEmailOtpPending(false);
         return result.errorMessage ?? 'Sign-in failed. Please try again.';
+      }
+
+      if (result.user!.isPermanentlyDisabled) {
+        await _authService.signOut();
+        await _setEmailOtpPending(false);
+        return 'This account has been permanently disabled.';
       }
 
       _user = result.user;
@@ -397,6 +418,13 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return result.errorMessage;
+    }
+
+    if (result.user?.isPermanentlyDisabled == true) {
+      await _authService.signOut();
+      _isLoading = false;
+      notifyListeners();
+      return 'This account has been permanently disabled.';
     }
 
     _user = result.user;

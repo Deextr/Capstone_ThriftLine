@@ -29,6 +29,7 @@ class AuthUser {
     this.isPhoneVerified = false,
     this.usesEmailPasswordAuth = false,
     this.authIdentityProviders = const [],
+    this.accountStatus = 'active',
   });
 
   final String id;
@@ -69,6 +70,11 @@ class AuthUser {
   /// Providers from GoTrue identities at hydration (may include `google`
   /// even when the JWT session user omits the list).
   final List<String> authIdentityProviders;
+
+  /// `users.account_status`. A banned account cannot keep using ThriftLine.
+  final String accountStatus;
+
+  bool get isPermanentlyDisabled => accountStatus == 'banned';
 
   String get displayName => role == UserRole.seller ? (shopName ?? name) : name;
   bool get isBuyer => role == UserRole.buyer;
@@ -154,6 +160,7 @@ class AuthUser {
       authIdentityProviders: List<String>.unmodifiable(
         (supabaseUser.identities ?? []).map((i) => i.provider),
       ),
+      accountStatus: profile?['account_status'] as String? ?? 'active',
       usesEmailPasswordAuth: authSessionUsesEmailPassword(
         lastAuthProvider: lastAuthProviderFromAppMetadata(
           supabaseUser.appMetadata,
@@ -197,6 +204,7 @@ class AuthUser {
     bool? isPhoneVerified,
     bool? usesEmailPasswordAuth,
     List<String>? authIdentityProviders,
+    String? accountStatus,
   }) {
     return AuthUser(
       id: id ?? this.id,
@@ -225,6 +233,7 @@ class AuthUser {
           usesEmailPasswordAuth ?? this.usesEmailPasswordAuth,
       authIdentityProviders:
           authIdentityProviders ?? this.authIdentityProviders,
+      accountStatus: accountStatus ?? this.accountStatus,
     );
   }
 }

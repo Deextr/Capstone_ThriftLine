@@ -10,7 +10,13 @@ import '../../features/admin/controllers/admin_reports_controller.dart';
 import '../../features/admin/controllers/admin_seller_applications_controller.dart';
 import '../../features/admin/presentation/screens/admin_dispute_detail_screen.dart';
 import '../../features/admin/presentation/screens/admin_disputes_queue_screen.dart';
+import '../../features/admin/controllers/admin_disabled_accounts_controller.dart';
+import '../../features/admin/controllers/admin_looking_for_report_controller.dart';
+import '../../features/admin/presentation/screens/admin_disabled_accounts_screen.dart';
+import '../../features/admin/presentation/screens/admin_looking_for_report_detail_screen.dart';
 import '../../features/admin/presentation/screens/admin_report_detail_screen.dart';
+import '../../features/admin/data/admin_review_rules.dart';
+import '../../features/admin/presentation/screens/admin_reports_hub_screen.dart';
 import '../../features/admin/presentation/screens/admin_reports_queue_screen.dart';
 import '../../features/admin/presentation/screens/admin_review_screen.dart';
 import '../../features/admin/presentation/screens/admin_seller_applications_screen.dart';
@@ -625,8 +631,25 @@ GoRouter createAppRouter({
         builder: (context, _) => ChangeNotifierProvider(
           create: (context) =>
               AdminReportsController(supabase: context.read<SupabaseService>()),
-          child: const AdminReportsQueueScreen(),
+          child: const AdminReportsHubScreen(),
         ),
+      ),
+      GoRoute(
+        path: RouteNames.adminReportsQueue,
+        builder: (context, state) {
+          final kind = adminReportKindFromQueuePath(
+            state.pathParameters['kind'] ?? '',
+          );
+          if (kind == null) {
+            return const AdminReportsHubScreen();
+          }
+          return ChangeNotifierProvider(
+            create: (context) => AdminReportsController(
+              supabase: context.read<SupabaseService>(),
+            ),
+            child: AdminReportsQueueScreen(kind: kind),
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.adminReportDetail,
@@ -636,6 +659,25 @@ GoRouter createAppRouter({
             reportId: state.pathParameters['id'],
           ),
           child: const AdminReportDetailScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.adminLookingForReport,
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => AdminLookingForReportController(
+            supabase: context.read<SupabaseService>(),
+            reportId: state.pathParameters['id']!,
+          ),
+          child: const AdminLookingForReportDetailScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.adminDisabledAccounts,
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => AdminDisabledAccountsController(
+            supabase: context.read<SupabaseService>(),
+          ),
+          child: const AdminDisabledAccountsScreen(),
         ),
       ),
       GoRoute(

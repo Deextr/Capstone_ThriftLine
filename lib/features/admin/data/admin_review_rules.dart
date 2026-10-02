@@ -26,7 +26,7 @@ enum AdminQueueFilter { open, closed }
 
 enum AdminReportListFilter { all, underReview, resolved, closed }
 
-enum AdminReportKind { all, community, order }
+enum AdminReportKind { all, community, order, lookingFor }
 
 enum AdminReportSort { newest, oldest }
 
@@ -45,8 +45,34 @@ bool isAdminOrderReport({required String category, String? orderId}) {
 
 String adminReportKindLabel(AdminReportKind kind) => switch (kind) {
   AdminReportKind.all => 'All Reports',
-  AdminReportKind.community => 'Community',
-  AdminReportKind.order => 'Orders',
+  AdminReportKind.community => 'Community Reports',
+  AdminReportKind.order => 'Order Reports',
+  AdminReportKind.lookingFor => 'Looking For Reports',
+};
+
+String adminReportKindHubSubtitle(AdminReportKind kind) => switch (kind) {
+  AdminReportKind.community =>
+    'Member conduct, harassment, and other community issues.',
+  AdminReportKind.order =>
+    'Delivery problems, item mismatches, and order-linked disputes.',
+  AdminReportKind.lookingFor =>
+    'Reports on buyer “Looking For” requests and posts.',
+  AdminReportKind.all => 'All report categories.',
+};
+
+AdminReportKind? adminReportKindFromQueuePath(String segment) =>
+    switch (segment) {
+      'community' => AdminReportKind.community,
+      'orders' => AdminReportKind.order,
+      'looking-for' => AdminReportKind.lookingFor,
+      _ => null,
+    };
+
+String adminReportQueuePathSegment(AdminReportKind kind) => switch (kind) {
+  AdminReportKind.community => 'community',
+  AdminReportKind.order => 'orders',
+  AdminReportKind.lookingFor => 'looking-for',
+  AdminReportKind.all => '',
 };
 
 String adminReportKindOf({required String category, String? orderId}) =>

@@ -182,6 +182,18 @@ void main() {
       expect(reportDetailsError('a' * 10), isNull);
     });
 
+    test('delivery failure Other requires a meaningful description', () {
+      expect(deliveryFailureOtherDetailsError(''), isNotNull);
+      expect(deliveryFailureOtherDetailsError('   '), isNotNull);
+      expect(deliveryFailureOtherDetailsError('too short'), isNotNull);
+      expect(
+        deliveryFailureOtherDetailsError(
+          'The rider reported that the delivery address could not be located.',
+        ),
+        isNull,
+      );
+    });
+
     test('requires one to three evidence photos', () {
       expect(kReportEvidenceMinCount, 1);
       expect(kReportEvidenceMaxCount, 3);
@@ -224,19 +236,50 @@ void main() {
         });
       }
 
-      expect(isOrderEligibleForReportLink(row(orderStatus: 'cancelled')), isFalse);
+      expect(
+        isOrderEligibleForReportLink(row(orderStatus: 'cancelled')),
+        isFalse,
+      );
       expect(
         isOrderEligibleForReportLink(
           row(orderStatus: 'cancelled', paymentStatus: 'paid'),
         ),
         isFalse,
       );
-      expect(isOrderEligibleForReportLink(row(orderStatus: 'pending')), isFalse);
-      expect(isOrderEligibleForReportLink(row(orderStatus: 'paid', paymentStatus: 'paid')), isTrue);
-      expect(isOrderEligibleForReportLink(row(orderStatus: 'shipped', paymentStatus: 'paid')), isTrue);
-      expect(isOrderEligibleForReportLink(row(orderStatus: 'delivered', paymentStatus: 'paid')), isTrue);
-      expect(isOrderEligibleForReportLink(row(orderStatus: 'completed', paymentStatus: 'paid')), isTrue);
-      expect(isOrderEligibleForReportLink(row(orderStatus: 'disputed', paymentStatus: 'paid')), isTrue);
+      expect(
+        isOrderEligibleForReportLink(row(orderStatus: 'pending')),
+        isFalse,
+      );
+      expect(
+        isOrderEligibleForReportLink(
+          row(orderStatus: 'paid', paymentStatus: 'paid'),
+        ),
+        isTrue,
+      );
+      expect(
+        isOrderEligibleForReportLink(
+          row(orderStatus: 'shipped', paymentStatus: 'paid'),
+        ),
+        isTrue,
+      );
+      expect(
+        isOrderEligibleForReportLink(
+          row(orderStatus: 'delivered', paymentStatus: 'paid'),
+        ),
+        isTrue,
+      );
+      expect(
+        isOrderEligibleForReportLink(
+          row(orderStatus: 'completed', paymentStatus: 'paid'),
+        ),
+        isTrue,
+      );
+      expect(
+        isOrderEligibleForReportLink(
+          row(orderStatus: 'disputed', paymentStatus: 'paid'),
+        ),
+        isTrue,
+      );
       expect(
         isOrderEligibleForReportLink(
           row(orderStatus: 'completed', paymentStatus: 'refunded'),

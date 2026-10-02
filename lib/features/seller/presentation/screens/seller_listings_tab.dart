@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -647,9 +646,7 @@ class _ListingCard extends StatelessWidget {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        builder: (_) => const Center(child: CircularProgressIndicator()),
       );
 
       Map<String, dynamic>? auctionData;
@@ -699,9 +696,9 @@ class _ListingCard extends StatelessWidget {
       Map<String, dynamic>? winningBid;
       if (currentWinnerId != null) {
         winningBid = roundBids.cast<Map<String, dynamic>?>().firstWhere(
-              (b) => b?['bidder_id'] == currentWinnerId,
-              orElse: () => roundBids.isNotEmpty ? roundBids.first : null,
-            );
+          (b) => b?['bidder_id'] == currentWinnerId,
+          orElse: () => roundBids.isNotEmpty ? roundBids.first : null,
+        );
       } else if (roundBids.isNotEmpty) {
         winningBid = roundBids.first;
       }
@@ -725,7 +722,8 @@ class _ListingCard extends StatelessWidget {
 
       final nextBid = candidateBids.first;
       final bidder = nextBid['bidder'] as Map<String, dynamic>?;
-      final nextUsername = bidder?['username'] as String? ??
+      final nextUsername =
+          bidder?['username'] as String? ??
           bidder?['full_name'] as String? ??
           'Next Bidder';
       final nextAmount = (nextBid['bid_amount'] as num?)?.toDouble() ?? 0.0;
@@ -734,13 +732,16 @@ class _ListingCard extends StatelessWidget {
           : null;
 
       final winBidder = winningBid?['bidder'] as Map<String, dynamic>?;
-      final winUsername = winBidder?['username'] as String? ?? 'Previous Winner';
+      final winUsername =
+          winBidder?['username'] as String? ?? 'Previous Winner';
       final winAmount = (winningBid?['bid_amount'] as num?)?.toDouble() ?? 0.0;
 
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: [
               const Icon(Icons.swap_horiz_rounded, color: AppColors.primary),
@@ -760,7 +761,10 @@ class _ListingCard extends StatelessWidget {
               children: [
                 Text(
                   'The previous winning buyer failed or expired. Pass "${item.name}" to the next highest bidder in line:',
-                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 16),
 
@@ -782,7 +786,10 @@ class _ListingCard extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.primary,
                               borderRadius: BorderRadius.circular(6),
@@ -799,7 +806,10 @@ class _ListingCard extends StatelessWidget {
                           if (nextTime != null)
                             Text(
                               formatRelativeTime(nextTime),
-                              style: const TextStyle(fontSize: 11, color: AppColors.textHint),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textHint,
+                              ),
                             ),
                         ],
                       ),
@@ -853,7 +863,10 @@ class _ListingCard extends StatelessWidget {
                 // Comparison with 1st bidder (Previous/Failed)
                 if (winningBid != null && winAmount > 0)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(8),
@@ -864,7 +877,10 @@ class _ListingCard extends StatelessWidget {
                       children: [
                         Text(
                           '1st Bid (@$winUsername - Expired):',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                          ),
                         ),
                         Text(
                           formatCurrency(winAmount),
@@ -883,12 +899,19 @@ class _ListingCard extends StatelessWidget {
                 const Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline, size: 16, color: AppColors.primary),
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
                     SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         'The 2nd highest bidder will receive an instant notification and a 12-hour payment window to complete checkout at their bid amount.',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
                   ],
@@ -905,12 +928,20 @@ class _ListingCard extends StatelessWidget {
               onPressed: () => Navigator.pop(dialogContext, true),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 10,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: Text(
                 'Send Offer (${formatCurrency(nextAmount)})',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -935,7 +966,10 @@ class _ListingCard extends StatelessWidget {
           );
           return;
         }
-        showThriftSnackBar(context, 'Offer sent to @$nextUsername for ${formatCurrency(nextAmount)}.');
+        showThriftSnackBar(
+          context,
+          'Offer sent to @$nextUsername for ${formatCurrency(nextAmount)}.',
+        );
         await onChanged();
       } catch (e) {
         if (context.mounted) {
@@ -953,9 +987,7 @@ class _ListingCard extends StatelessWidget {
       final startPriceCtrl = TextEditingController(
         text: item.price.toStringAsFixed(0),
       );
-      final minIncrementCtrl = TextEditingController(
-        text: '20',
-      );
+      final minIncrementCtrl = TextEditingController(text: '20');
       int selectedDays = 3;
 
       final confirmed = await showDialog<bool>(
@@ -976,8 +1008,9 @@ class _ListingCard extends StatelessWidget {
                     const SizedBox(height: 16),
                     TextField(
                       controller: startPriceCtrl,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: const InputDecoration(
                         labelText: 'Starting Price (₱)',
                         border: OutlineInputBorder(),
@@ -986,8 +1019,9 @@ class _ListingCard extends StatelessWidget {
                     const SizedBox(height: 12),
                     TextField(
                       controller: minIncrementCtrl,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: const InputDecoration(
                         labelText: 'Minimum Bid Increment (₱)',
                         border: OutlineInputBorder(),

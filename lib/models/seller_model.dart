@@ -22,30 +22,31 @@ class SellerModel extends BaseModel {
   final List<String> productIds;
 
   factory SellerModel.fromJson(Map<String, dynamic> json) => SellerModel(
-        id: json['id'] as String,
-        userId: json['userId'] as String,
-        shopName: json['shopName'] as String,
-        shopDescription: json['shopDescription'] as String?,
-        rating: (json['rating'] as num?)?.toDouble() ?? 0,
-        totalSales: json['totalSales'] as int? ?? 0,
-        isVerified: json['isVerified'] as bool? ?? false,
-        productIds: (json['productIds'] as List<dynamic>?)
-                ?.map((e) => e as String)
-                .toList() ??
-            const [],
-      );
+    id: json['id'] as String,
+    userId: json['userId'] as String,
+    shopName: json['shopName'] as String,
+    shopDescription: json['shopDescription'] as String?,
+    rating: (json['rating'] as num?)?.toDouble() ?? 0,
+    totalSales: json['totalSales'] as int? ?? 0,
+    isVerified: json['isVerified'] as bool? ?? false,
+    productIds:
+        (json['productIds'] as List<dynamic>?)
+            ?.map((e) => e as String)
+            .toList() ??
+        const [],
+  );
 
   @override
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'userId': userId,
-        'shopName': shopName,
-        'shopDescription': shopDescription,
-        'rating': rating,
-        'totalSales': totalSales,
-        'isVerified': isVerified,
-        'productIds': productIds,
-      };
+    'id': id,
+    'userId': userId,
+    'shopName': shopName,
+    'shopDescription': shopDescription,
+    'rating': rating,
+    'totalSales': totalSales,
+    'isVerified': isVerified,
+    'productIds': productIds,
+  };
 
   SellerModel copyWith({
     String? id,
@@ -56,17 +57,16 @@ class SellerModel extends BaseModel {
     int? totalSales,
     bool? isVerified,
     List<String>? productIds,
-  }) =>
-      SellerModel(
-        id: id ?? this.id,
-        userId: userId ?? this.userId,
-        shopName: shopName ?? this.shopName,
-        shopDescription: shopDescription ?? this.shopDescription,
-        rating: rating ?? this.rating,
-        totalSales: totalSales ?? this.totalSales,
-        isVerified: isVerified ?? this.isVerified,
-        productIds: productIds ?? this.productIds,
-      );
+  }) => SellerModel(
+    id: id ?? this.id,
+    userId: userId ?? this.userId,
+    shopName: shopName ?? this.shopName,
+    shopDescription: shopDescription ?? this.shopDescription,
+    rating: rating ?? this.rating,
+    totalSales: totalSales ?? this.totalSales,
+    isVerified: isVerified ?? this.isVerified,
+    productIds: productIds ?? this.productIds,
+  );
 
   @override
   bool operator ==(Object other) =>

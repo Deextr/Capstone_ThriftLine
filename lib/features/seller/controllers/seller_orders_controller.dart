@@ -30,10 +30,7 @@ final class SellerOrdersPeerHub {
     }
   }
 
-  static void refreshPeers(
-    String sellerId,
-    SellerOrdersController source,
-  ) {
+  static void refreshPeers(String sellerId, SellerOrdersController source) {
     for (final peer in _bySeller[sellerId] ?? {}) {
       if (identical(peer, source) || peer._disposed) continue;
       unawaited(peer.load(showSpinner: false));
@@ -216,10 +213,14 @@ class SellerOrdersController extends ChangeNotifier {
     }, fallback: 'Could not verify the Delivery PIN.');
   }
 
-  Future<String?> markDeliveryFailed(String reason) {
+  Future<String?> markDeliveryFailed({
+    required String reason,
+    String? details,
+  }) {
     return _runDeliveryRpc('mark_delivery_failed', {
       'p_order_id': orderId ?? _order?.id,
       'p_reason': reason,
+      if (details != null) 'p_details': details,
     }, fallback: 'Could not record the delivery problem.');
   }
 

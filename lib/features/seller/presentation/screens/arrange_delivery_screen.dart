@@ -84,12 +84,19 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
   }
 
   Future<void> _submit() async {
+    final shipment = context.read<SellerOrdersController>().order?.shipment;
+    if (shipment != null && !shipment.canEditRider) {
+      showThriftSnackBar(
+        context,
+        'Rider details are locked while delivery is in progress.',
+        isError: true,
+      );
+      return;
+    }
     final nameError = Validators.riderName(_name.text);
     final phoneError = phMobileValidationError(_phone.text);
     final plateTrimmed = _plate.text.trim();
-    final plateError = plateTrimmed.isEmpty
-        ? 'Enter the plate number.'
-        : null;
+    final plateError = plateTrimmed.isEmpty ? 'Enter the plate number.' : null;
     setState(() {
       _nameError = nameError;
       _phoneError = phoneError;
@@ -118,6 +125,8 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
   Widget build(BuildContext context) {
     final controller = context.watch<SellerOrdersController>();
     final order = controller.order;
+    final shipment = order?.shipment;
+    final readOnly = shipment != null && !shipment.canEditRider;
 
     return Scaffold(
       appBar: AppBar(
@@ -129,11 +138,24 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
       ),
       body: KeyboardSafeForm(
         padding: const EdgeInsets.all(AppConstants.spacingMd),
-        action: ThriftButton(
-          label: controller.isUpdatingDelivery ? 'Saving…' : 'Save rider',
-          onPressed: controller.isUpdatingDelivery ? null : _submit,
-        ),
+        action: readOnly
+            ? ThriftButton(
+                label: 'Back to order',
+                variant: ThriftButtonVariant.outline,
+                onPressed: () => context.pop(),
+              )
+            : ThriftButton(
+                label: controller.isUpdatingDelivery ? 'Saving…' : 'Save rider',
+                onPressed: controller.isUpdatingDelivery ? null : _submit,
+              ),
         children: [
+          if (readOnly) ...[
+            Text(
+              'Rider details are locked while delivery is in progress.',
+              style: AppTypography.caption,
+            ),
+            const SizedBox(height: 12),
+          ],
           Text('Freelance / Local Rider', style: AppTypography.subheading),
           Text(
             'Seller Arranged · ${order == null ? '' : '#${order.orderNumber}'}',
@@ -145,6 +167,7 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
             hint: 'Juan Dela Cruz',
             controller: _name,
             error: _nameError,
+            readOnly: readOnly,
             inputFormatters: [
               FilteringTextInputFormatter.allow(
                 Validators.fullNameInputCharacters,
@@ -158,6 +181,7 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
             controller: _phone,
             keyboardType: TextInputType.phone,
             error: _phoneError,
+            readOnly: readOnly,
           ),
           const SizedBox(height: 12),
           Text('Vehicle type', style: AppTypography.label),
@@ -171,7 +195,9 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
                   label: Text(vehicle.label),
                   selected: _vehicle == vehicle,
                   selectedColor: AppColors.primaryLight,
-                  onSelected: (_) => setState(() => _vehicle = vehicle),
+                  onSelected: readOnly
+                      ? null
+                      : (_) => setState(() => _vehicle = vehicle),
                 ),
             ],
           ),
@@ -181,6 +207,7 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
             hint: 'ABC 1234',
             controller: _plate,
             error: _plateError,
+            readOnly: readOnly,
           ),
           const SizedBox(height: 12),
           ThriftTextField(
@@ -189,7 +216,7 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
                 ? 'Choose date and time'
                 : _estimated.toString(),
             readOnly: true,
-            onTap: _pickEstimated,
+            onTap: readOnly ? null : _pickEstimated,
           ),
           const SizedBox(height: 12),
           ThriftTextField(
@@ -197,6 +224,7 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
             hint: 'Meet at the gate, call on arrival…',
             controller: _notes,
             maxLines: 3,
+            readOnly: readOnly,
           ),
           const SizedBox(height: 12),
         ],

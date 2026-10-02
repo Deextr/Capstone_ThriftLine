@@ -20,6 +20,11 @@ class LookingForModel {
     this.likesCount = 0,
     this.sharesCount = 0,
     this.isLiked = false,
+    this.expiresAt,
+    this.moderationRemovedAt,
+    this.ownerDeletedAt,
+    this.repostedFromPostId,
+    this.observedAt,
   });
 
   final String id;
@@ -40,6 +45,13 @@ class LookingForModel {
   final int likesCount;
   final int sharesCount;
   final bool isLiked;
+  final DateTime? expiresAt;
+  final DateTime? moderationRemovedAt;
+  final DateTime? ownerDeletedAt;
+  final String? repostedFromPostId;
+
+  /// Server time captured with this row. Expiration labels use this clock.
+  final DateTime? observedAt;
 
   factory LookingForModel.fromSupabase(
     Map<String, dynamic> row, {
@@ -79,6 +91,10 @@ class LookingForModel {
       responseCount: (row['response_count'] as num?)?.toInt() ?? 0,
       status: status,
       thumbnailUrl: row['reference_image_url'] as String?,
+      expiresAt: _parseTime(row['expires_at']),
+      moderationRemovedAt: _parseTime(row['moderation_removed_at']),
+      ownerDeletedAt: _parseTime(row['owner_deleted_at']),
+      repostedFromPostId: row['reposted_from_post_id'] as String?,
     );
   }
 
@@ -101,6 +117,11 @@ class LookingForModel {
     int? likesCount,
     int? sharesCount,
     bool? isLiked,
+    DateTime? expiresAt,
+    DateTime? moderationRemovedAt,
+    DateTime? ownerDeletedAt,
+    String? repostedFromPostId,
+    DateTime? observedAt,
   }) {
     return LookingForModel(
       id: id ?? this.id,
@@ -121,8 +142,21 @@ class LookingForModel {
       likesCount: likesCount ?? this.likesCount,
       sharesCount: sharesCount ?? this.sharesCount,
       isLiked: isLiked ?? this.isLiked,
+      expiresAt: expiresAt ?? this.expiresAt,
+      moderationRemovedAt: moderationRemovedAt ?? this.moderationRemovedAt,
+      ownerDeletedAt: ownerDeletedAt ?? this.ownerDeletedAt,
+      repostedFromPostId: repostedFromPostId ?? this.repostedFromPostId,
+      observedAt: observedAt ?? this.observedAt,
     );
   }
+}
+
+DateTime? _parseTime(Object? value) {
+  if (value is DateTime) return value.toUtc();
+  if (value is String && value.trim().isNotEmpty) {
+    return DateTime.tryParse(value)?.toUtc();
+  }
+  return null;
 }
 
 class LookingForResponse {

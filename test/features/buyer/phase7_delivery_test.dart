@@ -4,6 +4,7 @@ import 'package:thriftline/core/utils/rider_privacy.dart';
 import 'package:thriftline/features/buyer/presentation/buyer_delivery_status.dart';
 import 'package:thriftline/models/enums.dart';
 import 'package:thriftline/models/order_model.dart';
+import 'package:thriftline/models/shipment_model.dart';
 import 'package:thriftline/widgets/delivery_timeline.dart';
 
 void main() {
@@ -94,6 +95,8 @@ void main() {
       expect(order.shipment, isNotNull);
       expect(order.shipment!.deliveryStatus, DeliveryStatus.outForDelivery);
       expect(order.shipment!.pinAvailable, isTrue);
+      expect(order.shipment!.canEditRider, isFalse);
+      expect(order.canArrangeDelivery, isFalse);
       expect(order.shipment!.buyerRiderDisplayName(), 'Juan Dela Cruz');
       expect(order.shipment!.buyerRiderPhone(), '0917 123 4567');
       expect(order.shipment!.shouldShowBuyerRiderInfo, isTrue);
@@ -104,6 +107,49 @@ void main() {
       expect(order.isShippedTab, isTrue);
       expect(order.isTrackable, isTrue);
       expect(order.shipment!.toString(), isNot(contains('483921')));
+    });
+
+    test('allows rider edits until out for delivery', () {
+      final pickedUp = OrderModel.fromSupabase({
+        'order_id': 'order-picked',
+        'order_number': 'TL-7b',
+        'buyer_id': 'buyer-1',
+        'seller_id': 'seller-1',
+        'order_status': 'shipped',
+        'subtotal': 500,
+        'shipping_fee': 80,
+        'platform_fee': 10,
+        'total_amount': 590,
+        'created_at': '2026-09-12T02:00:00Z',
+        'shipment': {
+          'shipment_id': 'ship-picked',
+          'order_id': 'order-picked',
+          'delivery_status': 'picked_up',
+          'delivery_method': 'freelance_rider',
+          'rider_name': 'Juan Dela Cruz',
+          'rider_phone': '09171234567',
+        },
+      });
+      final completed = OrderModel.fromSupabase({
+        'order_id': 'order-done-rider',
+        'order_number': 'TL-7c',
+        'buyer_id': 'buyer-1',
+        'seller_id': 'seller-1',
+        'order_status': 'completed',
+        'subtotal': 500,
+        'shipping_fee': 80,
+        'platform_fee': 10,
+        'total_amount': 590,
+        'created_at': '2026-09-12T02:00:00Z',
+        'shipment': {
+          'shipment_id': 'ship-done',
+          'order_id': 'order-done-rider',
+          'delivery_status': 'completed',
+          'rider_name': 'Juan Dela Cruz',
+        },
+      });
+      expect(pickedUp.shipment!.canEditRider, isTrue);
+      expect(completed.shipment!.canEditRider, isFalse);
     });
 
     test('paid preparing shipment stays in To Ship', () {
@@ -190,6 +236,23 @@ void main() {
       expect(pending.isTrackable, isFalse);
       expect(completed.isTrackable, isFalse);
       expect(completed.showsInPurchaseHistory, isTrue);
+    });
+  });
+
+  group('delivery failure summary', () {
+    test('shows custom text for Other reasons', () {
+      const shipment = ShipmentModel(
+        id: 's1',
+        orderId: 'o1',
+        deliveryStatus: DeliveryStatus.deliveryFailed,
+        deliveryFailureReason: DeliveryFailureReason.other,
+        deliveryFailureDetails:
+            'The rider reported that the delivery address could not be located.',
+      );
+      expect(
+        shipment.deliveryFailureSummary,
+        'The rider reported that the delivery address could not be located.',
+      );
     });
   });
 

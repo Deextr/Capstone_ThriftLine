@@ -131,6 +131,20 @@ String? reportDetailsError(String details) {
   return null;
 }
 
+String? deliveryFailureOtherDetailsError(String details) {
+  final trimmed = details.trim();
+  if (trimmed.isEmpty) {
+    return 'Please describe the delivery problem.';
+  }
+  if (trimmed.length < kReportDetailsMinLength) {
+    return 'Please add a bit more detail.';
+  }
+  if (trimmed.length > kReportDetailsMaxLength) {
+    return 'Keep your description under 1,000 characters.';
+  }
+  return null;
+}
+
 bool isAllowedReportImageName(String name) {
   final dot = name.lastIndexOf('.');
   if (dot < 0 || dot == name.length - 1) return false;

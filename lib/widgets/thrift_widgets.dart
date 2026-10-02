@@ -7,6 +7,15 @@ import '../core/constants/app_typography.dart';
 import '../core/theme/app_gradients.dart';
 import '../core/utils/seller_trust.dart';
 
+Widget? _hideTextCounter(
+  BuildContext context, {
+  required int currentLength,
+  required bool isFocused,
+  required int? maxLength,
+}) {
+  return null;
+}
+
 enum ThriftButtonVariant { primary, secondary, outline, ghost }
 
 class ThriftButton extends StatelessWidget {
@@ -284,16 +293,7 @@ class _ThriftTextFieldState extends State<ThriftTextField> {
           maxLengthEnforcement: widget.maxLength != null
               ? MaxLengthEnforcement.enforced
               : null,
-          buildCounter: widget.maxLength != null
-              ? (
-                  _,
-                  {
-                    required currentLength,
-                    required isFocused,
-                    required maxLength,
-                  },
-                ) => null
-              : null,
+          buildCounter: widget.maxLength != null ? _hideTextCounter : null,
           maxLines: widget.maxLines,
           onTap: widget.onTap,
           readOnly: widget.readOnly,
