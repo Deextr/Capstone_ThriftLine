@@ -91,6 +91,7 @@ class OrderDeliveryReportController extends ChangeNotifier {
   }
 
   void setDetails(String value) {
+    if (value.length > kReportDetailsMaxLength) return;
     _details = value;
     notifyListeners();
   }

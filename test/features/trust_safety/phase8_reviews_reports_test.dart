@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:thriftline/features/trust_safety/data/delivery_report_mapping.dart';
+import 'package:thriftline/features/trust_safety/data/report_order_eligibility.dart';
 import 'package:thriftline/features/trust_safety/data/report_reasons.dart';
 import 'package:thriftline/features/trust_safety/data/review_rules.dart';
 import 'package:thriftline/models/review_model.dart';
@@ -176,7 +177,9 @@ void main() {
         reportDetailsError('Received a different item than listed.'),
         isNull,
       );
-      expect(reportDetailsError('a' * 2001), isNotNull);
+      expect(reportDetailsError('a' * 1001), isNotNull);
+      expect(reportDetailsError('a' * 1000), isNull);
+      expect(reportDetailsError('a' * 10), isNull);
     });
 
     test('requires one to three evidence photos', () {
@@ -201,6 +204,45 @@ void main() {
       expect(isAllowedReportImageName('notes.pdf'), isFalse);
       expect(isAllowedReportImageName('payload.exe'), isFalse);
       expect(reportImageContentType('shot.webp'), 'image/webp');
+    });
+
+    test('report linked order uses order_status not payment_status', () {
+      OrderModel row({
+        required String orderStatus,
+        String paymentStatus = 'pending',
+      }) {
+        return OrderModel.fromSupabase({
+          'order_id': 'o1',
+          'order_number': 'TL-1',
+          'buyer_id': 'buyer-1',
+          'seller_id': 'seller-1',
+          'order_status': orderStatus,
+          'payment_status': paymentStatus,
+          'subtotal': 100,
+          'total_amount': 100,
+          'created_at': '2026-09-13T01:00:00Z',
+        });
+      }
+
+      expect(isOrderEligibleForReportLink(row(orderStatus: 'cancelled')), isFalse);
+      expect(
+        isOrderEligibleForReportLink(
+          row(orderStatus: 'cancelled', paymentStatus: 'paid'),
+        ),
+        isFalse,
+      );
+      expect(isOrderEligibleForReportLink(row(orderStatus: 'pending')), isFalse);
+      expect(isOrderEligibleForReportLink(row(orderStatus: 'paid', paymentStatus: 'paid')), isTrue);
+      expect(isOrderEligibleForReportLink(row(orderStatus: 'shipped', paymentStatus: 'paid')), isTrue);
+      expect(isOrderEligibleForReportLink(row(orderStatus: 'delivered', paymentStatus: 'paid')), isTrue);
+      expect(isOrderEligibleForReportLink(row(orderStatus: 'completed', paymentStatus: 'paid')), isTrue);
+      expect(isOrderEligibleForReportLink(row(orderStatus: 'disputed', paymentStatus: 'paid')), isTrue);
+      expect(
+        isOrderEligibleForReportLink(
+          row(orderStatus: 'completed', paymentStatus: 'refunded'),
+        ),
+        isTrue,
+      );
     });
 
     test('maps a persisted report without exposing extra fields', () {

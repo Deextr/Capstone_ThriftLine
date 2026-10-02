@@ -110,6 +110,7 @@ class _OrderDeliveryReportScreenState extends State<OrderDeliveryReportScreen> {
                             hint: 'Describe the issue with your order…',
                             controller: _details,
                             maxLines: 5,
+                            maxLength: kReportDetailsMaxLength,
                             onChanged: context
                                 .read<OrderDeliveryReportController>()
                                 .setDetails,
@@ -118,7 +119,7 @@ class _OrderDeliveryReportScreenState extends State<OrderDeliveryReportScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: Text(
-                              '${controller.details.trim().length}/$kReportDetailsMaxLength',
+                              '${controller.details.length}/$kReportDetailsMaxLength',
                               style: AppTypography.caption,
                             ),
                           ),

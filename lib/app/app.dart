@@ -145,14 +145,28 @@ class _SessionBindingsState extends State<_SessionBindings>
     });
   }
 
+  void _syncNotificationAudience() {
+    final auth = context.read<AuthProvider>();
+    context.read<NotificationsProvider>().setAccountContext(
+      mode: auth.activeAccount,
+      hasSellerAccess: auth.user?.hasSellerAccess ?? false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final userId = context.watch<AuthProvider>().user?.id;
+    final auth = context.watch<AuthProvider>();
+    final userId = auth.user?.id;
+    context.read<NotificationsProvider>().setAccountContext(
+      mode: auth.activeAccount,
+      hasSellerAccess: auth.user?.hasSellerAccess ?? false,
+    );
     if (userId != _boundUserId) {
       _boundUserId = userId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _bindSession(userId);
+        _syncNotificationAudience();
       });
     }
     return widget.child;

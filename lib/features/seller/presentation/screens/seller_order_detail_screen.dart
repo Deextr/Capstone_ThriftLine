@@ -174,8 +174,15 @@ class SellerOrderDetailScreen extends StatelessWidget {
                   itemReturn: order.itemReturn!,
                   buyerView: false,
                   isBusy: controller.isUpdatingDelivery,
-                  onArrange: () =>
-                      context.push(RouteNames.arrangeReturnFor(order.id)),
+                  onArrange: () async {
+                    await context.push(
+                      RouteNames.arrangeReturnFor(order.id),
+                    );
+                    if (!context.mounted) return;
+                    await context.read<SellerOrdersController>().load(
+                      showSpinner: false,
+                    );
+                  },
                   onConfirmReceived: () async {
                     final error = await context
                         .read<SellerOrdersController>()
@@ -253,9 +260,15 @@ class SellerOrderDetailScreen extends StatelessWidget {
                         label: order.shipment?.hasRider == true
                             ? 'Update rider'
                             : 'Arrange Delivery',
-                        onPressed: () => context.push(
-                          RouteNames.arrangeDeliveryFor(order.id),
-                        ),
+                        onPressed: () async {
+                          await context.push(
+                            RouteNames.arrangeDeliveryFor(order.id),
+                          );
+                          if (!context.mounted) return;
+                          await context.read<SellerOrdersController>().load(
+                            showSpinner: false,
+                          );
+                        },
                       ),
                     ],
                     ..._milestoneButtons(context, order, controller),

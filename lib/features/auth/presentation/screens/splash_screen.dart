@@ -255,39 +255,36 @@ class _SplashScreenState extends State<SplashScreen>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Logo Badge — white frosted circle containing the ThriftLine logo image
+// Logo Badge — cropped rounded mark, no paper-white frame
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _LogoBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 120,
-      height: 120,
+      width: 128,
+      height: 128,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 32,
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 28,
             spreadRadius: 0,
             offset: const Offset(0, 10),
           ),
           BoxShadow(
-            color: const Color(0xFF0D9488).withValues(alpha: 0.35),
-            blurRadius: 50,
-            spreadRadius: -8,
-            offset: const Offset(0, 20),
+            color: const Color(0xFF0D9488).withValues(alpha: 0.28),
+            blurRadius: 44,
+            spreadRadius: -6,
+            offset: const Offset(0, 16),
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(26),
-        child: Image.asset(
-          'assets/images/thriftline-logo.png',
-          fit: BoxFit.contain,
-        ),
+      child: Image.asset(
+        'assets/images/thriftline-logo.png',
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
       ),
     );
   }

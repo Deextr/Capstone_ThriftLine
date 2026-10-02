@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/services/supabase_service.dart';
+import '../features/auth/domain/account_mode.dart';
+import '../features/notifications/domain/notification_audience.dart';
 import '../models/enums.dart';
 import '../models/notification_model.dart';
 
@@ -12,33 +14,70 @@ class NotificationsProvider extends ChangeNotifier {
   RealtimeChannel? _channel;
   String? _userId;
   bool _isLoading = false;
+  AccountMode _activeAccount = AccountMode.buyer;
+  bool _hasSellerAccess = false;
 
-  List<NotificationModel> get items => List.unmodifiable(_items);
+  List<NotificationModel> get items => List.unmodifiable(
+    notificationsForAccountMode(
+      _items,
+      _activeAccount,
+      hasSellerAccess: _hasSellerAccess,
+    ),
+  );
+
   bool get isLoading => _isLoading;
-  int get unreadCount => _items.where((n) => !n.isRead).length;
+
+  int get unreadCount => unreadNotificationsForAccountMode(
+    _items,
+    _activeAccount,
+    hasSellerAccess: _hasSellerAccess,
+  );
+
+  void setAccountContext({
+    required AccountMode mode,
+    required bool hasSellerAccess,
+  }) {
+    final changed =
+        _activeAccount != mode || _hasSellerAccess != hasSellerAccess;
+    _activeAccount = mode;
+    _hasSellerAccess = hasSellerAccess;
+    if (changed) notifyListeners();
+  }
 
   List<NotificationModel> forTab(String tab) {
+    final visible = items;
     return switch (tab) {
-      'orders' => _items
-          .where((n) =>
-              n.type == NotificationType.shipped ||
-              n.type == NotificationType.orderConfirmed)
-          .toList(),
-      'bids' => _items
-          .where((n) =>
-              n.type == NotificationType.outbid ||
-              n.type == NotificationType.wonBid)
-          .toList(),
+      'orders' =>
+        visible
+            .where(
+              (n) =>
+                  n.type == NotificationType.shipped ||
+                  n.type == NotificationType.orderConfirmed,
+            )
+            .toList(),
+      'bids' =>
+        visible
+            .where(
+              (n) =>
+                  n.type == NotificationType.outbid ||
+                  n.type == NotificationType.wonBid,
+            )
+            .toList(),
       'messages' =>
-        _items.where((n) => n.type == NotificationType.message).toList(),
-      'system' => _items
-          .where((n) =>
-              n.type == NotificationType.system ||
-              n.type == NotificationType.verificationSubmitted ||
-              n.type == NotificationType.verificationApproved ||
-              n.type == NotificationType.verificationRejected)
-          .toList(),
-      _ => _items,
+        visible.where((n) => n.type == NotificationType.message).toList(),
+      'system' =>
+        visible
+            .where(
+              (n) =>
+                  n.type == NotificationType.system ||
+                  n.type == NotificationType.verificationSubmitted ||
+                  n.type == NotificationType.verificationApproved ||
+                  n.type == NotificationType.verificationRejected ||
+                  n.type == NotificationType.reportDecision ||
+                  n.type == NotificationType.review,
+            )
+            .toList(),
+      _ => visible,
     };
   }
 
@@ -68,8 +107,13 @@ class NotificationsProvider extends ChangeNotifier {
           .limit(100);
       _items
         ..clear()
-        ..addAll((rows as List).map((row) =>
-            NotificationModel.fromJson(Map<String, dynamic>.from(row as Map))));
+        ..addAll(
+          (rows as List).map(
+            (row) => NotificationModel.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ),
+          ),
+        );
     } catch (e) {
       debugPrint('NotificationsProvider.refresh error: $e');
     } finally {
@@ -96,8 +140,17 @@ class NotificationsProvider extends ChangeNotifier {
   Future<void> markAllRead() async {
     final userId = _userId;
     if (userId == null) return;
+    final audiences = notificationAudienceDbValuesForMode(
+      _activeAccount,
+      hasSellerAccess: _hasSellerAccess,
+    );
+    final visibleIds = items.where((n) => !n.isRead).map((n) => n.id).toSet();
+    if (visibleIds.isEmpty) return;
+
     for (var i = 0; i < _items.length; i++) {
-      if (!_items[i].isRead) _items[i] = _items[i].copyWith(isRead: true);
+      if (visibleIds.contains(_items[i].id)) {
+        _items[i] = _items[i].copyWith(isRead: true);
+      }
     }
     notifyListeners();
     try {
@@ -105,7 +158,8 @@ class NotificationsProvider extends ChangeNotifier {
           .from('notifications')
           .update({'is_read': true})
           .eq('user_id', userId)
-          .eq('is_read', false);
+          .eq('is_read', false)
+          .inFilter('audience', audiences);
     } catch (e) {
       debugPrint('NotificationsProvider.markAllRead error: $e');
     }

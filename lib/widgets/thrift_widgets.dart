@@ -16,6 +16,7 @@ class ThriftButton extends StatelessWidget {
     required this.onPressed,
     this.variant = ThriftButtonVariant.primary,
     this.isLoading = false,
+    this.loadingLabel,
     this.icon,
     this.expand = true,
     this.color,
@@ -25,6 +26,7 @@ class ThriftButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final ThriftButtonVariant variant;
   final bool isLoading;
+  final String? loadingLabel;
   final IconData? icon;
   final bool expand;
   final Color? color;
@@ -32,13 +34,29 @@ class ThriftButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final child = isLoading
-        ? const SizedBox(
-            height: 20,
-            width: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: Colors.white,
-            ),
+        ? Row(
+            mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              ),
+              if (loadingLabel != null) ...[
+                const SizedBox(width: 10),
+                Text(
+                  loadingLabel!,
+                  style: AppTypography.label.copyWith(
+                    fontSize: 14,
+                    color: _textColor,
+                  ),
+                ),
+              ],
+            ],
           )
         : Row(
             mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
@@ -197,6 +215,7 @@ class ThriftTextField extends StatefulWidget {
     this.labelColor,
     this.autovalidateMode,
     this.onSubmitted,
+    this.maxLength,
   });
 
   final String? label;
@@ -218,6 +237,7 @@ class ThriftTextField extends StatefulWidget {
   final Color? labelColor;
   final AutovalidateMode? autovalidateMode;
   final ValueChanged<String>? onSubmitted;
+  final int? maxLength;
 
   @override
   State<ThriftTextField> createState() => _ThriftTextFieldState();
@@ -260,6 +280,20 @@ class _ThriftTextFieldState extends State<ThriftTextField> {
           onFieldSubmitted: widget.onSubmitted,
           keyboardType: widget.keyboardType,
           inputFormatters: widget.inputFormatters,
+          maxLength: widget.maxLength,
+          maxLengthEnforcement: widget.maxLength != null
+              ? MaxLengthEnforcement.enforced
+              : null,
+          buildCounter: widget.maxLength != null
+              ? (
+                  _,
+                  {
+                    required currentLength,
+                    required isFocused,
+                    required maxLength,
+                  },
+                ) => null
+              : null,
           maxLines: widget.maxLines,
           onTap: widget.onTap,
           readOnly: widget.readOnly,

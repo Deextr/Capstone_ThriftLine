@@ -7,6 +7,7 @@ import '../../../models/order_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../buyer/data/order_query.dart';
 import '../data/report_evidence_upload.dart';
+import '../data/report_order_eligibility.dart';
 import '../data/report_reasons.dart';
 
 class ReportEvidenceDraft {
@@ -67,6 +68,7 @@ class ReportUserController extends ChangeNotifier {
   final List<ReportEvidenceDraft> _evidence = [];
   bool _isLoading = true;
   bool _isSubmitting = false;
+  bool _submitLocked = false;
   String? _errorMessage;
   String? _evidenceError;
   String? _usernameQuery;
@@ -88,7 +90,7 @@ class ReportUserController extends ChangeNotifier {
       _reportedUserId != null && _reportedUserId!.isNotEmpty;
 
   bool get canSubmit {
-    if (_isSubmitting || !hasResolvedTarget) return false;
+    if (_isSubmitting || _submitLocked || !hasResolvedTarget) return false;
     if (_selectedCategory == null) return false;
     if (reportDetailsError(_details) != null) return false;
     return _evidence.length >= kReportEvidenceMinCount;
@@ -153,6 +155,7 @@ class ReportUserController extends ChangeNotifier {
   }
 
   void setDetails(String value) {
+    if (value.length > kReportDetailsMaxLength) return;
     _details = value;
     notifyListeners();
   }
@@ -277,6 +280,7 @@ class ReportUserController extends ChangeNotifier {
         await abandonOpenReport(_supabase, reportId);
         return attachError;
       }
+      _submitLocked = true;
       return null;
     } catch (e) {
       debugPrint('ReportUserController.submit error: $e');
@@ -322,6 +326,7 @@ class ReportUserController extends ChangeNotifier {
       final sellerOrders = await fetchOrdersForSeller(_supabase, myId);
       final merged = <String, OrderModel>{};
       for (final order in [...buyerOrders, ...sellerOrders]) {
+        if (!isOrderEligibleForReportLink(order)) continue;
         final counterpart = order.buyerId == myId
             ? order.sellerId
             : order.buyerId;
@@ -338,6 +343,10 @@ class ReportUserController extends ChangeNotifier {
             ),
           )
           .toList();
+      if (_linkedOrderId != null &&
+          !_orders.any((order) => order.id == _linkedOrderId)) {
+        _linkedOrderId = null;
+      }
     } catch (e) {
       debugPrint('ReportUserController._loadOrders error: $e');
       _orders = [];

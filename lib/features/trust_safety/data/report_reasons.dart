@@ -72,7 +72,11 @@ const List<ReportReason> kReportReasons = [
 ];
 
 const int kReportDetailsMinLength = 10;
-const int kReportDetailsMaxLength = 2000;
+const int kReportDetailsMaxLength = 1000;
+
+/// Returned by [submit_report] for cooldown / duplicate / burst limits.
+const String kReportSubmitTooFastMessage =
+    "You're submitting reports too quickly. Please wait a moment and try again.";
 const int kReportEvidenceMinCount = 1;
 const int kReportEvidenceMaxCount = 3;
 const int kReportEvidenceMaxBytes = 5 * 1024 * 1024;
@@ -122,7 +126,7 @@ String? reportDetailsError(String details) {
     return 'Please add a bit more detail.';
   }
   if (trimmed.length > kReportDetailsMaxLength) {
-    return 'Keep your report under 2,000 characters.';
+    return 'Keep your report under 1,000 characters.';
   }
   return null;
 }

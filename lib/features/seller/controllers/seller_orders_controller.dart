@@ -12,6 +12,35 @@ import '../../buyer/data/order_query.dart';
 import '../../trust_safety/data/review_query.dart';
 import '../data/seller_order_buckets.dart';
 
+/// Keeps every live [SellerOrdersController] for a seller in sync when one
+/// instance confirms an order change (detail vs list use separate providers).
+final class SellerOrdersPeerHub {
+  SellerOrdersPeerHub._();
+
+  static final Map<String, Set<SellerOrdersController>> _bySeller = {};
+
+  static void register(String sellerId, SellerOrdersController controller) {
+    _bySeller.putIfAbsent(sellerId, () => {}).add(controller);
+  }
+
+  static void unregister(String sellerId, SellerOrdersController controller) {
+    _bySeller[sellerId]?.remove(controller);
+    if (_bySeller[sellerId]?.isEmpty ?? false) {
+      _bySeller.remove(sellerId);
+    }
+  }
+
+  static void refreshPeers(
+    String sellerId,
+    SellerOrdersController source,
+  ) {
+    for (final peer in _bySeller[sellerId] ?? {}) {
+      if (identical(peer, source) || peer._disposed) continue;
+      unawaited(peer.load(showSpinner: false));
+    }
+  }
+}
+
 class SellerOrdersController extends ChangeNotifier {
   SellerOrdersController({
     required SupabaseService supabase,
@@ -40,6 +69,8 @@ class SellerOrdersController extends ChangeNotifier {
   String? _errorMessage;
   RealtimeChannel? _channel;
   AppLifecycleListener? _lifecycle;
+  int _loadGeneration = 0;
+  String? _peerSellerId;
   bool _disposed = false;
 
   List<OrderModel> get orders => _orders;
@@ -59,6 +90,8 @@ class SellerOrdersController extends ChangeNotifier {
 
   Future<void> load({bool showSpinner = true}) async {
     final myId = _auth.user?.id;
+    final generation = ++_loadGeneration;
+    _bindPeerHub(myId);
     if (myId == null) {
       _orders = [];
       _order = null;
@@ -75,19 +108,46 @@ class SellerOrdersController extends ChangeNotifier {
     try {
       unawaited(_completeExpiredInspections());
       if (orderId != null) {
-        _order = await fetchOrderById(_supabase, orderId!, sellerId: myId);
+        final fetched = await fetchOrderById(
+          _supabase,
+          orderId!,
+          sellerId: myId,
+        );
+        if (generation != _loadGeneration) return;
+        _order = fetched;
         if (_order == null) _errorMessage = 'Order not found.';
       } else {
         _orders = await fetchOrdersForSeller(_supabase, myId);
+        if (generation != _loadGeneration) return;
       }
       await _loadMyReviews(myId);
     } catch (e) {
       debugPrint('SellerOrdersController.load error: $e');
-      _errorMessage = 'Unable to load orders.';
+      if (generation == _loadGeneration) {
+        _errorMessage = 'Unable to load orders.';
+      }
     } finally {
-      _isLoading = false;
-      _notify();
+      if (generation == _loadGeneration) {
+        _isLoading = false;
+        _notify();
+      }
     }
+  }
+
+  void _bindPeerHub(String? sellerId) {
+    if (sellerId == null || sellerId.isEmpty) return;
+    if (_peerSellerId == sellerId) return;
+    if (_peerSellerId != null) {
+      SellerOrdersPeerHub.unregister(_peerSellerId!, this);
+    }
+    _peerSellerId = sellerId;
+    SellerOrdersPeerHub.register(sellerId, this);
+  }
+
+  void _refreshPeerControllers() {
+    final sellerId = _peerSellerId ?? _auth.user?.id;
+    if (sellerId == null || sellerId.isEmpty) return;
+    SellerOrdersPeerHub.refreshPeers(sellerId, this);
   }
 
   Future<void> _completeExpiredInspections() async {
@@ -179,6 +239,7 @@ class SellerOrdersController extends ChangeNotifier {
         return supabaseRpcError(rpcRes, fallback: fallback);
       }
       await load(showSpinner: false);
+      _refreshPeerControllers();
       return null;
     } catch (e) {
       debugPrint('$name error: $e');
@@ -205,20 +266,32 @@ class SellerOrdersController extends ChangeNotifier {
       final channelName = orderId != null
           ? 'seller-order-$orderId'
           : 'seller-orders-$myId';
-      _channel = _supabase.client
-          .channel(channelName)
-          .onPostgresChanges(
-            event: PostgresChangeEvent.update,
-            schema: 'public',
-            table: 'orders',
-            filter: PostgresChangeFilter(
-              type: PostgresChangeFilterType.eq,
-              column: orderId != null ? 'order_id' : 'seller_id',
-              value: orderId ?? myId,
-            ),
-            callback: (_) => unawaited(load(showSpinner: false)),
-          )
-          .subscribe();
+      var channel = _supabase.client.channel(channelName);
+      channel = channel.onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'orders',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: orderId != null ? 'order_id' : 'seller_id',
+          value: orderId ?? myId,
+        ),
+        callback: (_) => unawaited(load(showSpinner: false)),
+      );
+      if (orderId != null) {
+        channel = channel.onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'shipments',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'order_id',
+            value: orderId!,
+          ),
+          callback: (_) => unawaited(load(showSpinner: false)),
+        );
+      }
+      _channel = channel.subscribe();
     } catch (e) {
       debugPrint('SellerOrdersController realtime error: $e');
     }
@@ -231,6 +304,10 @@ class SellerOrdersController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    if (_peerSellerId != null) {
+      SellerOrdersPeerHub.unregister(_peerSellerId!, this);
+      _peerSellerId = null;
+    }
     _lifecycle?.dispose();
     final channel = _channel;
     _channel = null;

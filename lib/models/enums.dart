@@ -328,6 +328,21 @@ enum MessageType {
   };
 }
 
+enum NotificationAudience {
+  buyer,
+  seller,
+  system;
+
+  static NotificationAudience fromString(String? value) => switch (value) {
+    'buyer' => NotificationAudience.buyer,
+    'seller' => NotificationAudience.seller,
+    'system' => NotificationAudience.system,
+    _ => NotificationAudience.system,
+  };
+
+  String get dbValue => name;
+}
+
 enum NotificationType {
   outbid,
   wonBid,
@@ -338,13 +353,18 @@ enum NotificationType {
   verificationSubmitted,
   verificationApproved,
   verificationRejected,
+  review,
+  reportDecision,
   system;
 
-  static NotificationType fromString(String value) =>
-      NotificationType.values.firstWhere(
-        (e) => e.name == value,
-        orElse: () => NotificationType.system,
-      );
+  static NotificationType fromString(String value) => switch (value) {
+    'report_decision' => NotificationType.reportDecision,
+    'review' => NotificationType.review,
+    _ => NotificationType.values.firstWhere(
+      (e) => e.name == value,
+      orElse: () => NotificationType.system,
+    ),
+  };
 }
 
 enum LookingForStatus {

@@ -56,126 +56,117 @@ class _ReportSellerScreenState extends State<ReportSellerScreen> {
               ? const Center(
                   child: CircularProgressIndicator(color: AppColors.primary),
                 )
-              : Column(
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   children: [
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                        children: [
-                          Text(
-                            'Tell us what happened',
-                            style: AppTypography.heading.copyWith(fontSize: 22),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Reports stay private. The other person will not see this.',
-                            style: AppTypography.body.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          if (controller.hasResolvedTarget)
-                            _TargetRow(controller: controller)
-                          else ...[
-                            ThriftTextField(
-                              label: 'Username',
-                              hint: '@username',
-                              controller: _username,
-                              icon: Icons.alternate_email,
-                              onChanged: controller.setUsernameQuery,
-                            ),
-                            const SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton(
-                                onPressed: () async {
-                                  final error = await context
-                                      .read<ReportUserController>()
-                                      .resolveUsername();
-                                  if (!context.mounted || error == null) {
-                                    return;
-                                  }
-                                  showThriftSnackBar(
-                                    context,
-                                    error,
-                                    isError: true,
-                                  );
-                                },
-                                child: const Text('Find member'),
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 24),
-                          Text('Reason', style: AppTypography.subheading),
-                          const SizedBox(height: 10),
-                          ...kReportReasons.map(
-                            (reason) => _ReasonTile(
-                              reason: reason,
-                              selected:
-                                  controller.selectedCategory == reason.slug,
-                              onTap: () => context
-                                  .read<ReportUserController>()
-                                  .selectCategory(reason.slug),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          ThriftTextField(
-                            label: 'Details',
-                            hint: 'Describe what happened...',
-                            controller: _details,
-                            maxLines: 5,
-                            onChanged: controller.setDetails,
-                          ),
-                          const SizedBox(height: 6),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Text(
-                              '${controller.details.trim().length}/$kReportDetailsMaxLength',
-                              style: AppTypography.caption,
-                            ),
-                          ),
-                          if (controller.orders.isNotEmpty) ...[
-                            const SizedBox(height: 20),
-                            Text(
-                              'Related order (optional)',
-                              style: AppTypography.subheading,
-                            ),
-                            const SizedBox(height: 10),
-                            _OrderPicker(controller: controller),
-                          ],
-                          const SizedBox(height: 20),
-                          ReportEvidenceSection(
-                            evidence: controller.evidence,
-                            evidenceError: controller.evidenceError,
-                            required: true,
-                            onAddGallery: () => context
-                                .read<ReportUserController>()
-                                .addEvidenceFromGallery(),
-                            onAddCamera: () => context
-                                .read<ReportUserController>()
-                                .addEvidenceFromCamera(),
-                            onRemove: (i) => context
-                                .read<ReportUserController>()
-                                .removeEvidence(i),
-                          ),
-                        ],
+                    Text(
+                      'Tell us what happened',
+                      style: AppTypography.heading.copyWith(fontSize: 22),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Reports stay private. The other person will not see this.',
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textSecondary,
                       ),
                     ),
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        20,
-                        8,
-                        20,
-                        16 + MediaQuery.viewInsetsOf(context).bottom,
+                    const SizedBox(height: 20),
+                    if (controller.hasResolvedTarget)
+                      _TargetRow(controller: controller)
+                    else ...[
+                      ThriftTextField(
+                        label: 'Username',
+                        hint: '@username',
+                        controller: _username,
+                        icon: Icons.alternate_email,
+                        onChanged: controller.setUsernameQuery,
                       ),
-                      child: ThriftButton(
-                        label: 'Submit Report',
-                        color: AppColors.error,
-                        isLoading: controller.isSubmitting,
-                        onPressed: controller.canSubmit
-                            ? () => _submit(context)
-                            : null,
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: () async {
+                            final error = await context
+                                .read<ReportUserController>()
+                                .resolveUsername();
+                            if (!context.mounted || error == null) {
+                              return;
+                            }
+                            showThriftSnackBar(
+                              context,
+                              error,
+                              isError: true,
+                            );
+                          },
+                          child: const Text('Find member'),
+                        ),
                       ),
+                    ],
+                    const SizedBox(height: 24),
+                    Text('Reason', style: AppTypography.subheading),
+                    const SizedBox(height: 10),
+                    ...kReportReasons.map(
+                      (reason) => _ReasonTile(
+                        reason: reason,
+                        selected:
+                            controller.selectedCategory == reason.slug,
+                        onTap: () => context
+                            .read<ReportUserController>()
+                            .selectCategory(reason.slug),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    ThriftTextField(
+                      label: 'Details',
+                      hint: 'Describe what happened...',
+                      controller: _details,
+                      maxLines: 5,
+                      maxLength: kReportDetailsMaxLength,
+                      onChanged: controller.setDetails,
+                    ),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '${controller.details.length}/$kReportDetailsMaxLength',
+                        style: AppTypography.caption,
+                      ),
+                    ),
+                    if (controller.orders.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      Text(
+                        'Related order (optional)',
+                        style: AppTypography.subheading,
+                      ),
+                      const SizedBox(height: 10),
+                      _OrderPicker(controller: controller),
+                    ],
+                    const SizedBox(height: 20),
+                    ReportEvidenceSection(
+                      evidence: controller.evidence,
+                      evidenceError: controller.evidenceError,
+                      required: true,
+                      onAddGallery: () => context
+                          .read<ReportUserController>()
+                          .addEvidenceFromGallery(),
+                      onAddCamera: () => context
+                          .read<ReportUserController>()
+                          .addEvidenceFromCamera(),
+                      onRemove: (i) => context
+                          .read<ReportUserController>()
+                          .removeEvidence(i),
+                    ),
+                    const SizedBox(height: 24),
+                    ThriftButton(
+                      label: 'Submit Report',
+                      loadingLabel: 'Submitting Report...',
+                      color: AppColors.error,
+                      isLoading: controller.isSubmitting,
+                      onPressed: controller.canSubmit
+                          ? () => _submit(context)
+                          : null,
                     ),
                   ],
                 ),
@@ -185,7 +176,9 @@ class _ReportSellerScreenState extends State<ReportSellerScreen> {
   }
 
   Future<void> _submit(BuildContext context) async {
-    final error = await context.read<ReportUserController>().submit();
+    final reportController = context.read<ReportUserController>();
+    if (reportController.isSubmitting) return;
+    final error = await reportController.submit();
     if (!context.mounted) return;
     if (error != null) {
       showThriftSnackBar(context, error, isError: true);
