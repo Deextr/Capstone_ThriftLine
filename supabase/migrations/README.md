@@ -115,18 +115,52 @@ and `GMAIL_APP_PASSWORD` secrets. Apply the SQL, then:
 supabase functions deploy send-password-reset --no-verify-jwt
 ```
 
-The email contains Supabase's HTTPS `action_link` (clickable in Gmail). After
-verification, Auth redirects to `password-recovery-return`, which opens the app
-with session tokens in the query string (Android drops URL fragments). Deploy
-`password-recovery-return` with JWT verification off.
+The email button links to Storage HTML
+`/storage/v1/object/public/app-links/open-thriftline.html?token_hash=...`.
+Hosted Edge Functions cannot run JavaScript (HTML is rewritten to text/plain).
+The Storage page automatically opens `thriftline://reset-password` and shows
+an Open ThriftLine button if the browser blocks it. Apply
+`20261002120000_app_links_storage.sql` and upload
+`supabase/storage/app-links/open-thriftline.html`. Old function URLs 302 to
+that page. The app still calls `verifyOTP` with `token_hash`.
 
-Add both redirect URLs under **Authentication → URL Configuration → Redirect URLs**:
+Add under **Authentication → URL Configuration → Redirect URLs**:
 
-- `https://<project-ref>.supabase.co/functions/v1/password-recovery-return`
 - `thriftline://reset-password`
 
-Do not put custom-scheme URLs in the email body. Google-only accounts do not
-receive a link.
+Google-only accounts do not receive a link.
+
+## Email login bot protection (Turnstile)
+
+| File | Purpose |
+| --- | --- |
+| `20261002130000_email_login_abuse_protection.sql` | Hashed email/IP throttles for the `sign-in-with-email` Edge Function |
+
+Email/password sign-in from the app goes through `../functions/sign-in-with-email`
+(no JWT). That function:
+
+1. Validates the Turnstile token with Cloudflare Siteverify (`TURNSTILE_SECRET_KEY`).
+2. Applies `claim_email_login_attempt` rate limits.
+3. Calls GoTrue with the service path only after verification succeeds.
+
+Password reset uses the same Siteverify check in `send-password-reset`.
+
+Apply the SQL, then deploy:
+
+```bash
+supabase secrets set TURNSTILE_SECRET_KEY=your_cloudflare_secret
+supabase functions deploy sign-in-with-email --no-verify-jwt
+supabase functions deploy send-password-reset --no-verify-jwt
+```
+
+Set the **public** site key in Flutter `.env` as `TURNSTILE_SITE_KEY` and
+`TURNSTILE_BASE_URL` (must match the Turnstile widget domain list).
+
+**Bypass note:** GoTrue still accepts direct `grant_type=password` requests with
+the public anon key unless you add separate project-level Auth rate limits.
+Turnstile enforcement for the shipped app is on the Edge Function path; pairing
+with Supabase Auth rate limits is recommended defense in depth (Turnstile alone
+is not DDoS protection).
 
 ## Seed data
 

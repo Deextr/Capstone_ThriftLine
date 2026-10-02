@@ -32,11 +32,13 @@ dependencies:
   flutter_svg: ^2.1.0
   url_launcher: ^6.3.1
   app_links: ^6.4.0
+  cloudflare_turnstile: ^3.8.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true

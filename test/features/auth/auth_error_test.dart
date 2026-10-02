@@ -73,6 +73,30 @@ void main() {
     });
   });
 
+  group('emailLoginUiMessage', () {
+    test('maps edge function codes to safe copy', () {
+      expect(
+        emailLoginUiMessage(code: 'invalid_credentials'),
+        'Invalid email or password. Please try again.',
+      );
+      expect(
+        emailLoginUiMessage(code: 'turnstile_failed'),
+        'Human verification failed. Please try again.',
+      );
+      expect(
+        emailLoginUiMessage(
+          code: 'turnstile_failed',
+          serverError: 'Verification expired. Complete the check again.',
+        ),
+        'Verification expired. Complete the check again.',
+      );
+      expect(
+        emailLoginUiMessage(code: 'rate_limited'),
+        contains('Too many attempts'),
+      );
+    });
+  });
+
   group('passwordResetUiMessage', () {
     test(
       'keeps rate-limit and validation copy and hides other server text',

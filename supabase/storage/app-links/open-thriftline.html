@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Opening ThriftLine</title>
+</head>
+<body style="margin:0;background:#F8FAFC;color:#0F172A;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  <div style="max-width:420px;margin:48px auto;padding:24px;text-align:center;">
+    <p style="font-size:18px;font-weight:600;">Opening ThriftLine...</p>
+    <p style="font-size:14px;color:#64748B;line-height:1.5;">
+      Return to the app to choose a new password.
+    </p>
+    <p id="error" style="display:none;font-size:14px;color:#64748B;line-height:1.5;">
+      This password reset link is invalid or has expired. Please request a new
+      password reset email from the ThriftLine app.
+    </p>
+    <p id="fallback" style="display:none;margin-top:28px;">
+      <a id="open-app" href="#"
+         style="display:inline-block;background:#0D9488;color:#FFFFFF;text-decoration:none;font-weight:600;padding:14px 28px;border-radius:8px;">
+        Open ThriftLine
+      </a>
+    </p>
+  </div>
+  <script>
+(function () {
+  var params = new URLSearchParams(window.location.search || "");
+  var tokenHash = (params.get("token_hash") || "").trim();
+  var type = (params.get("type") || "recovery").trim() || "recovery";
+  if (!tokenHash) {
+    document.getElementById("error").style.display = "block";
+    return;
+  }
+  var query = "token_hash=" + encodeURIComponent(tokenHash) +
+    "&type=" + encodeURIComponent(type);
+  var appUrl = "thriftline://reset-password?" + query;
+  var intentUrl =
+    "intent://reset-password?" + query +
+    "#Intent;scheme=thriftline;package=com.example.thriftline;end";
+  var open = document.getElementById("open-app");
+  if (open) open.href = intentUrl;
+  try { window.location.replace(intentUrl); } catch (e) {}
+  setTimeout(function () {
+    try { window.location.href = appUrl; } catch (e) {}
+  }, 250);
+  setTimeout(function () {
+    var fb = document.getElementById("fallback");
+    if (fb) fb.style.display = "block";
+  }, 700);
+})();
+  </script>
+</body>
+</html>

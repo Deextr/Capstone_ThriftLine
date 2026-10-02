@@ -1,4 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  MAX_VERIFY_ATTEMPTS,
+  maskPhMobile,
+  normalizePhPhone,
+  sha256Hex,
+  timingSafeEqual,
+} from "../_shared/phone_otp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,22 +18,6 @@ function json(status: number, body: Record<string, unknown>) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-}
-
-function normalizePhPhone(raw: string): string | null {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.startsWith("63") && digits.length === 12) return `0${digits.slice(2)}`;
-  if (digits.startsWith("0") && digits.length === 11) return digits;
-  if (digits.length === 10 && digits.startsWith("9")) return `0${digits}`;
-  return null;
-}
-
-async function sha256Hex(value: string): Promise<string> {
-  const data = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
 }
 
 Deno.serve(async (req) => {
@@ -51,45 +42,106 @@ Deno.serve(async (req) => {
 
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) {
-      return json(401, { error: "Sign in first." });
+      return json(401, {
+        error: "Sign in first.",
+        code: "unauthenticated",
+      });
     }
 
     const body = await req.json();
     const phone = normalizePhPhone(String(body.phone ?? ""));
     const token = String(body.token ?? "").replace(/\D/g, "");
-    if (!phone) return json(400, { error: "Enter a valid Philippine mobile number." });
-    if (token.length < 6) return json(400, { error: "Enter the 6-digit code from the SMS." });
+    if (!phone) {
+      return json(400, {
+        error: "Enter a valid 11-digit mobile number starting with 09.",
+        code: "invalid_phone",
+      });
+    }
+    if (token.length < 6) {
+      return json(400, {
+        error: "Enter the 6-digit code from the SMS.",
+        code: "invalid_code",
+      });
+    }
+
+    const pepper = Deno.env.get("OTP_PEPPER") ?? "";
+    if (!pepper.trim()) {
+      console.error("verify-phone-otp OTP_PEPPER is not configured");
+      return json(503, {
+        error: "Could not verify that code. Please try again.",
+        code: "unavailable",
+      });
+    }
+
+    const userId = userData.user.id;
+    console.log("verify-phone-otp attempt", {
+      user: userId.slice(0, 8),
+      phone: maskPhMobile(phone),
+    });
 
     const { data: challenge, error: fetchError } = await service
       .from("phone_otp_challenges")
       .select("challenge_id, code_hash, expires_at, attempt_count, consumed_at")
-      .eq("user_id", userData.user.id)
+      .eq("user_id", userId)
       .eq("phone", phone)
-      .is("consumed_at", null)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (fetchError) throw fetchError;
     if (!challenge) {
-      return json(400, { error: "No active code. Request a new one." });
+      console.log("verify-phone-otp failed", { reason: "no_active_code" });
+      return json(400, {
+        error: "No active code. Request a new one.",
+        code: "no_active_code",
+      });
+    }
+    if (challenge.consumed_at) {
+      console.log("verify-phone-otp failed", { reason: "already_used" });
+      return json(400, {
+        error: "That code is no longer valid. Request a new one.",
+        code: "already_used",
+      });
     }
     if (new Date(challenge.expires_at).getTime() < Date.now()) {
-      return json(400, { error: "That code has expired. Request a new one." });
+      console.log("verify-phone-otp failed", { reason: "expired" });
+      return json(400, {
+        error: "That code has expired. Request a new one.",
+        code: "expired",
+      });
     }
-    if ((challenge.attempt_count ?? 0) >= 5) {
-      return json(429, { error: "Too many attempts. Request a new code." });
+    if ((challenge.attempt_count ?? 0) >= MAX_VERIFY_ATTEMPTS) {
+      console.log("verify-phone-otp rate-limit", { reason: "too_many_attempts" });
+      return json(429, {
+        error: "Too many attempts. Request a new code.",
+        code: "too_many_attempts",
+      });
     }
 
-    const pepper = Deno.env.get("OTP_PEPPER") ?? Deno.env.get("FMCSMS_API_KEY") ?? "";
-    const incoming = await sha256Hex(`${pepper}:${userData.user.id}:${phone}:${token}`);
-
-    if (incoming !== challenge.code_hash) {
+    const incoming = await sha256Hex(`${pepper}:${userId}:${phone}:${token}`);
+    if (!timingSafeEqual(incoming, String(challenge.code_hash))) {
+      const nextAttempts = (challenge.attempt_count ?? 0) + 1;
+      const locked = nextAttempts >= MAX_VERIFY_ATTEMPTS;
       await service
         .from("phone_otp_challenges")
-        .update({ attempt_count: (challenge.attempt_count ?? 0) + 1 })
+        .update({
+          attempt_count: nextAttempts,
+          ...(locked ? { consumed_at: new Date().toISOString() } : {}),
+        })
         .eq("challenge_id", challenge.challenge_id);
-      return json(400, { error: "That code is invalid." });
+      console.log("verify-phone-otp failed", {
+        reason: locked ? "too_many_attempts" : "invalid_code",
+      });
+      if (locked) {
+        return json(429, {
+          error: "Too many attempts. Request a new code.",
+          code: "too_many_attempts",
+        });
+      }
+      return json(400, {
+        error: "That code is invalid.",
+        code: "invalid_code",
+      });
     }
 
     await service
@@ -100,12 +152,19 @@ Deno.serve(async (req) => {
     const { error: updateError } = await service
       .from("users")
       .update({ phone_number: phone, is_phone_verified: true })
-      .eq("user_id", userData.user.id);
+      .eq("user_id", userId);
     if (updateError) throw updateError;
 
+    console.log("verify-phone-otp success", {
+      user: userId.slice(0, 8),
+      phone: maskPhMobile(phone),
+    });
     return json(200, { ok: true });
   } catch (error) {
     console.error("verify-phone-otp", error);
-    return json(500, { error: "Could not verify that code. Please try again." });
+    return json(500, {
+      error: "Could not verify that code. Please try again.",
+      code: "unavailable",
+    });
   }
 });

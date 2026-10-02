@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/app_gradients.dart';
 import '../../../../core/routes/route_names.dart';
-import '../../../../providers/app_provider.dart';
 import '../../../../providers/auth_provider.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -112,13 +111,10 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _navigate() {
     final auth = context.read<AuthProvider>();
-    final app = context.read<AppProvider>();
     if (auth.isEmailOtpPending && auth.isAuthenticated) {
       context.go(RouteNames.verifyEmailOtp);
     } else if (auth.isFullyAuthenticated) {
       context.go(auth.homeRoute);
-    } else if (!app.isOnboardingComplete) {
-      context.go(RouteNames.onboarding);
     } else {
       context.go(RouteNames.login);
     }

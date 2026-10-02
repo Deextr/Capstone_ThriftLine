@@ -13,6 +13,9 @@ abstract final class AppConstants {
   static const String keyDisplayName = 'display_name';
   static const String keyEmailOtpPending = 'email_otp_pending';
 
+  /// Survives process death while the user has not finished reset-password.
+  static const String keyPasswordRecoveryPending = 'password_recovery_pending';
+
   /// Non-secret marker that pairs with the secure-storage install token.
   /// Logout must keep it. It is not a credential and must not be the token.
   static const String keyDeviceTrustInstall = 'device_trust_install';

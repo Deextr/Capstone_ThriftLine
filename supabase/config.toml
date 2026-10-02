@@ -26,7 +26,16 @@ verify_jwt = true
 [functions.revoke-trusted-device]
 verify_jwt = true
 
+[functions.send-phone-otp]
+verify_jwt = true
+
+[functions.verify-phone-otp]
+verify_jwt = true
+
 [functions.send-password-reset]
+verify_jwt = false
+
+[functions.sign-in-with-email]
 verify_jwt = false
 
 [functions.password-recovery-return]

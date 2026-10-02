@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -58,7 +59,21 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       return;
     }
     links.clearLinkError();
+    links.resetForNewAttempt();
     setState(() => _resetComplete = true);
+  }
+
+  Future<void> _abandonRecovery({bool leaveApp = false}) async {
+    final auth = context.read<AuthProvider>();
+    final links = context.read<PasswordRecoveryCoordinator>();
+    await auth.cancelPasswordRecovery();
+    links.resetForNewAttempt();
+    if (!mounted) return;
+    if (leaveApp) {
+      await SystemNavigator.pop();
+      return;
+    }
+    context.go(RouteNames.login);
   }
 
   @override
@@ -76,26 +91,41 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       return _ResetSuccessScaffold(compact: compact);
     }
 
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        backgroundColor: AppColors.primaryDark,
-        resizeToAvoidBottomInset: true,
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            const LoginVideoBackground(),
-            const AuthVideoScrim(),
-            SafeArea(
-              child: Column(
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => context.go(RouteNames.login),
+    final blockBackDuringRecovery = canReset;
+
+    return PopScope(
+      canPop: !blockBackDuringRecovery,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop || !blockBackDuringRecovery) return;
+        _abandonRecovery(leaveApp: true);
+      },
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          backgroundColor: AppColors.primaryDark,
+          resizeToAvoidBottomInset: true,
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              const LoginVideoBackground(),
+              const AuthVideoScrim(),
+              SafeArea(
+                child: Column(
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.arrow_back,
+                          color: blockBackDuringRecovery
+                              ? Colors.white.withValues(alpha: 0.35)
+                              : Colors.white,
+                        ),
+                        onPressed: blockBackDuringRecovery
+                            ? null
+                            : () => _abandonRecovery(),
+                      ),
                     ),
-                  ),
                   Expanded(
                     child: LayoutBuilder(
                       builder: (context, constraints) {
@@ -120,6 +150,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                         'Open the password reset link from your '
                                             'email on this device to continue.',
                                     compact: compact,
+                                    onBackToLogin: () => _abandonRecovery(),
                                   )
                                 : Form(
                                     key: _formKey,
@@ -211,7 +242,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 ],
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -219,10 +251,15 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 }
 
 class _InvalidLinkBody extends StatelessWidget {
-  const _InvalidLinkBody({required this.message, required this.compact});
+  const _InvalidLinkBody({
+    required this.message,
+    required this.compact,
+    required this.onBackToLogin,
+  });
 
   final String message;
   final bool compact;
+  final VoidCallback onBackToLogin;
 
   @override
   Widget build(BuildContext context) {
@@ -270,7 +307,7 @@ class _InvalidLinkBody extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         TextButton(
-          onPressed: () => context.go(RouteNames.login),
+          onPressed: onBackToLogin,
           child: Text(
             'Back to login',
             style: AppTypography.body.copyWith(
@@ -332,8 +369,8 @@ class _ResetSuccessScaffold extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Your password was changed successfully. Sign in with your '
-                    'new password to continue.',
+                    'Password updated successfully. Please sign in with your '
+                    'new password.',
                     style: AppTypography.body.copyWith(
                       color: Colors.white.withValues(alpha: 0.82),
                     ),

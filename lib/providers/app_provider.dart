@@ -5,8 +5,8 @@ import '../core/services/shared_preferences_service.dart';
 /// Manages global application state (onboarding).
 class AppProvider extends ChangeNotifier {
   AppProvider(this._prefs) {
-    _isOnboardingComplete = _prefs.isOnboardingComplete;
-    //_isOnboardingComplete = false;
+    // Intro carousel removed; go straight to auth after splash.
+    _isOnboardingComplete = true;
   }
 
   final SharedPreferencesService _prefs;
