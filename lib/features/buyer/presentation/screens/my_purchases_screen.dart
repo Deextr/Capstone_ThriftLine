@@ -273,8 +273,8 @@ class _OrderList extends StatelessWidget {
     }
     if (controller.errorMessage != null && controller.orders.isEmpty) {
       return ErrorState(
-        message:
-            'Unable to load your purchases. Please check your connection and try again.',
+        message: controller.errorMessage ??
+            'Unable to load your purchases. Please try again.',
         onRetry: controller.load,
       );
     }

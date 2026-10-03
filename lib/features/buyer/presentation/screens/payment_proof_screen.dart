@@ -62,7 +62,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen> {
         body: ErrorState(
           message:
               controller.errorMessage ??
-              'We could not load this order. Check your connection and try again.',
+              'We could not load this order. Please try again.',
           onRetry: controller.load,
         ),
       );
