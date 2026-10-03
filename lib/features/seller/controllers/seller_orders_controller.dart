@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/supabase_errors.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/order_model.dart';
 import '../../../models/review_model.dart';
@@ -121,7 +122,10 @@ class SellerOrdersController extends ChangeNotifier {
     } catch (e) {
       debugPrint('SellerOrdersController.load error: $e');
       if (generation == _loadGeneration) {
-        _errorMessage = 'Unable to load orders.';
+        _errorMessage = userFacingOrderLoadError(
+          e,
+          fallback: 'Unable to load orders. Please try again.',
+        );
       }
     } finally {
       if (generation == _loadGeneration) {
