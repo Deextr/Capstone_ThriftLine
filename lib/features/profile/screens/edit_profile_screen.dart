@@ -54,9 +54,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       child: Consumer<ProfileController>(
         builder: (context, controller, child) {
           final currentUser = controller.currentUser;
-          final initialName = currentUser?.name ?? authUser?.name ?? '';
-          final initialUsername = currentUser?.username ?? authUser?.username ?? '';
-          final initialEmail = currentUser?.email ?? authUser?.email ?? '';
+          final isSeller = auth.isSeller;
+          final initialName = isSeller
+              ? (controller.shopName ??
+                  authUser?.shopName ??
+                  currentUser?.name ??
+                  '')
+              : (currentUser?.name ?? authUser?.name ?? '');
+          final initialUsername =
+              currentUser?.username ?? authUser?.username ?? '';
+          final initialEmail = authUser?.email ?? currentUser?.email ?? '';
           final initialPhone = currentUser?.phone ?? authUser?.phone ?? '';
 
           return GestureDetector(
@@ -107,9 +114,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                             ),
                                           )
                                         : ThriftAvatar(
-                                            imageUrl: currentUser?.avatarUrl ??
-                                                authUser?.avatarUrl ??
-                                                '',
+                                            imageUrl: controller.displayAvatarUrl,
                                             name: initialName,
                                             size: 90,
                                           ),
@@ -169,18 +174,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               initialUsername: initialUsername,
                               initialEmail: initialEmail,
                               initialPhone: initialPhone,
+                              isSellerMode: isSeller,
+                              canChangeEmail: auth.usesEmailPasswordAuth,
                               isSaving: controller.isSaving,
                               errorMessage: controller.errorMessage,
                               onSave: ({
                                 required String fullName,
                                 required String username,
-                                required String email,
                                 required String phone,
                               }) async {
                                 final success = await controller.updateProfile(
                                   fullName: fullName,
                                   username: username,
-                                  email: email,
                                   phone: phone,
                                 );
 

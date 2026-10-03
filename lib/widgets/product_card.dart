@@ -9,6 +9,8 @@ import '../core/utils/cart_popularity.dart';
 import '../core/utils/formatters.dart';
 import '../models/enums.dart';
 import '../models/product_model.dart';
+import '../core/utils/saved_items_eligibility.dart';
+import '../providers/auth_provider.dart';
 import '../providers/saved_items_provider.dart';
 import 'countdown_timer.dart';
 
@@ -111,8 +113,14 @@ class _ProductCardState extends State<ProductCard>
   }
 
   Widget _buildGrid(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
     final savedItems = context.watch<SavedItemsProvider>();
     final saved = savedItems.isSaved(widget.product.id);
+    final showFavorite = canShowProductFavoriteAction(
+      isBuyerExperience: auth.isBuyer,
+      viewerUserId: auth.user?.id,
+      productSellerId: widget.product.sellerId,
+    );
     final compact = widget.compact;
     final isLiveAuction = widget.product.hasActiveBid;
     final popularity = !isLiveAuction
@@ -211,19 +219,20 @@ class _ProductCardState extends State<ProductCard>
                         children: [
                           if (popularity != null) ...[
                             _CartPopularityBadge(label: popularity),
-                            const SizedBox(width: 6),
+                            if (showFavorite) const SizedBox(width: 6),
                           ],
-                          _SaveButton(
-                            saved: saved,
-                            controller: _heartController,
-                            onTap: () {
-                              _heartController.forward(from: 0);
-                              savedItems.toggleSave(
-                                widget.product.id,
-                                widget.product,
-                              );
-                            },
-                          ),
+                          if (showFavorite)
+                            _SaveButton(
+                              saved: saved,
+                              controller: _heartController,
+                              onTap: () {
+                                _heartController.forward(from: 0);
+                                savedItems.toggleSave(
+                                  widget.product.id,
+                                  widget.product,
+                                );
+                              },
+                            ),
                         ],
                       ),
                     ),
@@ -247,8 +256,14 @@ class _ProductCardState extends State<ProductCard>
   }
 
   Widget _buildList(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
     final savedItems = context.watch<SavedItemsProvider>();
     final saved = savedItems.isSaved(widget.product.id);
+    final showFavorite = canShowProductFavoriteAction(
+      isBuyerExperience: auth.isBuyer,
+      viewerUserId: auth.user?.id,
+      productSellerId: widget.product.sellerId,
+    );
 
     return Material(
       color: AppColors.surface,
@@ -303,18 +318,19 @@ class _ProductCardState extends State<ProductCard>
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: () {
-                  _heartController.forward(from: 0);
-                  savedItems.toggleSave(widget.product.id, widget.product);
-                },
-                icon: Icon(
-                  saved
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_border_rounded,
-                  color: saved ? AppColors.error : AppColors.textSecondary,
+              if (showFavorite)
+                IconButton(
+                  onPressed: () {
+                    _heartController.forward(from: 0);
+                    savedItems.toggleSave(widget.product.id, widget.product);
+                  },
+                  icon: Icon(
+                    saved
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    color: saved ? AppColors.error : AppColors.textSecondary,
+                  ),
                 ),
-              ),
             ],
           ),
         ),

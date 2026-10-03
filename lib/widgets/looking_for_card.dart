@@ -8,11 +8,14 @@ import '../features/buyer/domain/looking_for_lifecycle.dart';
 import '../models/looking_for_model.dart';
 import 'thrift_widgets.dart';
 
+enum LookingForCardLayout { compact, feed, detail }
+
 class LookingForCard extends StatelessWidget {
   const LookingForCard({
     super.key,
     required this.post,
     this.compact = true,
+    this.layout,
     this.showRespondButton = false,
     this.showShare = false,
     this.showOwnerActions = false,
@@ -28,6 +31,7 @@ class LookingForCard extends StatelessWidget {
 
   final LookingForModel post;
   final bool compact;
+  final LookingForCardLayout? layout;
   final bool showRespondButton;
   final bool showShare;
   final bool showOwnerActions;
@@ -40,10 +44,177 @@ class LookingForCard extends StatelessWidget {
   final VoidCallback? onReport;
   final VoidCallback? onTap;
 
+  LookingForCardLayout get _layout {
+    if (layout != null) return layout!;
+    if (!compact) return LookingForCardLayout.detail;
+    return LookingForCardLayout.compact;
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (compact) return _compact(context);
-    return _detail(context);
+    return switch (_layout) {
+      LookingForCardLayout.feed => _feed(context),
+      LookingForCardLayout.detail => _detail(context),
+      LookingForCardLayout.compact => _compact(context),
+    };
+  }
+
+  Widget _feed(BuildContext context) {
+    final hasImage =
+        post.thumbnailUrl != null && post.thumbnailUrl!.trim().isNotEmpty;
+    final budgetLine =
+        '${formatCurrency(post.budgetMin)} – ${formatCurrency(post.budgetMax)}';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: AppColors.surface,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            InkWell(
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 8, 0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ThriftAvatar(imageUrl: post.buyerAvatar, size: 44),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            post.buyerName.trim().isEmpty
+                                ? 'Buyer'
+                                : post.buyerName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.body.copyWith(
+                              fontWeight: FontWeight.w700,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            formatRelativeTime(post.createdAt),
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.textHint,
+                            ),
+                          ),
+                          if (post.location.trim().isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              post.location,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    _menu(),
+                  ],
+                ),
+              ),
+            ),
+            InkWell(
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      post.title,
+                      style: AppTypography.subheading.copyWith(
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                      ),
+                    ),
+                    if (post.description.trim().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        post.description,
+                        style: AppTypography.body.copyWith(
+                          color: AppColors.textPrimary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Text(
+                      budgetLine,
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryDark,
+                      ),
+                    ),
+                    if (post.size != null && post.size!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Size ${post.size!.trim()}',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            if (hasImage) ...[
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: onTap,
+                child: _FeedImage(url: post.thumbnailUrl!),
+              ),
+            ],
+            const SizedBox(height: 4),
+            const Divider(height: 1, color: AppColors.border),
+            _feedActions(context),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _feedActions(BuildContext context) {
+    if (!showShare && !showRespondButton) {
+      return const SizedBox(height: 4);
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (showShare)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: onShare,
+                icon: const Icon(Icons.share_outlined, size: 22),
+                label: const Text('Share'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  minimumSize: const Size(48, 44),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+              ),
+            ),
+          if (showRespondButton)
+            ThriftButton(
+              label: 'I Have This Item',
+              expand: true,
+              onPressed: onRespond,
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _compact(BuildContext context) {
@@ -183,7 +354,7 @@ class LookingForCard extends StatelessWidget {
               const Spacer(),
               if (showRespondButton)
                 ThriftButton(
-                  label: 'I Have This',
+                  label: 'I Have This Item',
                   expand: false,
                   onPressed: onRespond,
                 ),
@@ -249,6 +420,47 @@ Color _statusColor(LookingForLifecycle lifecycle) {
     LookingForLifecycle.active ||
     LookingForLifecycle.fulfilled => AppColors.primaryDark,
   };
+}
+
+class _FeedImage extends StatelessWidget {
+  const _FeedImage({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return AspectRatio(
+      aspectRatio: 4 / 3,
+      child: CachedNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        placeholder: (_, _) => const ColoredBox(
+          color: AppColors.surfaceVariant,
+          child: Center(
+            child: SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ),
+        errorWidget: (_, _, _) => const ColoredBox(
+          color: AppColors.surfaceVariant,
+          child: Center(
+            child: Icon(
+              Icons.image_not_supported_outlined,
+              color: AppColors.textHint,
+              size: 32,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _Thumb extends StatelessWidget {

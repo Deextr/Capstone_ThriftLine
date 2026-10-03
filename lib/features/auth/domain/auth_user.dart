@@ -13,8 +13,10 @@ class AuthUser {
     this.phone,
     required this.role,
     required this.avatarUrl,
+    this.sellerAvatarUrl = '',
     required this.location,
     this.shopName,
+    this.shopBio,
     this.rating,
     this.ratingCount = 0,
     this.sales,
@@ -39,8 +41,10 @@ class AuthUser {
   final String? phone;
   final UserRole role;
   final String avatarUrl;
+  final String sellerAvatarUrl;
   final String location;
   final String? shopName;
+  final String? shopBio;
   final double? rating;
   final int ratingCount;
   final int? sales;
@@ -136,6 +140,7 @@ class AuthUser {
           meta['picture'] as String? ??
           meta['avatar'] as String? ??
           '',
+      sellerAvatarUrl: sellerProfile?['shop_avatar_url'] as String? ?? '',
       location:
           profile?['location'] as String? ??
           [
@@ -147,7 +152,8 @@ class AuthUser {
       ratingCount: (profile?['rating_count'] as num?)?.toInt() ?? 0,
       sales: sellerProfile?['total_sales'] as int?,
       isVerified: approved,
-      bio: profile?['bio'] as String? ?? sellerProfile?['shop_bio'] as String?,
+      shopBio: sellerProfile?['shop_bio'] as String?,
+      bio: profile?['bio'] as String?,
       lastActive: _parseTime(profile?['last_active_at']),
       verificationStatus: approved ? 'approved' : status,
       verificationRejectionReason: verification?['rejection_reason'] as String?,
@@ -188,8 +194,10 @@ class AuthUser {
     String? phone,
     UserRole? role,
     String? avatarUrl,
+    String? sellerAvatarUrl,
     String? location,
     String? shopName,
+    String? shopBio,
     double? rating,
     int? ratingCount,
     int? sales,
@@ -214,8 +222,10 @@ class AuthUser {
       phone: phone ?? this.phone,
       role: role ?? this.role,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      sellerAvatarUrl: sellerAvatarUrl ?? this.sellerAvatarUrl,
       location: location ?? this.location,
       shopName: shopName ?? this.shopName,
+      shopBio: shopBio ?? this.shopBio,
       rating: rating ?? this.rating,
       ratingCount: ratingCount ?? this.ratingCount,
       sales: sales ?? this.sales,

@@ -23,6 +23,13 @@ abstract final class RouteNames {
   static const String sellerHome = '/seller';
   static const String search = '/search';
   static const String product = '/product/:id';
+
+  /// Buyer catalog detail, or seller read-only preview when [ownerPreview].
+  static String productFor(String productId, {bool ownerPreview = false}) {
+    final id = productId.trim();
+    if (ownerPreview) return '/product/$id?ownerPreview=1';
+    return '/product/$id';
+  }
   static const String buyNow = '/buy-now/:id';
   static const String payment = '/payment/:id';
   static const String orderConfirm = '/order-confirm/:orderId';
@@ -135,6 +142,7 @@ abstract final class RouteNames {
   }
 
   static const String myShop = '/my-shop';
+  static const String sellerAnalytics = '/seller-analytics';
   static const String adminHome = '/admin';
   static const String adminApplications = '/admin/applications';
   static const String adminReview = '/admin/review/:id';
@@ -158,5 +166,6 @@ abstract final class RouteNames {
   static const String verifyPhone = '/verify-phone';
   static const String verifyEmailOtp = '/verify-email-otp';
   static const String addresses = '/addresses';
+  static const String sellerShopAddress = '/seller/shop-address';
   static const String paymentMethods = '/payment-methods';
 }

@@ -8,7 +8,8 @@ import '../../../core/constants/app_typography.dart';
 import '../../../core/routes/route_names.dart';
 import '../../../providers/auth_provider.dart';
 import '../../auth/domain/auth_user.dart';
-import '../../../providers/data_provider.dart';
+import '../../../providers/settings_provider.dart';
+import '../../auth/domain/account_mode.dart';
 import '../../../widgets/thrift_widgets.dart';
 import '../../auth/presentation/widgets/auth_widgets.dart';
 import '../../buyer/controllers/buyer_orders_controller.dart';
@@ -26,7 +27,7 @@ class BuyerProfileTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final data = context.watch<DataProvider>();
+    final settings = context.watch<SettingsProvider>();
     final buyerOrders = context.watch<BuyerOrdersController>();
     final followingProvider = context.watch<FollowingShopsProvider>();
     final user = auth.user;
@@ -116,8 +117,13 @@ class BuyerProfileTab extends StatelessWidget {
                 ),
                 title: Text('Notifications', style: AppTypography.body),
                 trailing: Switch(
-                  value: data.notificationsEnabled,
-                  onChanged: (_) => data.toggleNotifications(),
+                  value: settings.pushFor(AccountMode.buyer),
+                  onChanged: settings.isSavingPush
+                      ? null
+                      : (value) => settings.setPushNotifications(
+                            value,
+                            mode: AccountMode.buyer,
+                          ),
                   activeTrackColor: AppColors.primary.withValues(alpha: 0.4),
                   activeThumbColor: AppColors.primary,
                 ),
@@ -204,7 +210,8 @@ class _ProfileHeader extends StatelessWidget {
     return Column(
       children: [
         SwitchableAvatar(
-          imageUrl: user?.avatarUrl ?? '',
+          key: ValueKey('buyer-profile-${auth.activeAvatarUrl}'),
+          imageUrl: auth.activeAvatarUrl,
           name: name,
           canSwitch: auth.canSwitchAccounts,
           onSwitch: () => SwitchAccountSheet.show(context),

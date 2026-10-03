@@ -13,6 +13,7 @@ import '../../../chat/presentation/widgets/share_looking_for_sheet.dart';
 import '../../controllers/looking_for_controller.dart';
 import '../../domain/looking_for_lifecycle.dart';
 import '../widgets/create_looking_for_sheet.dart';
+import '../widgets/looking_for_browse_feed_skeleton.dart';
 import '../widgets/report_looking_for_sheet.dart';
 
 class BuyerLookingForTab extends StatefulWidget {
@@ -357,6 +358,9 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
     bool showShare = false,
   }) {
     if (looking.isLoading && looking.posts.isEmpty) {
+      if (section == _LookingSection.browse) {
+        return const LookingForBrowseFeedSkeleton();
+      }
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
       );
@@ -376,14 +380,14 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
 
     final me = looking.auth.user?.id;
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+    final useFeed = section == _LookingSection.browse;
+
     return RefreshIndicator(
       onRefresh: looking.refresh,
       color: AppColors.primary,
-      child: ListView.separated(
-        padding: EdgeInsets.fromLTRB(0, 8, 0, 96.0 + bottomInset),
+      child: ListView.builder(
+        padding: EdgeInsets.fromLTRB(0, useFeed ? 0 : 8, 0, 96.0 + bottomInset),
         itemCount: posts.length,
-        separatorBuilder: (_, _) =>
-            const Divider(height: 1, color: AppColors.border),
         itemBuilder: (_, i) {
           final post = posts[i];
           final isOwn = me != null && me == post.buyerId;
@@ -393,6 +397,7 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
                   section == _LookingSection.inactive);
           return LookingForCard(
             post: post,
+            layout: useFeed ? LookingForCardLayout.feed : null,
             showShare: showShare && post.showInBrowse,
             showRespondButton: showRespond && !isOwn && post.showInBrowse,
             showOwnerActions: ownerSection && isOwn,
@@ -417,10 +422,10 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
         icon: Icons.search,
         title: widget.sellerWorkspace
             ? 'No buyer requests yet'
-            : 'No requests right now',
+            : 'No requests yet',
         message: widget.sellerWorkspace
             ? 'When buyers post what they are looking for, they will show up here.'
-            : 'Active requests from buyers will show up here.',
+            : 'Looking For requests from the community will appear here.',
         actionLabel: widget.sellerWorkspace || restricted
             ? null
             : 'Post a request',

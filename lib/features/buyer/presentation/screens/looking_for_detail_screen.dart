@@ -46,7 +46,7 @@ class LookingForDetailScreen extends StatelessWidget {
               children: [
                 LookingForCard(
                   post: post,
-                  compact: false,
+                  layout: LookingForCardLayout.detail,
                   showShare: !controller.isSellerWorkspace && post.showInBrowse,
                   showRespondButton:
                       controller.isSellerWorkspace &&

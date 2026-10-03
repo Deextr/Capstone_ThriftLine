@@ -1,11 +1,9 @@
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:storage_client/storage_client.dart' show FileOptions;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../features/auth/domain/account_mode.dart';
 import '../../../models/user_model.dart';
 import '../../../providers/auth_provider.dart';
 
@@ -20,6 +18,9 @@ class ProfileController extends ChangeNotifier {
   final AuthProvider? _authProvider;
 
   UserModel? _currentUser;
+  String? _shopName;
+  String? _shopBio;
+  String? _sellerAvatarUrl;
   bool _isLoading = false;
   bool _isSaving = false;
   bool _isUploadingAvatar = false;
@@ -27,13 +28,23 @@ class ProfileController extends ChangeNotifier {
   String? _successMessage;
 
   UserModel? get currentUser => _currentUser;
+  bool get isSellerMode =>
+      _authProvider?.activeAccount == AccountMode.seller;
+  String? get shopName => _shopName;
+  String? get shopBio => _shopBio;
+  String get displayAvatarUrl {
+    if (isSellerMode && (_sellerAvatarUrl?.trim().isNotEmpty ?? false)) {
+      return _sellerAvatarUrl!;
+    }
+    return _currentUser?.avatarUrl ?? _authProvider?.user?.avatarUrl ?? '';
+  }
+
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
   bool get isUploadingAvatar => _isUploadingAvatar;
   String? get errorMessage => _errorMessage;
   String? get successMessage => _successMessage;
 
-  /// Loads the profile data for [userId] (or currently authenticated user).
   Future<void> loadProfile({String? userId}) async {
     final targetId = userId ?? _supabaseService.currentUser?.id;
     if (targetId == null) {
@@ -67,6 +78,19 @@ class ProfileController extends ChangeNotifier {
       } else {
         _errorMessage = 'Profile data not found.';
       }
+
+      if (isSellerMode) {
+        final sellerRow = await _supabaseService.client
+            .from('seller_profiles')
+            .select('shop_name, shop_bio, shop_avatar_url')
+            .eq('seller_id', targetId)
+            .maybeSingle();
+        if (sellerRow != null) {
+          _shopName = sellerRow['shop_name'] as String?;
+          _shopBio = sellerRow['shop_bio'] as String?;
+          _sellerAvatarUrl = sellerRow['shop_avatar_url'] as String?;
+        }
+      }
     } catch (e) {
       _errorMessage = 'Failed to load profile: ${e.toString()}';
     } finally {
@@ -75,31 +99,32 @@ class ProfileController extends ChangeNotifier {
     }
   }
 
-  /// Checks if [username] is available for the given user.
   Future<bool> checkUsernameAvailability(String username) async {
-    final currentUserId = _supabaseService.currentUser?.id ?? _currentUser?.id ?? '';
+    final currentUserId =
+        _supabaseService.currentUser?.id ?? _currentUser?.id ?? '';
     if (currentUserId.isEmpty) return true;
 
     try {
-      return await _supabaseService.checkUsernameAvailability(username, currentUserId);
+      return await _supabaseService.checkUsernameAvailability(
+        username,
+        currentUserId,
+      );
     } catch (e) {
       return false;
     }
   }
 
-  /// Validates format of username: letters and numbers only, no spaces or special characters.
   bool isValidUsernameFormat(String username) {
     if (username.isEmpty) return false;
     final regex = RegExp(r'^[a-zA-Z0-9]+$');
     return regex.hasMatch(username);
   }
 
-  /// Updates profile in Supabase database and syncs with local state.
   Future<bool> updateProfile({
     required String fullName,
     required String username,
-    required String email,
     required String phone,
+    String? shopBio,
   }) async {
     final currentUserId = _supabaseService.currentUser?.id ?? _currentUser?.id;
     if (currentUserId == null) {
@@ -111,14 +136,14 @@ class ProfileController extends ChangeNotifier {
     _errorMessage = null;
     _successMessage = null;
 
-    // 1. Validation
     final trimmedName = fullName.trim();
     final trimmedUsername = username.trim();
-    final trimmedEmail = email.trim();
     final trimmedPhone = phone.trim();
 
     if (trimmedName.isEmpty) {
-      _errorMessage = 'Full Name cannot be empty.';
+      _errorMessage = isSellerMode
+          ? 'Shop name cannot be empty.'
+          : 'Full Name cannot be empty.';
       notifyListeners();
       return false;
     }
@@ -130,13 +155,8 @@ class ProfileController extends ChangeNotifier {
     }
 
     if (!isValidUsernameFormat(trimmedUsername)) {
-      _errorMessage = 'Username must contain letters and numbers only, with no spaces or special characters.';
-      notifyListeners();
-      return false;
-    }
-
-    if (trimmedEmail.isEmpty || !trimmedEmail.contains('@')) {
-      _errorMessage = 'Please enter a valid email address.';
+      _errorMessage =
+          'Username must contain letters and numbers only, with no spaces or special characters.';
       notifyListeners();
       return false;
     }
@@ -145,7 +165,6 @@ class ProfileController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 2. Uniqueness check if username has changed
       final currentUsername = _currentUser?.username ?? '';
       if (trimmedUsername.toLowerCase() != currentUsername.toLowerCase()) {
         final available = await _supabaseService.checkUsernameAvailability(
@@ -160,43 +179,60 @@ class ProfileController extends ChangeNotifier {
         }
       }
 
-      // 3. Supabase update using exact database column names
-      final updateData = <String, dynamic>{
-        'full_name': trimmedName,
+      if (isSellerMode) {
+        await _supabaseService.client.from('seller_profiles').update({
+          'shop_name': trimmedName,
+          if (shopBio != null) 'shop_bio': shopBio.trim(),
+        }).eq('seller_id', currentUserId);
+        _shopName = trimmedName;
+        if (shopBio != null) _shopBio = shopBio.trim();
+      } else {
+        await _supabaseService.updateUserProfile(
+          userId: currentUserId,
+          data: {
+            'full_name': trimmedName,
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+        );
+      }
+
+      final userUpdate = <String, dynamic>{
         'username': trimmedUsername,
-        'email': trimmedEmail,
         'phone_number': trimmedPhone,
         'updated_at': DateTime.now().toIso8601String(),
       };
+      if (!isSellerMode) {
+        userUpdate['full_name'] = trimmedName;
+      }
 
       await _supabaseService.updateUserProfile(
         userId: currentUserId,
-        data: updateData,
+        data: userUpdate,
       );
 
-      // 4. Update local UserModel
-      _currentUser = (_currentUser ?? UserModel(
-        id: currentUserId,
-        name: trimmedName,
+      _currentUser = (_currentUser ??
+              UserModel(
+                id: currentUserId,
+                name: trimmedName,
+                username: trimmedUsername,
+                email: _authProvider?.user?.email ?? '',
+                phone: trimmedPhone,
+                role: _authProvider?.user?.role ?? UserModel.fromJson({}).role,
+                createdAt: DateTime.now(),
+              ))
+          .copyWith(
+        name: isSellerMode ? (_currentUser?.name ?? trimmedName) : trimmedName,
         username: trimmedUsername,
-        email: trimmedEmail,
-        phone: trimmedPhone,
-        role: _authProvider?.user?.role ?? UserModel.fromJson({}).role,
-        createdAt: DateTime.now(),
-      )).copyWith(
-        name: trimmedName,
-        username: trimmedUsername,
-        email: trimmedEmail,
         phone: trimmedPhone,
       );
 
-      // 5. Update local AuthProvider state
       if (_authProvider != null) {
         await _authProvider.updateProfileData(
-          name: trimmedName,
+          name: isSellerMode ? _authProvider.user?.name : trimmedName,
           username: trimmedUsername,
-          email: trimmedEmail,
           phone: trimmedPhone,
+          shopName: isSellerMode ? trimmedName : null,
+          shopBio: isSellerMode && shopBio != null ? shopBio.trim() : null,
         );
       }
 
@@ -206,7 +242,9 @@ class ProfileController extends ChangeNotifier {
       return true;
     } on PostgrestException catch (e) {
       _isSaving = false;
-      if (e.message.contains('unique') || e.message.contains('duplicate') || e.code == '23505') {
+      if (e.message.contains('unique') ||
+          e.message.contains('duplicate') ||
+          e.code == '23505') {
         _errorMessage = 'Username is already taken.';
       } else {
         _errorMessage = e.message;
@@ -221,8 +259,6 @@ class ProfileController extends ChangeNotifier {
     }
   }
 
-  /// Opens the image picker, uploads the chosen photo to `avatars` Storage
-  /// bucket, then saves the public URL to `users.avatar`.
   Future<void> pickAndUploadAvatar() async {
     final currentUserId = _supabaseService.currentUser?.id ?? _currentUser?.id;
     if (currentUserId == null) return;
@@ -242,9 +278,10 @@ class ProfileController extends ChangeNotifier {
 
     try {
       final Uint8List bytes = await xfile.readAsBytes();
-      final path = '$currentUserId/avatar.jpg';
+      final path = isSellerMode
+          ? '$currentUserId/seller/avatar.jpg'
+          : '$currentUserId/avatar.jpg';
 
-      // Upload (upsert so repeated taps just overwrite)
       await _supabaseService.client.storage.from('avatars').uploadBinary(
             path,
             bytes,
@@ -253,23 +290,26 @@ class ProfileController extends ChangeNotifier {
 
       final url =
           _supabaseService.client.storage.from('avatars').getPublicUrl(path);
-
-      // Bust the CDN cache by appending a timestamp query param
       final bustUrl = '$url?t=${DateTime.now().millisecondsSinceEpoch}';
 
-      // Persist to DB
-      await _supabaseService.updateUserProfile(
-        userId: currentUserId,
-        data: {'avatar': bustUrl, 'updated_at': DateTime.now().toIso8601String()},
-      );
-
-      // Update local state
-      if (_currentUser != null) {
-        _currentUser = _currentUser!.copyWith(avatarUrl: bustUrl);
-      }
-
-      if (_authProvider != null) {
-        await _authProvider.updateProfileData(avatarUrl: bustUrl);
+      if (isSellerMode) {
+        await _supabaseService.client.from('seller_profiles').update({
+          'shop_avatar_url': bustUrl,
+        }).eq('seller_id', currentUserId);
+        _sellerAvatarUrl = bustUrl;
+        await _authProvider?.updateSellerAvatarUrl(bustUrl);
+      } else {
+        await _supabaseService.updateUserProfile(
+          userId: currentUserId,
+          data: {
+            'avatar': bustUrl,
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+        );
+        if (_currentUser != null) {
+          _currentUser = _currentUser!.copyWith(avatarUrl: bustUrl);
+        }
+        await _authProvider?.updateProfileData(avatarUrl: bustUrl);
       }
 
       _successMessage = 'Avatar updated!';

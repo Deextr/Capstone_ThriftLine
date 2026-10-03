@@ -434,13 +434,7 @@ class _ListingCard extends StatelessWidget {
   final _ListingItem item;
   final Future<void> Function() onChanged;
 
-  bool get _hasMenu {
-    final snapshot = item.snapshotAt(DateTime.now());
-    return item.bucket == ListingBucket.active ||
-        item.bucket == ListingBucket.inactive ||
-        canEndAuctionEarly(snapshot) ||
-        canRelistAuction(snapshot);
-  }
+  bool get _hasMenu => true;
 
   String _formatLabel(String listingType) {
     if (listingType == 'fixed_price') return 'Fixed';
@@ -461,6 +455,7 @@ class _ListingCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppConstants.spacingMd),
       child: ThriftCard(
+        onTap: () => _openViewListing(context),
         child: Row(
           children: [
             // Thumbnail
@@ -546,8 +541,15 @@ class _ListingCard extends StatelessWidget {
                 itemBuilder: (_) {
                   final snapshot = item.snapshotAt(DateTime.now());
                   return [
-                    if (item.bucket == ListingBucket.active)
-                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    const PopupMenuItem(
+                      value: 'view',
+                      child: Text('View Listing'),
+                    ),
+                    if (canEditListing(snapshot))
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Edit Listing'),
+                      ),
                     if (canEndAuctionEarly(snapshot))
                       const PopupMenuItem(
                         value: 'end',
@@ -590,7 +592,18 @@ class _ListingCard extends StatelessWidget {
     );
   }
 
+  Future<void> _openViewListing(BuildContext context) {
+    return context.push(
+      RouteNames.productFor(item.productId, ownerPreview: true),
+    );
+  }
+
   Future<void> _onMenuAction(BuildContext context, String action) async {
+    if (action == 'view') {
+      await _openViewListing(context);
+      return;
+    }
+
     if (action == 'edit') {
       final path = RouteNames.editListing.replaceFirst(':id', item.productId);
       await context.push(path);

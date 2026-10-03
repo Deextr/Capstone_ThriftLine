@@ -51,6 +51,12 @@ import '../../features/buyer/controllers/checkout_controller.dart';
 import '../../features/buyer/controllers/product_detail_controller.dart';
 import '../../features/buyer/controllers/buyer_search_controller.dart';
 import '../../features/seller/controllers/my_shop_controller.dart';
+import '../../features/seller/controllers/seller_analytics_controller.dart';
+import '../../features/seller/data/seller_analytics_service.dart';
+import '../../features/seller/presentation/screens/seller_analytics_screen.dart';
+import '../../features/seller/controllers/seller_shop_address_controller.dart';
+import '../../features/seller/data/seller_shop_address_service.dart';
+import '../../features/seller/presentation/screens/seller_shop_address_screen.dart';
 import '../../features/seller/controllers/seller_orders_controller.dart';
 import '../../providers/cart_provider.dart';
 import '../../features/buyer/presentation/screens/product_detail_screen.dart';
@@ -266,14 +272,20 @@ GoRouter createAppRouter({
       ..._homeCollectionRoutes(),
       GoRoute(
         path: RouteNames.product,
-        builder: (context, state) => ChangeNotifierProvider(
-          create: (context) => ProductDetailController(
-            productId: state.pathParameters['id']!,
-            supabase: context.read<SupabaseService>(),
-            auth: context.read<AuthProvider>(),
-          ),
-          child: ProductDetailScreen(productId: state.pathParameters['id']!),
-        ),
+        builder: (context, state) {
+          final ownerPreview =
+              state.uri.queryParameters['ownerPreview'] == '1';
+          final productId = state.pathParameters['id']!;
+          return ChangeNotifierProvider(
+            create: (context) => ProductDetailController(
+              productId: productId,
+              supabase: context.read<SupabaseService>(),
+              auth: context.read<AuthProvider>(),
+              ownerPreviewMode: ownerPreview,
+            ),
+            child: ProductDetailScreen(productId: productId),
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.buyNow,
@@ -589,6 +601,17 @@ GoRouter createAppRouter({
         ),
       ),
       GoRoute(
+        path: RouteNames.sellerAnalytics,
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => SellerAnalyticsController(
+            service: SellerAnalyticsService(
+              context.read<SupabaseService>(),
+            ),
+          ),
+          child: const SellerAnalyticsScreen(),
+        ),
+      ),
+      GoRoute(
         path: RouteNames.adminHome,
         builder: (context, _) => MultiProvider(
           providers: [
@@ -713,6 +736,17 @@ GoRouter createAppRouter({
         path: RouteNames.addresses,
         builder: (_, state) =>
             AddressBookScreen(currentAddressId: state.extra as String?),
+      ),
+      GoRoute(
+        path: RouteNames.sellerShopAddress,
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => SellerShopAddressController(
+            service: SellerShopAddressService(
+              context.read<SupabaseService>(),
+            ),
+          ),
+          child: const SellerShopAddressScreen(),
+        ),
       ),
       GoRoute(
         path: RouteNames.paymentMethods,

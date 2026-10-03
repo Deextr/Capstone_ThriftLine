@@ -10,6 +10,8 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/seller_trust.dart';
 import '../../../../core/utils/stock_limits.dart';
 import '../../../../models/product_model.dart';
+import '../../../../core/utils/saved_items_eligibility.dart';
+import '../../../../providers/auth_provider.dart';
 import '../../../../providers/cart_provider.dart';
 import '../../../../providers/saved_items_provider.dart';
 import '../../../../widgets/countdown_timer.dart';
@@ -586,6 +588,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
 
     final product = controller.product!;
     final minBid = controller.minimumNextBid;
+    final auth = context.watch<AuthProvider>();
+    final showFavorite = canShowProductFavoriteAction(
+      isBuyerExperience: auth.isBuyer,
+      viewerUserId: auth.user?.id,
+      productSellerId: product.sellerId,
+    );
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -603,7 +611,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTopStack(context, product, controller),
+              _buildTopStack(
+                context,
+                product,
+                controller,
+                showFavorite: showFavorite,
+              ),
 
               const SizedBox(height: 16),
 
@@ -687,7 +700,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                     const SizedBox(height: 16),
 
                     // Product details (listing info)
-                    _buildDetailsCard(product),
+                    _buildDetailsCard(product, controller),
 
                     const SizedBox(height: 16),
 
@@ -724,8 +737,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
   Widget _buildTopStack(
     BuildContext context,
     ProductModel product,
-    ProductDetailController controller,
-  ) {
+    ProductDetailController controller, {
+    required bool showFavorite,
+  }) {
     final images = product.imageUrls.isNotEmpty
         ? product.imageUrls
         : [product.imageUrl];
@@ -800,19 +814,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
               right: 16,
               child: Row(
                 children: [
-                  Consumer<SavedItemsProvider>(
-                    builder: (context, savedItems, _) {
-                      final isSaved = savedItems.isSaved(product.id);
-                      return _CircularButton(
-                        icon: isSaved ? Icons.favorite : Icons.favorite_border,
-                        iconColor: isSaved
-                            ? AppColors.error
-                            : AppColors.textPrimary,
-                        onTap: () => savedItems.toggleSave(product.id, product),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 10),
+                  if (showFavorite) ...[
+                    Consumer<SavedItemsProvider>(
+                      builder: (context, savedItems, _) {
+                        final isSaved = savedItems.isSaved(product.id);
+                        return _CircularButton(
+                          icon: isSaved
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          iconColor: isSaved
+                              ? AppColors.error
+                              : AppColors.textPrimary,
+                          onTap: () =>
+                              savedItems.toggleSave(product.id, product),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 10),
+                  ],
                   _CircularButton(
                     icon: Icons.share_outlined,
                     onTap: () => showThriftSnackBar(context, 'Link copied!'),
@@ -1183,8 +1202,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     );
   }
 
-  Widget _buildDetailsCard(ProductModel product) {
+  Widget _buildDetailsCard(
+    ProductModel product,
+    ProductDetailController controller,
+  ) {
     final details = <MapEntry<String, String>>[];
+    if (controller.isOwnListing) {
+      final statusLabel = controller.ownerListingStatusLabel;
+      if (statusLabel.isNotEmpty) {
+        details.add(MapEntry('Listing status', statusLabel));
+      }
+    }
     if (product.category.label.isNotEmpty) {
       details.add(MapEntry('Category', product.category.label));
     }
@@ -1198,6 +1226,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
       details.add(MapEntry('Color', product.color!));
     }
     details.add(MapEntry('Condition', product.condition.label));
+    if (!controller.isAuction) {
+      details.add(
+        MapEntry('Available quantity', product.quantityAvailable.toString()),
+      );
+    }
     details.add(MapEntry('Listed', formatRelativeTime(product.createdAt)));
     details.add(MapEntry('Views', product.viewCount.toString()));
     details.add(MapEntry('Favorites', product.favoriteCount.toString()));
@@ -1368,6 +1401,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
   ) {
     final cart = context.watch<CartProvider>();
     final isAuction = controller.isAuction;
+
+    if (controller.isOwnListing &&
+        (controller.ownerPreviewMode || !isAuction)) {
+      return _buildSellerOwnerActions(context, product, controller);
+    }
 
     if (listingUsesShoppingCart(product.sellingType) && !isAuction) {
       return Row(
@@ -1651,6 +1689,70 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     }
 
     return const SizedBox.shrink();
+  }
+
+  Widget _buildSellerOwnerActions(
+    BuildContext context,
+    ProductModel product,
+    ProductDetailController controller,
+  ) {
+    if (controller.canSellerEditListing) {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            final path = RouteNames.editListing.replaceFirst(
+              ':id',
+              product.id,
+            );
+            context.push(path);
+          },
+          icon: const Icon(Icons.edit_outlined, color: Colors.white, size: 20),
+          label: Text(
+            'Edit Listing',
+            style: AppTypography.body.copyWith(
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+              fontSize: 16,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final status = controller.ownerListingStatusLabel;
+    if (status.isEmpty) return const SizedBox.shrink();
+
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton(
+        onPressed: null,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          side: const BorderSide(color: AppColors.border, width: 1.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: Text(
+          'Editing unavailable · $status',
+          style: AppTypography.body.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+            fontSize: 15,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
   }
 
   Future<void> _addFixedPriceToCart(

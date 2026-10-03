@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../widgets/thrift_widgets.dart';
+import 'edit_profile_email_section.dart';
 
 class EditProfileForm extends StatefulWidget {
   const EditProfileForm({
@@ -14,6 +15,8 @@ class EditProfileForm extends StatefulWidget {
     required this.initialPhone,
     required this.isSaving,
     required this.onSave,
+    required this.isSellerMode,
+    required this.canChangeEmail,
     this.errorMessage,
   });
 
@@ -22,11 +25,12 @@ class EditProfileForm extends StatefulWidget {
   final String initialEmail;
   final String initialPhone;
   final bool isSaving;
+  final bool isSellerMode;
+  final bool canChangeEmail;
   final String? errorMessage;
   final Future<void> Function({
     required String fullName,
     required String username,
-    required String email,
     required String phone,
   }) onSave;
 
@@ -39,7 +43,6 @@ class _EditProfileFormState extends State<EditProfileForm> {
 
   late TextEditingController _nameController;
   late TextEditingController _usernameController;
-  late TextEditingController _emailController;
   late TextEditingController _phoneController;
 
   @override
@@ -47,24 +50,22 @@ class _EditProfileFormState extends State<EditProfileForm> {
     super.initState();
     _nameController = TextEditingController(text: widget.initialName);
     _usernameController = TextEditingController(text: widget.initialUsername);
-    _emailController = TextEditingController(text: widget.initialEmail);
     _phoneController = TextEditingController(text: widget.initialPhone);
   }
 
   @override
   void didUpdateWidget(EditProfileForm oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Keep user's entered text, but if initial values change and user hasn't edited, sync them
-    if (oldWidget.initialName != widget.initialName && _nameController.text.isEmpty) {
+    if (oldWidget.initialName != widget.initialName &&
+        _nameController.text.isEmpty) {
       _nameController.text = widget.initialName;
     }
-    if (oldWidget.initialUsername != widget.initialUsername && _usernameController.text.isEmpty) {
+    if (oldWidget.initialUsername != widget.initialUsername &&
+        _usernameController.text.isEmpty) {
       _usernameController.text = widget.initialUsername;
     }
-    if (oldWidget.initialEmail != widget.initialEmail && _emailController.text.isEmpty) {
-      _emailController.text = widget.initialEmail;
-    }
-    if (oldWidget.initialPhone != widget.initialPhone && _phoneController.text.isEmpty) {
+    if (oldWidget.initialPhone != widget.initialPhone &&
+        _phoneController.text.isEmpty) {
       _phoneController.text = widget.initialPhone;
     }
   }
@@ -73,7 +74,6 @@ class _EditProfileFormState extends State<EditProfileForm> {
   void dispose() {
     _nameController.dispose();
     _usernameController.dispose();
-    _emailController.dispose();
     _phoneController.dispose();
     super.dispose();
   }
@@ -83,7 +83,6 @@ class _EditProfileFormState extends State<EditProfileForm> {
       widget.onSave(
         fullName: _nameController.text,
         username: _usernameController.text,
-        email: _emailController.text,
         phone: _phoneController.text,
       );
     }
@@ -141,13 +140,19 @@ class _EditProfileFormState extends State<EditProfileForm> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ThriftTextField(
-                  label: 'Full Name',
-                  hint: 'Enter your full name',
+                  label: widget.isSellerMode ? 'Shop name' : 'Full name',
+                  hint: widget.isSellerMode
+                      ? 'Your shop display name'
+                      : 'Enter your full name',
                   controller: _nameController,
-                  icon: Icons.person_outline,
+                  icon: widget.isSellerMode
+                      ? Icons.store_outlined
+                      : Icons.person_outline,
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Full Name is required';
+                      return widget.isSellerMode
+                          ? 'Shop name is required'
+                          : 'Full name is required';
                     }
                     return null;
                   },
@@ -160,9 +165,7 @@ class _EditProfileFormState extends State<EditProfileForm> {
                   icon: Icons.alternate_email,
                   validator: (value) {
                     final trimmed = value?.trim() ?? '';
-                    if (trimmed.isEmpty) {
-                      return 'Username is required';
-                    }
+                    if (trimmed.isEmpty) return 'Username is required';
                     final regex = RegExp(r'^[a-zA-Z0-9]+$');
                     if (!regex.hasMatch(trimmed)) {
                       return 'Letters and numbers only. No spaces or special characters.';
@@ -173,7 +176,7 @@ class _EditProfileFormState extends State<EditProfileForm> {
                 Padding(
                   padding: const EdgeInsets.only(top: 4, left: 4),
                   child: Text(
-                    'Letters and numbers only. No spaces or special characters.',
+                    'Shared across Buyer and Seller modes.',
                     style: AppTypography.caption.copyWith(
                       color: AppColors.textHint,
                       fontSize: 11,
@@ -181,30 +184,13 @@ class _EditProfileFormState extends State<EditProfileForm> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                ThriftTextField(
-                  label: 'Email',
-                  labelSuffix: const ThriftBadge(
-                    label: 'Unverified',
-                    variant: BadgeVariant.warning,
-                  ),
-                  hint: 'your@email.com',
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  icon: Icons.email_outlined,
-                  validator: (value) {
-                    final trimmed = value?.trim() ?? '';
-                    if (trimmed.isEmpty) {
-                      return 'Email is required';
-                    }
-                    if (!trimmed.contains('@') || !trimmed.contains('.')) {
-                      return 'Enter a valid email address';
-                    }
-                    return null;
-                  },
+                EditProfileEmailSection(
+                  currentEmail: widget.initialEmail,
+                  canChangeEmail: widget.canChangeEmail,
                 ),
                 const SizedBox(height: 16),
                 ThriftTextField(
-                  label: 'Phone Number',
+                  label: 'Phone number',
                   labelSuffix: const ThriftBadge(
                     label: 'Unverified',
                     variant: BadgeVariant.warning,
@@ -216,17 +202,13 @@ class _EditProfileFormState extends State<EditProfileForm> {
                     FilteringTextInputFormatter.allow(RegExp(r'[\d\+\-\s\(\)]')),
                   ],
                   icon: Icons.phone_outlined,
-                  validator: (value) {
-                    // Phone Number is optional (not required)
-                    return null;
-                  },
                 ),
               ],
             ),
           ),
           const SizedBox(height: 32),
           ThriftButton(
-            label: widget.isSaving ? 'Saving...' : 'Save Changes',
+            label: widget.isSaving ? 'Saving...' : 'Save changes',
             isLoading: widget.isSaving,
             onPressed: widget.isSaving ? null : _submit,
           ),

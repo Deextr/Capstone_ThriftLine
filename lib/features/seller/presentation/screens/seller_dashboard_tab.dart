@@ -60,7 +60,7 @@ class SellerDashboardTab extends StatelessWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverToBoxAdapter(
-                child: _ShopHeader(user: user, unread: unread),
+                child: _ShopHeader(unread: unread),
               ),
               SliverToBoxAdapter(
                 child: Padding(
@@ -206,20 +206,26 @@ String _greetingText(AuthUser? user) {
 }
 
 class _ShopHeader extends StatelessWidget {
-  const _ShopHeader({required this.user, required this.unread});
+  const _ShopHeader({required this.unread});
 
-  final AuthUser? user;
   final int unread;
 
   @override
   Widget build(BuildContext context) {
-    final shopName = user?.shopName ?? user?.name ?? 'Your shop';
+    final auth = context.watch<AuthProvider>();
+    final user = auth.user;
+    final shopName = auth.displayName ?? user?.shopName ?? user?.name ?? 'Your shop';
     final greeting = _greetingText(user);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 6, 0),
       child: Row(
         children: [
-          ThriftAvatar(imageUrl: user?.avatarUrl ?? '', size: 40),
+          ThriftAvatar(
+            key: ValueKey('seller-dash-${auth.activeAvatarUrl}'),
+            imageUrl: auth.activeAvatarUrl,
+            name: shopName,
+            size: 40,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

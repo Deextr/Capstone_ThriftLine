@@ -26,14 +26,16 @@ class MyShopController extends ChangeNotifier {
   String? _errorMessage;
 
   List<ProductModel> get products => _products;
-  List<ProductModel> get previewProducts => _products.take(6).toList();
+  List<ProductModel> get activeProducts => _products
+      .where((p) => p.status == ProductStatus.active)
+      .toList();
+  List<ProductModel> get previewProducts => activeProducts.take(6).toList();
   int get followerCount => _followerCount;
   int get followingCount => _followingCount;
   String? get shopBio => _shopBio;
   int get soldCount =>
       _products.where((p) => p.status == ProductStatus.sold).length;
-  int get activeCount =>
-      _products.where((p) => p.status == ProductStatus.active).length;
+  int get activeCount => activeProducts.length;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -46,6 +48,8 @@ class MyShopController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      await _auth.reloadUser();
+
       try {
         final profile = await _supabase.client
             .from('seller_profiles')

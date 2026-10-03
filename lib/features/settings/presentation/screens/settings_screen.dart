@@ -6,8 +6,10 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
+import '../../../../providers/auth_provider.dart';
 import '../../../../providers/settings_provider.dart';
-import '../../../../widgets/thrift_widgets.dart';
+import '../../../auth/domain/account_mode.dart';
+import '../../../../widgets/thrift_widgets.dart' show ThriftButton, ThriftButtonVariant, showThriftSnackBar;
 import '../../../auth/domain/legal_documents.dart';
 import '../../../auth/presentation/widgets/auth_widgets.dart';
 
@@ -23,7 +25,10 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.watch<SettingsProvider>().settings;
+    final settingsProvider = context.watch<SettingsProvider>();
+    final auth = context.watch<AuthProvider>();
+    final mode =
+        auth.isSeller ? AccountMode.seller : AccountMode.buyer;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -51,24 +56,56 @@ class SettingsScreen extends StatelessWidget {
               children: [
                 SwitchListTile(
                   title: Text('Push Notifications', style: AppTypography.body),
-                  value: settings.pushNotificationsEnabled,
+                  subtitle: Text(
+                    auth.isSeller
+                        ? 'Seller workspace alerts'
+                        : 'Buyer workspace alerts',
+                    style: AppTypography.caption,
+                  ),
+                  value: settingsProvider.pushFor(mode),
                   activeThumbColor: AppColors.primary,
-                  onChanged: (value) => context
-                      .read<SettingsProvider>()
-                      .setPushNotifications(value),
+                  onChanged: settingsProvider.isSavingPush
+                      ? null
+                      : (value) async {
+                          final ok = await settingsProvider.setPushNotifications(
+                            value,
+                            mode: mode,
+                          );
+                          if (!context.mounted) return;
+                          if (!ok) {
+                            showThriftSnackBar(
+                              context,
+                              'Could not save push notification preference.',
+                              isError: true,
+                            );
+                          }
+                        },
                 ),
                 SwitchListTile(
                   title: Text('Email Notifications', style: AppTypography.body),
-                  value: settings.emailNotificationsEnabled,
+                  subtitle: Text(
+                    'Optional updates only — security emails still send',
+                    style: AppTypography.caption,
+                  ),
+                  value: settingsProvider.emailFor(mode),
                   activeThumbColor: AppColors.primary,
-                  onChanged: (value) => context
-                      .read<SettingsProvider>()
-                      .setEmailNotifications(value),
-                ),
-                ListTile(
-                  title: Text('Language', style: AppTypography.body),
-                  subtitle: Text('English', style: AppTypography.caption),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
+                  onChanged: settingsProvider.isSavingEmail
+                      ? null
+                      : (value) async {
+                          final ok =
+                              await settingsProvider.setEmailNotifications(
+                            value,
+                            mode: mode,
+                          );
+                          if (!context.mounted) return;
+                          if (!ok) {
+                            showThriftSnackBar(
+                              context,
+                              'Could not save email notification preference.',
+                              isError: true,
+                            );
+                          }
+                        },
                 ),
               ],
             ),

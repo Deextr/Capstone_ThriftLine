@@ -55,25 +55,26 @@ Deno.serve(async (req) => {
       return json(401, { error: "Sign in first." });
     }
 
-    const email = normalizeEmail(userData.user.email ?? "");
     const body = await req.json();
+    const purpose =
+      body.purpose === "email_change" ? "email_change" : "login_verify";
     const token = String(body.token ?? "").replace(/\D/g, "");
-    if (!email) {
-      return json(400, { error: "This account does not have an email address." });
-    }
     if (token.length < 6) {
       return json(400, { error: "Enter the 6-digit code from your email." });
     }
 
-    const { data: challenge, error: fetchError } = await service
+    let challengeQuery = service
       .from("email_otp_challenges")
-      .select("challenge_id, code_hash, expires_at, attempt_count, consumed_at")
+      .select(
+        "challenge_id, email, code_hash, expires_at, attempt_count, consumed_at",
+      )
       .eq("user_id", userData.user.id)
-      .eq("email", email)
+      .eq("purpose", purpose)
       .is("consumed_at", null)
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+
+    const { data: challenge, error: fetchError } = await challengeQuery.maybeSingle();
 
     if (fetchError) throw fetchError;
     if (!challenge) {
@@ -87,7 +88,10 @@ Deno.serve(async (req) => {
     }
 
     const pepper = Deno.env.get("OTP_PEPPER") ?? "";
-    const incoming = await sha256Hex(`${pepper}:${userData.user.id}:${email}:${token}`);
+    const challengeEmail = normalizeEmail(challenge.email ?? "");
+    const incoming = await sha256Hex(
+      `${pepper}:${userData.user.id}:${challengeEmail}:${token}`,
+    );
 
     if (incoming !== challenge.code_hash) {
       await service
@@ -101,6 +105,24 @@ Deno.serve(async (req) => {
       .from("email_otp_challenges")
       .update({ consumed_at: new Date().toISOString() })
       .eq("challenge_id", challenge.challenge_id);
+
+    if (purpose === "email_change") {
+      const { error: authUpdateError } = await service.auth.admin.updateUserById(
+        userData.user.id,
+        { email: challengeEmail, email_confirm: true },
+      );
+      if (authUpdateError) {
+        console.error("verify-email-otp email change", authUpdateError);
+        return json(400, {
+          error: "Could not update your email. It may already be in use.",
+        });
+      }
+      await service
+        .from("users")
+        .update({ email: challengeEmail })
+        .eq("user_id", userData.user.id);
+      return json(200, { ok: true, email: challengeEmail });
+    }
 
     const deviceToken = body.device_token;
     if (isDeviceToken(deviceToken)) {

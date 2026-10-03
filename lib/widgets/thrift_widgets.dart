@@ -468,6 +468,7 @@ class ThriftAvatar extends StatelessWidget {
           child: ClipOval(
             child: Image.network(
               url,
+              key: ValueKey(url),
               width: size,
               height: size,
               fit: BoxFit.cover,

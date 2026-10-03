@@ -45,7 +45,7 @@ Future<void> main() async {
   final dataProvider = DataProvider();
   final notificationsProvider = NotificationsProvider(supabaseService);
   final settingsProvider = SettingsProvider(supabaseService);
-  final savedItemsProvider = SavedItemsProvider(supabaseService);
+  final savedItemsProvider = SavedItemsProvider(supabaseService, authProvider);
   final followingShopsProvider = FollowingShopsProvider(supabaseService);
   final cartProvider = CartProvider(supabaseService);
 

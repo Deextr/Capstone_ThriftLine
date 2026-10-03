@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:thriftline/core/utils/seller_trust.dart';
+import 'package:thriftline/core/utils/seller_trust_explanation.dart';
 import 'package:thriftline/features/auth/domain/auth_user.dart';
 import 'package:thriftline/models/enums.dart';
 import 'package:thriftline/widgets/thrift_widgets.dart';
@@ -87,6 +88,39 @@ void main() {
           '{"iv":100,"st":0,"ur":60,"cr":100}',
         )?.ratings,
         60,
+      );
+    });
+
+    test('breakdown reads counts and mirrors WSM for transparency', () {
+      final parsed = SellerTrustBreakdown.tryParse({
+        'iv': 100,
+        'st': 40,
+        'ur': 80,
+        'cr': 100,
+        'completed_orders': 16,
+        'confirmed_reports': 0,
+        'rating_count': 5,
+      });
+      expect(sellerTrustTransactionCount(parsed!), 16);
+      expect(parsed?.confirmedReports, 0);
+      expect(mirrorTrustWeightedSum(parsed!), 78);
+    });
+
+    test('transaction copy uses server count tiers', () {
+      const breakdown = SellerTrustBreakdown(
+        identity: 100,
+        transactions: 40,
+        ratings: 80,
+        reports: 100,
+        eligibleTransactions: 16,
+      );
+      expect(
+        SellerTrustExplanation.transactionRangeLabel(16),
+        '11–20 transaction range',
+      );
+      expect(
+        SellerTrustExplanation.transactionDetail(breakdown),
+        contains('16 completed transaction'),
       );
     });
   });

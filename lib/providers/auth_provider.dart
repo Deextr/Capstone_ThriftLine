@@ -126,6 +126,42 @@ class AuthProvider extends ChangeNotifier {
     return user.name;
   }
 
+  /// Profile photo for the active Buyer/Seller workspace.
+  String get activeAvatarUrl => avatarUrlForMode(_activeAccount);
+
+  /// Profile photo for a workspace without changing the active mode.
+  String avatarUrlForMode(AccountMode mode) {
+    final user = _user;
+    if (user == null) return '';
+    if (mode == AccountMode.seller &&
+        user.sellerAvatarUrl.trim().isNotEmpty) {
+      return user.sellerAvatarUrl;
+    }
+    return user.avatarUrl;
+  }
+
+  Future<String?> sendEmailChangeOtp(String newEmail) =>
+      _authService.sendEmailChangeOtp(newEmail: newEmail);
+
+  Future<({String? error, String? email})> confirmEmailChangeOtp(
+    String token,
+  ) async {
+    final result = await _authService.confirmEmailChangeOtp(token: token);
+    if (result.error == null && result.email != null && _user != null) {
+      _user = _user!.copyWith(email: result.email);
+      await _saveSession(_user!);
+      notifyListeners();
+    }
+    return result;
+  }
+
+  Future<void> updateSellerAvatarUrl(String url) async {
+    if (_user == null) return;
+    _user = _user!.copyWith(sellerAvatarUrl: url);
+    await _saveSession(_user!);
+    notifyListeners();
+  }
+
   String get homeRoute =>
       homeRouteFor(isAdmin: isAdmin, activeAccount: _activeAccount);
 
@@ -138,7 +174,7 @@ class AuthProvider extends ChangeNotifier {
     if (_activeAccount == mode) return;
     _activeAccount = mode;
     await _prefs.setActiveAccount(userId: user.id, mode: mode.name);
-    notifyListeners();
+    await reloadUser();
   }
 
   /// Restores a session from Supabase (auto-login via persisted JWT).
@@ -591,6 +627,8 @@ class AuthProvider extends ChangeNotifier {
     String? email,
     String? phone,
     String? avatarUrl,
+    String? shopName,
+    String? shopBio,
   }) async {
     if (_user != null) {
       _user = _user!.copyWith(
@@ -599,6 +637,8 @@ class AuthProvider extends ChangeNotifier {
         email: email ?? _user!.email,
         phone: phone ?? _user!.phone,
         avatarUrl: avatarUrl ?? _user!.avatarUrl,
+        shopName: shopName ?? _user!.shopName,
+        shopBio: shopBio ?? _user!.shopBio,
       );
       await _saveSession(_user!);
       notifyListeners();
