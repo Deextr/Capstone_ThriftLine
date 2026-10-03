@@ -9,7 +9,7 @@ import '../../controllers/admin_dashboard_controller.dart';
 import '../../controllers/admin_reports_controller.dart';
 import '../../controllers/admin_seller_applications_controller.dart';
 import 'admin_dashboard_tab.dart';
-import 'admin_reports_queue_screen.dart';
+import 'admin_reports_shell_tab.dart';
 import 'admin_seller_applications_screen.dart';
 import 'admin_tab_scope.dart';
 
@@ -42,7 +42,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
       AdminTabScope.verifications => const AdminSellerApplicationsScreen(
         embedded: true,
       ),
-      AdminTabScope.reports => const AdminReportsQueueScreen(embedded: true),
+      AdminTabScope.reports => const AdminReportsShellTab(),
       AdminTabScope.settings => const SettingsScreen(
         showBackButton: false,
         showLogout: true,

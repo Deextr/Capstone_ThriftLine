@@ -5,6 +5,7 @@ class NotificationModel {
     required this.id,
     required this.userId,
     required this.type,
+    required this.audience,
     required this.title,
     required this.body,
     required this.createdAt,
@@ -15,6 +16,7 @@ class NotificationModel {
   final String id;
   final String userId;
   final NotificationType type;
+  final NotificationAudience audience;
   final String title;
   final String body;
   final DateTime createdAt;
@@ -26,6 +28,7 @@ class NotificationModel {
       id: json['notification_id'] as String? ?? json['id'] as String? ?? '',
       userId: json['user_id'] as String? ?? '',
       type: NotificationType.fromString(json['type'] as String? ?? 'system'),
+      audience: NotificationAudience.fromString(json['audience'] as String?),
       title: json['title'] as String? ?? '',
       body: json['body'] as String? ?? '',
       createdAt: json['created_at'] != null
@@ -41,6 +44,7 @@ class NotificationModel {
         id: id,
         userId: userId,
         type: type,
+        audience: audience,
         title: title,
         body: body,
         createdAt: createdAt,

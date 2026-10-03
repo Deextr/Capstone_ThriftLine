@@ -87,15 +87,45 @@ Deno.serve(async (req) => {
       return json(401, { error: "Sign in first." });
     }
 
-    const email = normalizeEmail(userData.user.email ?? "");
-    if (!email) {
+    let body: Record<string, unknown> = {};
+    try {
+      body = await req.json();
+    } catch (_) {
+      body = {};
+    }
+
+    const purpose =
+      body.purpose === "email_change" ? "email_change" : "login_verify";
+    const currentEmail = normalizeEmail(userData.user.email ?? "");
+    if (!currentEmail && purpose === "login_verify") {
       return json(400, { error: "This account does not have an email address." });
+    }
+
+    let targetEmail = currentEmail;
+    if (purpose === "email_change") {
+      const newEmail = normalizeEmail(String(body.new_email ?? ""));
+      if (!newEmail || !newEmail.includes("@")) {
+        return json(400, { error: "Enter a valid email address." });
+      }
+      if (newEmail === currentEmail) {
+        return json(400, { error: "That is already your email address." });
+      }
+      const { data: taken } = await service
+        .from("users")
+        .select("user_id")
+        .eq("email", newEmail)
+        .maybeSingle();
+      if (taken && taken.user_id !== userData.user.id) {
+        return json(409, { error: "That email is already used on ThriftLine." });
+      }
+      targetEmail = newEmail;
     }
 
     const { data: recent } = await service
       .from("email_otp_challenges")
       .select("created_at")
       .eq("user_id", userData.user.id)
+      .eq("purpose", purpose)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -111,18 +141,22 @@ Deno.serve(async (req) => {
 
     const otp = randomOtp();
     const pepper = Deno.env.get("OTP_PEPPER") ?? "";
-    const codeHash = await sha256Hex(`${pepper}:${userData.user.id}:${email}:${otp}`);
+    const codeHash = await sha256Hex(
+      `${pepper}:${userData.user.id}:${targetEmail}:${otp}`,
+    );
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
     const { error: insertError } = await service.from("email_otp_challenges").insert({
       user_id: userData.user.id,
-      email,
+      email: targetEmail,
+      target_email: purpose === "email_change" ? targetEmail : null,
+      purpose,
       code_hash: codeHash,
       expires_at: expiresAt,
     });
     if (insertError) throw insertError;
 
-    await sendGmail(email, otp);
+    await sendGmail(targetEmail, otp);
 
     return json(200, { ok: true, expires_in_seconds: 300 });
   } catch (error) {

@@ -12,7 +12,8 @@ const String kShipmentSelect =
     'delivery_verified_at, delivery_verification_method, '
     'buyer_confirmed_received, buyer_confirmed_received_at, '
     'inspection_started_at, inspection_expires_at, delivery_failed_at, '
-    'delivery_failure_reason, auto_completed, completion_reason, completed_at, '
+    'delivery_failure_reason, delivery_failure_details, auto_completed, '
+    'completion_reason, completed_at, '
     'created_at, updated_at';
 
 const String kReturnShipmentSelect =

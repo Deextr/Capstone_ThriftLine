@@ -4,3 +4,9 @@ flutter_launcher_icons:
   image_path: assets/images/thriftline-app-icon.png
   min_sdk_android: 21
   remove_alpha_ios: true
+  background_color_ios: "#166D65"
+  adaptive_icon_background: "#166D65"
+  adaptive_icon_foreground: assets/images/thriftline-app-icon.png
+  # Full-bleed mark; extra inset would reintroduce a padded frame inside the
+  # system mask. Brand teal fills the canvas so OEM masks never show white.
+  adaptive_icon_foreground_inset: 0

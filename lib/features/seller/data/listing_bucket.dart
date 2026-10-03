@@ -87,3 +87,7 @@ bool canOfferToNextBidder(ListingSnapshot listing) {
   }
   return listing.bidCount >= 2;
 }
+
+/// Seller may open the edit form only while the listing is in the Active tab.
+bool canEditListing(ListingSnapshot listing) =>
+    listingBucketFor(listing) == ListingBucket.active;

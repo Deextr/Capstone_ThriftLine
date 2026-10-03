@@ -15,8 +15,7 @@ class AuthBrandLogo extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white,
+        borderRadius: BorderRadius.circular(size * 0.22),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.22),
@@ -31,12 +30,10 @@ class AuthBrandLogo extends StatelessWidget {
           ),
         ],
       ),
-      child: Padding(
-        padding: EdgeInsets.all(size * 0.22),
-        child: Image.asset(
-          'assets/images/thriftline-logo.png',
-          fit: BoxFit.contain,
-        ),
+      child: Image.asset(
+        'assets/images/thriftline-logo.png',
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
       ),
     );
   }

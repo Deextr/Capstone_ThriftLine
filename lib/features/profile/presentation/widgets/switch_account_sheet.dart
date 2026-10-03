@@ -82,7 +82,7 @@ class SwitchAccountSheet extends StatelessWidget {
                   ? user!.name
                   : 'Buyer account',
               subtitle: 'Buyer account',
-              imageUrl: user?.avatarUrl ?? '',
+              imageUrl: auth.avatarUrlForMode(AccountMode.buyer),
               selected: auth.activeAccount == AccountMode.buyer,
               onTap: () => _select(context, AccountMode.buyer),
             ),
@@ -91,7 +91,7 @@ class SwitchAccountSheet extends StatelessWidget {
               mode: AccountMode.seller,
               title: _sellerTitle(user),
               subtitle: 'Seller account',
-              imageUrl: user?.avatarUrl ?? '',
+              imageUrl: auth.avatarUrlForMode(AccountMode.seller),
               selected: auth.activeAccount == AccountMode.seller,
               onTap: () => _select(context, AccountMode.seller),
             ),

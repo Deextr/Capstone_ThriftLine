@@ -126,6 +126,42 @@ class AuthProvider extends ChangeNotifier {
     return user.name;
   }
 
+  /// Profile photo for the active Buyer/Seller workspace.
+  String get activeAvatarUrl => avatarUrlForMode(_activeAccount);
+
+  /// Profile photo for a workspace without changing the active mode.
+  String avatarUrlForMode(AccountMode mode) {
+    final user = _user;
+    if (user == null) return '';
+    if (mode == AccountMode.seller &&
+        user.sellerAvatarUrl.trim().isNotEmpty) {
+      return user.sellerAvatarUrl;
+    }
+    return user.avatarUrl;
+  }
+
+  Future<String?> sendEmailChangeOtp(String newEmail) =>
+      _authService.sendEmailChangeOtp(newEmail: newEmail);
+
+  Future<({String? error, String? email})> confirmEmailChangeOtp(
+    String token,
+  ) async {
+    final result = await _authService.confirmEmailChangeOtp(token: token);
+    if (result.error == null && result.email != null && _user != null) {
+      _user = _user!.copyWith(email: result.email);
+      await _saveSession(_user!);
+      notifyListeners();
+    }
+    return result;
+  }
+
+  Future<void> updateSellerAvatarUrl(String url) async {
+    if (_user == null) return;
+    _user = _user!.copyWith(sellerAvatarUrl: url);
+    await _saveSession(_user!);
+    notifyListeners();
+  }
+
   String get homeRoute =>
       homeRouteFor(isAdmin: isAdmin, activeAccount: _activeAccount);
 
@@ -138,7 +174,7 @@ class AuthProvider extends ChangeNotifier {
     if (_activeAccount == mode) return;
     _activeAccount = mode;
     await _prefs.setActiveAccount(userId: user.id, mode: mode.name);
-    notifyListeners();
+    await reloadUser();
   }
 
   /// Restores a session from Supabase (auto-login via persisted JWT).
@@ -154,7 +190,7 @@ class AuthProvider extends ChangeNotifier {
 
       // Supabase SDK automatically restores the session from secure storage.
       final currentUser = await _authService.getCurrentUser();
-      if (currentUser != null) {
+      if (currentUser != null && !currentUser.isPermanentlyDisabled) {
         _user = currentUser;
         // TEMP: with the OTP bypass on, also clear any stale pending flag so
         // the router doesn't get stuck on the OTP gate.
@@ -163,6 +199,9 @@ class AuthProvider extends ChangeNotifier {
         _syncActiveAccount(currentUser, restoreFromPrefs: true);
         await _saveSession(currentUser);
       } else {
+        if (currentUser != null) {
+          await _authService.signOut();
+        }
         await _clearSession();
       }
     } catch (e) {
@@ -195,6 +234,10 @@ class AuthProvider extends ChangeNotifier {
       if (_authService.currentSession == null) return;
       final currentUser = await _authService.getCurrentUser();
       if (currentUser == null || _authService.currentSession == null) return;
+      if (currentUser.isPermanentlyDisabled) {
+        await _authService.signOut();
+        return;
+      }
       _user = currentUser;
       notifyListeners();
     } else if (authEvent == AuthChangeEvent.signedIn ||
@@ -205,6 +248,14 @@ class AuthProvider extends ChangeNotifier {
       if (_authService.currentSession == null) return;
       final currentUser = await _authService.getCurrentUser();
       if (currentUser == null || _authService.currentSession == null) return;
+
+      if (currentUser.isPermanentlyDisabled) {
+        await _authService.signOut();
+        _user = null;
+        await _clearSession();
+        notifyListeners();
+        return;
+      }
 
       final recoveryInProgress =
           _passwordRecoveryActive || _prefs.isPasswordRecoveryPending;
@@ -262,6 +313,12 @@ class AuthProvider extends ChangeNotifier {
       if (!result.success || result.user == null) {
         await _setEmailOtpPending(false);
         return result.errorMessage ?? 'Sign-in failed. Please try again.';
+      }
+
+      if (result.user!.isPermanentlyDisabled) {
+        await _authService.signOut();
+        await _setEmailOtpPending(false);
+        return 'This account has been permanently disabled.';
       }
 
       _user = result.user;
@@ -397,6 +454,13 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return result.errorMessage;
+    }
+
+    if (result.user?.isPermanentlyDisabled == true) {
+      await _authService.signOut();
+      _isLoading = false;
+      notifyListeners();
+      return 'This account has been permanently disabled.';
     }
 
     _user = result.user;
@@ -563,6 +627,8 @@ class AuthProvider extends ChangeNotifier {
     String? email,
     String? phone,
     String? avatarUrl,
+    String? shopName,
+    String? shopBio,
   }) async {
     if (_user != null) {
       _user = _user!.copyWith(
@@ -571,6 +637,8 @@ class AuthProvider extends ChangeNotifier {
         email: email ?? _user!.email,
         phone: phone ?? _user!.phone,
         avatarUrl: avatarUrl ?? _user!.avatarUrl,
+        shopName: shopName ?? _user!.shopName,
+        shopBio: shopBio ?? _user!.shopBio,
       );
       await _saveSession(_user!);
       notifyListeners();

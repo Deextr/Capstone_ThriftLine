@@ -46,10 +46,12 @@ class SellerProfile {
         (row['full_name'] as String? ??
             (username.isNotEmpty ? username : 'Seller'));
 
-    final avatarUrl =
-        user?['avatar'] as String? ??
-        (row['avatar'] as String? ??
-            'https://ui-avatars.com/api/?name=${Uri.encodeComponent(ownerName)}&background=0D9488&color=fff&size=150');
+    final shopAvatar = row['shop_avatar_url'] as String?;
+    final avatarUrl = shopAvatar != null && shopAvatar.trim().isNotEmpty
+        ? shopAvatar
+        : user?['avatar'] as String? ??
+            (row['avatar'] as String? ??
+                'https://ui-avatars.com/api/?name=${Uri.encodeComponent(ownerName)}&background=0D9488&color=fff&size=150');
 
     final bannerUrl =
         row['banner_url'] as String? ?? row['cover_image'] as String?;

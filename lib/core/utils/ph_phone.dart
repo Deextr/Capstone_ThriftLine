@@ -30,10 +30,10 @@ String formatPhMobile(String? raw) {
 
 String? phMobileValidationError(String? raw) {
   if (raw == null || raw.trim().isEmpty) {
-    return 'Enter a Philippine mobile number.';
+    return 'Please enter a valid phone number.';
   }
   if (normalizePhMobile(raw) == null) {
-    return 'Enter a valid number such as 09171234567.';
+    return 'Please enter a valid phone number.';
   }
   return null;
 }

@@ -1,15 +1,18 @@
 import 'package:flutter/foundation.dart';
 
 import '../core/services/supabase_service.dart';
+import '../core/utils/saved_items_eligibility.dart';
 import '../features/buyer/data/catalog_product_query.dart';
 import '../models/enums.dart';
 import '../models/product_model.dart';
+import 'auth_provider.dart';
 
 /// Manages saved/favorited items for the authenticated user using Supabase `saved_items`.
 class SavedItemsProvider extends ChangeNotifier {
-  SavedItemsProvider(this._supabase);
+  SavedItemsProvider(this._supabase, this._auth);
 
   final SupabaseService _supabase;
+  final AuthProvider _auth;
   final Set<String> _savedProductIds = {};
   List<ProductModel> _savedProducts = [];
   String? _userId;
@@ -85,24 +88,32 @@ class SavedItemsProvider extends ChangeNotifier {
       for (final row in rows) {
         final r = row as Map<String, dynamic>;
         final pId = r['product_id'] as String?;
-        if (pId != null) {
-          _savedProductIds.add(pId);
-        }
-
         final productRaw = r['product'] as Map<String, dynamic>?;
         if (productRaw != null) {
           final sellerId = productRaw['seller_id'] as String?;
+          if (pId != null &&
+              !canPersistProductSave(
+                viewerUserId: userId,
+                productSellerId: sellerId,
+              )) {
+            continue;
+          }
           final p = ProductModel.fromSupabase(
             productRaw,
             sellerProfile: sellerId != null
                 ? sellerProfilesMap[sellerId]
                 : null,
           );
+          if (pId != null) {
+            _savedProductIds.add(pId);
+          }
           // Only show active or sold products
           if (p.status == ProductStatus.active ||
               p.status == ProductStatus.sold) {
             products.add(p);
           }
+        } else if (pId != null) {
+          _savedProductIds.add(pId);
         }
       }
 
@@ -123,6 +134,22 @@ class SavedItemsProvider extends ChangeNotifier {
     if (userId == null) return false;
 
     final wasSaved = _savedProductIds.contains(productId);
+    final sellerId = product?.sellerId;
+
+    if (!wasSaved &&
+        !canShowProductFavoriteAction(
+          isBuyerExperience: _auth.isBuyer,
+          viewerUserId: userId,
+          productSellerId: sellerId,
+        )) {
+      if (!_auth.isBuyer) {
+        _errorMessage = 'Switch to Buyer mode to use Favorites.';
+      } else if (sellerId != null && userId == sellerId) {
+        _errorMessage = 'You cannot save your own listing.';
+      }
+      notifyListeners();
+      return false;
+    }
 
     // â”€â”€ Optimistic update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (wasSaved) {

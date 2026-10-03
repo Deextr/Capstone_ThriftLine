@@ -25,6 +25,29 @@ String resolveTrustLabel({required int score, String? storedLevel}) {
   return 'Banned';
 }
 
+/// WSM weights stored by `recalculate_seller_trust` (Table 2.3.2).
+abstract final class SellerTrustWeights {
+  static const double identity = sellerTrustWeightIdentity;
+  static const double transactions = sellerTrustWeightTransactions;
+  static const double ratings = sellerTrustWeightRatings;
+  static const double reports = sellerTrustWeightReports;
+}
+
+const double sellerTrustWeightIdentity = 0.40;
+const double sellerTrustWeightTransactions = 0.30;
+const double sellerTrustWeightRatings = 0.20;
+const double sellerTrustWeightReports = 0.10;
+
+/// Mirrors PostgreSQL `trust_weighted_sum` for optional transparency UI only.
+/// Criterion inputs must come from [SellerTrustBreakdown] (server-written).
+int mirrorTrustWeightedSum(SellerTrustBreakdown breakdown) {
+  return ((breakdown.identity * SellerTrustWeights.identity) +
+          (breakdown.transactions * SellerTrustWeights.transactions) +
+          (breakdown.ratings * SellerTrustWeights.ratings) +
+          (breakdown.reports * SellerTrustWeights.reports))
+      .round();
+}
+
 /// Criterion scores already computed by `recalculate_seller_trust`.
 class SellerTrustBreakdown {
   const SellerTrustBreakdown({
@@ -35,6 +58,9 @@ class SellerTrustBreakdown {
     this.verifiedExternal,
     this.completedThriftline,
     this.eligibleTransactions,
+    this.confirmedReports,
+    this.ratingCount,
+    this.weights,
   });
 
   final int identity;
@@ -44,6 +70,12 @@ class SellerTrustBreakdown {
   final int? verifiedExternal;
   final int? completedThriftline;
   final int? eligibleTransactions;
+  final int? confirmedReports;
+  final int? ratingCount;
+  final Map<String, double>? weights;
+
+  /// Count used for the ST rubric (ThriftLine + verified external, when present).
+  int get transactionCountForRubric => sellerTrustTransactionCount(this);
 
   static SellerTrustBreakdown? tryParse(Object? raw) {
     if (raw is String && raw.trim().isNotEmpty) {
@@ -64,6 +96,17 @@ class SellerTrustBreakdown {
         reports == null) {
       return null;
     }
+    Map<String, double>? weights;
+    final weightsRaw = raw['weights'];
+    if (weightsRaw is Map) {
+      weights = weightsRaw.map(
+        (key, value) => MapEntry(
+          key.toString(),
+          value is num ? value.toDouble() : 0,
+        ),
+      );
+    }
+
     return SellerTrustBreakdown(
       identity: identity,
       transactions: transactions,
@@ -71,7 +114,12 @@ class SellerTrustBreakdown {
       reports: reports,
       verifiedExternal: _score(raw['verified_external']),
       completedThriftline: _score(raw['completed_thriftline']),
-      eligibleTransactions: _score(raw['eligible_transactions']),
+      eligibleTransactions:
+          _score(raw['eligible_transactions']) ??
+          _score(raw['completed_orders']),
+      confirmedReports: _score(raw['confirmed_reports']),
+      ratingCount: _score(raw['rating_count']),
+      weights: weights,
     );
   }
 
@@ -80,3 +128,13 @@ class SellerTrustBreakdown {
     return null;
   }
 }
+
+/// Transaction count backing the ST rubric (from server breakdown JSON).
+int sellerTrustTransactionCount(SellerTrustBreakdown breakdown) =>
+    breakdown.eligibleTransactions ??
+    breakdown.completedThriftline ??
+    0;
+
+/// Admin-confirmed report count (from server breakdown JSON).
+int sellerTrustConfirmedReportCount(SellerTrustBreakdown breakdown) =>
+    breakdown.confirmedReports ?? 0;

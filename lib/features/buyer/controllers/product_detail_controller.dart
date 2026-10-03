@@ -9,6 +9,7 @@ import '../../../models/enums.dart';
 import '../../../models/product_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../chat/data/conversation_service.dart';
+import '../../seller/data/listing_bucket.dart';
 import '../data/catalog_product_query.dart';
 
 /// Controller for the Product Detail screen.
@@ -22,6 +23,7 @@ class ProductDetailController extends ChangeNotifier {
     required SupabaseService supabase,
     required AuthProvider auth,
     ConversationService? conversations,
+    this.ownerPreviewMode = false,
   }) : _productId = productId,
        _supabase = supabase,
        _auth = auth,
@@ -33,6 +35,9 @@ class ProductDetailController extends ChangeNotifier {
   final SupabaseService _supabase;
   final AuthProvider _auth;
   final ConversationService _conversations;
+
+  /// Read-only seller preview from My Listings (no purchase/bid actions).
+  final bool ownerPreviewMode;
 
   ProductModel? _product;
   Map<String, dynamic>? _auction;
@@ -113,6 +118,44 @@ class ProductDetailController extends ChangeNotifier {
     final uid = _auth.user?.id;
     final sellerId = _product?.sellerId;
     return uid != null && sellerId != null && uid == sellerId;
+  }
+
+  ListingSnapshot? get _listingSnapshot {
+    final product = _product;
+    if (product == null) return null;
+    final listingType = product.sellingType == SellingType.auction
+        ? 'auction'
+        : 'fixed_price';
+    return ListingSnapshot(
+      productStatus: product.status.name,
+      listingType: listingType,
+      auctionStatus: _auction?['status'] as String?,
+      endsAt: auctionEndTime,
+      winnerId: _auction?['winner_id'] as String?,
+      orderStatus: _auctionOrder?['order_status'] as String?,
+      paymentDueAt: paymentDueAt,
+      bidCount: bidCount,
+      now: DateTime.now(),
+    );
+  }
+
+  /// Matches My Listings: edit is only offered for listings in the Active bucket.
+  bool get canSellerEditListing {
+    if (!isOwnListing) return false;
+    final snapshot = _listingSnapshot;
+    if (snapshot == null) return false;
+    return canEditListing(snapshot);
+  }
+
+  String get ownerListingStatusLabel {
+    final snapshot = _listingSnapshot;
+    if (snapshot == null) return '';
+    return switch (listingBucketFor(snapshot)) {
+      ListingBucket.active => 'Active',
+      ListingBucket.awaitingPayment => 'Awaiting payment',
+      ListingBucket.sold => 'Sold',
+      ListingBucket.inactive => 'Inactive',
+    };
   }
 
   String? get auctionId => _auction?['auction_id'] as String?;
@@ -367,7 +410,9 @@ class ProductDetailController extends ChangeNotifier {
 
       _product = ProductModel.fromSupabase(row, sellerProfile: sellerProfile);
 
-      unawaited(_incrementView());
+      if (!isOwnListing) {
+        unawaited(_incrementView());
+      }
 
       if (_product!.sellingType == SellingType.auction) {
         await _closeExpiredAuctions();

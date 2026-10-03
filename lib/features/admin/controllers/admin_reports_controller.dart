@@ -8,16 +8,40 @@ import '../../trust_safety/data/report_reasons.dart';
 import '../data/admin_dashboard_models.dart';
 import '../data/admin_review_rules.dart';
 import '../data/admin_review_service.dart';
+import '../data/looking_for_moderation.dart';
+
+class AdminReportKindSummary {
+  const AdminReportKindSummary({
+    required this.total,
+    required this.underReview,
+    required this.resolved,
+    required this.closed,
+  });
+
+  final int total;
+  final int underReview;
+  final int resolved;
+  final int closed;
+
+  int countFor(AdminReportListFilter filter) => switch (filter) {
+    AdminReportListFilter.all => total,
+    AdminReportListFilter.underReview => underReview,
+    AdminReportListFilter.resolved => resolved,
+    AdminReportListFilter.closed => closed,
+  };
+}
 
 class AdminReportsController extends ChangeNotifier {
   AdminReportsController({required SupabaseService supabase, this.reportId})
     : _supabase = supabase,
-      _service = AdminReviewService(supabase) {
+      _service = AdminReviewService(supabase),
+      _lookingFor = LookingForModerationService(supabase) {
     load();
   }
 
   final SupabaseService _supabase;
   final AdminReviewService _service;
+  final LookingForModerationService _lookingFor;
   final String? reportId;
 
   AdminReportListFilter _filter = AdminReportListFilter.all;
@@ -25,6 +49,7 @@ class AdminReportsController extends ChangeNotifier {
   AdminReportSort _sort = AdminReportSort.newest;
   AdminDateWindow? _dateWindow;
   List<CommunityReportModel> _reports = const [];
+  List<LookingForAdminReport> _lookingForReports = const [];
   CommunityReportModel? _report;
   OrderModel? _relatedOrder;
   bool _isLoading = true;
@@ -39,6 +64,7 @@ class AdminReportsController extends ChangeNotifier {
   AdminReportSort get sort => _sort;
   AdminDateWindow? get dateWindow => _dateWindow;
   List<CommunityReportModel> get reports => _reports;
+  List<LookingForAdminReport> get lookingForReports => _lookingForReports;
   CommunityReportModel? get report => _report;
   OrderModel? get relatedOrder => _relatedOrder;
   bool get isLoading => _isLoading;
@@ -56,20 +82,87 @@ class AdminReportsController extends ChangeNotifier {
 
   bool get hasActiveListFilters =>
       _filter != AdminReportListFilter.all ||
-      _kind != AdminReportKind.all ||
       _dateWindow != null ||
       searchQuery.trim().isNotEmpty;
 
-  int get totalCount => _reports.length;
-  int get underReviewCount =>
-      _reports.where((item) => item.status == kAdminReportOpenStatus).length;
-  int get resolvedCount =>
-      _reports.where((item) => item.status == 'resolved').length;
-  int get closedCount => _reports
-      .where(
-        (item) => item.status == 'action_taken' || item.status == 'dismissed',
-      )
-      .length;
+  AdminReportKindSummary get activeKindSummary => kindSummary(_kind);
+
+  int get totalCount => activeKindSummary.total;
+  int get underReviewCount => activeKindSummary.underReview;
+  int get resolvedCount => activeKindSummary.resolved;
+  int get closedCount => activeKindSummary.closed;
+
+  AdminReportKindSummary kindSummary(AdminReportKind kind) {
+    if (kind == AdminReportKind.lookingFor) {
+      return _summaryForLookingFor(_lookingForReports);
+    }
+    if (kind == AdminReportKind.all) {
+      final community = kindSummary(AdminReportKind.community);
+      final orders = kindSummary(AdminReportKind.order);
+      final lookingFor = kindSummary(AdminReportKind.lookingFor);
+      return AdminReportKindSummary(
+        total: community.total + orders.total + lookingFor.total,
+        underReview:
+            community.underReview + orders.underReview + lookingFor.underReview,
+        resolved: community.resolved + orders.resolved + lookingFor.resolved,
+        closed: community.closed + orders.closed + lookingFor.closed,
+      );
+    }
+    return _summaryForCommunity(
+      _reports.where((report) => _reportMatchesKind(report, kind)),
+    );
+  }
+
+  AdminReportKindSummary _summaryForCommunity(
+    Iterable<CommunityReportModel> items,
+  ) {
+    final list = items.toList();
+    return AdminReportKindSummary(
+      total: list.length,
+      underReview: list
+          .where((item) => item.status == kAdminReportOpenStatus)
+          .length,
+      resolved: list.where((item) => item.status == 'resolved').length,
+      closed: list
+          .where(
+            (item) =>
+                item.status == 'action_taken' || item.status == 'dismissed',
+          )
+          .length,
+    );
+  }
+
+  AdminReportKindSummary _summaryForLookingFor(
+    Iterable<LookingForAdminReport> items,
+  ) {
+    final list = items.toList();
+    return AdminReportKindSummary(
+      total: list.length,
+      underReview: list
+          .where((item) => item.status == kAdminReportOpenStatus)
+          .length,
+      resolved: list.where((item) => item.status == 'resolved').length,
+      closed: list
+          .where(
+            (item) =>
+                item.status == 'action_taken' || item.status == 'dismissed',
+          )
+          .length,
+    );
+  }
+
+  bool _reportMatchesKind(CommunityReportModel report, AdminReportKind kind) {
+    final isOrder = isAdminOrderReport(
+      category: report.category,
+      orderId: report.orderId,
+    );
+    return switch (kind) {
+      AdminReportKind.community => !isOrder,
+      AdminReportKind.order => isOrder,
+      AdminReportKind.lookingFor => false,
+      AdminReportKind.all => true,
+    };
+  }
 
   List<CommunityReportModel> get visibleReports {
     final query = searchQuery.trim().toLowerCase();
@@ -104,16 +197,60 @@ class AdminReportsController extends ChangeNotifier {
     return filtered;
   }
 
-  bool matchesKind(CommunityReportModel report) {
-    final isOrder = isAdminOrderReport(
-      category: report.category,
-      orderId: report.orderId,
-    );
-    return switch (_kind) {
-      AdminReportKind.all => true,
-      AdminReportKind.community => !isOrder,
-      AdminReportKind.order => isOrder,
-    };
+  List<LookingForAdminReport> get visibleLookingForReports {
+    final query = searchQuery.trim().toLowerCase();
+    final statuses = adminReportListFilterStatuses(_filter);
+    final filtered = _lookingForReports.where((report) {
+      if (statuses != null && !statuses.contains(report.status)) return false;
+      final created = report.createdAt;
+      final window = _dateWindow;
+      if (window != null) {
+        if (created.isBefore(window.from)) return false;
+        if (!created.isBefore(window.toExclusive)) return false;
+      }
+      if (query.isEmpty) return true;
+      final haystack = [
+        report.postTitle,
+        report.reason,
+        report.details,
+        report.reporterName,
+        report.reporterUsername,
+        report.reportedName,
+        report.reportedUsername,
+      ].join(' ').toLowerCase();
+      return haystack.contains(query);
+    }).toList();
+    filtered.sort((a, b) {
+      final comparison = a.createdAt.compareTo(b.createdAt);
+      return _sort == AdminReportSort.newest ? -comparison : comparison;
+    });
+    return filtered;
+  }
+
+  bool matchesKind(CommunityReportModel report) =>
+      _reportMatchesKind(report, _kind);
+
+  void openCategoryList(AdminReportKind kind) {
+    if (kind == AdminReportKind.all) return;
+    _kind = kind;
+    _filter = AdminReportListFilter.all;
+    searchController.clear();
+    notifyListeners();
+  }
+
+  void leaveCategoryList() {
+    _kind = AdminReportKind.all;
+    _filter = AdminReportListFilter.all;
+    searchController.clear();
+    notifyListeners();
+  }
+
+  void clearListFilters() {
+    _filter = AdminReportListFilter.all;
+    _dateWindow = null;
+    searchController.clear();
+    notifyListeners();
+    load();
   }
 
   @override
@@ -188,6 +325,12 @@ class AdminReportsController extends ChangeNotifier {
           from: _dateWindow?.from,
           toExclusive: _dateWindow?.toExclusive,
         );
+        try {
+          _lookingForReports = await _lookingFor.listReports();
+        } catch (e) {
+          debugPrint('AdminReportsController looking for reports error: $e');
+          _lookingForReports = const [];
+        }
       }
     } catch (e) {
       debugPrint('AdminReportsController.load error: $e');

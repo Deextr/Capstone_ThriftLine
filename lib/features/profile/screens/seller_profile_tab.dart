@@ -8,6 +8,7 @@ import '../../../core/constants/app_typography.dart';
 import '../../../core/routes/route_names.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/settings_provider.dart';
+import '../../auth/domain/account_mode.dart';
 import '../../../widgets/thrift_widgets.dart';
 import '../../auth/presentation/widgets/auth_widgets.dart';
 import '../presentation/widgets/switch_account_sheet.dart';
@@ -16,7 +17,7 @@ import '../presentation/widgets/switchable_avatar.dart';
 /// Profile tab for the **Seller** workspace.
 ///
 /// Buying tools stay on the Buyer account. Approved sellers switch accounts
-/// from the header or the Account section.
+/// from the header avatar control.
 class SellerProfileTab extends StatelessWidget {
   const SellerProfileTab({super.key});
 
@@ -48,24 +49,9 @@ class SellerProfileTab extends StatelessWidget {
                 onTap: () => context.push(RouteNames.myShop),
               ),
               _MenuItem(
-                icon: Icons.bar_chart_rounded,
-                label: 'Seller Dashboard',
-                onTap: () => showThriftSnackBar(context, 'Coming soon'),
-              ),
-              _MenuItem(
-                icon: Icons.sell_outlined,
-                label: 'My Listings',
-                onTap: () => showThriftSnackBar(context, 'Coming soon'),
-              ),
-              _MenuItem(
-                icon: Icons.local_shipping_outlined,
-                label: 'Seller Orders',
-                onTap: () => showThriftSnackBar(context, 'Coming soon'),
-              ),
-              _MenuItem(
-                icon: Icons.star_outline_rounded,
-                label: 'Seller Reviews',
-                onTap: () => showThriftSnackBar(context, 'Coming soon'),
+                icon: Icons.insights_outlined,
+                label: 'Analytics Report',
+                onTap: () => context.push(RouteNames.sellerAnalytics),
               ),
             ],
           ),
@@ -74,12 +60,6 @@ class SellerProfileTab extends StatelessWidget {
           _SectionCard(
             title: 'Account',
             children: [
-              if (auth.canSwitchAccounts)
-                _MenuItem(
-                  icon: Icons.sync_alt_rounded,
-                  label: 'Switch Account',
-                  onTap: () => SwitchAccountSheet.show(context),
-                ),
               _MenuItem(
                 icon: Icons.person_outline_rounded,
                 label: 'Edit Profile',
@@ -92,9 +72,9 @@ class SellerProfileTab extends StatelessWidget {
                 onTap: () => context.push(RouteNames.paymentMethods),
               ),
               _MenuItem(
-                icon: Icons.location_on_outlined,
-                label: 'Addresses',
-                onTap: () => context.push(RouteNames.addresses),
+                icon: Icons.store_outlined,
+                label: 'Shop address',
+                onTap: () => context.push(RouteNames.sellerShopAddress),
               ),
               _MenuItem(
                 icon: Icons.settings_outlined,
@@ -142,7 +122,8 @@ class _ProfileHeader extends StatelessWidget {
     return Column(
       children: [
         SwitchableAvatar(
-          imageUrl: user?.avatarUrl ?? '',
+          key: ValueKey('seller-profile-${auth.activeAvatarUrl}'),
+          imageUrl: auth.activeAvatarUrl,
           name: name,
           canSwitch: auth.canSwitchAccounts,
           onSwitch: () => SwitchAccountSheet.show(context),
@@ -279,8 +260,13 @@ class _NotificationToggle extends StatelessWidget {
       ),
       title: Text('Notifications', style: AppTypography.body),
       trailing: Switch(
-        value: settings.pushNotificationsEnabled,
-        onChanged: settings.setPushNotifications,
+        value: settings.pushFor(AccountMode.seller),
+        onChanged: settings.isSavingPush
+            ? null
+            : (value) => settings.setPushNotifications(
+                  value,
+                  mode: AccountMode.seller,
+                ),
         activeTrackColor: AppColors.primary.withValues(alpha: 0.4),
         activeThumbColor: AppColors.primary,
       ),

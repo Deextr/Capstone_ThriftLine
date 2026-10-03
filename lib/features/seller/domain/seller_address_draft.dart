@@ -21,6 +21,19 @@ class SellerAddressDraft {
     return '$line1, $line2';
   }
 
+  /// Splits [shopAddress] stored in `seller_profiles.shop_address`.
+  static ({String line1, String line2}) parseStoredShopAddress(String? shopAddress) {
+    final s = shopAddress?.trim() ?? '';
+    if (s.isEmpty) return (line1: '', line2: '');
+    const sep = ', ';
+    final idx = s.indexOf(sep);
+    if (idx < 0) return (line1: s, line2: '');
+    return (
+      line1: s.substring(0, idx),
+      line2: s.substring(idx + sep.length),
+    );
+  }
+
   /// Returns a user-facing error, or null when the draft can proceed.
   static String? validate({
     required String storeName,

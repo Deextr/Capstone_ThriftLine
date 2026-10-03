@@ -14,6 +14,7 @@ import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/data_provider.dart';
+import '../providers/following_shops_provider.dart';
 import '../providers/notifications_provider.dart';
 import '../providers/saved_items_provider.dart';
 import '../providers/settings_provider.dart';
@@ -29,6 +30,7 @@ class ThriftlineApp extends StatelessWidget {
     required this.notificationsProvider,
     required this.settingsProvider,
     required this.savedItemsProvider,
+    required this.followingShopsProvider,
     required this.cartProvider,
     required this.supabaseService,
   });
@@ -41,6 +43,7 @@ class ThriftlineApp extends StatelessWidget {
   final NotificationsProvider notificationsProvider;
   final SettingsProvider settingsProvider;
   final SavedItemsProvider savedItemsProvider;
+  final FollowingShopsProvider followingShopsProvider;
   final CartProvider cartProvider;
   final SupabaseService supabaseService;
 
@@ -63,6 +66,9 @@ class ThriftlineApp extends StatelessWidget {
         ChangeNotifierProvider<SettingsProvider>.value(value: settingsProvider),
         ChangeNotifierProvider<SavedItemsProvider>.value(
           value: savedItemsProvider,
+        ),
+        ChangeNotifierProvider<FollowingShopsProvider>.value(
+          value: followingShopsProvider,
         ),
         ChangeNotifierProvider<CartProvider>.value(value: cartProvider),
       ],
@@ -88,7 +94,7 @@ class _SessionBindings extends StatefulWidget {
 }
 
 class _SessionBindingsState extends State<_SessionBindings>
-    with WidgetsBindingObserver {
+  with WidgetsBindingObserver {
   String? _boundUserId;
   Timer? _presenceTimer;
 
@@ -116,6 +122,7 @@ class _SessionBindingsState extends State<_SessionBindings>
     context.read<NotificationsProvider>().startForUser(userId);
     context.read<SettingsProvider>().loadForUser(userId);
     context.read<SavedItemsProvider>().startForUser(userId);
+    context.read<FollowingShopsProvider>().startForUser(userId);
     context.read<CartProvider>().startForUser(userId);
     _presenceTimer?.cancel();
     if (userId == null) return;
@@ -138,14 +145,28 @@ class _SessionBindingsState extends State<_SessionBindings>
     });
   }
 
+  void _syncNotificationAudience() {
+    final auth = context.read<AuthProvider>();
+    context.read<NotificationsProvider>().setAccountContext(
+      mode: auth.activeAccount,
+      hasSellerAccess: auth.user?.hasSellerAccess ?? false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final userId = context.watch<AuthProvider>().user?.id;
+    final auth = context.watch<AuthProvider>();
+    final userId = auth.user?.id;
+    context.read<NotificationsProvider>().setAccountContext(
+      mode: auth.activeAccount,
+      hasSellerAccess: auth.user?.hasSellerAccess ?? false,
+    );
     if (userId != _boundUserId) {
       _boundUserId = userId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _bindSession(userId);
+        _syncNotificationAudience();
       });
     }
     return widget.child;

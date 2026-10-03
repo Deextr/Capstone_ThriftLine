@@ -32,6 +32,17 @@ void main() {
     final listing = auction();
     expect(listingBucketFor(listing), ListingBucket.inactive);
     expect(canRelistAuction(listing), isTrue);
+    expect(canEditListing(listing), isFalse);
+  });
+
+  test('active fixed-price listing can be edited', () {
+    final listing = ListingSnapshot(
+      productStatus: 'active',
+      listingType: 'fixed_price',
+      now: now,
+    );
+    expect(listingBucketFor(listing), ListingBucket.active);
+    expect(canEditListing(listing), isTrue);
   });
 
   test('paid auction is sold', () {

@@ -469,6 +469,7 @@ class AuthService {
     try {
       final response = await _supabaseService.client.functions.invoke(
         'send-email-otp',
+        body: const {'purpose': 'login_verify'},
       );
       return _functionError(response);
     } on FunctionException catch (e) {
@@ -510,6 +511,61 @@ class AuthService {
   /// [deviceToken] is optional. When it is present the server hashes it and
   /// starts a 7-day trusted-device grant. A missing token still verifies the
   /// code and leaves the device untrusted.
+  Future<String?> sendEmailChangeOtp({required String newEmail}) async {
+    try {
+      final response = await _supabaseService.client.functions.invoke(
+        'send-email-otp',
+        body: {
+          'purpose': 'email_change',
+          'new_email': newEmail.trim(),
+        },
+      );
+      return _functionError(response);
+    } on FunctionException catch (e) {
+      debugPrint(
+        'AuthService.sendEmailChangeOtp failed: ${e.reasonPhrase} ${e.details}',
+      );
+      return _functionExceptionMessage(e) ??
+          'We could not send the verification email.';
+    } catch (e) {
+      debugPrint('AuthService.sendEmailChangeOtp error: $e');
+      return 'We could not send the verification email.';
+    }
+  }
+
+  Future<({String? error, String? email})> confirmEmailChangeOtp({
+    required String token,
+  }) async {
+    try {
+      final response = await _supabaseService.client.functions.invoke(
+        'verify-email-otp',
+        body: {
+          'purpose': 'email_change',
+          'token': token,
+        },
+      );
+      final err = _functionError(response);
+      if (err != null) return (error: err, email: null);
+      final data = response.data;
+      if (data is Map && data['email'] is String) {
+        return (error: null, email: data['email'] as String);
+      }
+      return (error: null, email: null);
+    } on FunctionException catch (e) {
+      debugPrint('AuthService.confirmEmailChangeOtp failed: status=${e.status}');
+      return (
+        error: _functionExceptionMessage(e) ??
+            'Could not verify that code. Please try again.',
+        email: null,
+      );
+    } catch (_) {
+      return (
+        error: 'Could not verify that code. Please try again.',
+        email: null,
+      );
+    }
+  }
+
   Future<String?> verifyEmailOtp({
     required String token,
     String? deviceToken,
@@ -519,6 +575,7 @@ class AuthService {
       final response = await _supabaseService.client.functions.invoke(
         'verify-email-otp',
         body: {
+          'purpose': 'login_verify',
           'token': token,
           'device_token': ?deviceToken,
           'platform': ?platform,

@@ -10,7 +10,13 @@ import '../../features/admin/controllers/admin_reports_controller.dart';
 import '../../features/admin/controllers/admin_seller_applications_controller.dart';
 import '../../features/admin/presentation/screens/admin_dispute_detail_screen.dart';
 import '../../features/admin/presentation/screens/admin_disputes_queue_screen.dart';
+import '../../features/admin/controllers/admin_disabled_accounts_controller.dart';
+import '../../features/admin/controllers/admin_looking_for_report_controller.dart';
+import '../../features/admin/presentation/screens/admin_disabled_accounts_screen.dart';
+import '../../features/admin/presentation/screens/admin_looking_for_report_detail_screen.dart';
 import '../../features/admin/presentation/screens/admin_report_detail_screen.dart';
+import '../../features/admin/data/admin_review_rules.dart';
+import '../../features/admin/presentation/screens/admin_reports_hub_screen.dart';
 import '../../features/admin/presentation/screens/admin_reports_queue_screen.dart';
 import '../../features/admin/presentation/screens/admin_review_screen.dart';
 import '../../features/admin/presentation/screens/admin_seller_applications_screen.dart';
@@ -31,9 +37,12 @@ import '../../features/buyer/presentation/screens/buyer_shell_screen.dart';
 import '../../features/buyer/presentation/screens/buy_now_screen.dart';
 import '../../features/buyer/presentation/screens/cart_screen.dart';
 import '../../features/buyer/presentation/screens/checkout_screen.dart';
+import '../../features/profile/controllers/following_shops_controller.dart';
 import '../../features/profile/controllers/seller_public_profile_controller.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
+import '../../features/profile/screens/following_shops_screen.dart';
 import '../../features/profile/screens/seller_public_profile_screen.dart';
+import '../../providers/following_shops_provider.dart';
 import '../../features/buyer/presentation/screens/order_confirmation_screen.dart';
 import '../../features/buyer/presentation/screens/order_tracking_screen.dart';
 import '../../features/buyer/presentation/screens/payment_proof_screen.dart';
@@ -42,6 +51,12 @@ import '../../features/buyer/controllers/checkout_controller.dart';
 import '../../features/buyer/controllers/product_detail_controller.dart';
 import '../../features/buyer/controllers/buyer_search_controller.dart';
 import '../../features/seller/controllers/my_shop_controller.dart';
+import '../../features/seller/controllers/seller_analytics_controller.dart';
+import '../../features/seller/data/seller_analytics_service.dart';
+import '../../features/seller/presentation/screens/seller_analytics_screen.dart';
+import '../../features/seller/controllers/seller_shop_address_controller.dart';
+import '../../features/seller/data/seller_shop_address_service.dart';
+import '../../features/seller/presentation/screens/seller_shop_address_screen.dart';
 import '../../features/seller/controllers/seller_orders_controller.dart';
 import '../../providers/cart_provider.dart';
 import '../../features/buyer/presentation/screens/product_detail_screen.dart';
@@ -257,14 +272,20 @@ GoRouter createAppRouter({
       ..._homeCollectionRoutes(),
       GoRoute(
         path: RouteNames.product,
-        builder: (context, state) => ChangeNotifierProvider(
-          create: (context) => ProductDetailController(
-            productId: state.pathParameters['id']!,
-            supabase: context.read<SupabaseService>(),
-            auth: context.read<AuthProvider>(),
-          ),
-          child: ProductDetailScreen(productId: state.pathParameters['id']!),
-        ),
+        builder: (context, state) {
+          final ownerPreview =
+              state.uri.queryParameters['ownerPreview'] == '1';
+          final productId = state.pathParameters['id']!;
+          return ChangeNotifierProvider(
+            create: (context) => ProductDetailController(
+              productId: productId,
+              supabase: context.read<SupabaseService>(),
+              auth: context.read<AuthProvider>(),
+              ownerPreviewMode: ownerPreview,
+            ),
+            child: ProductDetailScreen(productId: productId),
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.buyNow,
@@ -451,6 +472,17 @@ GoRouter createAppRouter({
         builder: (_, _) => const SavedItemsScreen(),
       ),
       GoRoute(
+        path: RouteNames.followingShops,
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => FollowingShopsController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+            provider: context.read<FollowingShopsProvider>(),
+          ),
+          child: const FollowingShopsScreen(),
+        ),
+      ),
+      GoRoute(
         path: RouteNames.becomeSeller,
         builder: (_, _) => const BecomeSellerScreen(),
       ),
@@ -461,6 +493,7 @@ GoRouter createAppRouter({
             username: state.pathParameters['username']!,
             supabase: context.read<SupabaseService>(),
             auth: context.read<AuthProvider>(),
+            followingProvider: context.read<FollowingShopsProvider>(),
           ),
           child: SellerPublicProfileScreen(
             username: state.pathParameters['username']!,
@@ -568,6 +601,17 @@ GoRouter createAppRouter({
         ),
       ),
       GoRoute(
+        path: RouteNames.sellerAnalytics,
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => SellerAnalyticsController(
+            service: SellerAnalyticsService(
+              context.read<SupabaseService>(),
+            ),
+          ),
+          child: const SellerAnalyticsScreen(),
+        ),
+      ),
+      GoRoute(
         path: RouteNames.adminHome,
         builder: (context, _) => MultiProvider(
           providers: [
@@ -610,8 +654,25 @@ GoRouter createAppRouter({
         builder: (context, _) => ChangeNotifierProvider(
           create: (context) =>
               AdminReportsController(supabase: context.read<SupabaseService>()),
-          child: const AdminReportsQueueScreen(),
+          child: const AdminReportsHubScreen(),
         ),
+      ),
+      GoRoute(
+        path: RouteNames.adminReportsQueue,
+        builder: (context, state) {
+          final kind = adminReportKindFromQueuePath(
+            state.pathParameters['kind'] ?? '',
+          );
+          if (kind == null) {
+            return const AdminReportsHubScreen();
+          }
+          return ChangeNotifierProvider(
+            create: (context) => AdminReportsController(
+              supabase: context.read<SupabaseService>(),
+            ),
+            child: AdminReportsQueueScreen(kind: kind),
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.adminReportDetail,
@@ -621,6 +682,25 @@ GoRouter createAppRouter({
             reportId: state.pathParameters['id'],
           ),
           child: const AdminReportDetailScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.adminLookingForReport,
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => AdminLookingForReportController(
+            supabase: context.read<SupabaseService>(),
+            reportId: state.pathParameters['id']!,
+          ),
+          child: const AdminLookingForReportDetailScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.adminDisabledAccounts,
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => AdminDisabledAccountsController(
+            supabase: context.read<SupabaseService>(),
+          ),
+          child: const AdminDisabledAccountsScreen(),
         ),
       ),
       GoRoute(
@@ -656,6 +736,17 @@ GoRouter createAppRouter({
         path: RouteNames.addresses,
         builder: (_, state) =>
             AddressBookScreen(currentAddressId: state.extra as String?),
+      ),
+      GoRoute(
+        path: RouteNames.sellerShopAddress,
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => SellerShopAddressController(
+            service: SellerShopAddressService(
+              context.read<SupabaseService>(),
+            ),
+          ),
+          child: const SellerShopAddressScreen(),
+        ),
       ),
       GoRoute(
         path: RouteNames.paymentMethods,

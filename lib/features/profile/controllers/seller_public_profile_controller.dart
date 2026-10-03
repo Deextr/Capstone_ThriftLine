@@ -6,6 +6,7 @@ import '../../../models/product_model.dart';
 import '../../../models/review_model.dart';
 import '../../../models/seller_profile.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/following_shops_provider.dart';
 import '../../auth/domain/account_mode.dart';
 import '../../buyer/data/catalog_product_query.dart';
 import '../../chat/data/conversation_service.dart';
@@ -21,10 +22,12 @@ class SellerPublicProfileController extends ChangeNotifier {
     required SupabaseService supabase,
     AuthProvider? auth,
     ConversationService? conversations,
+    FollowingShopsProvider? followingProvider,
   }) : _username = username,
        _supabase = supabase,
        _auth = auth,
-       _conversations = conversations ?? ConversationService(supabase) {
+       _conversations = conversations ?? ConversationService(supabase),
+       _followingProvider = followingProvider {
     loadSellerProfile();
   }
 
@@ -32,6 +35,7 @@ class SellerPublicProfileController extends ChangeNotifier {
   final SupabaseService _supabase;
   final AuthProvider? _auth;
   final ConversationService _conversations;
+  final FollowingShopsProvider? _followingProvider;
 
   // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -321,6 +325,11 @@ class SellerPublicProfileController extends ChangeNotifier {
         }
       }
       await _refreshFollowerCount(sellerId);
+      _followingProvider?.syncFollowState(
+        sellerId,
+        _isFollowing,
+        _sellerProfile,
+      );
       notifyListeners();
     } catch (e) {
       debugPrint('SellerPublicProfileController.toggleFollow error: $e');
@@ -332,6 +341,11 @@ class SellerPublicProfileController extends ChangeNotifier {
             : (currentFollowers > 0 ? currentFollowers - 1 : 0);
         _sellerProfile = _sellerProfile!.copyWith(followerCount: newFollowers);
       }
+      _followingProvider?.syncFollowState(
+        sellerId,
+        wasFollowing,
+        _sellerProfile,
+      );
       notifyListeners();
     }
   }

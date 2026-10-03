@@ -3,9 +3,11 @@ import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 import 'package:uuid/uuid.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/enums.dart';
 import '../../../models/looking_for_model.dart';
 import '../../../providers/auth_provider.dart';
+import '../domain/looking_for_lifecycle.dart';
 import '../../chat/data/chat_action_result.dart';
 import '../../chat/data/conversation_service.dart';
 
@@ -47,6 +49,8 @@ class LookingForController extends ChangeNotifier {
   bool _isLoading = true;
   bool _isPosting = false;
   String? _errorMessage;
+  DateTime _serverNow = DateTime.now().toUtc();
+  DateTime? _restrictedUntil;
 
   List<LookingForModel> get posts => _posts;
   bool get isLoading => _isLoading;
@@ -54,12 +58,29 @@ class LookingForController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   AuthProvider get auth => _auth;
   ConversationService get conversations => _conversations;
+  DateTime get serverNow => _serverNow;
+
+  bool get isPostingRestricted =>
+      _restrictedUntil != null && _restrictedUntil!.isAfter(_serverNow);
+
+  String? get postingRestrictionMessage => isPostingRestricted
+      ? lookingForRestrictionMessage(_restrictedUntil!)
+      : null;
+
+  List<LookingForModel> get browsePosts =>
+      _posts.where((post) => post.showInBrowse).toList();
 
   List<LookingForModel> get myPosts {
     final id = _auth.user?.id;
     if (id == null) return const [];
-    return _posts.where((p) => p.buyerId == id).toList();
+    return _posts.where((post) => post.buyerId == id).toList();
   }
+
+  List<LookingForModel> get myActivePosts =>
+      myPosts.where((post) => post.showInMyActive).toList();
+
+  List<LookingForModel> get myInactivePosts =>
+      myPosts.where((post) => post.showInInactive).toList();
 
   Future<void> loadPosts() async {
     _isLoading = true;
@@ -67,6 +88,14 @@ class LookingForController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      await _syncClock();
+      await _loadRestriction();
+      try {
+        await _supabase.client.rpc('notify_my_expired_looking_for_requests');
+      } catch (e) {
+        debugPrint('LookingForController expiry notice error: $e');
+      }
+
       final response = await _supabase.client
           .from('looking_for_posts')
           .select('''
@@ -106,7 +135,7 @@ class LookingForController extends ChangeNotifier {
         return LookingForModel.fromSupabase(
           map,
           buyer: uid != null ? buyers[uid] : null,
-        );
+        ).copyWith(observedAt: _serverNow);
       }).toList();
     } catch (e) {
       debugPrint('LookingForController.loadPosts error: $e');
@@ -136,16 +165,6 @@ class LookingForController extends ChangeNotifier {
     _isPosting = true;
 
     try {
-      String? categoryId;
-      try {
-        final cat = await _supabase.client
-            .from('categories')
-            .select('category_id')
-            .ilike('category_name', category.label)
-            .maybeSingle();
-        categoryId = cat?['category_id'] as String?;
-      } catch (_) {}
-
       final postId = const Uuid().v4();
       String? imageUrl;
       if (referenceImageBytes != null && referenceImageBytes.isNotEmpty) {
@@ -161,21 +180,23 @@ class LookingForController extends ChangeNotifier {
         }
       }
 
-      await _supabase.client.from('looking_for_posts').insert({
-        'post_id': postId,
-        'user_id': user.id,
-        'title': title.trim(),
-        'description': description.trim(),
-        'preferred_size': (size == null || size.trim().isEmpty)
-            ? null
-            : size.trim(),
-        'minimum_price': budgetMin,
-        'maximum_price': budgetMax,
-        'category_id': ?categoryId,
-        'status': 'open',
-        'reference_image_url': ?imageUrl,
-      });
-
+      final error = await _callLookingFor(
+        'create_looking_for_request',
+        {
+          'p_title': title.trim(),
+          'p_description': description.trim(),
+          'p_category_name': category.label,
+          'p_budget_min': budgetMin,
+          'p_budget_max': budgetMax,
+          'p_size': (size == null || size.trim().isEmpty) ? null : size.trim(),
+          'p_image_url': imageUrl,
+        },
+        'Could not post your request. Please try again.',
+      );
+      if (error != null) {
+        await _deleteReferenceImage(imageUrl);
+        return error;
+      }
       return null;
     } catch (e) {
       debugPrint('LookingForController.createPost error: $e');
@@ -185,8 +206,91 @@ class LookingForController extends ChangeNotifier {
     }
   }
 
+  Future<String?> repostPost({
+    required String sourcePostId,
+    required String title,
+    required String description,
+    required ProductCategory category,
+    required double budgetMin,
+    required double budgetMax,
+    String? size,
+    Uint8List? referenceImageBytes,
+    bool clearReferenceImage = false,
+  }) async {
+    final user = _auth.user;
+    if (user == null) return 'Please sign in to repost this request.';
+    if (title.trim().isEmpty) return 'Please enter what you are looking for.';
+
+    _isPosting = true;
+    try {
+      String? imageUrl;
+      if (referenceImageBytes != null && referenceImageBytes.isNotEmpty) {
+        try {
+          imageUrl = await _uploadReferenceImage(
+            userId: user.id,
+            postId: const Uuid().v4(),
+            bytes: referenceImageBytes,
+          );
+        } catch (e) {
+          debugPrint('LookingForController repost image error: $e');
+          return 'Could not upload the reference image.';
+        }
+      }
+
+      final error = await _callLookingFor(
+        'repost_looking_for_request',
+        {
+          'p_post_id': sourcePostId,
+          'p_title': title.trim(),
+          'p_description': description.trim(),
+          'p_category_name': category.label,
+          'p_budget_min': budgetMin,
+          'p_budget_max': budgetMax,
+          'p_size': (size == null || size.trim().isEmpty) ? null : size.trim(),
+          'p_image_url': imageUrl,
+          'p_clear_image': clearReferenceImage && imageUrl == null,
+        },
+        'Could not repost this request. Please try again.',
+      );
+      if (error != null) {
+        await _deleteReferenceImage(imageUrl);
+        return error;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('LookingForController.repostPost error: $e');
+      return 'Could not repost this request. Please try again.';
+    } finally {
+      _isPosting = false;
+    }
+  }
+
+  Future<String?> reportPost({
+    required String postId,
+    required String reason,
+    String? details,
+  }) async {
+    final detailsError = lookingForReportDetailsError(
+      reason: reason,
+      details: details ?? '',
+    );
+    if (detailsError != null) return detailsError;
+    return _callLookingFor(
+      'report_looking_for_request',
+      {
+        'p_post_id': postId,
+        'p_reason': reason,
+        'p_details': (details == null || details.trim().isEmpty)
+            ? null
+            : details.trim(),
+      },
+      'Could not send this report. Please try again.',
+    );
+  }
+
   Future<LookingForModel?> loadPostById(String postId) async {
     try {
+      await _syncClock();
       final row = await _supabase.client
           .from('looking_for_posts')
           .select('''
@@ -207,7 +311,10 @@ class LookingForController extends ChangeNotifier {
               .maybeSingle();
         } catch (_) {}
       }
-      return LookingForModel.fromSupabase(row, buyer: buyer);
+      return LookingForModel.fromSupabase(
+        row,
+        buyer: buyer,
+      ).copyWith(observedAt: _serverNow);
     } catch (e) {
       debugPrint('LookingForController.loadPostById error: $e');
       return null;
@@ -231,16 +338,6 @@ class LookingForController extends ChangeNotifier {
 
     _isPosting = true;
     try {
-      String? categoryId;
-      try {
-        final cat = await _supabase.client
-            .from('categories')
-            .select('category_id')
-            .ilike('category_name', category.label)
-            .maybeSingle();
-        categoryId = cat?['category_id'] as String?;
-      } catch (_) {}
-
       final current = await _supabase.client
           .from('looking_for_posts')
           .select('reference_image_url')
@@ -265,23 +362,25 @@ class LookingForController extends ChangeNotifier {
         }
       }
 
-      await _supabase.client
-          .from('looking_for_posts')
-          .update({
-            'title': title.trim(),
-            'description': description.trim(),
-            'preferred_size': (size == null || size.trim().isEmpty)
-                ? null
-                : size.trim(),
-            'minimum_price': budgetMin,
-            'maximum_price': budgetMax,
-            'category_id': ?categoryId,
-            if (replacing || clearReferenceImage)
-              'reference_image_url': imageUrl,
-          })
-          .eq('post_id', postId)
-          .eq('user_id', user.id);
-
+      final error = await _callLookingFor(
+        'update_looking_for_request',
+        {
+          'p_post_id': postId,
+          'p_title': title.trim(),
+          'p_description': description.trim(),
+          'p_category_name': category.label,
+          'p_budget_min': budgetMin,
+          'p_budget_max': budgetMax,
+          'p_size': (size == null || size.trim().isEmpty) ? null : size.trim(),
+          'p_image_url': replacing ? imageUrl : null,
+          'p_clear_image': clearReferenceImage && !replacing,
+        },
+        'Could not save your request. Please try again.',
+      );
+      if (error != null) {
+        if (replacing) await _deleteReferenceImage(imageUrl);
+        return error;
+      }
       if (replacing || clearReferenceImage) {
         await _deleteReferenceImage(previousUrl);
       }
@@ -305,11 +404,12 @@ class LookingForController extends ChangeNotifier {
           .eq('post_id', postId)
           .eq('user_id', user.id)
           .maybeSingle();
-      await _supabase.client
-          .from('looking_for_posts')
-          .delete()
-          .eq('post_id', postId)
-          .eq('user_id', user.id);
+      final error = await _callLookingFor(
+        'delete_looking_for_request',
+        {'p_post_id': postId},
+        'Could not delete this request. Please try again.',
+      );
+      if (error != null) return error;
       await _deleteReferenceImage(row?['reference_image_url'] as String?);
       _posts = _posts.where((p) => p.id != postId).toList();
       notifyListeners();
@@ -356,6 +456,9 @@ class LookingForController extends ChangeNotifier {
         'You cannot respond to your own request.',
       );
     }
+    if (!post.showInBrowse) {
+      return const ChatActionResult.error('This request is no longer active.');
+    }
     try {
       final conversationId = await _conversations.sendIHaveThis(
         sellerId: user.id,
@@ -371,6 +474,57 @@ class LookingForController extends ChangeNotifier {
   }
 
   Future<void> refresh() => loadPosts();
+
+  Future<void> _syncClock() async {
+    try {
+      final raw = await _supabase.client.rpc('looking_for_server_now');
+      final stamp = DateTime.tryParse(
+        supabaseRpcMap(raw)?['now']?.toString() ?? '',
+      );
+      if (stamp != null) _serverNow = stamp.toUtc();
+    } catch (e) {
+      debugPrint('LookingForController clock error: $e');
+    }
+  }
+
+  Future<void> _loadRestriction() async {
+    final id = _auth.user?.id;
+    _restrictedUntil = null;
+    if (id == null) return;
+    try {
+      final row = await _supabase.client
+          .from('looking_for_account_sanctions')
+          .select('restricted_until, permanently_disabled_at')
+          .eq('user_id', id)
+          .maybeSingle();
+      final until = row?['restricted_until'];
+      final disabled = row?['permanently_disabled_at'];
+      if (disabled != null) {
+        _restrictedUntil = DateTime.utc(9999);
+        return;
+      }
+      if (until is String) {
+        _restrictedUntil = DateTime.tryParse(until)?.toUtc();
+      }
+    } catch (e) {
+      debugPrint('LookingForController restriction error: $e');
+    }
+  }
+
+  Future<String?> _callLookingFor(
+    String fn,
+    Map<String, dynamic> params,
+    String fallback,
+  ) async {
+    try {
+      final raw = await _supabase.client.rpc(fn, params: params);
+      if (supabaseRpcSuccess(raw)) return null;
+      return supabaseRpcError(raw, fallback: fallback);
+    } catch (e) {
+      debugPrint('LookingForController.$fn error: $e');
+      return fallback;
+    }
+  }
 
   Future<String> _uploadReferenceImage({
     required String userId,

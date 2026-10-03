@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -6,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/ph_phone.dart';
+import '../../../../core/utils/validators.dart';
 import '../../../../models/enums.dart';
 import '../../../../widgets/keyboard_safe.dart';
 import '../../../../widgets/thrift_widgets.dart';
@@ -29,6 +31,7 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
   DateTime? _estimated;
   String? _nameError;
   String? _phoneError;
+  String? _plateError;
 
   @override
   void initState() {
@@ -81,21 +84,31 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
   }
 
   Future<void> _submit() async {
-    final nameError = _name.text.trim().isEmpty
-        ? 'Enter the rider name.'
-        : null;
+    final shipment = context.read<SellerOrdersController>().order?.shipment;
+    if (shipment != null && !shipment.canEditRider) {
+      showThriftSnackBar(
+        context,
+        'Rider details are locked while delivery is in progress.',
+        isError: true,
+      );
+      return;
+    }
+    final nameError = Validators.riderName(_name.text);
     final phoneError = phMobileValidationError(_phone.text);
+    final plateTrimmed = _plate.text.trim();
+    final plateError = plateTrimmed.isEmpty ? 'Enter the plate number.' : null;
     setState(() {
       _nameError = nameError;
       _phoneError = phoneError;
+      _plateError = plateError;
     });
-    if (nameError != null || phoneError != null) return;
+    if (nameError != null || phoneError != null || plateError != null) return;
 
     final error = await context.read<SellerOrdersController>().assignRider(
-      riderName: _name.text.trim(),
+      riderName: Validators.normalizeFullName(_name.text),
       riderPhone: _phone.text.trim(),
       vehicleType: _vehicle.dbValue,
-      plateNumber: _plate.text.trim().isEmpty ? null : _plate.text.trim(),
+      plateNumber: plateTrimmed,
       estimatedDeliveryAt: _estimated,
       deliveryNotes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
     );
@@ -112,6 +125,8 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
   Widget build(BuildContext context) {
     final controller = context.watch<SellerOrdersController>();
     final order = controller.order;
+    final shipment = order?.shipment;
+    final readOnly = shipment != null && !shipment.canEditRider;
 
     return Scaffold(
       appBar: AppBar(
@@ -123,11 +138,24 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
       ),
       body: KeyboardSafeForm(
         padding: const EdgeInsets.all(AppConstants.spacingMd),
-        action: ThriftButton(
-          label: controller.isUpdatingDelivery ? 'Saving…' : 'Save rider',
-          onPressed: controller.isUpdatingDelivery ? null : _submit,
-        ),
+        action: readOnly
+            ? ThriftButton(
+                label: 'Back to order',
+                variant: ThriftButtonVariant.outline,
+                onPressed: () => context.pop(),
+              )
+            : ThriftButton(
+                label: controller.isUpdatingDelivery ? 'Saving…' : 'Save rider',
+                onPressed: controller.isUpdatingDelivery ? null : _submit,
+              ),
         children: [
+          if (readOnly) ...[
+            Text(
+              'Rider details are locked while delivery is in progress.',
+              style: AppTypography.caption,
+            ),
+            const SizedBox(height: 12),
+          ],
           Text('Freelance / Local Rider', style: AppTypography.subheading),
           Text(
             'Seller Arranged · ${order == null ? '' : '#${order.orderNumber}'}',
@@ -139,6 +167,12 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
             hint: 'Juan Dela Cruz',
             controller: _name,
             error: _nameError,
+            readOnly: readOnly,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(
+                Validators.fullNameInputCharacters,
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           ThriftTextField(
@@ -147,6 +181,7 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
             controller: _phone,
             keyboardType: TextInputType.phone,
             error: _phoneError,
+            readOnly: readOnly,
           ),
           const SizedBox(height: 12),
           Text('Vehicle type', style: AppTypography.label),
@@ -160,15 +195,19 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
                   label: Text(vehicle.label),
                   selected: _vehicle == vehicle,
                   selectedColor: AppColors.primaryLight,
-                  onSelected: (_) => setState(() => _vehicle = vehicle),
+                  onSelected: readOnly
+                      ? null
+                      : (_) => setState(() => _vehicle = vehicle),
                 ),
             ],
           ),
           const SizedBox(height: 12),
           ThriftTextField(
-            label: 'Plate number (optional)',
+            label: 'Plate number',
             hint: 'ABC 1234',
             controller: _plate,
+            error: _plateError,
+            readOnly: readOnly,
           ),
           const SizedBox(height: 12),
           ThriftTextField(
@@ -177,7 +216,7 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
                 ? 'Choose date and time'
                 : _estimated.toString(),
             readOnly: true,
-            onTap: _pickEstimated,
+            onTap: readOnly ? null : _pickEstimated,
           ),
           const SizedBox(height: 12),
           ThriftTextField(
@@ -185,6 +224,7 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
             hint: 'Meet at the gate, call on arrival…',
             controller: _notes,
             maxLines: 3,
+            readOnly: readOnly,
           ),
           const SizedBox(height: 12),
         ],

@@ -22,7 +22,8 @@ class _TermsAcceptanceNoteState extends State<TermsAcceptanceNote> {
   void initState() {
     super.initState();
     _termsRecognizer = TapGestureRecognizer()
-      ..onTap = () => context.push(RouteNames.legalDocument(LegalDocumentType.terms));
+      ..onTap = () =>
+          context.push(RouteNames.legalDocument(LegalDocumentType.terms));
   }
 
   @override

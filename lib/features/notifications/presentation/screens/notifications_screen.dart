@@ -4,11 +4,12 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
-import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../models/enums.dart';
 import '../../../../models/notification_model.dart';
+import '../../../../providers/auth_provider.dart';
 import '../../../../providers/notifications_provider.dart';
+import '../../domain/notification_navigation.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -130,10 +131,11 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           ),
           onTap: () {
             context.read<NotificationsProvider>().markRead(n.id);
-            final reportId = notificationAppealReportId(n.data);
-            if (reportId != null) {
-              context.push(RouteNames.accountReviewFor(reportId));
-            }
+            openNotification(
+              GoRouter.of(context),
+              notification: n,
+              activeAccount: context.read<AuthProvider>().activeAccount,
+            );
           },
         );
       },
@@ -150,6 +152,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     NotificationType.verificationSubmitted => '📄',
     NotificationType.verificationApproved => '✅',
     NotificationType.verificationRejected => '⚠️',
+    NotificationType.review => '⭐',
+    NotificationType.reportDecision => '🛡️',
     NotificationType.system => 'ℹ️',
   };
 
@@ -163,6 +167,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     NotificationType.verificationSubmitted => AppColors.warning,
     NotificationType.verificationApproved => AppColors.success,
     NotificationType.verificationRejected => AppColors.error,
+    NotificationType.review => AppColors.warning,
+    NotificationType.reportDecision => AppColors.info,
     NotificationType.system => AppColors.textHint,
   };
 }

@@ -30,6 +30,7 @@ class ShipmentModel {
     this.inspectionExpiresAt,
     this.deliveryFailedAt,
     this.deliveryFailureReason,
+    this.deliveryFailureDetails,
     this.autoCompleted = false,
     this.completionReason,
     this.completedAt,
@@ -61,6 +62,7 @@ class ShipmentModel {
   final DateTime? inspectionExpiresAt;
   final DateTime? deliveryFailedAt;
   final DeliveryFailureReason? deliveryFailureReason;
+  final String? deliveryFailureDetails;
   final bool autoCompleted;
   final String? completionReason;
   final DateTime? completedAt;
@@ -99,12 +101,18 @@ class ShipmentModel {
       shouldShowBuyerRiderInfo && hasRiderPhone;
 
   bool get canEditRider =>
-      deliveryVerifiedAt == null &&
-      deliveryStatus != DeliveryStatus.inspectionPeriod &&
-      deliveryStatus != DeliveryStatus.completed &&
-      deliveryStatus != DeliveryStatus.cancelled &&
-      deliveryStatus != DeliveryStatus.disputed &&
-      deliveryStatus != DeliveryStatus.deliveryFailed;
+      deliveryVerifiedAt == null && deliveryStatus.allowsRiderUpdates;
+
+  /// Human-readable delivery failure summary for buyer/seller surfaces.
+  String? get deliveryFailureSummary {
+    final reason = deliveryFailureReason;
+    if (reason == null) return null;
+    if (reason == DeliveryFailureReason.other) {
+      final details = deliveryFailureDetails?.trim();
+      if (details != null && details.isNotEmpty) return details;
+    }
+    return reason.label;
+  }
 
   bool get isOutForDelivery =>
       deliveryStatus == DeliveryStatus.outForDelivery ||
@@ -179,6 +187,7 @@ class ShipmentModel {
       deliveryFailureReason: DeliveryFailureReason.fromDb(
         row['delivery_failure_reason'] as String?,
       ),
+      deliveryFailureDetails: row['delivery_failure_details'] as String?,
       autoCompleted: row['auto_completed'] as bool? ?? false,
       completionReason: row['completion_reason'] as String?,
       completedAt: _parseTime(row['completed_at']),

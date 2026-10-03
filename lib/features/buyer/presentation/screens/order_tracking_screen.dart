@@ -231,7 +231,7 @@ class OrderTrackingScreen extends StatelessWidget {
                   child: _NoticeSection(
                     title: 'Delivery was not completed',
                     message:
-                        order.shipment?.deliveryFailureReason?.label ??
+                        order.shipment?.deliveryFailureSummary ??
                         'A delivery problem was reported.',
                     color: AppColors.warning,
                     icon: Icons.error_outline,

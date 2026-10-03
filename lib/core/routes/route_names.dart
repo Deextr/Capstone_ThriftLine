@@ -1,3 +1,4 @@
+import '../../features/admin/data/admin_review_rules.dart';
 import '../../features/auth/domain/legal_documents.dart';
 
 abstract final class RouteNames {
@@ -22,6 +23,13 @@ abstract final class RouteNames {
   static const String sellerHome = '/seller';
   static const String search = '/search';
   static const String product = '/product/:id';
+
+  /// Buyer catalog detail, or seller read-only preview when [ownerPreview].
+  static String productFor(String productId, {bool ownerPreview = false}) {
+    final id = productId.trim();
+    if (ownerPreview) return '/product/$id?ownerPreview=1';
+    return '/product/$id';
+  }
   static const String buyNow = '/buy-now/:id';
   static const String payment = '/payment/:id';
   static const String orderConfirm = '/order-confirm/:orderId';
@@ -46,7 +54,8 @@ abstract final class RouteNames {
   }
 
   static const String myPurchases = '/my-purchases';
-  static String myPurchasesTab(String queryValue) => '$myPurchases?tab=$queryValue';
+  static String myPurchasesTab(String queryValue) =>
+      '$myPurchases?tab=$queryValue';
   static const String trackOrders = '/track-orders';
   static const String trackOrder = '/track-order/:orderId';
   static String trackOrderFor(String orderId) => '/track-order/$orderId';
@@ -72,6 +81,7 @@ abstract final class RouteNames {
   static const String settings = '/settings';
   static const String purchaseHistory = '/purchase-history';
   static const String savedItems = '/saved-items';
+  static const String followingShops = '/following-shops';
   static const String becomeSeller = '/become-seller';
   static const String sellerProfile = '/seller-profile/:username';
   static const String cart = '/cart';
@@ -132,19 +142,30 @@ abstract final class RouteNames {
   }
 
   static const String myShop = '/my-shop';
+  static const String sellerAnalytics = '/seller-analytics';
   static const String adminHome = '/admin';
   static const String adminApplications = '/admin/applications';
   static const String adminReview = '/admin/review/:id';
   static const String adminReports = '/admin/reports';
+  static const String adminReportsQueue = '/admin/reports/queue/:kind';
   static const String adminReportDetail = '/admin/reports/:id';
   static const String adminDisputes = '/admin/disputes';
   static const String adminDisputeDetail = '/admin/disputes/:id';
+  static const String adminLookingForReport = '/admin/looking-for-reports/:id';
+  static const String adminDisabledAccounts = '/admin/disabled-accounts';
 
   static String adminReviewFor(String id) => '/admin/review/$id';
   static String adminReportDetailFor(String id) => '/admin/reports/$id';
+
+  static String adminReportsQueueFor(AdminReportKind kind) =>
+      '/admin/reports/queue/${adminReportQueuePathSegment(kind)}';
   static String adminDisputeDetailFor(String id) => '/admin/disputes/$id';
+
+  static String adminLookingForReportFor(String id) =>
+      '/admin/looking-for-reports/$id';
   static const String verifyPhone = '/verify-phone';
   static const String verifyEmailOtp = '/verify-email-otp';
   static const String addresses = '/addresses';
+  static const String sellerShopAddress = '/seller/shop-address';
   static const String paymentMethods = '/payment-methods';
 }
