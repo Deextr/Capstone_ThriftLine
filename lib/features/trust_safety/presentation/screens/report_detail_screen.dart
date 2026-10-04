@@ -37,84 +37,98 @@ class ReportDetailScreen extends StatelessWidget {
                   style: AppTypography.body,
                 ),
               )
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-                children: [
-                  Text(
-                    reportReasonLabel(report.category),
-                    style: AppTypography.heading.copyWith(fontSize: 22),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    report.reportedUsername.isEmpty
-                        ? report.reportedDisplayName
-                        : '@${report.reportedUsername}',
-                    style: AppTypography.body.copyWith(
-                      color: AppColors.textSecondary,
+            : RefreshIndicator(
+                color: AppColors.primary,
+                onRefresh: () => context.read<MyReportsController>().load(
+                  showSpinner: false,
+                ),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                  children: [
+                    Text(
+                      reportReasonLabel(report.category),
+                      style: AppTypography.heading.copyWith(fontSize: 22),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  _StatusChip(status: report.status),
-                  const SizedBox(height: 24),
-                  Text('Your report', style: AppTypography.subheading),
-                  const SizedBox(height: 8),
-                  Text(report.details, style: AppTypography.body),
-                  if (report.orderNumber != null &&
-                      report.orderNumber!.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    Text('Related order', style: AppTypography.subheading),
-                    const SizedBox(height: 8),
-                    Text('#${report.orderNumber}', style: AppTypography.body),
-                  ],
-                  if (report.evidence.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    Text('Evidence', style: AppTypography.subheading),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        for (final item in report.evidence)
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: item.signedUrl == null
-                                ? Container(
-                                    width: 88,
-                                    height: 88,
-                                    color: AppColors.surfaceVariant,
-                                    child: const Icon(
-                                      Icons.image_outlined,
-                                      color: AppColors.textHint,
-                                    ),
-                                  )
-                                : CachedNetworkImage(
-                                    imageUrl: item.signedUrl!,
-                                    width: 88,
-                                    height: 88,
-                                    fit: BoxFit.cover,
-                                  ),
-                          ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  Text('Status', style: AppTypography.subheading),
-                  const SizedBox(height: 8),
-                  Text(
-                    reportStatusLabel(report.status),
-                    style: AppTypography.body,
-                  ),
-                  if (report.adminResponse != null &&
-                      report.adminResponse!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    Text('Admin Response', style: AppTypography.subheading),
                     const SizedBox(height: 8),
                     Text(
-                      report.adminResponse!.trim(),
+                      report.reportedUsername.isEmpty
+                          ? report.reportedDisplayName
+                          : '@${report.reportedUsername}',
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _StatusChip(status: report.status),
+                    const SizedBox(height: 24),
+                    Text('Your report', style: AppTypography.subheading),
+                    const SizedBox(height: 8),
+                    Text(report.details, style: AppTypography.body),
+                    if (report.orderNumber != null &&
+                        report.orderNumber!.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      Text('Related order', style: AppTypography.subheading),
+                      const SizedBox(height: 8),
+                      Text('#${report.orderNumber}', style: AppTypography.body),
+                    ],
+                    if (report.evidence.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      Text('Evidence', style: AppTypography.subheading),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          for (final item in report.evidence)
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: item.signedUrl == null
+                                  ? Container(
+                                      width: 88,
+                                      height: 88,
+                                      color: AppColors.surfaceVariant,
+                                      child: const Icon(
+                                        Icons.image_outlined,
+                                        color: AppColors.textHint,
+                                      ),
+                                    )
+                                  : CachedNetworkImage(
+                                      imageUrl: item.signedUrl!,
+                                      width: 88,
+                                      height: 88,
+                                      fit: BoxFit.cover,
+                                    ),
+                            ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    Text('Status', style: AppTypography.subheading),
+                    const SizedBox(height: 8),
+                    Text(
+                      reportStatusLabel(report.status),
                       style: AppTypography.body,
                     ),
+                    const SizedBox(height: 6),
+                    Text(
+                      reportStatusDescription(report.status),
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    if (report.adminResponse != null &&
+                        report.adminResponse!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      Text('Admin Response', style: AppTypography.subheading),
+                      const SizedBox(height: 8),
+                      Text(
+                        report.adminResponse!.trim(),
+                        style: AppTypography.body,
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
       ),
     );

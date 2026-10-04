@@ -25,10 +25,8 @@ class BuyerToRateController extends ChangeNotifier {
   bool _isLoading = true;
   String? _errorMessage;
 
-  List<OrderModel> get pendingOrders => ordersPendingBuyerReview(
-    _orders,
-    _myReviews,
-  );
+  List<OrderModel> get pendingOrders =>
+      ordersPendingBuyerReview(_orders, _myReviews);
 
   List<BuyerRatedPurchase> get ratedPurchases =>
       buyerReviewHistory(_orders, _myReviews);
@@ -54,14 +52,10 @@ class BuyerToRateController extends ChangeNotifier {
 
     try {
       _orders = await fetchOrdersForBuyer(_supabase, myId);
-      final completedIds = completedOrdersEligibleForBuyerReview(_orders)
-          .map((order) => order.id)
-          .toList();
-      _myReviews = await fetchMyReviewsForOrders(
-        _supabase,
-        myId,
-        completedIds,
-      );
+      final completedIds = completedOrdersEligibleForBuyerReview(
+        _orders,
+      ).map((order) => order.id).toList();
+      _myReviews = await fetchMyReviewsForOrders(_supabase, myId, completedIds);
     } catch (e) {
       debugPrint('BuyerToRateController.load error: $e');
       _errorMessage = 'Unable to load your reviews.';

@@ -9,10 +9,12 @@ import '../../../core/utils/supabase_errors.dart';
 import '../../../core/utils/ph_phone.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/address_model.dart';
+import '../../../models/community_report_model.dart';
 import '../../../models/order_model.dart';
 import '../../../models/review_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../profile/data/address_service.dart';
+import '../../trust_safety/data/report_query.dart';
 import '../../trust_safety/data/review_query.dart';
 import '../data/order_query.dart';
 import '../data/paymongo_checkout.dart';
@@ -41,6 +43,7 @@ class BuyerOrdersController extends ChangeNotifier {
   OrderModel? _order;
   List<OrderModel> _paymentGroup = [];
   Map<String, ReviewModel> _myReviews = {};
+  Map<String, CommunityReportModel> _myReportsByOrderId = {};
   bool _isLoading = true;
   bool _isSavingAddress = false;
   bool _isStartingPayment = false;
@@ -68,6 +71,8 @@ class BuyerOrdersController extends ChangeNotifier {
   double get paymentGroupTotal =>
       paymentGroup.fold<double>(0, (sum, order) => sum + order.total);
   ReviewModel? reviewFor(String orderId) => _myReviews[orderId];
+  CommunityReportModel? reportForOrder(String orderId) =>
+      _myReportsByOrderId[orderId];
   bool get isLoading => _isLoading;
   bool get isSavingAddress => _isSavingAddress;
   bool get isStartingPayment => _isStartingPayment;
@@ -87,6 +92,7 @@ class BuyerOrdersController extends ChangeNotifier {
       _order = null;
       _paymentGroup = [];
       _myReviews = {};
+      _myReportsByOrderId = {};
       _isLoading = false;
       _notify();
       return;
@@ -139,6 +145,7 @@ class BuyerOrdersController extends ChangeNotifier {
         }
       }
       await _loadMyReviews(myId);
+      await _loadMyReportsForOrders(myId);
     } catch (e) {
       debugPrint('BuyerOrdersController.load error: $e');
       if (generation == _loadGeneration) {
@@ -548,6 +555,14 @@ class BuyerOrdersController extends ChangeNotifier {
     _myReviews = await fetchMyReviewsForOrders(_supabase, myId, ids);
   }
 
+  Future<void> _loadMyReportsForOrders(String myId) async {
+    final ids = <String>{
+      if (_order != null) _order!.id,
+      for (final order in _orders) order.id,
+    };
+    _myReportsByOrderId = await fetchMyReportsForOrders(_supabase, myId, ids);
+  }
+
   void _subscribe() {
     final myId = _auth.user?.id;
     if (myId == null) return;
@@ -565,6 +580,17 @@ class BuyerOrdersController extends ChangeNotifier {
               type: PostgresChangeFilterType.eq,
               column: orderId != null ? 'order_id' : 'buyer_id',
               value: orderId ?? myId,
+            ),
+            callback: (_) => unawaited(load(showSpinner: false)),
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'reports',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'reporter_id',
+              value: myId,
             ),
             callback: (_) => unawaited(load(showSpinner: false)),
           )

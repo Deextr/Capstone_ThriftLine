@@ -16,9 +16,9 @@ List<OrderModel> ordersPendingBuyerReview(
   Iterable<OrderModel> orders,
   Map<String, ReviewModel> myReviews,
 ) {
-  return completedOrdersEligibleForBuyerReview(orders)
-      .where((order) => myReviews[order.id] == null)
-      .toList()
+  return completedOrdersEligibleForBuyerReview(
+      orders,
+    ).where((order) => myReviews[order.id] == null).toList()
     ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 }
 

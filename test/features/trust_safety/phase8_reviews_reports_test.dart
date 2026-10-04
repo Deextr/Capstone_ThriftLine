@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:thriftline/features/trust_safety/data/delivery_report_mapping.dart';
 import 'package:thriftline/features/trust_safety/data/report_order_eligibility.dart';
+import 'package:thriftline/core/utils/report_status.dart';
+import 'package:thriftline/features/trust_safety/data/report_query.dart';
 import 'package:thriftline/features/trust_safety/data/report_reasons.dart';
 import 'package:thriftline/features/trust_safety/data/review_rules.dart';
 import 'package:thriftline/models/review_model.dart';
@@ -150,6 +152,34 @@ void main() {
       expect(reportStatusLabel('action_taken'), 'Action Taken');
       expect(reportStatusLabel('resolved'), 'Resolved');
       expect(reportStatusLabel('dismissed'), 'Dismissed');
+      expect(reportStatusFromDb('Dismissed'), 'dismissed');
+      expect(reportStatusDescription('dismissed'), contains('dismissed'));
+    });
+
+    test('keeps the newest linked report per order', () {
+      final older = CommunityReportModel.fromSupabase({
+        'report_id': 'r-old',
+        'reporter_id': 'buyer-1',
+        'reported_user_id': 'seller-1',
+        'order_id': 'order-1',
+        'category': 'other',
+        'details': 'First report',
+        'status': 'dismissed',
+        'created_at': '2026-09-13T01:00:00Z',
+      });
+      final newer = CommunityReportModel.fromSupabase({
+        'report_id': 'r-new',
+        'reporter_id': 'buyer-1',
+        'reported_user_id': 'seller-1',
+        'order_id': 'order-1',
+        'category': 'other',
+        'details': 'Second report',
+        'status': 'under_review',
+        'created_at': '2026-09-14T01:00:00Z',
+      });
+      final mapped = pickLatestReportPerOrder([older, newer]);
+      expect(mapped['order-1']?.id, 'r-new');
+      expect(mapped['order-1']?.status, 'under_review');
     });
 
     test('allows up to three optional review photos', () {

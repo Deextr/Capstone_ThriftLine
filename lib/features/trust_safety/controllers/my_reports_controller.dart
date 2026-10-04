@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+
+import 'package:flutter/widgets.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../models/community_report_model.dart';
@@ -12,12 +14,19 @@ class MyReportsController extends ChangeNotifier {
     this.reportId,
   }) : _supabase = supabase,
        _auth = auth {
+    _lifecycle = AppLifecycleListener(
+      onResume: () {
+        unawaited(load());
+      },
+    );
     load();
   }
 
   final SupabaseService _supabase;
   final AuthProvider _auth;
   final String? reportId;
+  AppLifecycleListener? _lifecycle;
+  bool _disposed = false;
 
   List<CommunityReportModel> _reports = [];
   CommunityReportModel? _report;
@@ -29,7 +38,7 @@ class MyReportsController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  Future<void> load() async {
+  Future<void> load({bool showSpinner = true}) async {
     final myId = _auth.user?.id;
     if (myId == null) {
       _reports = [];
@@ -40,9 +49,13 @@ class MyReportsController extends ChangeNotifier {
       return;
     }
 
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
+    if (showSpinner) {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+    } else {
+      _errorMessage = null;
+    }
 
     try {
       var query = _supabase.client
@@ -110,8 +123,10 @@ class MyReportsController extends ChangeNotifier {
       _reports = [];
       _report = null;
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!_disposed) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -153,5 +168,12 @@ class MyReportsController extends ChangeNotifier {
       }
     }
     return report.copyWith(evidence: signed);
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _lifecycle?.dispose();
+    super.dispose();
   }
 }

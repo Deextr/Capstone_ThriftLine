@@ -93,7 +93,12 @@ class _ReportCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => context.push(RouteNames.reportDetailFor(report.id)),
+        onTap: () async {
+          await context.push(RouteNames.reportDetailFor(report.id));
+          if (context.mounted) {
+            await context.read<MyReportsController>().load(showSpinner: false);
+          }
+        },
         child: Container(
           padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
           decoration: BoxDecoration(
@@ -119,7 +124,16 @@ class _ReportCard extends StatelessWidget {
                           : '@$username',
                       style: AppTypography.caption,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
+                    Text(
+                      reportStatusDescription(report.status),
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
                     Text(
                       _formatSubmitted(report.createdAt),
                       style: AppTypography.caption.copyWith(
