@@ -167,5 +167,7 @@ abstract final class RouteNames {
   static const String verifyEmailOtp = '/verify-email-otp';
   static const String addresses = '/addresses';
   static const String sellerShopAddress = '/seller/shop-address';
+  static const String sellerMyRiders = '/seller/my-riders';
+  static const String sellerSavedRiderEditor = '/seller/my-riders/editor';
   static const String paymentMethods = '/payment-methods';
 }

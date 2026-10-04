@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/routes/route_names.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/ph_phone.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../models/enums.dart';
 import '../../../../widgets/keyboard_safe.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/seller_orders_controller.dart';
+import '../../data/seller_saved_rider.dart';
+import '../../data/seller_saved_riders_service.dart';
+import '../widgets/saved_rider_form_fields.dart';
+import '../widgets/saved_rider_select_sheet.dart';
 
 class ArrangeDeliveryScreen extends StatefulWidget {
   const ArrangeDeliveryScreen({super.key, required this.orderId});
@@ -33,9 +38,25 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
   String? _phoneError;
   String? _plateError;
 
+  List<SellerSavedRider> _savedRiders = const [];
+  bool _loadingRiders = true;
+  String? _selectedSavedRiderId;
+  SellerSavedRider? get _selectedSavedRider {
+    if (_selectedSavedRiderId == null) return null;
+    for (final r in _savedRiders) {
+      if (r.id == _selectedSavedRiderId) return r;
+    }
+    return null;
+  }
+
+  late final SellerSavedRidersService _savedRidersService;
+
   @override
   void initState() {
     super.initState();
+    _savedRidersService = SellerSavedRidersService(
+      context.read<SupabaseService>(),
+    );
     final shipment = context.read<SellerOrdersController>().order?.shipment;
     if (shipment != null) {
       _name.text = shipment.riderName ?? '';
@@ -47,6 +68,65 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
       }
       _estimated = shipment.estimatedDeliveryAt;
     }
+    _loadSavedRiders();
+  }
+
+  Future<void> _loadSavedRiders() async {
+    try {
+      final list = await _savedRidersService.listMine();
+      if (!mounted) return;
+      setState(() {
+        _savedRiders = list;
+        _loadingRiders = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingRiders = false);
+    }
+  }
+
+  void _applySavedRider(SellerSavedRider rider) {
+    setState(() {
+      _selectedSavedRiderId = rider.id;
+      _name.text = rider.riderName;
+      _phone.text = rider.riderPhone;
+      _plate.text = rider.plateNumber;
+      _vehicle = rider.vehicle;
+      _nameError = null;
+      _phoneError = null;
+      _plateError = null;
+      final defaultNotes = rider.defaultDeliveryNotes?.trim();
+      if (defaultNotes != null && defaultNotes.isNotEmpty) {
+        _notes.text = defaultNotes;
+      }
+    });
+  }
+
+  Future<void> _openRiderPicker() async {
+    await _loadSavedRiders();
+    if (!mounted) return;
+    await showSavedRiderSelectSheet(
+      context: context,
+      riders: _savedRiders,
+      selectedId: _selectedSavedRiderId,
+      onSelected: (rider) {
+        _applySavedRider(rider);
+        if (!_savedRiders.any((r) => r.id == rider.id)) {
+          setState(() => _savedRiders = [..._savedRiders, rider]);
+        }
+      },
+    );
+  }
+
+  Future<void> _addRiderInline() async {
+    final created = await context.push<SellerSavedRider>(
+      RouteNames.sellerSavedRiderEditor,
+    );
+    if (created == null || !mounted) return;
+    setState(() {
+      _savedRiders = [..._savedRiders, created];
+    });
+    _applySavedRider(created);
   }
 
   @override
@@ -121,6 +201,83 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
     context.pop();
   }
 
+  Widget _buildSelectedRiderSection({required bool readOnly}) {
+    final selected = _selectedSavedRider;
+    if (selected != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Selected rider', style: AppTypography.label),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(selected.riderName, style: AppTypography.subheading),
+                const SizedBox(height: 4),
+                Text(selected.maskedPhone, style: AppTypography.caption),
+                if (!readOnly) ...[
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: _openRiderPicker,
+                      child: const Text('Change rider'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      );
+    }
+
+    if (readOnly) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Select rider', style: AppTypography.label),
+        const SizedBox(height: 8),
+        if (_loadingRiders)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: LinearProgressIndicator(minHeight: 2),
+          )
+        else ...[
+          OutlinedButton(
+            onPressed: _savedRiders.isEmpty ? null : _openRiderPicker,
+            child: Text(
+              _savedRiders.isEmpty
+                  ? 'No saved riders yet'
+                  : 'Select saved rider',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _addRiderInline,
+            icon: const Icon(Icons.add),
+            label: const Text('Add new rider'),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Text(
+          'Or enter rider details below for this order only.',
+          style: AppTypography.caption,
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<SellerOrdersController>();
@@ -135,6 +292,13 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
+        actions: [
+          if (!readOnly)
+            TextButton(
+              onPressed: () => context.push(RouteNames.sellerMyRiders),
+              child: const Text('My Riders'),
+            ),
+        ],
       ),
       body: KeyboardSafeForm(
         padding: const EdgeInsets.all(AppConstants.spacingMd),
@@ -145,7 +309,7 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
                 onPressed: () => context.pop(),
               )
             : ThriftButton(
-                label: controller.isUpdatingDelivery ? 'Saving…' : 'Save rider',
+                label: controller.isUpdatingDelivery ? 'Saving…' : 'Confirm delivery',
                 onPressed: controller.isUpdatingDelivery ? null : _submit,
               ),
         children: [
@@ -156,57 +320,34 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
             ),
             const SizedBox(height: 12),
           ],
-          Text('Freelance / Local Rider', style: AppTypography.subheading),
+          Text('Delivery information', style: AppTypography.subheading),
           Text(
             'Seller Arranged · ${order == null ? '' : '#${order.orderNumber}'}',
             style: AppTypography.caption,
           ),
           const SizedBox(height: 16),
-          ThriftTextField(
-            label: 'Rider name',
-            hint: 'Juan Dela Cruz',
-            controller: _name,
-            error: _nameError,
-            readOnly: readOnly,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(
-                Validators.fullNameInputCharacters,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ThriftTextField(
-            label: 'Phone number',
-            hint: '09171234567',
-            controller: _phone,
-            keyboardType: TextInputType.phone,
-            error: _phoneError,
-            readOnly: readOnly,
-          ),
-          const SizedBox(height: 12),
-          Text('Vehicle type', style: AppTypography.label),
+          _buildSelectedRiderSection(readOnly: readOnly),
+          Text('Rider details', style: AppTypography.label),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final vehicle in DeliveryVehicleType.values)
-                ChoiceChip(
-                  label: Text(vehicle.label),
-                  selected: _vehicle == vehicle,
-                  selectedColor: AppColors.primaryLight,
-                  onSelected: readOnly
-                      ? null
-                      : (_) => setState(() => _vehicle = vehicle),
-                ),
-            ],
+          SavedRiderFormFields(
+            nameController: _name,
+            phoneController: _phone,
+            plateController: _plate,
+            notesController: _notes,
+            vehicle: _vehicle,
+            onVehicleChanged: (v) => setState(() => _vehicle = v),
+            nameError: _nameError,
+            phoneError: _phoneError,
+            plateError: _plateError,
+            readOnly: readOnly,
+            showDefaultNotes: false,
           ),
           const SizedBox(height: 12),
           ThriftTextField(
-            label: 'Plate number',
-            hint: 'ABC 1234',
-            controller: _plate,
-            error: _plateError,
+            label: 'Delivery notes (optional)',
+            hint: 'Meet at the gate, call on arrival…',
+            controller: _notes,
+            maxLines: 3,
             readOnly: readOnly,
           ),
           const SizedBox(height: 12),
@@ -218,15 +359,6 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
             readOnly: true,
             onTap: readOnly ? null : _pickEstimated,
           ),
-          const SizedBox(height: 12),
-          ThriftTextField(
-            label: 'Delivery notes (optional)',
-            hint: 'Meet at the gate, call on arrival…',
-            controller: _notes,
-            maxLines: 3,
-            readOnly: readOnly,
-          ),
-          const SizedBox(height: 12),
         ],
       ),
     );

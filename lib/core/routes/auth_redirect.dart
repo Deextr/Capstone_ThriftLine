@@ -63,6 +63,8 @@ bool isSellerWorkspaceLocation(String location) {
   if (location == RouteNames.myShop) return true;
   if (location == RouteNames.sellerAnalytics) return true;
   if (location == RouteNames.sellerShopAddress) return true;
+  if (location == RouteNames.sellerMyRiders) return true;
+  if (location == RouteNames.sellerSavedRiderEditor) return true;
   if (location.startsWith('/edit-listing/')) return true;
   if (location.startsWith('/seller-order/')) return true;
   return false;
