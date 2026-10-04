@@ -57,6 +57,10 @@ import '../../features/seller/presentation/screens/seller_analytics_screen.dart'
 import '../../features/seller/controllers/seller_shop_address_controller.dart';
 import '../../features/seller/data/seller_shop_address_service.dart';
 import '../../features/seller/presentation/screens/seller_shop_address_screen.dart';
+import '../../features/seller/controllers/seller_saved_riders_controller.dart';
+import '../../features/seller/data/seller_saved_riders_service.dart';
+import '../../features/seller/presentation/screens/seller_saved_rider_editor_screen.dart';
+import '../../features/seller/presentation/screens/seller_saved_riders_screen.dart';
 import '../../features/seller/controllers/seller_orders_controller.dart';
 import '../../providers/cart_provider.dart';
 import '../../features/buyer/presentation/screens/product_detail_screen.dart';
@@ -747,6 +751,24 @@ GoRouter createAppRouter({
           ),
           child: const SellerShopAddressScreen(),
         ),
+      ),
+      GoRoute(
+        path: RouteNames.sellerMyRiders,
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => SellerSavedRidersController(
+            service: SellerSavedRidersService(
+              context.read<SupabaseService>(),
+            ),
+          ),
+          child: const SellerSavedRidersScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.sellerSavedRiderEditor,
+        builder: (context, state) {
+          final id = state.uri.queryParameters['id'];
+          return SellerSavedRiderEditorScreen(savedRiderId: id);
+        },
       ),
       GoRoute(
         path: RouteNames.paymentMethods,

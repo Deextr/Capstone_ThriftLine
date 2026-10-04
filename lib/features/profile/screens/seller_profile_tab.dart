@@ -53,6 +53,11 @@ class SellerProfileTab extends StatelessWidget {
                 label: 'Analytics Report',
                 onTap: () => context.push(RouteNames.sellerAnalytics),
               ),
+              _MenuItem(
+                icon: Icons.two_wheeler_outlined,
+                label: 'My Riders',
+                onTap: () => context.push(RouteNames.sellerMyRiders),
+              ),
             ],
           ),
 
