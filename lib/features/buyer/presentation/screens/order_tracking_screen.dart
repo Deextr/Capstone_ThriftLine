@@ -16,6 +16,7 @@ import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/rider_contact_card.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../widgets/item_return_panel.dart';
+import '../../../trust_safety/presentation/widgets/order_community_report_panel.dart';
 import '../../../trust_safety/presentation/widgets/order_review_cta.dart';
 import '../../controllers/buyer_orders_controller.dart';
 import '../buyer_delivery_status.dart';
@@ -33,6 +34,9 @@ class OrderTrackingScreen extends StatelessWidget {
     }
 
     final order = controller.order;
+    final orderReport = order == null
+        ? null
+        : controller.reportForOrder(order.id);
     if (order == null) {
       return Scaffold(
         appBar: AppBar(
@@ -200,16 +204,26 @@ class OrderTrackingScreen extends StatelessWidget {
                     showSpinner: false,
                   ),
                 ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: () => context.push(
-                      RouteNames.reportUser(
-                        userId: order.sellerId,
-                        orderId: order.id,
+                if (orderReport == null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: () => context.push(
+                        RouteNames.reportUser(
+                          userId: order.sellerId,
+                          orderId: order.id,
+                        ),
                       ),
+                      child: const Text('Report this seller'),
                     ),
-                    child: const Text('Report this seller'),
+                  ),
+              ],
+              if (orderReport != null) ...[
+                const SizedBox(height: 16),
+                OrderCommunityReportPanel(
+                  report: orderReport,
+                  onReturned: () => context.read<BuyerOrdersController>().load(
+                    showSpinner: false,
                   ),
                 ),
               ],

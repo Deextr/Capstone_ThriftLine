@@ -94,11 +94,7 @@ class _ReportSellerScreenState extends State<ReportSellerScreen> {
                             if (!context.mounted || error == null) {
                               return;
                             }
-                            showThriftSnackBar(
-                              context,
-                              error,
-                              isError: true,
-                            );
+                            showThriftSnackBar(context, error, isError: true);
                           },
                           child: const Text('Find member'),
                         ),
@@ -110,8 +106,7 @@ class _ReportSellerScreenState extends State<ReportSellerScreen> {
                     ...kReportReasons.map(
                       (reason) => _ReasonTile(
                         reason: reason,
-                        selected:
-                            controller.selectedCategory == reason.slug,
+                        selected: controller.selectedCategory == reason.slug,
                         onTap: () => context
                             .read<ReportUserController>()
                             .selectCategory(reason.slug),

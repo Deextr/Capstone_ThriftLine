@@ -1,3 +1,4 @@
+import '../core/utils/report_status.dart';
 import 'base_model.dart';
 
 class ReportEvidenceItem {
@@ -127,7 +128,7 @@ class CommunityReportModel extends BaseModel {
       orderTitle: orderTitle ?? row['order_title'] as String?,
       category: row['category'] as String? ?? 'other',
       details: row['details'] as String? ?? '',
-      status: row['status'] as String? ?? 'under_review',
+      status: reportStatusFromDb(row['status']),
       adminResponse: row['admin_response'] as String?,
       reviewedBy: row['reviewed_by'] as String?,
       createdAt: parseTime(row['created_at']) ?? DateTime.now(),

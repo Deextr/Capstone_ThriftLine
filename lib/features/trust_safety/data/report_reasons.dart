@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/report_status.dart';
+
 class ReportReason {
   const ReportReason({
     required this.slug,
@@ -101,22 +103,43 @@ String reportReasonLabel(String slug) {
 }
 
 String reportStatusLabel(String status) {
-  return switch (status) {
+  final normalized = reportStatusFromDb(status);
+  return switch (normalized) {
     'under_review' => 'Under Review',
     'action_taken' => 'Action Taken',
     'resolved' => 'Resolved',
     'dismissed' => 'Dismissed',
-    _ => 'Under Review',
+    _ =>
+      normalized
+          .split('_')
+          .map(
+            (part) => part.isEmpty
+                ? part
+                : '${part[0].toUpperCase()}${part.substring(1)}',
+          )
+          .join(' '),
   };
 }
 
 Color reportStatusColor(String status) {
-  return switch (status) {
+  final normalized = reportStatusFromDb(status);
+  return switch (normalized) {
     'under_review' => const Color(0xFFF59E0B),
     'action_taken' => const Color(0xFF10B981),
     'resolved' => const Color(0xFF10B981),
     'dismissed' => const Color(0xFF64748B),
-    _ => const Color(0xFF3B82F6),
+    _ => const Color(0xFF64748B),
+  };
+}
+
+String reportStatusDescription(String status) {
+  final normalized = reportStatusFromDb(status);
+  return switch (normalized) {
+    'under_review' => 'Your report is currently being reviewed.',
+    'action_taken' => 'The review is complete and action was taken.',
+    'resolved' => 'The review has been completed.',
+    'dismissed' => 'The report was reviewed and dismissed.',
+    _ => 'Open report details for the latest update.',
   };
 }
 
