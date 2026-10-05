@@ -27,6 +27,19 @@ class SellerVerificationService {
     if (userId == null) {
       throw StateError('You must be signed in to apply.');
     }
+    final profile = await _supabase.client
+        .from('users')
+        .select('is_phone_verified, phone_number')
+        .eq('user_id', userId)
+        .maybeSingle();
+    final verified = profile?['is_phone_verified'] == true;
+    final phone = profile?['phone_number']?.toString() ?? '';
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    if (!verified || digits.length != 11 || !digits.startsWith('09')) {
+      throw SellerSubmitException(
+        'Verify your mobile number before submitting your seller application.',
+      );
+    }
     if (!address.barangay!.isDavaoCity) {
       throw StateError('Shop address must be in Davao City.');
     }
@@ -258,6 +271,10 @@ String sellerSubmitUserMessage(Object error) {
         message.contains('not-null') ||
         message.contains('null value')) {
       return 'The application is missing a required field. Please try again.';
+    }
+    if (message.contains('mobile number') ||
+        message.contains('verify your philippine')) {
+      return 'Verify your mobile number before submitting your seller application.';
     }
     if (code == '42501' || message.contains('row-level security')) {
       return 'Could not save the application. Please sign in again and retry.';

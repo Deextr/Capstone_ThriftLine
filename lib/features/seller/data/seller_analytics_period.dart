@@ -162,8 +162,7 @@ SellerAnalyticsPeriodWindow resolveSellerAnalyticsPeriod({
       final duration = rangeEnd.difference(rangeStart);
       final compareEnd = rangeStart;
       final compareStart = compareEnd.subtract(duration);
-      final label =
-          '${_formatShort(start)} – ${_formatShort(end)}';
+      final label = '${_formatShort(start)} – ${_formatShort(end)}';
       final bucket = duration.inDays > 120 ? 'month' : 'day';
       return SellerAnalyticsPeriodWindow(
         preset: preset,
@@ -201,5 +200,7 @@ class SellerAnalyticsPeriodException implements Exception {
   final String message;
 
   factory SellerAnalyticsPeriodException.invalidCustomRange() =>
-      SellerAnalyticsPeriodException('Start date must be on or before end date.');
+      SellerAnalyticsPeriodException(
+        'Start date must be on or before end date.',
+      );
 }

@@ -10,6 +10,7 @@ import '../../../../models/enums.dart';
 import '../../../../models/product_model.dart';
 import '../../../../providers/auth_provider.dart';
 import '../data/catalog_product_query.dart';
+import '../domain/bid_placement_result.dart';
 
 /// Controller for managing the buyer's active, won, and lost auction bids.
 ///
@@ -46,9 +47,12 @@ class BuyerBidsController extends ChangeNotifier {
       )
       .toList();
 
-  /// Won bids (auction ended and current user is winner)
-  List<UserBid> get wonBids =>
-      _allBids.where((b) => b.status == BidStatus.won).toList();
+  /// Won bids and optional second-chance offers for this buyer.
+  List<UserBid> get wonBids => _allBids
+      .where(
+        (b) => b.status == BidStatus.won || b.status == BidStatus.secondChance,
+      )
+      .toList();
 
   /// Lost bids (auction ended and another bidder won)
   List<UserBid> get lostBids =>
@@ -286,33 +290,39 @@ class BuyerBidsController extends ChangeNotifier {
 
   /// Places or raises a bid on an auction through `place_bid` only.
   ///
-  /// Returns `null` on success, or an error message. Does not wait for the
-  /// bids list to reload — that refresh is quiet and happens after return.
-  Future<String?> raiseBid({
+  /// Does not wait for the bids list to reload — that refresh is quiet.
+  Future<BidPlacementResult> raiseBid({
     required String auctionId,
     required double amount,
   }) async {
     if (_auth.user?.id == null) {
-      return 'Please sign in to place a bid.';
+      return BidPlacementResult.failure('Please sign in to place a bid.');
     }
     if (auctionId.isEmpty) {
-      return 'Auction record not found.';
+      return BidPlacementResult.failure('Auction record not found.');
     }
 
     try {
-      final rpcRes = await _supabase.client.rpc(
-        'place_bid',
-        params: {'p_auction_id': auctionId, 'p_amount': amount},
-      );
+      final deviceToken = await _auth.deviceInstallTokenForRisk();
+      final params = <String, dynamic>{
+        'p_auction_id': auctionId,
+        'p_amount': amount,
+      };
+      if (deviceToken != null) {
+        params['p_device_token_hash'] = deviceToken;
+      }
+      final rpcRes = await _supabase.client.rpc('place_bid', params: params);
 
       if (supabaseRpcSuccess(rpcRes)) {
         unawaited(loadBids(showLoading: false, settleExpired: false));
-        return null;
+        return BidPlacementResult.success;
       }
-      return supabaseRpcError(rpcRes, fallback: 'Failed to place bid.');
+      return BidPlacementResult.fromRpc(rpcRes);
     } catch (e) {
       debugPrint('place_bid RPC error: $e');
-      return 'Failed to place bid. Please try again.';
+      return BidPlacementResult.failure(
+        'Failed to place bid. Please try again.',
+      );
     }
   }
 
@@ -395,6 +405,30 @@ class BuyerBidsController extends ChangeNotifier {
 
   /// Pull-to-refresh helper.
   Future<void> refresh() => loadBids();
+
+  /// Declines an optional second-chance auction offer (no violation).
+  Future<String?> declineSecondChance(String orderId) async {
+    if (orderId.isEmpty) {
+      return 'Order not found.';
+    }
+    try {
+      final rpcRes = await _supabase.client.rpc(
+        'decline_auction_second_chance',
+        params: {'p_order_id': orderId},
+      );
+      if (supabaseRpcSuccess(rpcRes)) {
+        unawaited(loadBids(showLoading: false, settleExpired: true));
+        return null;
+      }
+      return supabaseRpcError(
+        rpcRes,
+        fallback: 'Could not decline this offer.',
+      );
+    } catch (e) {
+      debugPrint('decline_auction_second_chance error: $e');
+      return 'Could not decline this offer.';
+    }
+  }
 
   /// Pending order created by close_auctions / ensure_auction_order.
   Future<String?> orderIdForWonAuction(String auctionId) async {

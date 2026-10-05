@@ -47,7 +47,8 @@ class TrackOrdersScreen extends StatelessWidget {
     }
     if (controller.errorMessage != null && controller.orders.isEmpty) {
       return ErrorState(
-        message: controller.errorMessage ??
+        message:
+            controller.errorMessage ??
             'Unable to load your orders. Please try again.',
         onRetry: controller.load,
       );

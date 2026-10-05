@@ -137,6 +137,28 @@ void main() {
       expect(bidStatusFromView('leading'), BidStatus.winning);
       expect(bidStatusFromView('winning'), BidStatus.winning);
       expect(bidStatusFromView('won'), BidStatus.won);
+      expect(bidStatusFromView('second_chance'), BidStatus.secondChance);
+    });
+
+    test('parses second-chance fields from v_user_bids row', () {
+      final bid = UserBid.fromSupabase({
+        'bid_id': 'bid-sc',
+        'bidder_id': 'user-2',
+        'bid_amount': 800.0,
+        'is_highest_bid': false,
+        'created_at': '2026-09-07T12:00:00Z',
+        'auction_id': 'auc-1',
+        'product_id': 'prod-1',
+        'auction_status': 'ended',
+        'bid_status': 'second_chance',
+        'payment_due_at': '2026-09-08T12:00:00Z',
+        'auction_offer_rank': 2,
+        'auction_order_id': 'ord-sc',
+      });
+      expect(bid.status, BidStatus.secondChance);
+      expect(bid.auctionOfferRank, 2);
+      expect(bid.auctionOrderId, 'ord-sc');
+      expect(bid.isSecondChanceOffer, isTrue);
     });
 
     test('AuctionBidQuote uses live current price plus increment', () {

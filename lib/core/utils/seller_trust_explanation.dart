@@ -19,7 +19,9 @@ abstract final class SellerTrustExplanation {
     final range = transactionRangeLabel(count);
     final thrift = breakdown.completedThriftline;
     final external = breakdown.verifiedExternal;
-    if (thrift != null && external != null && (external > 0 || thrift != count)) {
+    if (thrift != null &&
+        external != null &&
+        (external > 0 || thrift != count)) {
       return 'You have $count transactions counted toward trust '
           '($thrift completed on ThriftLine'
           '${external > 0 ? ', $external verified outside ThriftLine (capped at 10)' : ''}). '
@@ -33,7 +35,10 @@ abstract final class SellerTrustExplanation {
         'This places you in the $range.';
   }
 
-  static String identityTitle({required bool isVerified, required int ivScore}) {
+  static String identityTitle({
+    required bool isVerified,
+    required int ivScore,
+  }) {
     if (ivScore >= 100) return 'Fully verified';
     if (isVerified || ivScore >= 75) return 'Verified';
     if (ivScore > 0) return 'Partially verified';
@@ -119,7 +124,9 @@ abstract final class SellerTrustExplanation {
     if (breakdown.transactions >= 60) {
       parts.add('your transaction history is a strong contributor');
     } else if (txCount > 0) {
-      parts.add('you have some successful transactions, and more completed orders can help');
+      parts.add(
+        'you have some successful transactions, and more completed orders can help',
+      );
     } else {
       parts.add('completing successful orders can strengthen your profile');
     }
@@ -129,7 +136,9 @@ abstract final class SellerTrustExplanation {
     } else if (ratingCount == 0) {
       parts.add('ratings will matter more as buyers review completed orders');
     } else {
-      parts.add('consistent service on completed orders can improve ratings over time');
+      parts.add(
+        'consistent service on completed orders can improve ratings over time',
+      );
     }
 
     final confirmed = sellerTrustConfirmedReportCount(breakdown);

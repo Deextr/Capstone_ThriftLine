@@ -47,7 +47,13 @@ class _FollowingShopsScreenState extends State<FollowingShopsScreen> {
               child: RefreshIndicator(
                 color: AppColors.primary,
                 onRefresh: controller.refresh,
-                child: _buildBody(context, controller, shops, isLoading, hasError),
+                child: _buildBody(
+                  context,
+                  controller,
+                  shops,
+                  isLoading,
+                  hasError,
+                ),
               ),
             ),
           ],
@@ -173,7 +179,9 @@ class _FollowingShopsScreenState extends State<FollowingShopsScreen> {
                       ? AppColors.primaryDark
                       : AppColors.textSecondary,
                 ),
-                backgroundColor: AppColors.surfaceVariant.withValues(alpha: 0.6),
+                backgroundColor: AppColors.surfaceVariant.withValues(
+                  alpha: 0.6,
+                ),
                 selectedColor: AppColors.primaryLight,
                 checkmarkColor: AppColors.primaryDark,
                 shape: RoundedRectangleBorder(
@@ -469,7 +477,6 @@ class _FollowingShopsScreenState extends State<FollowingShopsScreen> {
     );
   }
 }
-
 
 class _FollowingShopsSkeleton extends StatelessWidget {
   const _FollowingShopsSkeleton();

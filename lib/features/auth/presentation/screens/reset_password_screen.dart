@@ -126,122 +126,123 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                             : () => _abandonRecovery(),
                       ),
                     ),
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return SingleChildScrollView(
-                          padding: EdgeInsets.fromLTRB(
-                            AppConstants.spacingLg,
-                            compact ? 4 : AppConstants.spacingSm,
-                            AppConstants.spacingLg,
-                            AppConstants.spacingLg,
-                          ),
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              minHeight:
-                                  constraints.maxHeight -
-                                  (compact ? 4 : AppConstants.spacingSm) -
-                                  AppConstants.spacingLg,
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return SingleChildScrollView(
+                            padding: EdgeInsets.fromLTRB(
+                              AppConstants.spacingLg,
+                              compact ? 4 : AppConstants.spacingSm,
+                              AppConstants.spacingLg,
+                              AppConstants.spacingLg,
                             ),
-                            child: linkError != null || !canReset
-                                ? _InvalidLinkBody(
-                                    message:
-                                        linkError ??
-                                        'Open the password reset link from your '
-                                            'email on this device to continue.',
-                                    compact: compact,
-                                    onBackToLogin: () => _abandonRecovery(),
-                                  )
-                                : Form(
-                                    key: _formKey,
-                                    autovalidateMode: _submitted
-                                        ? AutovalidateMode.onUserInteraction
-                                        : AutovalidateMode.disabled,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Center(
-                                          child: AuthBrandLogo(
-                                            size: compact ? 72 : 84,
-                                          ),
-                                        ),
-                                        SizedBox(height: compact ? 12 : 16),
-                                        Text(
-                                          'Choose a new password',
-                                          style: AppTypography.heading.copyWith(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          'Create a strong password you have not used '
-                                          'on ThriftLine before.',
-                                          style: AppTypography.body.copyWith(
-                                            color: Colors.white.withValues(
-                                              alpha: 0.82,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minHeight:
+                                    constraints.maxHeight -
+                                    (compact ? 4 : AppConstants.spacingSm) -
+                                    AppConstants.spacingLg,
+                              ),
+                              child: linkError != null || !canReset
+                                  ? _InvalidLinkBody(
+                                      message:
+                                          linkError ??
+                                          'Open the password reset link from your '
+                                              'email on this device to continue.',
+                                      compact: compact,
+                                      onBackToLogin: () => _abandonRecovery(),
+                                    )
+                                  : Form(
+                                      key: _formKey,
+                                      autovalidateMode: _submitted
+                                          ? AutovalidateMode.onUserInteraction
+                                          : AutovalidateMode.disabled,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Center(
+                                            child: AuthBrandLogo(
+                                              size: compact ? 72 : 84,
                                             ),
                                           ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                        SizedBox(height: compact ? 24 : 32),
-                                        ThriftTextField(
-                                          label: 'New password',
-                                          controller: _passwordController,
-                                          obscureText: _obscurePassword,
-                                          icon: Icons.lock_outline,
-                                          validator: Validators.password,
-                                          labelColor: fieldLabelColor,
-                                          suffix: IconButton(
-                                            icon: Icon(
-                                              _obscurePassword
-                                                  ? Icons.visibility_outlined
-                                                  : Icons
-                                                        .visibility_off_outlined,
-                                            ),
-                                            onPressed: () => setState(
-                                              () => _obscurePassword =
-                                                  !_obscurePassword,
-                                            ),
+                                          SizedBox(height: compact ? 12 : 16),
+                                          Text(
+                                            'Choose a new password',
+                                            style: AppTypography.heading
+                                                .copyWith(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                            textAlign: TextAlign.center,
                                           ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        ThriftTextField(
-                                          label: 'Confirm password',
-                                          controller:
-                                              _confirmPasswordController,
-                                          obscureText: _obscurePassword,
-                                          icon: Icons.lock_reset_outlined,
-                                          validator: (value) =>
-                                              Validators.confirmPassword(
-                                                value,
-                                                _passwordController.text,
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Create a strong password you have not used '
+                                            'on ThriftLine before.',
+                                            style: AppTypography.body.copyWith(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.82,
                                               ),
-                                          labelColor: fieldLabelColor,
-                                        ),
-                                        SizedBox(height: compact ? 20 : 24),
-                                        ThriftButton(
-                                          label: 'Update password',
-                                          onPressed: auth.isLoading
-                                              ? null
-                                              : _submit,
-                                          isLoading: auth.isLoading,
-                                        ),
-                                      ],
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                          SizedBox(height: compact ? 24 : 32),
+                                          ThriftTextField(
+                                            label: 'New password',
+                                            controller: _passwordController,
+                                            obscureText: _obscurePassword,
+                                            icon: Icons.lock_outline,
+                                            validator: Validators.password,
+                                            labelColor: fieldLabelColor,
+                                            suffix: IconButton(
+                                              icon: Icon(
+                                                _obscurePassword
+                                                    ? Icons.visibility_outlined
+                                                    : Icons
+                                                          .visibility_off_outlined,
+                                              ),
+                                              onPressed: () => setState(
+                                                () => _obscurePassword =
+                                                    !_obscurePassword,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          ThriftTextField(
+                                            label: 'Confirm password',
+                                            controller:
+                                                _confirmPasswordController,
+                                            obscureText: _obscurePassword,
+                                            icon: Icons.lock_reset_outlined,
+                                            validator: (value) =>
+                                                Validators.confirmPassword(
+                                                  value,
+                                                  _passwordController.text,
+                                                ),
+                                            labelColor: fieldLabelColor,
+                                          ),
+                                          SizedBox(height: compact ? 20 : 24),
+                                          ThriftButton(
+                                            label: 'Update password',
+                                            onPressed: auth.isLoading
+                                                ? null
+                                                : _submit,
+                                            isLoading: auth.isLoading,
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                          ),
-                        );
-                      },
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
             ],
           ),
         ),

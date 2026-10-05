@@ -50,8 +50,8 @@ class SellerProfile {
     final avatarUrl = shopAvatar != null && shopAvatar.trim().isNotEmpty
         ? shopAvatar
         : user?['avatar'] as String? ??
-            (row['avatar'] as String? ??
-                'https://ui-avatars.com/api/?name=${Uri.encodeComponent(ownerName)}&background=0D9488&color=fff&size=150');
+              (row['avatar'] as String? ??
+                  'https://ui-avatars.com/api/?name=${Uri.encodeComponent(ownerName)}&background=0D9488&color=fff&size=150');
 
     final bannerUrl =
         row['banner_url'] as String? ?? row['cover_image'] as String?;

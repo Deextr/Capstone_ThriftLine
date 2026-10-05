@@ -55,7 +55,10 @@ AiSearchResult parseAiSearch(String query) {
     }
   }
 
-  final sizeMatch = RegExp(r'size\s*([xsml\d/]+)', caseSensitive: false).firstMatch(lower);
+  final sizeMatch = RegExp(
+    r'size\s*([xsml\d/]+)',
+    caseSensitive: false,
+  ).firstMatch(lower);
   if (sizeMatch != null) {
     size = sizeMatch.group(1)?.toUpperCase();
   } else {
@@ -63,18 +66,31 @@ AiSearchResult parseAiSearch(String query) {
     if (numSize != null) size = numSize.group(1);
   }
 
-  final underMatch = RegExp(r'under\s*₱?\s*(\d+)', caseSensitive: false).firstMatch(lower);
+  final underMatch = RegExp(
+    r'under\s*₱?\s*(\d+)',
+    caseSensitive: false,
+  ).firstMatch(lower);
   if (underMatch != null) {
     priceMax = double.tryParse(underMatch.group(1)!);
   }
 
-  final rangeMatch = RegExp(r'₱?\s*(\d+)\s*[-–]\s*₱?\s*(\d+)').firstMatch(lower);
+  final rangeMatch = RegExp(
+    r'₱?\s*(\d+)\s*[-–]\s*₱?\s*(\d+)',
+  ).firstMatch(lower);
   if (rangeMatch != null) {
     priceMin = double.tryParse(rangeMatch.group(1)!);
     priceMax = double.tryParse(rangeMatch.group(2)!);
   }
 
-  const styles = ['90s', 'y2k', 'vintage', 'korean', 'cottagecore', 'streetwear', 'baggy'];
+  const styles = [
+    '90s',
+    'y2k',
+    'vintage',
+    'korean',
+    'cottagecore',
+    'streetwear',
+    'baggy',
+  ];
   for (final s in styles) {
     if (lower.contains(s)) {
       style = s.toUpperCase();

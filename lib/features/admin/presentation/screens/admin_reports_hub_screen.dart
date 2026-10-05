@@ -43,6 +43,11 @@ class AdminReportsHubScreen extends StatelessWidget {
               ),
         actions: [
           IconButton(
+            tooltip: 'Bid risk events',
+            icon: const Icon(Icons.gavel_outlined),
+            onPressed: () => context.push(RouteNames.adminBidRiskEvents),
+          ),
+          IconButton(
             tooltip: 'Disabled accounts',
             icon: const Icon(Icons.person_off_outlined),
             onPressed: () => context.push(RouteNames.adminDisabledAccounts),
@@ -108,10 +113,8 @@ class AdminReportsHubScreen extends StatelessWidget {
                       ),
                       icon: Icons.groups_outlined,
                       loading: controller.isLoading,
-                      onTap: () => _openCategory(
-                        context,
-                        AdminReportKind.community,
-                      ),
+                      onTap: () =>
+                          _openCategory(context, AdminReportKind.community),
                     ),
                     const SizedBox(height: 12),
                     AdminReportCategoryCard(
@@ -119,7 +122,8 @@ class AdminReportsHubScreen extends StatelessWidget {
                       summary: controller.kindSummary(AdminReportKind.order),
                       icon: Icons.local_shipping_outlined,
                       loading: controller.isLoading,
-                      onTap: () => _openCategory(context, AdminReportKind.order),
+                      onTap: () =>
+                          _openCategory(context, AdminReportKind.order),
                     ),
                     const SizedBox(height: 12),
                     AdminReportCategoryCard(
@@ -129,10 +133,8 @@ class AdminReportsHubScreen extends StatelessWidget {
                       ),
                       icon: Icons.manage_search_outlined,
                       loading: controller.isLoading,
-                      onTap: () => _openCategory(
-                        context,
-                        AdminReportKind.lookingFor,
-                      ),
+                      onTap: () =>
+                          _openCategory(context, AdminReportKind.lookingFor),
                     ),
                   ],
                 ),

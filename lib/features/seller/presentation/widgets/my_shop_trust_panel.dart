@@ -54,10 +54,7 @@ class _MyShopTrustPanelState extends State<MyShopTrustPanel> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _ScoreRing(
-                score: user.trustScore,
-                accent: AppColors.primary,
-              ),
+              _ScoreRing(score: user.trustScore, accent: AppColors.primary),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -117,9 +114,7 @@ class _MyShopTrustPanelState extends State<MyShopTrustPanel> {
             const SizedBox(height: 18),
             Text(
               'How your score is built',
-              style: AppTypography.body.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+              style: AppTypography.body.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 6),
             Text(
@@ -150,7 +145,7 @@ class _MyShopTrustPanelState extends State<MyShopTrustPanel> {
               headline: sellerTrustTransactionCount(breakdown) <= 0
                   ? 'No counted transactions yet'
                   : '${sellerTrustTransactionCount(breakdown)} completed '
-                      'transaction${sellerTrustTransactionCount(breakdown) == 1 ? '' : 's'}',
+                        'transaction${sellerTrustTransactionCount(breakdown) == 1 ? '' : 's'}',
               detail: SellerTrustExplanation.transactionDetail(breakdown),
               factorScore: breakdown.transactions,
             ),
@@ -201,9 +196,7 @@ class _MyShopTrustPanelState extends State<MyShopTrustPanel> {
                       ),
                     ),
                     Icon(
-                      _showCalculation
-                          ? Icons.expand_less
-                          : Icons.expand_more,
+                      _showCalculation ? Icons.expand_less : Icons.expand_more,
                       color: AppColors.primary,
                       size: 20,
                     ),
@@ -211,7 +204,8 @@ class _MyShopTrustPanelState extends State<MyShopTrustPanel> {
                 ),
               ),
             ),
-            if (_showCalculation) _CalculationDetails(user: user, breakdown: breakdown),
+            if (_showCalculation)
+              _CalculationDetails(user: user, breakdown: breakdown),
           ] else ...[
             const SizedBox(height: 12),
             Text(
@@ -353,9 +347,7 @@ class _FactorCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               headline,
-              style: AppTypography.body.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
             ),
             if (trailing != null) ...[const SizedBox(height: 4), trailing!],
             const SizedBox(height: 4),

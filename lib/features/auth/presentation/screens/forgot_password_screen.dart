@@ -73,8 +73,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final screenHeight = MediaQuery.sizeOf(context).height;
     final compact = screenHeight < 700;
     const fieldLabelColor = Colors.white;
-    final canSubmit =
-        !auth.isLoading && (_turnstileToken?.isNotEmpty ?? false);
+    final canSubmit = !auth.isLoading && (_turnstileToken?.isNotEmpty ?? false);
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -187,9 +186,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                         ),
                                         const SizedBox(height: 20),
                                         GestureDetector(
-                                          onTap: () => context.go(
-                                            RouteNames.emailLogin,
-                                          ),
+                                          onTap: () =>
+                                              context.go(RouteNames.emailLogin),
                                           child: Text(
                                             'Back to login',
                                             style: AppTypography.body.copyWith(

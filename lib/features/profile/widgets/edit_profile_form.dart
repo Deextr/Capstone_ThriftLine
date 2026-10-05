@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/ph_phone.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../widgets/thrift_widgets.dart';
 import 'edit_profile_email_section.dart';
+import 'edit_profile_phone_section.dart';
 
 class EditProfileForm extends StatefulWidget {
   const EditProfileForm({
@@ -18,6 +18,7 @@ class EditProfileForm extends StatefulWidget {
     required this.isSellerMode,
     required this.canChangeEmail,
     this.errorMessage,
+    this.onPhoneVerified,
   });
 
   final String initialName;
@@ -28,11 +29,13 @@ class EditProfileForm extends StatefulWidget {
   final bool isSellerMode;
   final bool canChangeEmail;
   final String? errorMessage;
+  final VoidCallback? onPhoneVerified;
   final Future<void> Function({
     required String fullName,
     required String username,
     required String phone,
-  }) onSave;
+  })
+  onSave;
 
   @override
   State<EditProfileForm> createState() => _EditProfileFormState();
@@ -44,6 +47,7 @@ class _EditProfileFormState extends State<EditProfileForm> {
   late TextEditingController _nameController;
   late TextEditingController _usernameController;
   late TextEditingController _phoneController;
+  bool _phoneUserEdited = false;
 
   @override
   void initState() {
@@ -51,6 +55,18 @@ class _EditProfileFormState extends State<EditProfileForm> {
     _nameController = TextEditingController(text: widget.initialName);
     _usernameController = TextEditingController(text: widget.initialUsername);
     _phoneController = TextEditingController(text: widget.initialPhone);
+    _phoneController.addListener(_trackPhoneEdits);
+  }
+
+  void _trackPhoneEdits() {
+    final field = normalizePhMobile(_phoneController.text);
+    final initial = normalizePhMobile(widget.initialPhone);
+    if (field != null &&
+        initial != null &&
+        field != initial &&
+        isPhMobile09Format(field)) {
+      _phoneUserEdited = true;
+    }
   }
 
   @override
@@ -64,8 +80,11 @@ class _EditProfileFormState extends State<EditProfileForm> {
         _usernameController.text.isEmpty) {
       _usernameController.text = widget.initialUsername;
     }
-    if (oldWidget.initialPhone != widget.initialPhone &&
-        _phoneController.text.isEmpty) {
+    if (!_phoneUserEdited &&
+        oldWidget.initialPhone != widget.initialPhone &&
+        (_phoneController.text.isEmpty ||
+            normalizePhMobile(_phoneController.text) ==
+                normalizePhMobile(oldWidget.initialPhone))) {
       _phoneController.text = widget.initialPhone;
     }
   }
@@ -74,6 +93,7 @@ class _EditProfileFormState extends State<EditProfileForm> {
   void dispose() {
     _nameController.dispose();
     _usernameController.dispose();
+    _phoneController.removeListener(_trackPhoneEdits);
     _phoneController.dispose();
     super.dispose();
   }
@@ -95,18 +115,25 @@ class _EditProfileFormState extends State<EditProfileForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (widget.errorMessage != null && widget.errorMessage!.isNotEmpty) ...[
+          if (widget.errorMessage != null &&
+              widget.errorMessage!.isNotEmpty) ...[
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: AppColors.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: AppColors.error.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                  const Icon(
+                    Icons.error_outline,
+                    color: AppColors.error,
+                    size: 20,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -127,13 +154,15 @@ class _EditProfileFormState extends State<EditProfileForm> {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+              border: Border.all(
+                color: AppColors.border.withValues(alpha: 0.5),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.02),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
-                )
+                ),
               ],
             ),
             child: Column(
@@ -173,35 +202,18 @@ class _EditProfileFormState extends State<EditProfileForm> {
                     return null;
                   },
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 4, left: 4),
-                  child: Text(
-                    'Shared across Buyer and Seller modes.',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.textHint,
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 16),
                 EditProfileEmailSection(
                   currentEmail: widget.initialEmail,
                   canChangeEmail: widget.canChangeEmail,
                 ),
                 const SizedBox(height: 16),
-                ThriftTextField(
-                  label: 'Phone number',
-                  labelSuffix: const ThriftBadge(
-                    label: 'Unverified',
-                    variant: BadgeVariant.warning,
-                  ),
-                  hint: '+63 9XX XXX XXXX',
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[\d\+\-\s\(\)]')),
-                  ],
-                  icon: Icons.phone_outlined,
+                EditProfilePhoneSection(
+                  phoneController: _phoneController,
+                  onVerified: () {
+                    _phoneUserEdited = false;
+                    widget.onPhoneVerified?.call();
+                  },
                 ),
               ],
             ),

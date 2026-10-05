@@ -1,6 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   MAX_VERIFY_ATTEMPTS,
+  PHONE_ALREADY_IN_USE_MESSAGE,
+  isPhoneVerifiedByOtherAccount,
   maskPhMobile,
   normalizePhPhone,
   sha256Hex,
@@ -118,6 +120,14 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (await isPhoneVerifiedByOtherAccount(service, phone, userId)) {
+      console.log("verify-phone-otp failed", { reason: "phone_already_in_use" });
+      return json(409, {
+        error: PHONE_ALREADY_IN_USE_MESSAGE,
+        code: "phone_already_in_use",
+      });
+    }
+
     const incoming = await sha256Hex(`${pepper}:${userId}:${phone}:${token}`);
     if (!timingSafeEqual(incoming, String(challenge.code_hash))) {
       const nextAttempts = (challenge.attempt_count ?? 0) + 1;
@@ -153,7 +163,37 @@ Deno.serve(async (req) => {
       .from("users")
       .update({ phone_number: phone, is_phone_verified: true })
       .eq("user_id", userId);
-    if (updateError) throw updateError;
+    if (updateError) {
+      if (updateError.code === "23505") {
+        return json(409, {
+          error: PHONE_ALREADY_IN_USE_MESSAGE,
+          code: "phone_already_in_use",
+        });
+      }
+      throw updateError;
+    }
+
+    const deviceToken = String(body.device_token ?? "").trim();
+    const platformRaw = String(body.platform ?? "").trim().toLowerCase();
+    const platform =
+      platformRaw === "android" || platformRaw === "ios" ? platformRaw : "other";
+    if (deviceToken.length >= 32) {
+      const tokenHash =
+        /^[0-9a-f]{64}$/i.test(deviceToken)
+          ? deviceToken.toLowerCase()
+          : await sha256Hex(deviceToken);
+      const { error: signalError } = await service.rpc(
+        "register_user_install_signal",
+        {
+          p_user_id: userId,
+          p_token_hash: tokenHash,
+          p_platform: platform,
+        },
+      );
+      if (signalError) {
+        console.error("verify-phone-otp install signal", signalError);
+      }
+    }
 
     console.log("verify-phone-otp success", {
       user: userId.slice(0, 8),

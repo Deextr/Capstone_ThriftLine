@@ -133,8 +133,7 @@ class AuthProvider extends ChangeNotifier {
   String avatarUrlForMode(AccountMode mode) {
     final user = _user;
     if (user == null) return '';
-    if (mode == AccountMode.seller &&
-        user.sellerAvatarUrl.trim().isNotEmpty) {
+    if (mode == AccountMode.seller && user.sellerAvatarUrl.trim().isNotEmpty) {
       return user.sellerAvatarUrl;
     }
     return user.avatarUrl;
@@ -680,6 +679,17 @@ class AuthProvider extends ChangeNotifier {
     return error;
   }
 
+  /// Install-scoped token for bid-risk signals (hashed server-side).
+  Future<String?> deviceInstallTokenForRisk() async {
+    try {
+      final token = await _trustedDevices.currentToken();
+      if (isDeviceTrustToken(token)) return token;
+    } catch (e) {
+      debugPrint('AuthProvider.deviceInstallTokenForRisk: $e');
+    }
+    return null;
+  }
+
   /// Sends a phone OTP through the server-side FMCSMS function.
   Future<PhoneOtpResult> sendPhoneOtp(String phone) {
     return _authService.sendPhoneOtp(phone);
@@ -689,10 +699,14 @@ class AuthProvider extends ChangeNotifier {
   Future<PhoneOtpResult> verifyPhoneOtp({
     required String phone,
     required String token,
+    String? deviceToken,
+    String? platform,
   }) async {
     final result = await _authService.verifyPhoneOtp(
       phone: phone,
       token: token,
+      deviceToken: deviceToken,
+      platform: platform,
     );
     if (result.isOk) await reloadUser();
     return result;

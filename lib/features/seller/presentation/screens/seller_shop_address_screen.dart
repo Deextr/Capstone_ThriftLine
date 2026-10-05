@@ -36,16 +36,10 @@ class SellerShopAddressScreen extends StatelessWidget {
       body: ctrl.isLoading
           ? const _LoadingBody()
           : ctrl.errorMessage != null && ctrl.address == null
-              ? _ErrorBody(
-                  message: ctrl.errorMessage!,
-                  onRetry: ctrl.load,
-                )
-              : ctrl.isEditing
-                  ? _EditBody(controller: ctrl)
-                  : _ViewBody(
-                      address: ctrl.address!,
-                      onEdit: ctrl.startEditing,
-                    ),
+          ? _ErrorBody(message: ctrl.errorMessage!, onRetry: ctrl.load)
+          : ctrl.isEditing
+          ? _EditBody(controller: ctrl)
+          : _ViewBody(address: ctrl.address!, onEdit: ctrl.startEditing),
     );
   }
 }
@@ -82,7 +76,9 @@ class _ErrorBody extends StatelessWidget {
           children: [
             Text(
               message,
-              style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+              style: AppTypography.body.copyWith(
+                color: AppColors.textSecondary,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -148,10 +144,7 @@ class _ViewBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
-        ThriftButton(
-          label: 'Edit address',
-          onPressed: () => onEdit(),
-        ),
+        ThriftButton(label: 'Edit address', onPressed: () => onEdit()),
       ],
     );
   }
@@ -257,80 +250,80 @@ class _EditBodyState extends State<_EditBody> {
             MediaQuery.viewInsetsOf(context).bottom,
       ),
       children: [
+        Text(
+          'Update your shop address. This does not change buyer checkout '
+          'delivery addresses.',
+          style: AppTypography.caption.copyWith(
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        if (ctrl.validationMessage != null) ...[
+          const SizedBox(height: 12),
           Text(
-            'Update your shop address. This does not change buyer checkout '
-            'delivery addresses.',
-            style: AppTypography.caption.copyWith(
-              color: AppColors.textSecondary,
-              height: 1.4,
-            ),
-          ),
-          if (ctrl.validationMessage != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              ctrl.validationMessage!,
-              style: AppTypography.caption.copyWith(color: AppColors.error),
-            ),
-          ],
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border.withValues(alpha: 0.55)),
-            ),
-            child: Column(
-              children: [
-                ThriftTextField(
-                  label: 'Shop name',
-                  hint: 'e.g. Vintage Vibes PH',
-                  controller: _shopNameCtrl,
-                  icon: Icons.store_outlined,
-                ),
-                const SizedBox(height: 20),
-                DavaoBarangayField(
-                  barangays: ctrl.barangays,
-                  selected: _barangay,
-                  loading: ctrl.barangaysLoading,
-                  error: ctrl.barangayLoadError,
-                  onRetry: ctrl.retryBarangays,
-                  onSelected: (b) {
-                    if (!b.isDavaoCity) return;
-                    setState(() => _barangay = b);
-                  },
-                ),
-                const SizedBox(height: 20),
-                ThriftTextField(
-                  label: 'Address line 1',
-                  hint: 'Street, building, or house number',
-                  controller: _line1Ctrl,
-                  icon: Icons.location_on_outlined,
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 20),
-                ThriftTextField(
-                  label: 'Address line 2',
-                  hint: 'Unit / Floor / Building / Landmark',
-                  controller: _line2Ctrl,
-                  icon: Icons.apartment_outlined,
-                  labelSuffix: Text(
-                    'Optional',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.textHint,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          ThriftButton(
-            label: ctrl.isSaving ? 'Saving…' : 'Save changes',
-            onPressed: ctrl.isSaving ? null : _save,
+            ctrl.validationMessage!,
+            style: AppTypography.caption.copyWith(color: AppColors.error),
           ),
         ],
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.55)),
+          ),
+          child: Column(
+            children: [
+              ThriftTextField(
+                label: 'Shop name',
+                hint: 'e.g. Vintage Vibes PH',
+                controller: _shopNameCtrl,
+                icon: Icons.store_outlined,
+              ),
+              const SizedBox(height: 20),
+              DavaoBarangayField(
+                barangays: ctrl.barangays,
+                selected: _barangay,
+                loading: ctrl.barangaysLoading,
+                error: ctrl.barangayLoadError,
+                onRetry: ctrl.retryBarangays,
+                onSelected: (b) {
+                  if (!b.isDavaoCity) return;
+                  setState(() => _barangay = b);
+                },
+              ),
+              const SizedBox(height: 20),
+              ThriftTextField(
+                label: 'Address line 1',
+                hint: 'Street, building, or house number',
+                controller: _line1Ctrl,
+                icon: Icons.location_on_outlined,
+                maxLines: 2,
+              ),
+              const SizedBox(height: 20),
+              ThriftTextField(
+                label: 'Address line 2',
+                hint: 'Unit / Floor / Building / Landmark',
+                controller: _line2Ctrl,
+                icon: Icons.apartment_outlined,
+                labelSuffix: Text(
+                  'Optional',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textHint,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        ThriftButton(
+          label: ctrl.isSaving ? 'Saving…' : 'Save changes',
+          onPressed: ctrl.isSaving ? null : _save,
+        ),
+      ],
     );
   }
 }

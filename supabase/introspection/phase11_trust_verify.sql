@@ -18,6 +18,14 @@ WITH checks AS (
            public.trust_ur_score(NULL, 0),
            public.trust_cr_score(0)
          ) = 62
+  UNION ALL SELECT 41, 'partial IV 50 with neutral UR CR is 42 Under Review',
+         public.trust_weighted_sum(
+           public.trust_iv_score(true, false, true, true),
+           public.trust_st_score(0),
+           public.trust_ur_score(NULL, 0),
+           public.trust_cr_score(0)
+         ) = 42
+         AND public.trust_level_for(42) = 'Under Review'
   UNION ALL SELECT 5, '62 is New Seller',
          public.trust_level_for(62) = 'New Seller'
   UNION ALL SELECT 6, '100 and 90 are Highly Trusted Seller',

@@ -219,10 +219,7 @@ class AuthService {
     try {
       final response = await _supabaseService.client.functions.invoke(
         'send-password-reset',
-        body: {
-          'email': email.trim(),
-          'turnstile_token': turnstileToken.trim(),
-        },
+        body: {'email': email.trim(), 'turnstile_token': turnstileToken.trim()},
       );
       final data = response.data;
       if (data is Map && data['error'] != null) {
@@ -515,10 +512,7 @@ class AuthService {
     try {
       final response = await _supabaseService.client.functions.invoke(
         'send-email-otp',
-        body: {
-          'purpose': 'email_change',
-          'new_email': newEmail.trim(),
-        },
+        body: {'purpose': 'email_change', 'new_email': newEmail.trim()},
       );
       return _functionError(response);
     } on FunctionException catch (e) {
@@ -539,10 +533,7 @@ class AuthService {
     try {
       final response = await _supabaseService.client.functions.invoke(
         'verify-email-otp',
-        body: {
-          'purpose': 'email_change',
-          'token': token,
-        },
+        body: {'purpose': 'email_change', 'token': token},
       );
       final err = _functionError(response);
       if (err != null) return (error: err, email: null);
@@ -552,9 +543,12 @@ class AuthService {
       }
       return (error: null, email: null);
     } on FunctionException catch (e) {
-      debugPrint('AuthService.confirmEmailChangeOtp failed: status=${e.status}');
+      debugPrint(
+        'AuthService.confirmEmailChangeOtp failed: status=${e.status}',
+      );
       return (
-        error: _functionExceptionMessage(e) ??
+        error:
+            _functionExceptionMessage(e) ??
             'Could not verify that code. Please try again.',
         email: null,
       );
@@ -641,11 +635,20 @@ class AuthService {
   Future<PhoneOtpResult> verifyPhoneOtp({
     required String phone,
     required String token,
+    String? deviceToken,
+    String? platform,
   }) async {
     try {
+      final body = <String, dynamic>{'phone': phone, 'token': token};
+      if (deviceToken != null && deviceToken.isNotEmpty) {
+        body['device_token'] = deviceToken;
+      }
+      if (platform != null && platform.isNotEmpty) {
+        body['platform'] = platform;
+      }
       final response = await _supabaseService.client.functions.invoke(
         'verify-phone-otp',
-        body: {'phone': phone, 'token': token},
+        body: body,
       );
       return _phoneOtpResult(
         response,

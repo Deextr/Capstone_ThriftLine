@@ -22,8 +22,9 @@ class SellerAnalyticsComparison {
     if (percentChange == null) return null;
     if (percentChange == 0) return '→ 0%';
     final abs = percentChange!.abs();
-    final formatted =
-        abs >= 10 ? abs.round().toString() : abs.toStringAsFixed(1);
+    final formatted = abs >= 10
+        ? abs.round().toString()
+        : abs.toStringAsFixed(1);
     return percentChange! > 0 ? '↑ $formatted%' : '↓ $formatted%';
   }
 
@@ -48,10 +49,7 @@ class SellerAnalyticsComparison {
     required bool includeComparison,
   }) {
     if (!includeComparison) {
-      return const SellerAnalyticsComparison(
-        hasComparison: false,
-        label: '',
-      );
+      return const SellerAnalyticsComparison(hasComparison: false, label: '');
     }
     if (previous <= 0 && current <= 0) {
       return SellerAnalyticsComparison(

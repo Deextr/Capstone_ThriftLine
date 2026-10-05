@@ -89,10 +89,12 @@ class SellerAnalyticsReport {
       productsSold: readCentavos(map['products_sold']),
       previousProductsSold: readCentavos(map['previous_products_sold']),
       completedOrders: readCentavos(map['completed_orders']),
-      chart: asMaps(map['chart']).map(SellerAnalyticsChartPoint.fromMap).toList(),
-      recentSales: asMaps(map['recent_sales'])
-          .map(SellerAnalyticsRecentSale.fromMap)
-          .toList(),
+      chart: asMaps(
+        map['chart'],
+      ).map(SellerAnalyticsChartPoint.fromMap).toList(),
+      recentSales: asMaps(
+        map['recent_sales'],
+      ).map(SellerAnalyticsRecentSale.fromMap).toList(),
       includeComparison: includeComparison,
     );
   }
@@ -104,6 +106,9 @@ class SellerAnalyticsReport {
     if (!supabaseRpcSuccess(rpcRes)) return null;
     final map = supabaseRpcMap(rpcRes);
     if (map == null) return null;
-    return SellerAnalyticsReport.fromMap(map, includeComparison: includeComparison);
+    return SellerAnalyticsReport.fromMap(
+      map,
+      includeComparison: includeComparison,
+    );
   }
 }

@@ -107,6 +107,7 @@ enum BidStatus {
   winning,
   outbid,
   won,
+  secondChance,
   lost,
   expired;
 

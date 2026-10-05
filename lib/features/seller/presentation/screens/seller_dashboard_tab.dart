@@ -59,9 +59,7 @@ class SellerDashboardTab extends StatelessWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              SliverToBoxAdapter(
-                child: _ShopHeader(unread: unread),
-              ),
+              SliverToBoxAdapter(child: _ShopHeader(unread: unread)),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -214,7 +212,8 @@ class _ShopHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.user;
-    final shopName = auth.displayName ?? user?.shopName ?? user?.name ?? 'Your shop';
+    final shopName =
+        auth.displayName ?? user?.shopName ?? user?.name ?? 'Your shop';
     final greeting = _greetingText(user);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 6, 0),

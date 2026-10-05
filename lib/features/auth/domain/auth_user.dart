@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart' show User;
 
+import '../../../core/utils/ph_phone.dart';
 import '../../../core/utils/seller_trust.dart';
 import '../../../models/enums.dart';
 import 'trusted_device.dart';
@@ -79,6 +80,13 @@ class AuthUser {
   final String accountStatus;
 
   bool get isPermanentlyDisabled => accountStatus == 'banned';
+
+  /// `users.is_phone_verified` with a valid stored `09` mobile number.
+  bool get hasVerifiedAccountPhone {
+    if (!isPhoneVerified) return false;
+    final normalized = normalizePhMobile(phone);
+    return normalized != null && isPhMobile09Format(normalized);
+  }
 
   String get displayName => role == UserRole.seller ? (shopName ?? name) : name;
   bool get isBuyer => role == UserRole.buyer;

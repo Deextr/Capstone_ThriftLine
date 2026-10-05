@@ -78,4 +78,3 @@ class SupabaseService {
     await client.from('users').update(data).eq('user_id', userId);
   }
 }
-

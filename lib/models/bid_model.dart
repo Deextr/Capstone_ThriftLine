@@ -15,6 +15,8 @@ class UserBid {
     this.auctionIncrement,
     this.product,
     this.paymentDueAt,
+    this.auctionOfferRank,
+    this.auctionOrderId,
   });
 
   final String id;
@@ -29,6 +31,8 @@ class UserBid {
   final double? auctionIncrement;
   final ProductModel? product;
   final DateTime? paymentDueAt;
+  final int? auctionOfferRank;
+  final String? auctionOrderId;
 
   factory UserBid.fromSupabase(
     Map<String, dynamic> row, {
@@ -114,8 +118,12 @@ class UserBid {
       paymentDueAt: row['payment_due_at'] != null
           ? DateTime.tryParse(row['payment_due_at'] as String)
           : null,
+      auctionOfferRank: (row['auction_offer_rank'] as num?)?.toInt(),
+      auctionOrderId: row['auction_order_id'] as String?,
     );
   }
+
+  bool get isSecondChanceOffer => auctionOfferRank == 2;
 
   UserBid copyWith({
     String? id,
@@ -177,6 +185,8 @@ BidStatus bidStatusFromView(String value) {
       return BidStatus.outbid;
     case 'won':
       return BidStatus.won;
+    case 'second_chance':
+      return BidStatus.secondChance;
     case 'lost':
       return BidStatus.lost;
     default:

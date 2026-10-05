@@ -50,21 +50,21 @@ class AdminSellerApplicationsScreen extends StatelessWidget {
           child: controller.isLoading && !controller.hasLoadedCounts
               ? const _VerificationsSkeleton()
               : controller.errorMessage != null && !controller.hasLoadedCounts
-                  ? ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      children: [
-                        AdminErrorState(
-                          message: controller.errorMessage!,
-                          onRetry: () => context
-                              .read<AdminSellerApplicationsController>()
-                              .load(),
-                        ),
-                      ],
-                    )
-                  : _VerificationsContent(
-                      controller: controller,
-                      bottomPad: bottomPad,
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    AdminErrorState(
+                      message: controller.errorMessage!,
+                      onRetry: () => context
+                          .read<AdminSellerApplicationsController>()
+                          .load(),
                     ),
+                  ],
+                )
+              : _VerificationsContent(
+                  controller: controller,
+                  bottomPad: bottomPad,
+                ),
         ),
       ),
     );
@@ -167,7 +167,8 @@ class _VerificationsContent extends StatelessWidget {
                 count: controller.approvedCount,
                 icon: Icons.check_circle_outline_rounded,
                 accentColor: AppColors.success,
-                isSelected: controller.filter ==
+                isSelected:
+                    controller.filter ==
                     AdminDashboardVerificationFilter.approved,
                 onTap: () => context
                     .read<AdminSellerApplicationsController>()
@@ -181,7 +182,8 @@ class _VerificationsContent extends StatelessWidget {
                 count: controller.rejectedCount,
                 icon: Icons.cancel_outlined,
                 accentColor: AppColors.error,
-                isSelected: controller.filter ==
+                isSelected:
+                    controller.filter ==
                     AdminDashboardVerificationFilter.rejected,
                 onTap: () => context
                     .read<AdminSellerApplicationsController>()
@@ -296,8 +298,9 @@ class _PendingVerificationCard extends StatelessWidget {
                       child: Icon(
                         Icons.pending_actions_rounded,
                         size: 24,
-                        color:
-                            hasPending ? AppColors.primary : AppColors.textHint,
+                        color: hasPending
+                            ? AppColors.primary
+                            : AppColors.textHint,
                       ),
                     ),
                     const Spacer(),
@@ -459,8 +462,7 @@ class _StatusCard extends StatelessWidget {
                 Text(
                   label,
                   style: AppTypography.label.copyWith(
-                    color:
-                        isSelected ? accentColor : AppColors.textSecondary,
+                    color: isSelected ? accentColor : AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
                   ),

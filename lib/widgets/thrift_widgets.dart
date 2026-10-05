@@ -667,7 +667,8 @@ const List<TrustClassificationData> trustClassifications = [
     color: Color(0xFFF97316), // Orange
     icon: Icons.gpp_maybe_rounded,
     description:
-        '40–59. The score is in the review range. This label does not suspend the account.',
+        '40–59. A lower trust score from partial verification or limited marketplace history. '
+        'This is not your seller application status and does not suspend the account.',
   ),
   TrustClassificationData(
     label: 'Banned',
@@ -680,6 +681,67 @@ const List<TrustClassificationData> trustClassifications = [
   ),
 ];
 
+String _buyerTrustClassificationBlurb(TrustClassificationData item) {
+  return item.description
+      .replaceFirst(RegExp(r'^\d+[–-]\d+\.\s*'), '')
+      .replaceFirst(RegExp(r'^Below 40\.\s*'), '');
+}
+
+/// Compact trust classification for buyer-facing seller surfaces (no numeric score).
+class SellerTrustLevelChip extends StatelessWidget {
+  const SellerTrustLevelChip({
+    super.key,
+    required this.trustScore,
+    this.trustLevel,
+    this.fontSize = 11,
+    this.iconSize = 12,
+  });
+
+  final int trustScore;
+  final String? trustLevel;
+  final double fontSize;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = resolveTrustLabel(
+      score: trustScore,
+      storedLevel: trustLevel,
+    );
+    final trustData = trustClassifications.firstWhere(
+      (c) => c.label == label,
+      orElse: () => trustClassifications.first,
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: trustData.color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(trustData.icon, size: iconSize, color: trustData.color),
+          const SizedBox(width: 3),
+          Flexible(
+            child: Text(
+              label,
+              style: AppTypography.caption.copyWith(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w700,
+                color: trustData.color,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class SellerTrustBadge extends StatelessWidget {
   const SellerTrustBadge({
     super.key,
@@ -687,7 +749,7 @@ class SellerTrustBadge extends StatelessWidget {
     required this.isVerified,
     required this.shopName,
     this.trustLevel,
-    this.showNumericScore = true,
+    this.showNumericScore = false,
   });
 
   final int trustScore;
@@ -889,7 +951,9 @@ class SellerTrustBadge extends StatelessWidget {
                           ),
                           const Divider(height: 24, thickness: 1),
                           Text(
-                            '$shopName is classified as a ${current.label} with a trust score of $trustScore/100. Only completed orders, reviews on completed orders, and reports an admin confirmed are counted.',
+                            showNumericScore
+                                ? '$shopName is classified as a ${current.label} with a trust score of $trustScore/100. Only completed orders, reviews on completed orders, and reports an admin confirmed are counted.'
+                                : '$shopName is classified as a ${current.label}. Classifications reflect identity verification, completed orders, buyer ratings on completed orders, and reports an admin confirmed.',
                             style: AppTypography.body.copyWith(
                               fontSize: 13,
                               height: 1.4,
@@ -979,7 +1043,9 @@ class SellerTrustBadge extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    item.description,
+                                    showNumericScore
+                                        ? item.description
+                                        : _buyerTrustClassificationBlurb(item),
                                     style: AppTypography.caption.copyWith(
                                       color: AppColors.textSecondary,
                                     ),

@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/routes/route_names.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/supabase_rpc.dart';
+import '../data/seller_listings_refresh.dart';
 import '../../../models/enums.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../widgets/thrift_widgets.dart';
@@ -405,8 +406,9 @@ class AddListingController extends ChangeNotifier {
       ]);
 
       uploadStatusMessage = '';
+      SellerListingsRefresh.notify(sellerId);
       if (context.mounted) {
-        context.go(RouteNames.sellerHome);
+        context.go(RouteNames.sellerHomeWithTab('listings'));
         showThriftSnackBar(context, 'Listing published!');
       }
     } catch (e) {

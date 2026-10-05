@@ -214,7 +214,9 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
             decoration: BoxDecoration(
               color: AppColors.primaryLight.withValues(alpha: 0.25),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.35),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -309,7 +311,9 @@ class _ArrangeDeliveryScreenState extends State<ArrangeDeliveryScreen> {
                 onPressed: () => context.pop(),
               )
             : ThriftButton(
-                label: controller.isUpdatingDelivery ? 'Saving…' : 'Confirm delivery',
+                label: controller.isUpdatingDelivery
+                    ? 'Saving…'
+                    : 'Confirm delivery',
                 onPressed: controller.isUpdatingDelivery ? null : _submit,
               ),
         children: [

@@ -42,8 +42,21 @@ Run `../introspection/phase1_verify.sql` afterwards; all 13 checks should report
 `PASS`.
 
 Edge Functions live in `../functions/send-phone-otp` and
-`../functions/verify-phone-otp`. Deploy them and set `FMCSMS_API_KEY` plus
-`OTP_PEPPER` before testing SMS. The Flutter app must never receive those values.
+`../functions/verify-phone-otp`. Deploy them and set `OTP_PEPPER` before testing
+SMS. The Flutter app must never receive SMS provider credentials.
+
+**SMS provider (Edge Function secrets only):**
+
+| Secret | When required |
+| --- | --- |
+| `SMS_PROVIDER` | `unisms` (recommended) or `fmcsms` (legacy fallback). Defaults to `fmcsms` if unset. |
+| `UNISMS_API_SECRET_KEY` | UniSMS API secret (`Authorization: Basic` username, empty password). |
+| `UNISMS_SENDER_ID` | Approved or trial sender ID from the UniSMS dashboard. |
+| `UNISMS_API_URL` | Optional; defaults to `https://unismsapi.com/api`. |
+| `FMCSMS_API_KEY`, `FMCSMS_FROM_NUMBER` | Only when `SMS_PROVIDER=fmcsms`. |
+
+Optional admin-only connectivity check: deploy `../functions/test-unisms-sms`
+(requires signed-in admin JWT). See `../../docs/agile/unisms-sms-testing.md`.
 
 ## Email OTP (signup and login)
 

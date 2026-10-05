@@ -33,7 +33,7 @@ Apply **in filename order** in the Supabase SQL Editor after Phase 0:
 
 | Function | Purpose |
 | --- | --- |
-| `send-phone-otp` | Creates a hashed 6-digit code and sends it through FMCSMS |
+| `send-phone-otp` | Creates a hashed 6-digit code and sends SMS via `SMS_PROVIDER` (UniSMS or FMCSMS) |
 | `verify-phone-otp` | Checks the code and sets `users.is_phone_verified` |
 
 ### 3. Flutter
@@ -50,13 +50,17 @@ Apply **in filename order** in the Supabase SQL Editor after Phase 0:
 
 The app code is ready. SMS will fail until these steps are done **outside Flutter**.
 
-### A. FMCSMS account
+### A. UniSMS account (recommended)
 
-1. Sign in at [https://www.fortmed.org/web/FMCSMS/auth/login.php](https://www.fortmed.org/web/FMCSMS/auth/login.php).
-2. Request an **API key** from the dashboard. Their admin team must approve it before sends work.
-3. Use the 10 free SMS or buy a credit pack.
-4. Copy the approved API key. Do **not** put it in `.env` or any Dart file.
-5. In the dashboard API docs, confirm the four POST fields. The function sends `api_key`, `number`, `message`, and `sender`.
+1. Sign up at [https://unismsapi.com](https://unismsapi.com) and copy the **API Secret Key** from the dashboard.
+2. Note the trial **sender ID** (or apply for an approved sender ID before production).
+3. Do **not** put the secret in `.env` or Dart — only Supabase Edge Function secrets.
+4. API reference: [UniSMS SMS docs](https://unismsapi.com/docs/sms) (`POST /sms`, Basic auth, E.164 `+639…`).
+5. Optional admin smoke test: deploy `test-unisms-sms` and follow [unisms-sms-testing.md](./unisms-sms-testing.md).
+
+### A2. FMCSMS account (legacy fallback)
+
+Set `SMS_PROVIDER=fmcsms` and configure `FMCSMS_*` secrets if you still use FortMed FMCSMS.
 
 ### B. Apply the Phase 1 SQL
 
@@ -69,6 +73,7 @@ From a machine with the Supabase CLI logged in:
 ```bash
 supabase functions deploy send-phone-otp
 supabase functions deploy verify-phone-otp
+supabase functions deploy test-unisms-sms
 ```
 
 Or create both functions in the Dashboard and paste the files from `supabase/functions/`.
@@ -79,10 +84,13 @@ In Supabase → Edge Functions → Secrets (or `supabase secrets set`):
 
 | Secret | Value |
 | --- | --- |
-| `FMCSMS_API_KEY` | Approved API key from the FMCSMS dashboard |
+| `SMS_PROVIDER` | `unisms` (recommended) or `fmcsms` |
+| `UNISMS_API_SECRET_KEY` | UniSMS API secret (Basic auth username) |
+| `UNISMS_SENDER_ID` | Sender ID from UniSMS dashboard |
+| `UNISMS_API_URL` | Optional. Default `https://unismsapi.com/api` |
 | `OTP_PEPPER` | A long random string you invent (not the SMS key) |
-| `FMCSMS_API_URL` | Optional. Default is `https://www.fortmed.org/web/FMCSMS/api/messages.php` |
-| `FMCSMS_SENDER` | Optional. Default is `ThriftLine` |
+| `FMCSMS_API_KEY` | Only when `SMS_PROVIDER=fmcsms` |
+| `FMCSMS_FROM_NUMBER` | Only when `SMS_PROVIDER=fmcsms` |
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are already available inside Edge Functions. Do not copy the service role key into Flutter.
 

@@ -127,12 +127,9 @@ class FollowingShopsPreview extends StatelessWidget {
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 14),
-          itemCount: followedShops.length + 1,
+          itemCount: followedShops.length,
           separatorBuilder: (_, _) => const SizedBox(width: 14),
           itemBuilder: (context, index) {
-            if (index == followedShops.length) {
-              return _buildExploreMoreBubble(context);
-            }
             final shop = followedShops[index];
             return _buildShopBubble(context, shop);
           },
@@ -238,48 +235,6 @@ class FollowingShopsPreview extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildExploreMoreBubble(BuildContext context) {
-    return GestureDetector(
-      onTap: onViewAll,
-      child: SizedBox(
-        width: 70,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primaryLight,
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.3),
-                  style: BorderStyle.solid,
-                ),
-              ),
-              child: const Icon(
-                Icons.add_rounded,
-                color: AppColors.primary,
-                size: 26,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'View All',
-              style: AppTypography.caption.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-                fontSize: 11,
-              ),
-              maxLines: 1,
-              textAlign: TextAlign.center,
-            ),
           ],
         ),
       ),

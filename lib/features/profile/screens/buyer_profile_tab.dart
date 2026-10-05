@@ -57,6 +57,12 @@ class BuyerProfileTab extends StatelessWidget {
             child: _ProfileHeader(auth: auth),
           ),
           const SizedBox(height: 28),
+          FollowingShopsPreview(
+            followedShops: followingProvider.followedShops,
+            isLoading: followingProvider.isLoading,
+            onViewAll: () => context.push(RouteNames.followingShops),
+          ),
+          const SizedBox(height: 8),
           _SectionCard(
             title: 'My Activity',
             children: [
@@ -92,11 +98,6 @@ class BuyerProfileTab extends StatelessWidget {
               ),
             ],
           ),
-          FollowingShopsPreview(
-            followedShops: followingProvider.followedShops,
-            isLoading: followingProvider.isLoading,
-            onViewAll: () => context.push(RouteNames.followingShops),
-          ),
           _SectionCard(
             title: 'Account & Settings',
             children: [
@@ -121,9 +122,9 @@ class BuyerProfileTab extends StatelessWidget {
                   onChanged: settings.isSavingPush
                       ? null
                       : (value) => settings.setPushNotifications(
-                            value,
-                            mode: AccountMode.buyer,
-                          ),
+                          value,
+                          mode: AccountMode.buyer,
+                        ),
                   activeTrackColor: AppColors.primary.withValues(alpha: 0.4),
                   activeThumbColor: AppColors.primary,
                 ),

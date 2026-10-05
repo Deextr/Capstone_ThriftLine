@@ -11,11 +11,7 @@ import '../../data/seller_analytics_comparison.dart';
 const double kAnalyticsMetricCardMinHeight = 118;
 
 class AnalyticsSectionTitle extends StatelessWidget {
-  const AnalyticsSectionTitle({
-    super.key,
-    required this.title,
-    this.subtitle,
-  });
+  const AnalyticsSectionTitle({super.key, required this.title, this.subtitle});
 
   final String title;
   final String? subtitle;
@@ -33,7 +29,9 @@ class AnalyticsSectionTitle extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             subtitle!,
-            style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ],
@@ -62,7 +60,9 @@ class AnalyticsMetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minHeight: kAnalyticsMetricCardMinHeight),
+      constraints: const BoxConstraints(
+        minHeight: kAnalyticsMetricCardMinHeight,
+      ),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -88,20 +88,18 @@ class AnalyticsMetricCard extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               value,
-              style: (emphasizeValue
-                      ? AppTypography.heading.copyWith(fontSize: 24)
-                      : AppTypography.heading.copyWith(fontSize: 22))
-                  .copyWith(
-                fontWeight: FontWeight.w800,
-                color: valueColor ?? AppColors.textPrimary,
-              ),
+              style:
+                  (emphasizeValue
+                          ? AppTypography.heading.copyWith(fontSize: 24)
+                          : AppTypography.heading.copyWith(fontSize: 22))
+                      .copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: valueColor ?? AppColors.textPrimary,
+                      ),
             ),
           ),
           const SizedBox(height: 6),
-          AnalyticsTrendRow(
-            comparison: comparison,
-            vsLabel: vsLabel,
-          ),
+          AnalyticsTrendRow(comparison: comparison, vsLabel: vsLabel),
         ],
       ),
     );
@@ -148,8 +146,8 @@ class AnalyticsTrendRow extends StatelessWidget {
     final trendColor = isUp
         ? AppColors.success
         : isDown
-            ? AppColors.error
-            : AppColors.textSecondary;
+        ? AppColors.error
+        : AppColors.textSecondary;
 
     return Row(
       children: [
@@ -157,18 +155,15 @@ class AnalyticsTrendRow extends StatelessWidget {
           isUp
               ? Icons.arrow_upward_rounded
               : isDown
-                  ? Icons.arrow_downward_rounded
-                  : Icons.remove_rounded,
+              ? Icons.arrow_downward_rounded
+              : Icons.remove_rounded,
           size: 14,
           color: trendColor,
         ),
         const SizedBox(width: 2),
         Flexible(
           child: Text(
-            [
-              trend,
-              if (vsLabel.isNotEmpty) vsLabel,
-            ].join(' '),
+            [trend, if (vsLabel.isNotEmpty) vsLabel].join(' '),
             style: AppTypography.caption.copyWith(
               color: trendColor,
               fontWeight: FontWeight.w600,
@@ -238,8 +233,10 @@ class _ComparisonBarRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxVal = [data.currentValue, data.previousValue]
-        .fold<num>(0, (a, b) => a > b ? a : b);
+    final maxVal = [
+      data.currentValue,
+      data.previousValue,
+    ].fold<num>(0, (a, b) => a > b ? a : b);
     final scale = maxVal <= 0 ? 1.0 : maxVal.toDouble();
 
     return Column(

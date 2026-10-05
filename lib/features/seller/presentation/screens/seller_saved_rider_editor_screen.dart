@@ -78,8 +78,7 @@ class _SellerSavedRiderEditorScreenState
     final plateTrimmed = _plate.text.trim();
     final nameError = Validators.riderName(_name.text);
     final phoneError = phMobileValidationError(_phone.text);
-    final plateError =
-        plateTrimmed.isEmpty ? 'Enter the plate number.' : null;
+    final plateError = plateTrimmed.isEmpty ? 'Enter the plate number.' : null;
     setState(() {
       _nameError = nameError;
       _phoneError = phoneError;

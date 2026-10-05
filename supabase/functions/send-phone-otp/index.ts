@@ -4,14 +4,18 @@ import {
   MAX_SENDS_PER_PHONE_HOUR,
   MAX_SENDS_PER_USER_HOUR,
   OTP_TTL_MS,
+  PHONE_ALREADY_IN_USE_MESSAGE,
   PhoneOtpHttpError,
   RESEND_COOLDOWN_MS,
   clientIp,
+  currentVerifiedPhoneForUser,
+  isPhoneVerifiedByOtherAccount,
   maskPhMobile,
   normalizePhPhone,
   randomOtp,
   secondsUntil,
-  sendFmcsms,
+  buildPhoneOtpSmsMessage,
+  sendSms,
   sha256Hex,
 } from "../_shared/phone_otp.ts";
 
@@ -87,6 +91,25 @@ Deno.serve(async (req) => {
       user: userId.slice(0, 8),
       phone: maskPhMobile(phone),
     });
+
+    const currentVerified = await currentVerifiedPhoneForUser(service, userId);
+    if (currentVerified === phone) {
+      console.log("send-phone-otp skipped", { reason: "already_verified_for_user" });
+      return json(200, {
+        ok: true,
+        already_verified: true,
+        expires_in_seconds: OTP_TTL_MS / 1000,
+        retry_after_seconds: RESEND_COOLDOWN_MS / 1000,
+      });
+    }
+
+    if (await isPhoneVerifiedByOtherAccount(service, phone, userId)) {
+      console.log("send-phone-otp rejected", { reason: "phone_already_in_use" });
+      return json(409, {
+        error: PHONE_ALREADY_IN_USE_MESSAGE,
+        code: "phone_already_in_use",
+      });
+    }
 
     const { data: recentUser } = await service
       .from("phone_otp_challenges")
@@ -224,10 +247,7 @@ Deno.serve(async (req) => {
     }
     if (insertError || !inserted) throw insertError;
 
-    const sms = await sendFmcsms(
-      phone,
-      `ThriftLine code: ${otp}. Valid 5 minutes. Do not share this code.`,
-    );
+    const sms = await sendSms(phone, buildPhoneOtpSmsMessage(otp));
 
     if (!sms.accepted) {
       await service

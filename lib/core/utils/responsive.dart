@@ -4,8 +4,7 @@ import '../constants/app_constants.dart';
 
 /// Mobile-first responsive layout utilities.
 abstract final class Responsive {
-  static double width(BuildContext context) =>
-      MediaQuery.sizeOf(context).width;
+  static double width(BuildContext context) => MediaQuery.sizeOf(context).width;
 
   static double height(BuildContext context) =>
       MediaQuery.sizeOf(context).height;
@@ -47,10 +46,6 @@ abstract final class Responsive {
   }
 
   /// Returns responsive column count for grids.
-  static int gridColumns(BuildContext context) => value(
-        context: context,
-        mobile: 2,
-        tablet: 3,
-        desktop: 4,
-      );
+  static int gridColumns(BuildContext context) =>
+      value(context: context, mobile: 2, tablet: 3, desktop: 4);
 }

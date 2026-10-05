@@ -248,9 +248,7 @@ String _emptyTitle(AdminReportsController controller, AdminReportKind kind) {
         ? 'No Looking For reports'
         : 'No matching reports';
   }
-  final inKind = controller.reports.where(
-    (r) => controller.matchesKind(r),
-  );
+  final inKind = controller.reports.where((r) => controller.matchesKind(r));
   if (inKind.isEmpty) {
     return switch (kind) {
       AdminReportKind.community => 'No community reports',
@@ -268,9 +266,7 @@ String _emptyMessage(AdminReportsController controller, AdminReportKind kind) {
         ? 'Reports about Looking For requests will appear here.'
         : 'Try a different status filter or search term.';
   }
-  final inKind = controller.reports.where(
-    (r) => controller.matchesKind(r),
-  );
+  final inKind = controller.reports.where((r) => controller.matchesKind(r));
   if (inKind.isEmpty) {
     return switch (kind) {
       AdminReportKind.community =>

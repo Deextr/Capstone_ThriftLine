@@ -90,7 +90,10 @@ class BidCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          Text(product.sellerName, style: AppTypography.caption),
+                          Text(
+                            product.sellerName,
+                            style: AppTypography.caption,
+                          ),
                           const SizedBox(height: 8),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -114,7 +117,9 @@ class BidCard extends StatelessWidget {
                               Text(
                                 formatCurrency(currentHighest),
                                 style: AppTypography.subheading.copyWith(
-                                  color: isWinning ? AppColors.success : AppColors.textSecondary,
+                                  color: isWinning
+                                      ? AppColors.success
+                                      : AppColors.textSecondary,
                                   fontSize: 14,
                                 ),
                               ),
@@ -122,15 +127,22 @@ class BidCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            isWinning ? "You're #1" : "Outbid by ${formatCurrency(currentHighest - bid.amount)}",
+                            isWinning
+                                ? "You're #1"
+                                : "Outbid by ${formatCurrency(currentHighest - bid.amount)}",
                             style: AppTypography.caption.copyWith(
-                              color: isWinning ? AppColors.success : AppColors.textSecondary,
+                              color: isWinning
+                                  ? AppColors.success
+                                  : AppColors.textSecondary,
                             ),
                           ),
                           if (product.bidEndTime != null) ...[
                             const SizedBox(height: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppColors.surfaceVariant,
                                 borderRadius: BorderRadius.circular(16),
@@ -164,7 +176,9 @@ class BidCard extends StatelessWidget {
                       children: [
                         ThriftBadge(
                           label: isWinning ? 'Winning' : 'Outbid',
-                          variant: isWinning ? BadgeVariant.success : BadgeVariant.warning,
+                          variant: isWinning
+                              ? BadgeVariant.success
+                              : BadgeVariant.warning,
                         ),
                         if (!isWinning && onRaiseBid != null) ...[
                           const SizedBox(height: 12),
@@ -187,4 +201,3 @@ class BidCard extends StatelessWidget {
     );
   }
 }
-

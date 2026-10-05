@@ -37,9 +37,7 @@ class SellerSavedRider {
     );
   }
 
-  Map<String, dynamic> toInsertPayload({
-    required String sellerId,
-  }) {
+  Map<String, dynamic> toInsertPayload({required String sellerId}) {
     return {
       'seller_id': sellerId,
       'rider_name': riderName,
