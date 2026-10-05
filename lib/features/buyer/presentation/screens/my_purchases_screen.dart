@@ -224,8 +224,10 @@ class _TabChip extends StatelessWidget {
               if (count > 0) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: selected ? AppColors.primary : AppColors.textHint,
                     borderRadius: BorderRadius.circular(10),
@@ -273,7 +275,8 @@ class _OrderList extends StatelessWidget {
     }
     if (controller.errorMessage != null && controller.orders.isEmpty) {
       return ErrorState(
-        message: controller.errorMessage ??
+        message:
+            controller.errorMessage ??
             'Unable to load your purchases. Please try again.',
         onRetry: controller.load,
       );
@@ -330,31 +333,32 @@ class _OrderList extends StatelessWidget {
   }
 
   IconData _emptyIcon(BuyerPurchaseCategory cat) => switch (cat) {
-        BuyerPurchaseCategory.all => Icons.receipt_long_outlined,
-        BuyerPurchaseCategory.toPay => Icons.payments_outlined,
-        BuyerPurchaseCategory.paymentConfirmed => Icons.verified_outlined,
-        BuyerPurchaseCategory.toReceive => Icons.local_shipping_outlined,
-        BuyerPurchaseCategory.cancelled => Icons.cancel_outlined,
-        BuyerPurchaseCategory.completed => Icons.check_circle_outline,
-        BuyerPurchaseCategory.returnRefund => Icons.assignment_return_outlined,
-      };
+    BuyerPurchaseCategory.all => Icons.receipt_long_outlined,
+    BuyerPurchaseCategory.toPay => Icons.payments_outlined,
+    BuyerPurchaseCategory.paymentConfirmed => Icons.verified_outlined,
+    BuyerPurchaseCategory.toReceive => Icons.local_shipping_outlined,
+    BuyerPurchaseCategory.cancelled => Icons.cancel_outlined,
+    BuyerPurchaseCategory.completed => Icons.check_circle_outline,
+    BuyerPurchaseCategory.returnRefund => Icons.assignment_return_outlined,
+  };
 
   String _emptyTitle(BuyerPurchaseCategory cat) => switch (cat) {
-        BuyerPurchaseCategory.all => 'No purchases yet',
-        BuyerPurchaseCategory.toPay => 'Nothing to pay',
-        BuyerPurchaseCategory.paymentConfirmed => 'No orders preparing',
-        BuyerPurchaseCategory.toReceive => 'Nothing on the way',
-        BuyerPurchaseCategory.cancelled => 'No cancelled wins',
-        BuyerPurchaseCategory.completed => 'No completed orders',
-        BuyerPurchaseCategory.returnRefund => 'No returns or refunds',
-      };
+    BuyerPurchaseCategory.all => 'No purchases yet',
+    BuyerPurchaseCategory.toPay => 'Nothing to pay',
+    BuyerPurchaseCategory.paymentConfirmed => 'No orders preparing',
+    BuyerPurchaseCategory.toReceive => 'Nothing on the way',
+    BuyerPurchaseCategory.cancelled => 'No cancelled wins',
+    BuyerPurchaseCategory.completed => 'No completed orders',
+    BuyerPurchaseCategory.returnRefund => 'No returns or refunds',
+  };
 
   String _emptyMessage(BuyerPurchaseCategory cat, bool hasAny) {
     if (!hasAny) {
       return 'When you buy or win an auction, your orders will show up here.';
     }
     return switch (cat) {
-      BuyerPurchaseCategory.all => 'Orders in other stages appear when you shop.',
+      BuyerPurchaseCategory.all =>
+        'Orders in other stages appear when you shop.',
       BuyerPurchaseCategory.toPay =>
         'Auction wins that need payment will appear in this tab.',
       BuyerPurchaseCategory.paymentConfirmed =>

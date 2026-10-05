@@ -9,7 +9,8 @@ import '../../../../core/routes/route_names.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../auth/domain/account_mode.dart';
-import '../../../../widgets/thrift_widgets.dart' show ThriftButton, ThriftButtonVariant, showThriftSnackBar;
+import '../../../../widgets/thrift_widgets.dart'
+    show ThriftButton, ThriftButtonVariant, showThriftSnackBar;
 import '../../../auth/domain/legal_documents.dart';
 import '../../../auth/presentation/widgets/auth_widgets.dart';
 
@@ -27,8 +28,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final settingsProvider = context.watch<SettingsProvider>();
     final auth = context.watch<AuthProvider>();
-    final mode =
-        auth.isSeller ? AccountMode.seller : AccountMode.buyer;
+    final mode = auth.isSeller ? AccountMode.seller : AccountMode.buyer;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -67,10 +67,8 @@ class SettingsScreen extends StatelessWidget {
                   onChanged: settingsProvider.isSavingPush
                       ? null
                       : (value) async {
-                          final ok = await settingsProvider.setPushNotifications(
-                            value,
-                            mode: mode,
-                          );
+                          final ok = await settingsProvider
+                              .setPushNotifications(value, mode: mode);
                           if (!context.mounted) return;
                           if (!ok) {
                             showThriftSnackBar(
@@ -92,11 +90,8 @@ class SettingsScreen extends StatelessWidget {
                   onChanged: settingsProvider.isSavingEmail
                       ? null
                       : (value) async {
-                          final ok =
-                              await settingsProvider.setEmailNotifications(
-                            value,
-                            mode: mode,
-                          );
+                          final ok = await settingsProvider
+                              .setEmailNotifications(value, mode: mode);
                           if (!context.mounted) return;
                           if (!ok) {
                             showThriftSnackBar(

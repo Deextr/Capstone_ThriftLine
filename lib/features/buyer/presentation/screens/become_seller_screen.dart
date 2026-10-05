@@ -9,7 +9,9 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/utils/ph_phone.dart';
 import '../../../../features/auth/domain/auth_user.dart';
+import '../../../../features/auth/presentation/widgets/account_phone_verification_section.dart';
 import '../../../../features/seller/data/davao_barangay_service.dart';
 import '../../../../features/seller/data/seller_verification_service.dart';
 import '../../../../features/seller/domain/davao_barangay.dart';
@@ -35,9 +37,11 @@ class BecomeSellerScreen extends StatefulWidget {
 }
 
 class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
+  final _phoneCtrl = TextEditingController();
   final _storeNameCtrl = TextEditingController();
   final _addressLine1Ctrl = TextEditingController();
   final _addressLine2Ctrl = TextEditingController();
+  bool _phoneFieldInitialized = false;
   final _barangayService = DavaoBarangayService();
 
   List<DavaoBarangay> _barangays = const [];
@@ -76,7 +80,20 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_phoneFieldInitialized) {
+      final phone = normalizePhMobile(context.read<AuthProvider>().user?.phone);
+      if (phone != null) {
+        _phoneCtrl.text = phone;
+      }
+      _phoneFieldInitialized = true;
+    }
+  }
+
+  @override
   void dispose() {
+    _phoneCtrl.dispose();
     _storeNameCtrl.dispose();
     _addressLine1Ctrl.dispose();
     _addressLine2Ctrl.dispose();
@@ -180,13 +197,15 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                     children: [
                       Row(
                         children: [
-                          _buildSegment(0, 'Seller Info'),
+                          _buildSegment(0, 'Phone'),
                           const SizedBox(width: 8),
-                          _buildSegment(1, 'ID Capture'),
+                          _buildSegment(1, 'Info'),
                           const SizedBox(width: 8),
-                          _buildSegment(2, 'Face'),
+                          _buildSegment(2, 'ID'),
                           const SizedBox(width: 8),
-                          _buildSegment(3, 'History'),
+                          _buildSegment(3, 'Face'),
+                          const SizedBox(width: 8),
+                          _buildSegment(4, 'History'),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -200,7 +219,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
                             ),
                           ),
                           Text(
-                            'Step ${_currentStep + 1} of 4',
+                            'Step ${_currentStep + 1} of 5',
                             style: AppTypography.caption,
                           ),
                         ],
@@ -238,6 +257,13 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
   Widget _buildBottomActions(AuthProvider auth) {
     if (_currentStep == 0) {
+      final phoneReady = auth.user?.hasVerifiedAccountPhone ?? false;
+      return ThriftButton(
+        label: 'Continue to seller information',
+        onPressed: phoneReady ? _continueFromPhone : null,
+      );
+    }
+    if (_currentStep == 1) {
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -247,7 +273,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
         ],
       );
     }
-    if (_currentStep == 1) {
+    if (_currentStep == 2) {
       if (_idGateOpen) {
         return ThriftButton(
           label: 'Continue to selfie',
@@ -260,11 +286,11 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
         onPressed: type == null ? null : _startIdCaptureFlow,
       );
     }
-    if (_currentStep == 2) {
+    if (_currentStep == 3) {
       if (_liveness?.passed == true) {
         return ThriftButton(
           label: 'Continue',
-          onPressed: () => setState(() => _currentStep = 3),
+          onPressed: () => setState(() => _currentStep = 4),
         );
       }
       return ThriftButton(label: 'Take a selfie', onPressed: _startLiveness);
@@ -309,12 +335,14 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   String _getStepTitle() {
     switch (_currentStep) {
       case 0:
-        return 'Seller information & address';
+        return 'Phone number verification';
       case 1:
-        return _idGateOpen ? 'ID captured' : 'Choose an ID';
+        return 'Seller information & address';
       case 2:
-        return 'Take a selfie';
+        return _idGateOpen ? 'ID captured' : 'Choose an ID';
       case 3:
+        return 'Take a selfie';
+      case 4:
         return 'Past selling experience';
       default:
         return '';
@@ -324,12 +352,14 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   Widget _buildStep() {
     switch (_currentStep) {
       case 0:
-        return _storeInfoStep();
+        return _phoneVerificationStep();
       case 1:
-        return _idCaptureStep();
+        return _storeInfoStep();
       case 2:
-        return _selfieStep();
+        return _idCaptureStep();
       case 3:
+        return _selfieStep();
+      case 4:
         return PastSellingExperienceStep(
           adding: _addingHistory,
           claimedRange: _claimedRange,
@@ -341,6 +371,27 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  Widget _phoneVerificationStep() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+      ),
+      child: AccountPhoneVerificationSection(
+        phoneController: _phoneCtrl,
+        sendOtpButtonLabel: 'Send OTP',
+        intro:
+            'Verify your mobile number before we collect seller information. '
+            'This uses the same SMS verification as Edit Profile.',
+        onVerified: () {
+          if (mounted) setState(() {});
+        },
+      ),
+    );
   }
 
   Widget _storeInfoStep() {
@@ -1073,7 +1124,30 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     );
   }
 
+  void _continueFromPhone() {
+    final user = context.read<AuthProvider>().user;
+    if (user == null || !user.hasVerifiedAccountPhone) {
+      showThriftSnackBar(
+        context,
+        'Verify your mobile number before continuing.',
+        isError: true,
+      );
+      return;
+    }
+    setState(() => _currentStep = 1);
+  }
+
   void _continueFromAddress() {
+    final user = context.read<AuthProvider>().user;
+    if (user == null || !user.hasVerifiedAccountPhone) {
+      showThriftSnackBar(
+        context,
+        'Verify your mobile number before continuing.',
+        isError: true,
+      );
+      setState(() => _currentStep = 0);
+      return;
+    }
     final error = SellerAddressDraft.validate(
       storeName: _storeNameCtrl.text,
       barangay: _selectedBarangay,
@@ -1084,7 +1158,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       showThriftSnackBar(context, error);
       return;
     }
-    setState(() => _currentStep = 1);
+    setState(() => _currentStep = 2);
   }
 
   String _idPairStatusMessage(IdCapturePair pair) {
@@ -1121,7 +1195,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       showThriftSnackBar(context, _idPairStatusMessage(pair));
       return;
     }
-    setState(() => _currentStep = 2);
+    setState(() => _currentStep = 3);
   }
 
   Future<void> _startIdCaptureFlow() async {
@@ -1190,6 +1264,15 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   }
 
   Future<void> _submit(AuthProvider auth, {bool skipHistory = false}) async {
+    if (!(auth.user?.hasVerifiedAccountPhone ?? false)) {
+      showThriftSnackBar(
+        context,
+        'Verify your mobile number before submitting your application.',
+        isError: true,
+      );
+      setState(() => _currentStep = 0);
+      return;
+    }
     final front = _idFrontBytes;
     final back = _idBackBytes;
     final liveness = _liveness;
@@ -1206,12 +1289,12 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
             ? 'Choose an ID and capture both sides before continuing.'
             : 'Choose an ID and capture the required photo before continuing.',
       );
-      setState(() => _currentStep = 1);
+      setState(() => _currentStep = 2);
       return;
     }
     if (liveness == null || !liveness.passed) {
       showThriftSnackBar(context, 'Please complete the live face check first.');
-      setState(() => _currentStep = 2);
+      setState(() => _currentStep = 3);
       return;
     }
     final historyError = validateExternalHistory(
@@ -1220,7 +1303,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     );
     if (historyError != null) {
       showThriftSnackBar(context, historyError);
-      setState(() => _currentStep = 3);
+      setState(() => _currentStep = 4);
       return;
     }
 
@@ -1238,7 +1321,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     );
     if (addressError != null) {
       showThriftSnackBar(context, addressError);
-      setState(() => _currentStep = 0);
+      setState(() => _currentStep = 1);
       return;
     }
 

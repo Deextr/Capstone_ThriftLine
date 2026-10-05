@@ -53,10 +53,7 @@ class SellerAnalyticsScreen extends StatelessWidget {
             else if (ctrl.errorMessage != null && ctrl.report == null)
               _ErrorState(onRetry: ctrl.refresh)
             else if (ctrl.report != null)
-              _AnalyticsBody(
-                report: ctrl.report!,
-                window: ctrl.window,
-              ),
+              _AnalyticsBody(report: ctrl.report!, window: ctrl.window),
           ],
         ),
       ),
@@ -113,7 +110,8 @@ class _FilterBar extends StatelessWidget {
                       context: context,
                       firstDate: DateTime(2020),
                       lastDate: DateTime.now(),
-                      initialDateRange: controller.customStart != null &&
+                      initialDateRange:
+                          controller.customStart != null &&
                               controller.customEnd != null
                           ? DateTimeRange(
                               start: controller.customStart!,
@@ -127,10 +125,7 @@ class _FilterBar extends StatelessWidget {
                             ),
                     );
                     if (range != null && context.mounted) {
-                      await controller.applyCustomRange(
-                        range.start,
-                        range.end,
-                      );
+                      await controller.applyCustomRange(range.start, range.end);
                     }
                     return;
                   }
@@ -155,10 +150,7 @@ class _FilterBar extends StatelessWidget {
 }
 
 class _AnalyticsBody extends StatelessWidget {
-  const _AnalyticsBody({
-    required this.report,
-    required this.window,
-  });
+  const _AnalyticsBody({required this.report, required this.window});
 
   final SellerAnalyticsReport report;
   final SellerAnalyticsPeriodWindow? window;
@@ -180,7 +172,8 @@ class _AnalyticsBody extends StatelessWidget {
       includeComparison: includeCompare,
     );
 
-    final hasData = report.earningsCentavos > 0 ||
+    final hasData =
+        report.earningsCentavos > 0 ||
         report.productsSold > 0 ||
         report.completedOrders > 0;
 
@@ -198,7 +191,9 @@ class _AnalyticsBody extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border.withValues(alpha: 0.55)),
+              border: Border.all(
+                color: AppColors.border.withValues(alpha: 0.55),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,7 +342,9 @@ class _AnalyticsBody extends StatelessWidget {
             points: report.chart,
             periodCaption: periodLabel,
           ),
-        if (includeCompare && window != null && window!.preset != SellerAnalyticsPreset.allTime) ...[
+        if (includeCompare &&
+            window != null &&
+            window!.preset != SellerAnalyticsPreset.allTime) ...[
           const SizedBox(height: 28),
           AnalyticsComparisonBars(
             sectionTitle: window!.currentPeriodComparisonTitle,

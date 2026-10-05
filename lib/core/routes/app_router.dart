@@ -10,8 +10,10 @@ import '../../features/admin/controllers/admin_reports_controller.dart';
 import '../../features/admin/controllers/admin_seller_applications_controller.dart';
 import '../../features/admin/presentation/screens/admin_dispute_detail_screen.dart';
 import '../../features/admin/presentation/screens/admin_disputes_queue_screen.dart';
+import '../../features/admin/controllers/admin_bid_risk_controller.dart';
 import '../../features/admin/controllers/admin_disabled_accounts_controller.dart';
 import '../../features/admin/controllers/admin_looking_for_report_controller.dart';
+import '../../features/admin/presentation/screens/admin_bid_risk_events_screen.dart';
 import '../../features/admin/presentation/screens/admin_disabled_accounts_screen.dart';
 import '../../features/admin/presentation/screens/admin_looking_for_report_detail_screen.dart';
 import '../../features/admin/presentation/screens/admin_report_detail_screen.dart';
@@ -27,7 +29,6 @@ import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/auth/presentation/screens/signup_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/verify_email_otp_screen.dart';
-import '../../features/auth/controllers/phone_verification_controller.dart';
 import '../../features/auth/presentation/screens/verify_phone_screen.dart';
 import '../../features/profile/presentation/screens/address_book_screen.dart';
 import '../../features/profile/presentation/screens/payment_methods_screen.dart';
@@ -277,8 +278,7 @@ GoRouter createAppRouter({
       GoRoute(
         path: RouteNames.product,
         builder: (context, state) {
-          final ownerPreview =
-              state.uri.queryParameters['ownerPreview'] == '1';
+          final ownerPreview = state.uri.queryParameters['ownerPreview'] == '1';
           final productId = state.pathParameters['id']!;
           return ChangeNotifierProvider(
             create: (context) => ProductDetailController(
@@ -608,9 +608,7 @@ GoRouter createAppRouter({
         path: RouteNames.sellerAnalytics,
         builder: (context, _) => ChangeNotifierProvider(
           create: (context) => SellerAnalyticsController(
-            service: SellerAnalyticsService(
-              context.read<SupabaseService>(),
-            ),
+            service: SellerAnalyticsService(context.read<SupabaseService>()),
           ),
           child: const SellerAnalyticsScreen(),
         ),
@@ -708,6 +706,14 @@ GoRouter createAppRouter({
         ),
       ),
       GoRoute(
+        path: RouteNames.adminBidRiskEvents,
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) =>
+              AdminBidRiskController(supabase: context.read<SupabaseService>()),
+          child: const AdminBidRiskEventsScreen(),
+        ),
+      ),
+      GoRoute(
         path: RouteNames.adminDisputes,
         builder: (context, _) => ChangeNotifierProvider(
           create: (context) => AdminDisputesController(
@@ -728,13 +734,7 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: RouteNames.verifyPhone,
-        builder: (context, _) => ChangeNotifierProvider(
-          create: (context) => PhoneVerificationController(
-            auth: context.read<AuthProvider>(),
-            initialPhone: context.read<AuthProvider>().user?.phone,
-          ),
-          child: const VerifyPhoneScreen(),
-        ),
+        builder: (context, _) => const VerifyPhoneScreen(),
       ),
       GoRoute(
         path: RouteNames.addresses,
@@ -745,9 +745,7 @@ GoRouter createAppRouter({
         path: RouteNames.sellerShopAddress,
         builder: (context, _) => ChangeNotifierProvider(
           create: (context) => SellerShopAddressController(
-            service: SellerShopAddressService(
-              context.read<SupabaseService>(),
-            ),
+            service: SellerShopAddressService(context.read<SupabaseService>()),
           ),
           child: const SellerShopAddressScreen(),
         ),
@@ -756,9 +754,7 @@ GoRouter createAppRouter({
         path: RouteNames.sellerMyRiders,
         builder: (context, _) => ChangeNotifierProvider(
           create: (context) => SellerSavedRidersController(
-            service: SellerSavedRidersService(
-              context.read<SupabaseService>(),
-            ),
+            service: SellerSavedRidersService(context.read<SupabaseService>()),
           ),
           child: const SellerSavedRidersScreen(),
         ),

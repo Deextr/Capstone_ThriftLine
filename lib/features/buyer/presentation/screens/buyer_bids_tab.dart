@@ -16,7 +16,10 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/bid_card.dart';
 import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../../providers/auth_provider.dart';
 import '../../controllers/buyer_bids_controller.dart';
+import '../../domain/bid_placement_result.dart';
+import '../widgets/bid_phone_verification_prompt.dart';
 import '../widgets/payment_deadline_text.dart';
 
 class BuyerBidsTab extends StatefulWidget {
@@ -236,6 +239,7 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
           Widget cardContent;
 
           if (tab == BidTab.won) {
+            final isSecondChance = bid.status == BidStatus.secondChance;
             final isExpired =
                 bid.paymentDueAt != null &&
                 bid.paymentDueAt!.isBefore(DateTime.now());
@@ -246,17 +250,33 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                 decoration: BoxDecoration(
                   color: isExpired
                       ? AppColors.surfaceVariant.withValues(alpha: 0.3)
+                      : isSecondChance
+                      ? AppColors.primary.withValues(alpha: 0.04)
                       : AppColors.success.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(AppConstants.radiusLg),
                   border: Border.all(
                     color: isExpired
                         ? AppColors.border
+                        : isSecondChance
+                        ? AppColors.primary.withValues(alpha: 0.2)
                         : AppColors.success.withValues(alpha: 0.2),
                   ),
                 ),
                 padding: const EdgeInsets.all(AppConstants.spacingMd),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (isSecondChance && !isExpired)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Text(
+                          'Second Chance Offer',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.primaryDark,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                     Row(
                       children: [
                         ClipRRect(
@@ -296,7 +316,9 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                                 textBaseline: TextBaseline.alphabetic,
                                 children: [
                                   Text(
-                                    'Winning bid: ',
+                                    isSecondChance
+                                        ? 'Offer amount: '
+                                        : 'Winning bid: ',
                                     style: AppTypography.caption,
                                   ),
                                   Text(
@@ -308,15 +330,19 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                               const SizedBox(height: 4),
                               Text(
                                 isExpired
-                                    ? 'Payment window expired. Order cancelled.'
-                                    : 'You won this auction. Payment is unpaid.',
+                                    ? (isSecondChance
+                                          ? 'This offer has expired.'
+                                          : 'Payment window expired.')
+                                    : isSecondChance
+                                    ? 'The original winner did not complete payment. You can purchase this item at your eligible bid amount. This offer is optional and expires in 12 hours. Declining will not affect your bidding record.'
+                                    : 'You won this auction. Complete payment before the deadline.',
                                 style: AppTypography.caption.copyWith(
                                   color: isExpired
                                       ? AppColors.textSecondary
-                                      : AppColors.success,
+                                      : AppColors.textSecondary,
                                 ),
                               ),
-                              if (bid.paymentDueAt != null) ...[
+                              if (bid.paymentDueAt != null && !isExpired) ...[
                                 const SizedBox(height: 4),
                                 PaymentDeadlineText(due: bid.paymentDueAt!),
                               ],
@@ -326,34 +352,117 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                       ],
                     ),
                     const SizedBox(height: 12),
-                    ThriftButton(
-                      label: isExpired ? 'Payment expired' : 'Pay now',
-                      onPressed: isExpired
-                          ? null
-                          : () async {
-                              final auctionId = bid.auctionId;
-                              if (auctionId == null || auctionId.isEmpty) {
-                                showThriftSnackBar(
-                                  context,
-                                  'This win has no auction yet. Pull to refresh.',
-                                  isError: true,
+                    if (isSecondChance && !isExpired) ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () async {
+                                final orderId = bid.auctionOrderId;
+                                if (orderId == null || orderId.isEmpty) {
+                                  showThriftSnackBar(
+                                    context,
+                                    'Offer not ready. Pull to refresh.',
+                                    isError: true,
+                                  );
+                                  return;
+                                }
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Decline this offer?'),
+                                    content: const Text(
+                                      'You will not be penalized, but you will not be able to purchase this auction item through this offer afterward.',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, true),
+                                        child: const Text('Decline offer'),
+                                      ),
+                                    ],
+                                  ),
                                 );
-                                return;
-                              }
-                              final orderId = await bidsCtrl
-                                  .orderIdForWonAuction(auctionId);
-                              if (!mounted) return;
-                              if (orderId == null) {
-                                showThriftSnackBar(
-                                  context,
-                                  'Your pending order is not ready yet. Pull to refresh.',
-                                  isError: true,
+                                if (confirmed != true || !mounted) return;
+                                final err = await bidsCtrl.declineSecondChance(
+                                  orderId,
                                 );
-                                return;
-                              }
-                              context.push(RouteNames.paymentForOrder(orderId));
-                            },
-                    ),
+                                if (!mounted) return;
+                                if (err != null) {
+                                  showThriftSnackBar(
+                                    context,
+                                    err,
+                                    isError: true,
+                                  );
+                                } else {
+                                  showThriftSnackBar(
+                                    context,
+                                    'Offer declined.',
+                                  );
+                                }
+                              },
+                              child: const Text('Decline'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ThriftButton(
+                              label: 'Pay now',
+                              expand: true,
+                              onPressed: () {
+                                final orderId = bid.auctionOrderId;
+                                if (orderId == null || orderId.isEmpty) {
+                                  showThriftSnackBar(
+                                    context,
+                                    'Offer not ready. Pull to refresh.',
+                                    isError: true,
+                                  );
+                                  return;
+                                }
+                                context.push(
+                                  RouteNames.paymentForOrder(orderId),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else
+                      ThriftButton(
+                        label: isExpired ? 'Payment expired' : 'Pay now',
+                        onPressed: isExpired
+                            ? null
+                            : () async {
+                                final auctionId = bid.auctionId;
+                                if (auctionId == null || auctionId.isEmpty) {
+                                  showThriftSnackBar(
+                                    context,
+                                    'This win has no auction yet. Pull to refresh.',
+                                    isError: true,
+                                  );
+                                  return;
+                                }
+                                final orderId = await bidsCtrl
+                                    .orderIdForWonAuction(auctionId);
+                                if (!mounted) return;
+                                if (orderId == null) {
+                                  showThriftSnackBar(
+                                    context,
+                                    'Your pending order is not ready yet. Pull to refresh.',
+                                    isError: true,
+                                  );
+                                  return;
+                                }
+                                context.push(
+                                  RouteNames.paymentForOrder(orderId),
+                                );
+                              },
+                      ),
                   ],
                 ),
               ),
@@ -587,7 +696,17 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
     );
   }
 
-  void _raiseBid(BuildContext context, ProductModel product, UserBid bid) {
+  Future<void> _raiseBid(
+    BuildContext context,
+    ProductModel product,
+    UserBid bid,
+  ) async {
+    final auth = context.read<AuthProvider>();
+    if (auth.user?.hasVerifiedAccountPhone != true) {
+      await showBidPhoneVerificationPrompt(context, productId: product.id);
+      return;
+    }
+    if (!context.mounted) return;
     final controller = context.read<BuyerBidsController>();
     ThriftBottomSheet.show(
       context,
@@ -725,12 +844,12 @@ class _RaiseBidContentState extends State<_RaiseBidContent> {
     });
 
     try {
-      final error = await widget.controller.raiseBid(
+      final result = await widget.controller.raiseBid(
         auctionId: auctionId,
         amount: amount,
       );
       if (!mounted) return;
-      if (error == null) {
+      if (result.isSuccess) {
         _submitting = false;
         final messenger = ScaffoldMessenger.of(context);
         Navigator.pop(context);
@@ -742,7 +861,15 @@ class _RaiseBidContentState extends State<_RaiseBidContent> {
         );
         return;
       }
-      setState(() => _submitError = error);
+      if (result.code == 'phone_verification_required') {
+        Navigator.pop(context);
+        await showBidPhoneVerificationPrompt(
+          context,
+          productId: widget.product.id,
+        );
+        return;
+      }
+      setState(() => _submitError = result.error);
       await _refreshQuote();
     } catch (e) {
       debugPrint('Raise bid submit error: $e');

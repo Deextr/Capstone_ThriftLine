@@ -23,7 +23,15 @@ void openNotification(
   }
 
   final orderId = notification.data['order_id']?.trim();
+  final event = notification.data['event']?.trim();
   if (orderId != null && orderId.isNotEmpty) {
+    if (activeAccount == AccountMode.buyer &&
+        (event == 'second_chance_offer' ||
+            event == 'fallback_offer' ||
+            notification.type == NotificationType.wonBid)) {
+      router.push(RouteNames.paymentForOrder(orderId));
+      return;
+    }
     if (activeAccount == AccountMode.seller &&
         notification.audience == NotificationAudience.seller) {
       router.push('/seller-order/$orderId');

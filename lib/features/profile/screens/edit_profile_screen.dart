@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/ph_phone.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../providers/auth_provider.dart';
@@ -57,14 +58,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           final isSeller = auth.isSeller;
           final initialName = isSeller
               ? (controller.shopName ??
-                  authUser?.shopName ??
-                  currentUser?.name ??
-                  '')
+                    authUser?.shopName ??
+                    currentUser?.name ??
+                    '')
               : (currentUser?.name ?? authUser?.name ?? '');
           final initialUsername =
               currentUser?.username ?? authUser?.username ?? '';
           final initialEmail = authUser?.email ?? currentUser?.email ?? '';
-          final initialPhone = currentUser?.phone ?? authUser?.phone ?? '';
+          final rawPhone = currentUser?.phone ?? authUser?.phone ?? '';
+          final initialPhone = normalizePhMobile(rawPhone) ?? rawPhone.trim();
 
           return GestureDetector(
             onTap: () => FocusScope.of(context).unfocus(),
@@ -114,7 +116,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                             ),
                                           )
                                         : ThriftAvatar(
-                                            imageUrl: controller.displayAvatarUrl,
+                                            imageUrl:
+                                                controller.displayAvatarUrl,
                                             name: initialName,
                                             size: 90,
                                           ),
@@ -152,8 +155,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                           color: AppColors.primary,
                                           shape: BoxShape.circle,
                                           border: Border.all(
-                                              color: AppColors.surface,
-                                              width: 2),
+                                            color: AppColors.surface,
+                                            width: 2,
+                                          ),
                                         ),
                                         child: const Icon(
                                           Icons.camera_alt,
@@ -167,7 +171,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ),
                             ),
                             const SizedBox(height: 32),
-                            Text('Edit Profile', style: AppTypography.subheading),
+                            Text(
+                              'Edit Profile',
+                              style: AppTypography.subheading,
+                            ),
                             const SizedBox(height: 16),
                             EditProfileForm(
                               initialName: initialName,
@@ -178,33 +185,50 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               canChangeEmail: auth.usesEmailPasswordAuth,
                               isSaving: controller.isSaving,
                               errorMessage: controller.errorMessage,
-                              onSave: ({
-                                required String fullName,
-                                required String username,
-                                required String phone,
-                              }) async {
-                                final success = await controller.updateProfile(
-                                  fullName: fullName,
-                                  username: username,
-                                  phone: phone,
-                                );
-
-                                if (context.mounted) {
-                                  if (success) {
-                                    showThriftSnackBar(
-                                      context,
-                                      controller.successMessage ?? 'Profile updated successfully!',
-                                    );
-                                    context.pop();
-                                  } else if (controller.errorMessage != null) {
-                                    showThriftSnackBar(
-                                      context,
-                                      controller.errorMessage!,
-                                      isError: true,
-                                    );
-                                  }
-                                }
+                              onPhoneVerified: () async {
+                                await auth.reloadUser();
+                                await controller.loadProfile();
                               },
+                              onSave:
+                                  ({
+                                    required String fullName,
+                                    required String username,
+                                    required String phone,
+                                  }) async {
+                                    final success = await controller
+                                        .updateProfile(
+                                          fullName: fullName,
+                                          username: username,
+                                          phone: phone,
+                                        );
+
+                                    if (context.mounted) {
+                                      if (success) {
+                                        final pendingPhoneChange =
+                                            phoneFieldDiffersFromAccount(
+                                          auth.user?.phone,
+                                          phone,
+                                        );
+                                        showThriftSnackBar(
+                                          context,
+                                          pendingPhoneChange
+                                              ? 'Profile saved. Tap Verify to confirm your new phone number.'
+                                              : controller.successMessage ??
+                                                    'Profile updated successfully!',
+                                        );
+                                        if (!pendingPhoneChange) {
+                                          context.pop();
+                                        }
+                                      } else if (controller.errorMessage !=
+                                          null) {
+                                        showThriftSnackBar(
+                                          context,
+                                          controller.errorMessage!,
+                                          isError: true,
+                                        );
+                                      }
+                                    }
+                                  },
                             ),
                           ],
                         ),

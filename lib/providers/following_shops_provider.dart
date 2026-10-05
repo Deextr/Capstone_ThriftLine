@@ -230,10 +230,15 @@ class FollowingShopsProvider extends ChangeNotifier {
   }
 
   /// Externally synchronizes a follow state without full re-fetch.
-  void syncFollowState(String sellerId, bool isFollowing, [SellerProfile? profile]) {
+  void syncFollowState(
+    String sellerId,
+    bool isFollowing, [
+    SellerProfile? profile,
+  ]) {
     if (isFollowing) {
       _followingSellerIds.add(sellerId);
-      if (profile != null && !_followedShops.any((s) => s.sellerId == sellerId)) {
+      if (profile != null &&
+          !_followedShops.any((s) => s.sellerId == sellerId)) {
         _followedShops = [
           FollowedShopItem(profile: profile),
           ..._followedShops,

@@ -15,3 +15,10 @@ String? supabaseRpcError(dynamic value, {String fallback = 'Request failed.'}) {
   if (error != null && error.isNotEmpty) return error;
   return fallback;
 }
+
+String? supabaseRpcCode(dynamic value) {
+  final map = supabaseRpcMap(value);
+  final code = map?['code']?.toString().trim();
+  if (code != null && code.isNotEmpty) return code;
+  return null;
+}

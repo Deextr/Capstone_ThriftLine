@@ -10,7 +10,7 @@ enum FollowingFilter {
   all('All'),
   hasListings('Active Listings'),
   topRated('Top Rated (4.5+ ★)'),
-  highTrust('High Trust (75+)');
+  highTrust('High trust sellers');
 
   const FollowingFilter(this.label);
   final String label;
@@ -26,9 +26,9 @@ class FollowingShopsController extends ChangeNotifier {
     AuthProvider? auth,
     FollowingShopsProvider? provider,
     ConversationService? conversations,
-  })  : _auth = auth,
-        _provider = provider,
-        _conversations = conversations ?? ConversationService(supabase) {
+  }) : _auth = auth,
+       _provider = provider,
+       _conversations = conversations ?? ConversationService(supabase) {
     _provider?.addListener(_onProviderUpdated);
   }
 

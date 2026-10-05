@@ -461,12 +461,13 @@ class SellerPublicProfileScreen extends StatelessWidget {
 
           const SizedBox(height: 12),
 
-          // Seller Trust Badge & Score
+          // Seller trust classification (buyer-facing — no numeric score)
           SellerTrustBadge(
             trustScore: seller.trustScore,
             trustLevel: seller.trustLevel,
             isVerified: seller.isVerified,
             shopName: seller.shopName,
+            showNumericScore: false,
           ),
 
           const SizedBox(height: 16),

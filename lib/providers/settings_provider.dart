@@ -17,23 +17,23 @@ class UserSettings {
   final bool sellerEmailEnabled;
 
   factory UserSettings.fromJson(Map<String, dynamic> json) => UserSettings(
-        buyerPushEnabled:
-            json['buyer_push_notifications_enabled'] as bool? ??
-            json['push_notifications_enabled'] as bool? ??
-            true,
-        sellerPushEnabled:
-            json['seller_push_notifications_enabled'] as bool? ??
-            json['push_notifications_enabled'] as bool? ??
-            true,
-        buyerEmailEnabled:
-            json['buyer_email_notifications_enabled'] as bool? ??
-            json['email_notifications_enabled'] as bool? ??
-            false,
-        sellerEmailEnabled:
-            json['seller_email_notifications_enabled'] as bool? ??
-            json['email_notifications_enabled'] as bool? ??
-            false,
-      );
+    buyerPushEnabled:
+        json['buyer_push_notifications_enabled'] as bool? ??
+        json['push_notifications_enabled'] as bool? ??
+        true,
+    sellerPushEnabled:
+        json['seller_push_notifications_enabled'] as bool? ??
+        json['push_notifications_enabled'] as bool? ??
+        true,
+    buyerEmailEnabled:
+        json['buyer_email_notifications_enabled'] as bool? ??
+        json['email_notifications_enabled'] as bool? ??
+        false,
+    sellerEmailEnabled:
+        json['seller_email_notifications_enabled'] as bool? ??
+        json['email_notifications_enabled'] as bool? ??
+        false,
+  );
 
   static const defaults = UserSettings(
     buyerPushEnabled: true,
@@ -43,14 +43,14 @@ class UserSettings {
   );
 
   bool pushFor(AccountMode mode) => switch (mode) {
-        AccountMode.buyer => buyerPushEnabled,
-        AccountMode.seller => sellerPushEnabled,
-      };
+    AccountMode.buyer => buyerPushEnabled,
+    AccountMode.seller => sellerPushEnabled,
+  };
 
   bool emailFor(AccountMode mode) => switch (mode) {
-        AccountMode.buyer => buyerEmailEnabled,
-        AccountMode.seller => sellerEmailEnabled,
-      };
+    AccountMode.buyer => buyerEmailEnabled,
+    AccountMode.seller => sellerEmailEnabled,
+  };
 
   UserSettings copyWith({
     bool? buyerPushEnabled,
@@ -95,8 +95,9 @@ class SettingsProvider extends ChangeNotifier {
           .select()
           .eq('user_id', userId)
           .maybeSingle();
-      _settings =
-          row != null ? UserSettings.fromJson(row) : UserSettings.defaults;
+      _settings = row != null
+          ? UserSettings.fromJson(row)
+          : UserSettings.defaults;
     } catch (e) {
       debugPrint('SettingsProvider.loadForUser error: $e');
     }
@@ -127,9 +128,7 @@ class SettingsProvider extends ChangeNotifier {
   }) async {
     final previous = _settings;
     _settings = _settings.copyWith(
-      buyerPushEnabled: mode == AccountMode.buyer && push != null
-          ? push
-          : null,
+      buyerPushEnabled: mode == AccountMode.buyer && push != null ? push : null,
       sellerPushEnabled: mode == AccountMode.seller && push != null
           ? push
           : null,

@@ -40,7 +40,11 @@ class _EditProfileEmailSectionState extends State<EditProfileEmailSection> {
   Future<void> _sendCode() async {
     final email = _newEmailCtrl.text.trim();
     if (!email.contains('@')) {
-      showThriftSnackBar(context, 'Enter a valid email address.', isError: true);
+      showThriftSnackBar(
+        context,
+        'Enter a valid email address.',
+        isError: true,
+      );
       return;
     }
     setState(() => _sending = true);
@@ -68,7 +72,9 @@ class _EditProfileEmailSectionState extends State<EditProfileEmailSection> {
       return;
     }
     setState(() => _verifying = true);
-    final result = await context.read<AuthProvider>().confirmEmailChangeOtp(token);
+    final result = await context.read<AuthProvider>().confirmEmailChangeOtp(
+      token,
+    );
     if (!mounted) return;
     setState(() => _verifying = false);
     if (result.error != null) {
@@ -108,12 +114,11 @@ class _EditProfileEmailSectionState extends State<EditProfileEmailSection> {
               decoration: BoxDecoration(
                 color: AppColors.background,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+                border: Border.all(
+                  color: AppColors.border.withValues(alpha: 0.5),
+                ),
               ),
-              child: Text(
-                widget.currentEmail,
-                style: AppTypography.body,
-              ),
+              child: Text(widget.currentEmail, style: AppTypography.body),
             ),
           ],
         ),

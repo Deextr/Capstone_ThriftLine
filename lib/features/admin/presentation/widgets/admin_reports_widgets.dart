@@ -97,7 +97,11 @@ class AdminReportCategoryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 if (loading)
-                  const ShimmerBox(width: double.infinity, height: 36, radius: 8)
+                  const ShimmerBox(
+                    width: double.infinity,
+                    height: 36,
+                    radius: 8,
+                  )
                 else
                   _StatRow(summary: summary),
               ],
@@ -475,7 +479,8 @@ class AdminReportsListFilters extends StatelessWidget {
                 ),
               ListTile(
                 title: const Text('Custom range…'),
-                trailing: controller.dateWindow?.preset == AdminDatePreset.custom
+                trailing:
+                    controller.dateWindow?.preset == AdminDatePreset.custom
                     ? const Icon(Icons.check, color: AppColors.primary)
                     : null,
                 onTap: () async {

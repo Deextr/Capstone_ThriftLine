@@ -72,32 +72,32 @@ class TurnstileChallengeState extends State<TurnstileChallenge> {
               width: TurnstileSize.normal.width,
               height: TurnstileSize.normal.height,
               child: CloudflareTurnstile(
-              siteKey: TurnstileConfig.siteKey,
-              baseUrl: TurnstileConfig.baseUrl,
-              action: widget.action,
-              controller: _controller,
-              options: TurnstileOptions(
-                size: TurnstileSize.normal,
-                theme: TurnstileTheme.light,
-                retryAutomatically: true,
+                siteKey: TurnstileConfig.siteKey,
+                baseUrl: TurnstileConfig.baseUrl,
+                action: widget.action,
+                controller: _controller,
+                options: TurnstileOptions(
+                  size: TurnstileSize.normal,
+                  theme: TurnstileTheme.light,
+                  retryAutomatically: true,
+                ),
+                onTokenReceived: (token) {
+                  if (!mounted) return;
+                  widget.onToken(token);
+                },
+                onError: (error) {
+                  if (!mounted) return;
+                  setState(() {
+                    _loadError =
+                        'Verification could not load. Check your connection '
+                        'and try again.';
+                  });
+                  widget.onError(error);
+                },
+                onTokenExpired: () {
+                  widget.onExpired?.call();
+                },
               ),
-              onTokenReceived: (token) {
-                if (!mounted) return;
-                widget.onToken(token);
-              },
-              onError: (error) {
-                if (!mounted) return;
-                setState(() {
-                  _loadError =
-                      'Verification could not load. Check your connection '
-                      'and try again.';
-                });
-                widget.onError(error);
-              },
-              onTokenExpired: () {
-                widget.onExpired?.call();
-              },
-            ),
             ),
           ),
         ),
@@ -156,10 +156,7 @@ class _MessageBox extends StatelessWidget {
             const SizedBox(height: 10),
             Align(
               alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: onAction,
-                child: Text(actionLabel!),
-              ),
+              child: TextButton(onPressed: onAction, child: Text(actionLabel!)),
             ),
           ],
         ],

@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/ph_phone.dart';
 import '../../../features/auth/domain/account_mode.dart';
 import '../../../models/user_model.dart';
 import '../../../providers/auth_provider.dart';
@@ -11,8 +12,8 @@ class ProfileController extends ChangeNotifier {
   ProfileController({
     required SupabaseService supabaseService,
     AuthProvider? authProvider,
-  })  : _supabaseService = supabaseService,
-        _authProvider = authProvider;
+  }) : _supabaseService = supabaseService,
+       _authProvider = authProvider;
 
   final SupabaseService _supabaseService;
   final AuthProvider? _authProvider;
@@ -28,8 +29,7 @@ class ProfileController extends ChangeNotifier {
   String? _successMessage;
 
   UserModel? get currentUser => _currentUser;
-  bool get isSellerMode =>
-      _authProvider?.activeAccount == AccountMode.seller;
+  bool get isSellerMode => _authProvider?.activeAccount == AccountMode.seller;
   String? get shopName => _shopName;
   String? get shopBio => _shopBio;
   String get displayAvatarUrl {
@@ -139,6 +139,8 @@ class ProfileController extends ChangeNotifier {
     final trimmedName = fullName.trim();
     final trimmedUsername = username.trim();
     final trimmedPhone = phone.trim();
+    final authUser = _authProvider?.user;
+    final authPhone = normalizePhMobile(authUser?.phone);
 
     if (trimmedName.isEmpty) {
       _errorMessage = isSellerMode
@@ -161,6 +163,15 @@ class ProfileController extends ChangeNotifier {
       return false;
     }
 
+    if (trimmedPhone.isNotEmpty) {
+      final phoneError = phMobile09EditProfileValidationError(trimmedPhone);
+      if (phoneError != null) {
+        _errorMessage = phoneError;
+        notifyListeners();
+        return false;
+      }
+    }
+
     _isSaving = true;
     notifyListeners();
 
@@ -180,10 +191,13 @@ class ProfileController extends ChangeNotifier {
       }
 
       if (isSellerMode) {
-        await _supabaseService.client.from('seller_profiles').update({
-          'shop_name': trimmedName,
-          if (shopBio != null) 'shop_bio': shopBio.trim(),
-        }).eq('seller_id', currentUserId);
+        await _supabaseService.client
+            .from('seller_profiles')
+            .update({
+              'shop_name': trimmedName,
+              if (shopBio != null) 'shop_bio': shopBio.trim(),
+            })
+            .eq('seller_id', currentUserId);
         _shopName = trimmedName;
         if (shopBio != null) _shopBio = shopBio.trim();
       } else {
@@ -196,9 +210,9 @@ class ProfileController extends ChangeNotifier {
         );
       }
 
+      // `phone_number` / `is_phone_verified` are updated only by verify-phone-otp.
       final userUpdate = <String, dynamic>{
         'username': trimmedUsername,
-        'phone_number': trimmedPhone,
         'updated_at': DateTime.now().toIso8601String(),
       };
       if (!isSellerMode) {
@@ -210,27 +224,34 @@ class ProfileController extends ChangeNotifier {
         data: userUpdate,
       );
 
-      _currentUser = (_currentUser ??
-              UserModel(
-                id: currentUserId,
-                name: trimmedName,
+      final syncedPhone = authPhone ?? _currentUser?.phone;
+
+      _currentUser =
+          (_currentUser ??
+                  UserModel(
+                    id: currentUserId,
+                    name: trimmedName,
+                    username: trimmedUsername,
+                    email: _authProvider?.user?.email ?? '',
+                    phone: syncedPhone,
+                    role:
+                        _authProvider?.user?.role ??
+                        UserModel.fromJson({}).role,
+                    createdAt: DateTime.now(),
+                  ))
+              .copyWith(
+                name: isSellerMode
+                    ? (_currentUser?.name ?? trimmedName)
+                    : trimmedName,
                 username: trimmedUsername,
-                email: _authProvider?.user?.email ?? '',
-                phone: trimmedPhone,
-                role: _authProvider?.user?.role ?? UserModel.fromJson({}).role,
-                createdAt: DateTime.now(),
-              ))
-          .copyWith(
-        name: isSellerMode ? (_currentUser?.name ?? trimmedName) : trimmedName,
-        username: trimmedUsername,
-        phone: trimmedPhone,
-      );
+                phone: syncedPhone,
+              );
 
       if (_authProvider != null) {
         await _authProvider.updateProfileData(
           name: isSellerMode ? _authProvider.user?.name : trimmedName,
           username: trimmedUsername,
-          phone: trimmedPhone,
+          phone: syncedPhone,
           shopName: isSellerMode ? trimmedName : null,
           shopBio: isSellerMode && shopBio != null ? shopBio.trim() : null,
         );
@@ -282,20 +303,24 @@ class ProfileController extends ChangeNotifier {
           ? '$currentUserId/seller/avatar.jpg'
           : '$currentUserId/avatar.jpg';
 
-      await _supabaseService.client.storage.from('avatars').uploadBinary(
+      await _supabaseService.client.storage
+          .from('avatars')
+          .uploadBinary(
             path,
             bytes,
             fileOptions: FileOptions(contentType: 'image/jpeg', upsert: true),
           );
 
-      final url =
-          _supabaseService.client.storage.from('avatars').getPublicUrl(path);
+      final url = _supabaseService.client.storage
+          .from('avatars')
+          .getPublicUrl(path);
       final bustUrl = '$url?t=${DateTime.now().millisecondsSinceEpoch}';
 
       if (isSellerMode) {
-        await _supabaseService.client.from('seller_profiles').update({
-          'shop_avatar_url': bustUrl,
-        }).eq('seller_id', currentUserId);
+        await _supabaseService.client
+            .from('seller_profiles')
+            .update({'shop_avatar_url': bustUrl})
+            .eq('seller_id', currentUserId);
         _sellerAvatarUrl = bustUrl;
         await _authProvider?.updateSellerAvatarUrl(bustUrl);
       } else {

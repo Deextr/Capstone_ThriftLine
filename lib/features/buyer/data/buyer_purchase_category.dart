@@ -138,9 +138,7 @@ List<OrderModel> ordersForPurchaseCategory(
 Map<BuyerPurchaseCategory, int> purchaseCategoryCounts(
   Iterable<OrderModel> orders,
 ) {
-  final counts = {
-    for (final cat in BuyerPurchaseCategory.values) cat: 0,
-  };
+  final counts = {for (final cat in BuyerPurchaseCategory.values) cat: 0};
   var allCount = 0;
   for (final order in orders) {
     if (!orderIncludedInMyPurchases(order)) continue;

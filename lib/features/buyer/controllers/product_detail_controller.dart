@@ -11,6 +11,7 @@ import '../../../providers/auth_provider.dart';
 import '../../chat/data/conversation_service.dart';
 import '../../seller/data/listing_bucket.dart';
 import '../data/catalog_product_query.dart';
+import '../domain/bid_placement_result.dart';
 
 /// Controller for the Product Detail screen.
 ///
@@ -253,11 +254,8 @@ class ProductDetailController extends ChangeNotifier {
     return winnerId == null || winnerId.isEmpty || _bids.isEmpty;
   }
 
-  bool get canOfferToNextBidder {
-    if (!isOwnListing || !isAuction || isAuctionActive) return false;
-    if (_product?.status == ProductStatus.sold) return false;
-    return _bids.length >= 2;
-  }
+  /// Second-chance fallback is automatic after the primary winner's deadline.
+  bool get canOfferToNextBidder => false;
 
   bool isViewerBid(Map<String, dynamic> bid) {
     final uid = _auth.user?.id;
@@ -596,24 +594,27 @@ class ProductDetailController extends ChangeNotifier {
   }
 
   /// Place a bid on the product's auction.
-  /// Returns `null` on success, or an error message string on failure.
-  Future<String?> placeBid(double amount) async {
+  Future<BidPlacementResult> placeBid(double amount) async {
     final userId = _auth.user?.id;
     if (userId == null) {
-      return 'Please sign in to place a bid.';
+      return BidPlacementResult.failure('Please sign in to place a bid.');
     }
 
     if (_product?.sellerId != null && _product!.sellerId == userId) {
-      return 'Sellers cannot bid on their own listings.';
+      return BidPlacementResult.failure(
+        'Sellers cannot bid on their own listings.',
+      );
     }
 
     if (isViewerLeading) {
-      return 'You are already the highest bidder.';
+      return BidPlacementResult.failure('You are already the highest bidder.');
     }
 
     final minBid = minimumNextBid;
     if (amount < minBid) {
-      return 'Bid must be at least ₱${minBid.toStringAsFixed(0)}.';
+      return BidPlacementResult.failure(
+        'Bid must be at least ₱${minBid.toStringAsFixed(0)}.',
+      );
     }
 
     if (_auction == null) {
@@ -632,27 +633,36 @@ class ProductDetailController extends ChangeNotifier {
     }
 
     if (_auction == null) {
-      return 'Auction record not found for this product.';
+      return BidPlacementResult.failure(
+        'Auction record not found for this product.',
+      );
     }
 
     final auctionId = _auction!['auction_id'] as String;
 
     try {
-      final rpcRes = await _supabase.client.rpc(
-        'place_bid',
-        params: {'p_auction_id': auctionId, 'p_amount': amount},
-      );
+      final deviceToken = await _auth.deviceInstallTokenForRisk();
+      final params = <String, dynamic>{
+        'p_auction_id': auctionId,
+        'p_amount': amount,
+      };
+      if (deviceToken != null) {
+        params['p_device_token_hash'] = deviceToken;
+      }
+      final rpcRes = await _supabase.client.rpc('place_bid', params: params);
 
       if (supabaseRpcSuccess(rpcRes)) {
         await _loadAuctionData();
         _subscribeAuctionRealtime();
         notifyListeners();
-        return null;
+        return BidPlacementResult.success;
       }
-      return supabaseRpcError(rpcRes, fallback: 'Failed to place bid.');
+      return BidPlacementResult.fromRpc(rpcRes);
     } catch (e) {
       debugPrint('ProductDetailController.placeBid error: $e');
-      return 'Failed to place bid. Please try again.';
+      return BidPlacementResult.failure(
+        'Failed to place bid. Please try again.',
+      );
     }
   }
 

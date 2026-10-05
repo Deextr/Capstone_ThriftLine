@@ -29,7 +29,8 @@ Future<void> showSavedRiderSelectSheet({
             left: AppConstants.spacingMd,
             right: AppConstants.spacingMd,
             top: AppConstants.spacingMd,
-            bottom: MediaQuery.viewInsetsOf(sheetContext).bottom +
+            bottom:
+                MediaQuery.viewInsetsOf(sheetContext).bottom +
                 AppConstants.spacingMd,
           ),
           child: Column(

@@ -53,3 +53,26 @@ String? phMobile09FormatValidationError(String? raw) {
   }
   return null;
 }
+
+/// Edit Profile / OTP: digits-only `09XXXXXXXXX` with explicit empty/length errors.
+/// True when the form field mobile differs from the account's stored number.
+bool phoneFieldDiffersFromAccount(String? accountPhone, String fieldRaw) {
+  final field = normalizePhMobile(fieldRaw);
+  if (field == null || !isPhMobile09Format(field)) return false;
+  final stored = normalizePhMobile(accountPhone);
+  return stored != field;
+}
+
+String? phMobile09EditProfileValidationError(String? raw) {
+  if (raw == null || raw.trim().isEmpty) {
+    return 'Enter your phone number.';
+  }
+  final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+  if (digits.length != 11) {
+    return 'Phone number must contain exactly 11 digits.';
+  }
+  if (!RegExp(r'^09[0-9]{9}$').hasMatch(digits)) {
+    return 'Enter a valid 11-digit Philippine mobile number starting with 09.';
+  }
+  return null;
+}

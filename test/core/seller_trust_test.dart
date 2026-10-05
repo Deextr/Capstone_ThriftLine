@@ -21,6 +21,28 @@ AuthUser _user({required int trustScore, String? trustLevel}) {
 
 void main() {
   group('trust labels', () {
+    test('buyer visibility hides score but allows level from server', () {
+      expect(
+        sellerTrustLevelVisible(trustScore: null, trustLevel: 'New Seller'),
+        isTrue,
+      );
+      expect(
+        sellerTrustLevelVisible(trustScore: 62, trustLevel: null),
+        isTrue,
+      );
+      expect(
+        sellerTrustLevelVisible(trustScore: null, trustLevel: null),
+        isFalse,
+      );
+      expect(
+        resolveTrustLabel(
+          score: sellerTrustScoreForLabel(trustScore: null),
+          storedLevel: 'Trusted Seller',
+        ),
+        'Trusted Seller',
+      );
+    });
+
     test('score bands use the paper classes', () {
       expect(resolveTrustLabel(score: 100), 'Highly Trusted Seller');
       expect(resolveTrustLabel(score: 90), 'Highly Trusted Seller');
@@ -89,6 +111,31 @@ void main() {
         )?.ratings,
         60,
       );
+    });
+
+    test('newly verified seller with no history mirrors IMRAD sample TS 62', () {
+      final parsed = SellerTrustBreakdown.tryParse({
+        'iv': 100,
+        'st': 0,
+        'ur': 60,
+        'cr': 100,
+        'confirmed_reports': 0,
+        'rating_count': 0,
+      });
+      expect(parsed, isNotNull);
+      expect(mirrorTrustWeightedSum(parsed!), 62);
+      expect(resolveTrustLabel(score: 62), 'New Seller');
+    });
+
+    test('partial IV without email/phone lands in Under Review band', () {
+      final parsed = SellerTrustBreakdown.tryParse({
+        'iv': 50,
+        'st': 0,
+        'ur': 60,
+        'cr': 100,
+      });
+      expect(mirrorTrustWeightedSum(parsed!), 42);
+      expect(resolveTrustLabel(score: 42), 'Under Review');
     });
 
     test('breakdown reads counts and mirrors WSM for transparency', () {

@@ -8,7 +8,7 @@ import '../domain/seller_address_draft.dart';
 
 class SellerShopAddressController extends ChangeNotifier {
   SellerShopAddressController({required SellerShopAddressService service})
-      : _service = service {
+    : _service = service {
     load();
   }
 

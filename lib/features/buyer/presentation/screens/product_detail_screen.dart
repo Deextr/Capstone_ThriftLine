@@ -18,6 +18,8 @@ import '../../../../widgets/countdown_timer.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../seller/presentation/widgets/end_auction_dialog.dart';
 import '../../controllers/product_detail_controller.dart';
+import '../../domain/bid_placement_result.dart';
+import '../widgets/bid_phone_verification_prompt.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({super.key, required this.productId});
@@ -455,6 +457,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     context.push(RouteNames.paymentForOrder(orderId));
   }
 
+  Future<void> _startPlaceBidFlow(
+    BuildContext context,
+    ProductDetailController controller,
+    double minBid,
+  ) async {
+    final auth = context.read<AuthProvider>();
+    if (auth.user?.hasVerifiedAccountPhone != true) {
+      await showBidPhoneVerificationPrompt(
+        context,
+        productId: widget.productId,
+      );
+      return;
+    }
+    if (!context.mounted) return;
+    _showBidBottomSheet(context, controller, minBid);
+  }
+
   void _showBidBottomSheet(
     BuildContext context,
     ProductDetailController controller,
@@ -525,15 +544,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                     '',
                   );
                   final amount = double.tryParse(cleanText) ?? minBid;
-                  final error = await controller.placeBid(amount);
-                  if (context.mounted) {
+                  final result = await controller.placeBid(amount);
+                  if (!context.mounted) return;
+                  if (result.isSuccess) {
                     Navigator.pop(context);
-                    if (error == null) {
-                      showThriftSnackBar(context, 'Bid placed successfully!');
-                    } else {
-                      showThriftSnackBar(context, error, isError: true);
-                    }
+                    showThriftSnackBar(context, 'Bid placed successfully!');
+                    return;
                   }
+                  if (result.code == 'phone_verification_required') {
+                    Navigator.pop(context);
+                    await showBidPhoneVerificationPrompt(
+                      context,
+                      productId: widget.productId,
+                    );
+                    return;
+                  }
+                  showThriftSnackBar(
+                    context,
+                    result.error ?? 'Failed to place bid.',
+                    isError: true,
+                  );
                 },
               ),
             ],
@@ -1154,17 +1184,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                             fontSize: 12,
                           ),
                         ),
-                      if (product.sellerTrustScore != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          '${resolveTrustLabel(score: product.sellerTrustScore!, storedLevel: product.sellerTrustLevel)} · ${product.sellerTrustScore}/100',
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
+                      if (sellerTrustLevelVisible(
+                        trustScore: product.sellerTrustScore,
+                        trustLevel: product.sellerTrustLevel,
+                      )) ...[
+                        const SizedBox(height: 4),
+                        SellerTrustLevelChip(
+                          trustScore: sellerTrustScoreForLabel(
+                            trustScore: product.sellerTrustScore,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          trustLevel: product.sellerTrustLevel,
+                          fontSize: 12,
                         ),
                       ],
                       const SizedBox(height: 4),
@@ -1589,7 +1619,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
         return SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () => _showBidBottomSheet(context, controller, minBid),
+            onPressed: () => _startPlaceBidFlow(context, controller, minBid),
             icon: const Icon(
               Icons.gavel_rounded,
               color: Colors.white,
@@ -1701,10 +1731,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
         width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: () {
-            final path = RouteNames.editListing.replaceFirst(
-              ':id',
-              product.id,
-            );
+            final path = RouteNames.editListing.replaceFirst(':id', product.id);
             context.push(path);
           },
           icon: const Icon(Icons.edit_outlined, color: Colors.white, size: 20),

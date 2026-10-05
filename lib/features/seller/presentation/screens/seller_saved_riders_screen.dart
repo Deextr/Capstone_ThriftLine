@@ -50,73 +50,71 @@ class SellerSavedRidersScreen extends StatelessWidget {
               ],
             )
           : ctrl.errorMessage != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppConstants.spacingMd),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          ctrl.errorMessage!,
-                          textAlign: TextAlign.center,
-                          style: AppTypography.body.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        OutlinedButton(
-                          onPressed: ctrl.load,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : ctrl.riders.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppConstants.spacingMd),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.two_wheeler_outlined,
-                              size: 48,
-                              color: AppColors.textSecondary.withValues(
-                                alpha: 0.6,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Save riders you use often',
-                              style: AppTypography.subheading,
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'When arranging delivery, pick a saved rider '
-                              'instead of typing the same details every time.',
-                              style: AppTypography.caption,
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppConstants.spacingMd),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      ctrl.errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textSecondary,
                       ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppConstants.spacingMd,
-                        AppConstants.spacingMd,
-                        AppConstants.spacingMd,
-                        88,
-                      ),
-                      itemCount: ctrl.riders.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final rider = ctrl.riders[index];
-                        return _RiderTile(rider: rider);
-                      },
                     ),
+                    const SizedBox(height: 16),
+                    OutlinedButton(
+                      onPressed: ctrl.load,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : ctrl.riders.isEmpty
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppConstants.spacingMd),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.two_wheeler_outlined,
+                      size: 48,
+                      color: AppColors.textSecondary.withValues(alpha: 0.6),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Save riders you use often',
+                      style: AppTypography.subheading,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'When arranging delivery, pick a saved rider '
+                      'instead of typing the same details every time.',
+                      style: AppTypography.caption,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.fromLTRB(
+                AppConstants.spacingMd,
+                AppConstants.spacingMd,
+                AppConstants.spacingMd,
+                88,
+              ),
+              itemCount: ctrl.riders.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final rider = ctrl.riders[index];
+                return _RiderTile(rider: rider);
+              },
+            ),
     );
   }
 }
@@ -142,19 +140,16 @@ class _RiderTile extends StatelessWidget {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              'Remove',
-              style: TextStyle(color: AppColors.error),
-            ),
+            child: Text('Remove', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
     );
     if (confirmed != true || !context.mounted) return;
 
-    final error = await context
-        .read<SellerSavedRidersController>()
-        .deleteRider(rider.id);
+    final error = await context.read<SellerSavedRidersController>().deleteRider(
+      rider.id,
+    );
     if (!context.mounted) return;
     if (error != null) {
       showThriftSnackBar(context, error, isError: true);
@@ -215,9 +210,7 @@ class _RiderTile extends StatelessWidget {
                     '${RouteNames.sellerSavedRiderEditor}?id=${rider.id}',
                   );
                   if (updated != null && context.mounted) {
-                    await context
-                        .read<SellerSavedRidersController>()
-                        .load();
+                    await context.read<SellerSavedRidersController>().load();
                   }
                 },
               ),

@@ -23,4 +23,3 @@ class PaymongoReturnCoordinator extends ChangeNotifier {
     _pending = null;
   }
 }
-

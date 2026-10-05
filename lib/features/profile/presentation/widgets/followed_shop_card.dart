@@ -43,10 +43,7 @@ class FollowedShopCard extends StatelessWidget {
 
     void openShop() {
       context.push(
-        RouteNames.sellerProfile.replaceFirst(
-          ':username',
-          shop.username,
-        ),
+        RouteNames.sellerProfile.replaceFirst(':username', shop.username),
       );
     }
 
@@ -73,268 +70,282 @@ class FollowedShopCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-          // ── Header: Avatar, Name, Location, Follow Toggle ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                GestureDetector(
-                  onTap: () => context.push(
-                    RouteNames.sellerProfile.replaceFirst(
-                      ':username',
-                      shop.username,
-                    ),
-                  ),
-                  child: Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      ThriftAvatar(
-                        imageUrl: shop.avatarUrl,
-                        name: shop.shopName,
-                        size: 52,
-                      ),
-                      if (shop.isVerified)
-                        Container(
-                          padding: const EdgeInsets.all(2.5),
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check_rounded,
-                            color: Colors.white,
-                            size: 11,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      GestureDetector(
-                        onTap: () => context.push(
-                          RouteNames.sellerProfile.replaceFirst(
-                            ':username',
-                            shop.username,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                shop.shopName,
-                                style: AppTypography.heading.copyWith(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (shop.isVerified) ...[
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.verified,
-                                color: AppColors.primary,
-                                size: 16,
-                              ),
-                            ],
-                          ],
+              // ── Header: Avatar, Name, Location, Follow Toggle ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      onTap: () => context.push(
+                        RouteNames.sellerProfile.replaceFirst(
+                          ':username',
+                          shop.username,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Row(
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
                         children: [
-                          Flexible(
-                            child: Text(
-                              '@${shop.username}',
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.textSecondary,
-                                fontSize: 13,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                          ThriftAvatar(
+                            imageUrl: shop.avatarUrl,
+                            name: shop.shopName,
+                            size: 52,
                           ),
-                          if (shop.location.isNotEmpty) ...[
-                            const SizedBox(width: 6),
-                            const Text(
-                              '•',
-                              style: TextStyle(
-                                color: AppColors.textHint,
-                                fontSize: 12,
+                          if (shop.isVerified)
+                            Container(
+                              padding: const EdgeInsets.all(2.5),
+                              decoration: const BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.check_rounded,
+                                color: Colors.white,
+                                size: 11,
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            const Icon(
-                              Icons.location_on_outlined,
-                              size: 13,
-                              color: AppColors.textSecondary,
-                            ),
-                            const SizedBox(width: 2),
-                            Flexible(
-                              child: Text(
-                                shop.location,
-                                style: AppTypography.caption.copyWith(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 12,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      // Rating & Sales & Trust
-                      Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 8,
-                        runSpacing: 4,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (shop.ratingCount > 0)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.star_rounded,
-                                  size: 16,
-                                  color: Color(0xFFFFB800),
-                                ),
-                                const SizedBox(width: 2),
-                                Text(
-                                  '${shop.rating.toStringAsFixed(1)} (${shop.ratingCount})',
-                                  style: AppTypography.caption.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          if (shop.sales > 0)
-                            Text(
-                              '${shop.sales} sold',
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.textSecondary,
+                          GestureDetector(
+                            onTap: () => context.push(
+                              RouteNames.sellerProfile.replaceFirst(
+                                ':username',
+                                shop.username,
                               ),
-                            ),
-                          // Trust score chip
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: trustData.color.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(6),
                             ),
                             child: Row(
-                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  trustData.icon,
-                                  size: 12,
-                                  color: trustData.color,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  '${shop.trustScore} Trust',
-                                  style: AppTypography.caption.copyWith(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: trustData.color,
+                                Flexible(
+                                  child: Text(
+                                    shop.shopName,
+                                    style: AppTypography.heading.copyWith(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
+                                if (shop.isVerified) ...[
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.verified,
+                                    color: AppColors.primary,
+                                    size: 16,
+                                  ),
+                                ],
                               ],
                             ),
                           ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  '@${shop.username}',
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 13,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (shop.location.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                const Text(
+                                  '•',
+                                  style: TextStyle(
+                                    color: AppColors.textHint,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                const Icon(
+                                  Icons.location_on_outlined,
+                                  size: 13,
+                                  color: AppColors.textSecondary,
+                                ),
+                                const SizedBox(width: 2),
+                                Flexible(
+                                  child: Text(
+                                    shop.location,
+                                    style: AppTypography.caption.copyWith(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          // Rating & Sales & Trust
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              if (shop.ratingCount > 0)
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.star_rounded,
+                                      size: 16,
+                                      color: Color(0xFFFFB800),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      '${shop.rating.toStringAsFixed(1)} (${shop.ratingCount})',
+                                      style: AppTypography.caption.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              if (shop.sales > 0)
+                                Text(
+                                  '${shop.sales} sold',
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              // Trust score chip
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: trustData.color.withValues(
+                                    alpha: 0.12,
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      trustData.icon,
+                                      size: 12,
+                                      color: trustData.color,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Flexible(
+                                      child: Text(
+                                        label,
+                                        style: AppTypography.caption.copyWith(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: trustData.color,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Follow / Unfollow Button
+                    _FollowToggleButton(
+                      isFollowing: isFollowing,
+                      onPressed: onToggleFollow,
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Shop Bio snippet ──
+              if (shop.shopBio != null && shop.shopBio!.trim().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    bottom: 12,
+                  ),
+                  child: Text(
+                    shop.shopBio!.trim(),
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+
+              // ── Preview Products Row ──
+              if (shop.previewProducts.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    bottom: 8,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Recent Listings',
+                        style: AppTypography.caption.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textSecondary,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      if (shop.itemCount > shop.previewProducts.length)
+                        Text(
+                          '${shop.itemCount} items',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.textHint,
+                            fontSize: 11,
+                          ),
+                        ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                // Follow / Unfollow Button
-                _FollowToggleButton(
-                  isFollowing: isFollowing,
-                  onPressed: onToggleFollow,
-                ),
-              ],
-            ),
-          ),
-
-          // ── Shop Bio snippet ──
-          if (shop.shopBio != null && shop.shopBio!.trim().isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
-              child: Text(
-                shop.shopBio!.trim(),
-                style: AppTypography.body.copyWith(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                  height: 1.35,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-
-          // ── Preview Products Row ──
-          if (shop.previewProducts.isNotEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Recent Listings',
-                    style: AppTypography.caption.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textSecondary,
-                      letterSpacing: 0.3,
-                    ),
+                SizedBox(
+                  height: 112,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: shop.previewProducts.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 10),
+                    itemBuilder: (context, index) {
+                      final product = shop.previewProducts[index];
+                      return _ProductThumbnail(
+                        product: product,
+                        currencyFormatter: currencyFormatter,
+                      );
+                    },
                   ),
-                  if (shop.itemCount > shop.previewProducts.length)
-                    Text(
-                      '${shop.itemCount} items',
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.textHint,
-                        fontSize: 11,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            SizedBox(
-              height: 112,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: shop.previewProducts.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (context, index) {
-                  final product = shop.previewProducts[index];
-                  return _ProductThumbnail(
-                    product: product,
-                    currencyFormatter: currencyFormatter,
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-          ] else ...[
-            const SizedBox(height: 4),
-          ],
-        ],
+                ),
+                const SizedBox(height: 16),
+              ] else ...[
+                const SizedBox(height: 4),
+              ],
+            ],
+          ),
+        ),
       ),
-    ),
-  ),
-);
+    );
   }
 }
 
@@ -409,9 +420,8 @@ class _ProductThumbnail extends StatelessWidget {
         : product.price;
 
     return GestureDetector(
-      onTap: () => context.push(
-        RouteNames.product.replaceFirst(':id', product.id),
-      ),
+      onTap: () =>
+          context.push(RouteNames.product.replaceFirst(':id', product.id)),
       child: Container(
         width: 84,
         decoration: BoxDecoration(

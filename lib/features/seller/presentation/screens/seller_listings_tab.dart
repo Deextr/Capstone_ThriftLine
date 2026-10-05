@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -12,6 +14,7 @@ import '../../../../core/utils/supabase_rpc.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../data/listing_bucket.dart';
+import '../../data/seller_listings_refresh.dart';
 import '../widgets/end_auction_dialog.dart';
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -158,16 +161,43 @@ class _SellerListingsTabState extends State<SellerListingsTab>
   List<_ListingItem> _inactive = [];
   bool _loading = true;
   String? _error;
+  String? _refreshListenerSellerId;
 
   @override
   void initState() {
     super.initState();
     _tab = TabController(length: 4, vsync: this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _bindRefreshListener();
+      unawaited(_load());
+    });
+  }
+
+  void _bindRefreshListener() {
+    final sellerId = context.read<AuthProvider>().user?.id;
+    if (sellerId == null || sellerId == _refreshListenerSellerId) return;
+    if (_refreshListenerSellerId != null) {
+      SellerListingsRefresh.removeListener(
+        _refreshListenerSellerId!,
+        _onListingsRefreshRequested,
+      );
+    }
+    _refreshListenerSellerId = sellerId;
+    SellerListingsRefresh.addListener(sellerId, _onListingsRefreshRequested);
+  }
+
+  void _onListingsRefreshRequested() {
+    unawaited(_load());
   }
 
   @override
   void dispose() {
+    if (_refreshListenerSellerId != null) {
+      SellerListingsRefresh.removeListener(
+        _refreshListenerSellerId!,
+        _onListingsRefreshRequested,
+      );
+    }
     _tab.dispose();
     super.dispose();
   }

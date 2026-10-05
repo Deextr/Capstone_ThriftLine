@@ -140,8 +140,7 @@ class MyShopScreen extends StatelessWidget {
                             return GridView.builder(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate:
-                                  ProductCard.gridDelegateFor(
+                              gridDelegate: ProductCard.gridDelegateFor(
                                 maxWidth: constraints.maxWidth,
                                 horizontalPadding: 0,
                                 compact: true,
@@ -302,10 +301,7 @@ class _ShopHeader extends StatelessWidget {
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => context.push(RouteNames.followingShops),
-                    child: _StatColumn(
-                      value: '$following',
-                      label: 'Following',
-                    ),
+                    child: _StatColumn(value: '$following', label: 'Following'),
                   ),
                 ],
               ),

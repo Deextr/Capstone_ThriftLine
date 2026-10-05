@@ -21,6 +21,9 @@ abstract final class RouteNames {
 
   static const String buyerHome = '/buyer';
   static const String sellerHome = '/seller';
+
+  /// Opens the seller shell on a specific bottom-nav tab (`listings`, `orders`, …).
+  static String sellerHomeWithTab(String tab) => '$sellerHome?tab=$tab';
   static const String search = '/search';
   static const String product = '/product/:id';
 
@@ -30,6 +33,7 @@ abstract final class RouteNames {
     if (ownerPreview) return '/product/$id?ownerPreview=1';
     return '/product/$id';
   }
+
   static const String buyNow = '/buy-now/:id';
   static const String payment = '/payment/:id';
   static const String orderConfirm = '/order-confirm/:orderId';
@@ -153,6 +157,7 @@ abstract final class RouteNames {
   static const String adminDisputeDetail = '/admin/disputes/:id';
   static const String adminLookingForReport = '/admin/looking-for-reports/:id';
   static const String adminDisabledAccounts = '/admin/disabled-accounts';
+  static const String adminBidRiskEvents = '/admin/bid-risk-events';
 
   static String adminReviewFor(String id) => '/admin/review/$id';
   static String adminReportDetailFor(String id) => '/admin/reports/$id';
@@ -164,6 +169,9 @@ abstract final class RouteNames {
   static String adminLookingForReportFor(String id) =>
       '/admin/looking-for-reports/$id';
   static const String verifyPhone = '/verify-phone';
+
+  static String verifyPhoneForBidReturn(String productId) =>
+      '/verify-phone?returnBidProduct=$productId';
   static const String verifyEmailOtp = '/verify-email-otp';
   static const String addresses = '/addresses';
   static const String sellerShopAddress = '/seller/shop-address';

@@ -219,8 +219,7 @@ class MyPurchaseOrderCard extends StatelessWidget {
     final bucket = category == BuyerPurchaseCategory.all
         ? buyerPurchaseCategory(order)
         : category;
-    if (bucket == BuyerPurchaseCategory.completed &&
-        reviewActionKind != null) {
+    if (bucket == BuyerPurchaseCategory.completed && reviewActionKind != null) {
       return reviewActionLabel(reviewActionKind!, ratingBuyer: false);
     }
     if (bucket == BuyerPurchaseCategory.toReceive) return 'Track delivery';
@@ -286,9 +285,7 @@ class _PrimaryLine extends StatelessWidget {
             children: [
               Text(
                 order.productTitle,
-                style: AppTypography.body.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),

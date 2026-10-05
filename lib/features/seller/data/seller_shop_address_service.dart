@@ -30,9 +30,7 @@ class SellerShopAddressService {
     }
   }
 
-  Future<String?> updateMine({
-    required SellerAddressDraft draft,
-  }) async {
+  Future<String?> updateMine({required SellerAddressDraft draft}) async {
     final userId = _supabase.currentUser?.id;
     if (userId == null) return 'Please sign in.';
 

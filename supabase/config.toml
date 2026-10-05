@@ -32,6 +32,9 @@ verify_jwt = true
 [functions.verify-phone-otp]
 verify_jwt = true
 
+[functions.test-unisms-sms]
+verify_jwt = true
+
 [functions.send-password-reset]
 verify_jwt = false
 

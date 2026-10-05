@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
@@ -68,6 +69,26 @@ class _SellerShellScreenState extends State<SellerShellScreen> {
       ),
       child: const ChatInboxView(showHeader: true),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncTabFromRoute());
+  }
+
+  int? _tabIndexFromQuery(String? tab) => switch (tab) {
+        'dashboard' => 0,
+        'listings' => SellerTabScope.listings,
+        'looking' => SellerTabScope.looking,
+        'orders' => SellerTabScope.orders,
+        'messages' => SellerTabScope.messages,
+        'profile' => 5,
+        _ => null,
+      };
+
+  void _syncTabFromRoute() {
+    if (!mounted) return;
+    final tab = GoRouterState.of(context).uri.queryParameters['tab'];
+    final index = _tabIndexFromQuery(tab);
+    if (index != null && index != _index) {
+      _openTab(index);
+    }
   }
 
   void _openTab(int index, {SellerOrderBucket? ordersBucket}) {

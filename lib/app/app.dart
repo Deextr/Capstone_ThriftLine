@@ -94,7 +94,7 @@ class _SessionBindings extends StatefulWidget {
 }
 
 class _SessionBindingsState extends State<_SessionBindings>
-  with WidgetsBindingObserver {
+    with WidgetsBindingObserver {
   String? _boundUserId;
   Timer? _presenceTimer;
 

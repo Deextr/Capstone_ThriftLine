@@ -13,6 +13,18 @@ const List<String> kTrustLabels = [
   'Banned',
 ];
 
+/// Whether a buyer-facing surface should show a seller trust classification.
+bool sellerTrustLevelVisible({int? trustScore, String? trustLevel}) {
+  final stored = trustLevel?.trim();
+  if (stored != null && stored.isNotEmpty && kTrustLabels.contains(stored)) {
+    return true;
+  }
+  return trustScore != null;
+}
+
+/// Score used only to resolve the label when [trustLevel] is absent.
+int sellerTrustScoreForLabel({int? trustScore}) => trustScore ?? 80;
+
 String resolveTrustLabel({required int score, String? storedLevel}) {
   final stored = storedLevel?.trim();
   if (stored != null && stored.isNotEmpty && kTrustLabels.contains(stored)) {
@@ -100,10 +112,8 @@ class SellerTrustBreakdown {
     final weightsRaw = raw['weights'];
     if (weightsRaw is Map) {
       weights = weightsRaw.map(
-        (key, value) => MapEntry(
-          key.toString(),
-          value is num ? value.toDouble() : 0,
-        ),
+        (key, value) =>
+            MapEntry(key.toString(), value is num ? value.toDouble() : 0),
       );
     }
 
@@ -131,9 +141,7 @@ class SellerTrustBreakdown {
 
 /// Transaction count backing the ST rubric (from server breakdown JSON).
 int sellerTrustTransactionCount(SellerTrustBreakdown breakdown) =>
-    breakdown.eligibleTransactions ??
-    breakdown.completedThriftline ??
-    0;
+    breakdown.eligibleTransactions ?? breakdown.completedThriftline ?? 0;
 
 /// Admin-confirmed report count (from server breakdown JSON).
 int sellerTrustConfirmedReportCount(SellerTrustBreakdown breakdown) =>

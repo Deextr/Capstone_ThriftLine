@@ -30,7 +30,9 @@ class SellerAnalyticsService {
         params['p_range_end'] = window.rangeEnd!.toUtc().toIso8601String();
       }
       if (window.compareStart != null) {
-        params['p_compare_start'] = window.compareStart!.toUtc().toIso8601String();
+        params['p_compare_start'] = window.compareStart!
+            .toUtc()
+            .toIso8601String();
       }
       if (window.compareEnd != null) {
         params['p_compare_end'] = window.compareEnd!.toUtc().toIso8601String();
@@ -49,8 +51,8 @@ class SellerAnalyticsService {
         }
         return (
           report: null,
-          error: supabaseRpcError(rpcRes, fallback: userFallback) ??
-              userFallback,
+          error:
+              supabaseRpcError(rpcRes, fallback: userFallback) ?? userFallback,
         );
       }
 
@@ -78,7 +80,8 @@ class SellerAnalyticsService {
           '${e.code} ${e.message}\n$st',
         );
       }
-      final missingFn = e.code == 'PGRST202' ||
+      final missingFn =
+          e.code == 'PGRST202' ||
           (e.message.contains('seller_analytics_report'));
       return (
         report: null,

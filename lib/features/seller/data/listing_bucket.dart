@@ -71,22 +71,9 @@ bool canRelistAuction(ListingSnapshot listing) {
       listingBucketFor(listing) == ListingBucket.inactive;
 }
 
-/// Seller can offer item to the next-highest bidder if the auction ended,
-/// payment was not completed, and there were multiple bids.
-bool canOfferToNextBidder(ListingSnapshot listing) {
-  if (listing.listingType != 'auction') return false;
-  if (listing.auctionStatus != 'ended') return false;
-  if (listing.productStatus == 'sold' || listing.paymentStatus == 'paid') {
-    return false;
-  }
-  final windowOpen =
-      listing.paymentDueAt != null &&
-      listing.paymentDueAt!.isAfter(listing.now);
-  if (windowOpen && listing.orderStatus == 'pending') {
-    return false;
-  }
-  return listing.bidCount >= 2;
-}
+/// Fallback to the second-highest bidder is automatic after the primary
+/// winner's payment window expires. Sellers do not assign the next bidder.
+bool canOfferToNextBidder(ListingSnapshot listing) => false;
 
 /// Seller may open the edit form only while the listing is in the Active tab.
 bool canEditListing(ListingSnapshot listing) =>

@@ -5,7 +5,7 @@ import '../data/seller_saved_riders_service.dart';
 
 class SellerSavedRidersController extends ChangeNotifier {
   SellerSavedRidersController({required SellerSavedRidersService service})
-      : _service = service {
+    : _service = service {
     load();
   }
 

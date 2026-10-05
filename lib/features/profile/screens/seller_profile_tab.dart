@@ -269,9 +269,9 @@ class _NotificationToggle extends StatelessWidget {
         onChanged: settings.isSavingPush
             ? null
             : (value) => settings.setPushNotifications(
-                  value,
-                  mode: AccountMode.seller,
-                ),
+                value,
+                mode: AccountMode.seller,
+              ),
         activeTrackColor: AppColors.primary.withValues(alpha: 0.4),
         activeThumbColor: AppColors.primary,
       ),

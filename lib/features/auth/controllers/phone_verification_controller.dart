@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/utils/ph_phone.dart';
+import '../../../core/utils/ph_smart_tnt_prefixes.dart';
 import '../../../providers/auth_provider.dart';
 import '../domain/phone_otp.dart';
+import '../domain/trusted_device.dart';
 
 class PhoneVerificationController extends ChangeNotifier {
   PhoneVerificationController({
@@ -29,23 +31,59 @@ class PhoneVerificationController extends ChangeNotifier {
 
   bool get isBusy => isSending || isVerifying;
   bool get canResend => codeSent && resendSeconds <= 0 && !isBusy;
-  bool get isDitoUnavailable =>
+  bool get isSmsNetworkUnavailable =>
       errorMessage != null &&
-      (errorMessage == kDitoUnavailableMessage ||
-          errorMessage!.contains('DITO numbers is currently unavailable'));
-  bool get isAlreadyVerified => _auth.user?.isPhoneVerified == true;
+      (errorMessage == kSmsNetworkUnavailableMessage ||
+          errorMessage!.contains(
+            'SMS verification is currently unavailable for this mobile number',
+          ));
+
+  /// @deprecated Use [isSmsNetworkUnavailable].
+  bool get isDitoUnavailable => isSmsNetworkUnavailable;
+  bool get isAlreadyVerified => isVerifiedForEnteredPhone;
+
+  /// Verified only when auth says so **and** it matches the number in the field.
+  bool get accountHasVerifiedPhone =>
+      _auth.user?.hasVerifiedAccountPhone ?? false;
+
+  /// User is replacing an already verified account mobile with a new one.
+  bool get isChangingVerifiedPhone =>
+      accountHasVerifiedPhone && !isVerifiedForEnteredPhone;
+
+  bool get isVerifiedForEnteredPhone {
+    final user = _auth.user;
+    if (user == null || !user.isPhoneVerified) return false;
+    final stored = normalizePhMobile(user.phone);
+    final entered = normalizePhMobile(phone);
+    return stored != null &&
+        entered != null &&
+        stored == entered &&
+        isPhMobile09Format(entered);
+  }
+
   String get maskedPhone => maskPhMobileForOtp(phone);
+
+  void syncPhoneFromField(String raw) {
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    phone = digits.length > 11 ? digits.substring(0, 11) : digits;
+    phoneError = null;
+    if (codeSent && !isVerifiedForEnteredPhone) {
+      changePhoneNumber();
+    }
+    if (isSmsNetworkUnavailable) errorMessage = null;
+    notifyListeners();
+  }
 
   void updatePhone(String value) {
     phone = value.replaceAll(RegExp(r'\D'), '');
     phoneError = null;
-    if (isDitoUnavailable) errorMessage = null;
+    if (isSmsNetworkUnavailable) errorMessage = null;
     notifyListeners();
   }
 
   void updateCode(String value) {
     code = value.replaceAll(RegExp(r'\D'), '');
-    if (errorMessage != null && !isDitoUnavailable) {
+    if (errorMessage != null && !isSmsNetworkUnavailable) {
       errorMessage = null;
     }
     notifyListeners();
@@ -60,11 +98,25 @@ class PhoneVerificationController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> sendCode() async {
-    phoneError = phMobile09FormatValidationError(phone);
+  Future<bool> sendCode({bool editProfileCopy = false}) async {
+    phoneError = editProfileCopy
+        ? phMobile09EditProfileValidationError(phone)
+        : phMobile09FormatValidationError(phone);
     if (phoneError != null) {
       notifyListeners();
       return false;
+    }
+
+    final smartTntBlock = smartTntPrefixOtpBlockMessage(phone);
+    if (smartTntBlock != null) {
+      phoneError = smartTntBlock;
+      errorMessage = null;
+      notifyListeners();
+      return false;
+    }
+
+    if (isVerifiedForEnteredPhone) {
+      return true;
     }
 
     isSending = true;
@@ -76,9 +128,16 @@ class PhoneVerificationController extends ChangeNotifier {
 
     isSending = false;
     if (!result.isOk) {
-      errorMessage = result.error;
-      if (result.code == PhoneOtpErrorCode.invalidPhone) {
-        phoneError = result.error;
+      errorMessage = phoneOtpUserMessage(
+        result,
+        fallback: 'We couldn\'t send the verification code. Please try again.',
+      );
+      if (result.code == PhoneOtpErrorCode.invalidPhone ||
+          result.code == PhoneOtpErrorCode.phoneAlreadyInUse ||
+          result.code == PhoneOtpErrorCode.networkUnavailable ||
+          result.code == PhoneOtpErrorCode.ditoUnavailable) {
+        phoneError = errorMessage;
+        errorMessage = null;
       }
       if (result.retryAfterSeconds != null && result.retryAfterSeconds! > 0) {
         _startResendCountdown(result.retryAfterSeconds!);
@@ -105,12 +164,26 @@ class PhoneVerificationController extends ChangeNotifier {
     errorMessage = null;
     notifyListeners();
 
-    final result = await _auth.verifyPhoneOtp(phone: phone, token: code);
+    final deviceToken = await _auth.deviceInstallTokenForRisk();
+    final result = await _auth.verifyPhoneOtp(
+      phone: phone,
+      token: code,
+      deviceToken: deviceToken,
+      platform: trustedDevicePlatformLabel(defaultTargetPlatform),
+    );
     if (!hasListeners) return false;
 
     isVerifying = false;
     if (!result.isOk) {
-      errorMessage = result.error;
+      errorMessage = phoneOtpUserMessage(
+        result,
+        fallback: 'The verification code is incorrect.',
+      );
+      if (result.code == PhoneOtpErrorCode.phoneAlreadyInUse) {
+        phoneError = errorMessage;
+        errorMessage = null;
+        codeSent = false;
+      }
       notifyListeners();
       return false;
     }

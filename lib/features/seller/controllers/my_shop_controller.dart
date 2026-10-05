@@ -26,9 +26,8 @@ class MyShopController extends ChangeNotifier {
   String? _errorMessage;
 
   List<ProductModel> get products => _products;
-  List<ProductModel> get activeProducts => _products
-      .where((p) => p.status == ProductStatus.active)
-      .toList();
+  List<ProductModel> get activeProducts =>
+      _products.where((p) => p.status == ProductStatus.active).toList();
   List<ProductModel> get previewProducts => activeProducts.take(6).toList();
   int get followerCount => _followerCount;
   int get followingCount => _followingCount;

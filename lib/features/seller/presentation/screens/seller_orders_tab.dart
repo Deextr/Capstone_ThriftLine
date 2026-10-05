@@ -106,7 +106,8 @@ class _SellerOrdersTabState extends State<SellerOrdersTab>
     }
     if (controller.errorMessage != null && controller.orders.isEmpty) {
       return ErrorState(
-        message: controller.errorMessage ??
+        message:
+            controller.errorMessage ??
             'Unable to load orders. Please try again.',
         onRetry: controller.load,
       );

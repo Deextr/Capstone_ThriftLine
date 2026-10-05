@@ -148,9 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
     const fieldLabelColor = Colors.white;
     final lockedOut = _rateLimiter.isLockedOut;
     final canSubmitEmail =
-        !auth.isLoading &&
-        !lockedOut &&
-        (_turnstileToken?.isNotEmpty ?? false);
+        !auth.isLoading && !lockedOut && (_turnstileToken?.isNotEmpty ?? false);
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -204,9 +202,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                       () =>
                                           _obscurePassword = !_obscurePassword,
                                     ),
-                                    onTurnstileToken: (token) => setState(
-                                      () => _turnstileToken = token,
-                                    ),
+                                    onTurnstileToken: (token) =>
+                                        setState(() => _turnstileToken = token),
                                     onTurnstileClear: () =>
                                         setState(() => _turnstileToken = null),
                                     onSignIn: _loginWithEmail,

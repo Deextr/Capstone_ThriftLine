@@ -100,8 +100,9 @@ class _HelpSupportSheetState extends State<HelpSupportSheet> {
                           children: [
                             Text(
                               'Need Immediate Assistance?',
-                              style: AppTypography.subheading
-                                  .copyWith(fontSize: 14),
+                              style: AppTypography.subheading.copyWith(
+                                fontSize: 14,
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
@@ -247,7 +248,10 @@ class TermsPrivacySheet extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text('2. Seller Obligations', style: AppTypography.subheading),
+                  Text(
+                    '2. Seller Obligations',
+                    style: AppTypography.subheading,
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     'Sellers must provide accurate descriptions, high-resolution original photos, and process orders promptly. Counterfeit or mislabeled items will lead to account suspension.',
@@ -257,7 +261,10 @@ class TermsPrivacySheet extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text('3. Privacy & Security', style: AppTypography.subheading),
+                  Text(
+                    '3. Privacy & Security',
+                    style: AppTypography.subheading,
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     'We safeguard your personal details, shipping addresses, and GCash proof uploads with end-to-end encryption. Your contact details are never shared with third parties.',
@@ -435,10 +442,7 @@ class _StatItem extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 2),
-        Text(
-          label,
-          style: AppTypography.caption.copyWith(fontSize: 11),
-        ),
+        Text(label, style: AppTypography.caption.copyWith(fontSize: 11)),
       ],
     );
   }
