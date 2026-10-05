@@ -62,6 +62,7 @@ import '../../features/seller/controllers/seller_saved_riders_controller.dart';
 import '../../features/seller/data/seller_saved_riders_service.dart';
 import '../../features/seller/presentation/screens/seller_saved_rider_editor_screen.dart';
 import '../../features/seller/presentation/screens/seller_saved_riders_screen.dart';
+import '../../features/seller/controllers/seller_earnings_controller.dart';
 import '../../features/seller/controllers/seller_orders_controller.dart';
 import '../../providers/cart_provider.dart';
 import '../../features/buyer/presentation/screens/product_detail_screen.dart';
@@ -75,6 +76,7 @@ import '../../features/chat/presentation/screens/chat_detail_screen.dart';
 import '../../features/chat/presentation/screens/chat_list_screen.dart';
 import '../../features/buyer/controllers/home_collection_controller.dart';
 import '../../features/buyer/controllers/home_controller.dart';
+import '../../features/buyer/controllers/looking_for_controller.dart';
 import '../../features/buyer/controllers/looking_for_detail_controller.dart';
 import '../../features/buyer/presentation/screens/home_collection_screen.dart';
 import '../../features/buyer/presentation/screens/looking_for_detail_screen.dart';
@@ -245,21 +247,46 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: RouteNames.buyerHome,
-        builder: (context, _) => ChangeNotifierProvider(
-          create: (context) => BuyerOrdersController(
-            supabase: context.read<SupabaseService>(),
-            auth: context.read<AuthProvider>(),
-          ),
+        builder: (context, _) => MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (context) => BuyerOrdersController(
+                supabase: context.read<SupabaseService>(),
+                auth: context.read<AuthProvider>(),
+              ),
+            ),
+            ChangeNotifierProvider(
+              create: (context) => LookingForController(
+                supabase: context.read<SupabaseService>(),
+                auth: context.read<AuthProvider>(),
+              ),
+            ),
+          ],
           child: const BuyerShellScreen(),
         ),
       ),
       GoRoute(
         path: RouteNames.sellerHome,
-        builder: (context, _) => ChangeNotifierProvider(
-          create: (context) => SellerOrdersController(
-            supabase: context.read<SupabaseService>(),
-            auth: context.read<AuthProvider>(),
-          ),
+        builder: (context, _) => MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (context) => SellerOrdersController(
+                supabase: context.read<SupabaseService>(),
+                auth: context.read<AuthProvider>(),
+              ),
+            ),
+            ChangeNotifierProvider(
+              create: (context) => LookingForController(
+                supabase: context.read<SupabaseService>(),
+                auth: context.read<AuthProvider>(),
+              ),
+            ),
+            ChangeNotifierProvider(
+              create: (context) => SellerEarningsController(
+                supabase: context.read<SupabaseService>(),
+              ),
+            ),
+          ],
           child: const SellerShellScreen(),
         ),
       ),

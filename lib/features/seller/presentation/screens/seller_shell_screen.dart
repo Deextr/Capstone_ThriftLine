@@ -6,12 +6,10 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/curved_navigation_bar.dart';
-import '../../../buyer/controllers/looking_for_controller.dart';
 import '../../../buyer/presentation/screens/buyer_looking_for_tab.dart';
 import '../../../chat/controllers/chat_list_controller.dart';
 import '../../../chat/presentation/widgets/chat_inbox_view.dart';
 import '../../../profile/screens/seller_profile_tab.dart';
-import '../../controllers/seller_earnings_controller.dart';
 import '../../controllers/seller_orders_controller.dart';
 import '../../data/seller_order_buckets.dart';
 import 'seller_dashboard_tab.dart';
@@ -182,39 +180,24 @@ class _SellerShellScreenState extends State<SellerShellScreen> {
 
     return SellerTabScope(
       openTab: _openTab,
-      child: MultiProvider(
-        providers: [
-          ChangeNotifierProvider(
-            create: (context) => LookingForController(
-              supabase: context.read<SupabaseService>(),
-              auth: context.read<AuthProvider>(),
-            ),
+      child: Scaffold(
+        extendBody: true,
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, animation) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          child: KeyedSubtree(
+            key: ValueKey<int>(_index),
+            child: _page(_index),
           ),
-          ChangeNotifierProvider(
-            create: (context) => SellerEarningsController(
-              supabase: context.read<SupabaseService>(),
-            ),
-          ),
-        ],
-        child: Scaffold(
-          extendBody: true,
-          body: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
-            transitionBuilder: (child, animation) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-            child: KeyedSubtree(
-              key: ValueKey<int>(_index),
-              child: _page(_index),
-            ),
-          ),
-          bottomNavigationBar: CurvedNavigationBar(
-            selectedIndex: _index,
-            onTap: _onTabChanged,
-            items: navItems,
-          ),
+        ),
+        bottomNavigationBar: CurvedNavigationBar(
+          selectedIndex: _index,
+          onTap: _onTabChanged,
+          items: navItems,
         ),
       ),
     );

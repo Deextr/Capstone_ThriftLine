@@ -245,6 +245,18 @@ class AuthProvider extends ChangeNotifier {
       // A rejected Google→email signup signs the session back out. Ignore a
       // stale signedIn that finishes after that sign-out.
       if (_authService.currentSession == null) return;
+
+      // signInWithEmail / loginWithGoogle already hydrated _user; repeating
+      // getCurrentUser here duplicates getUser + profile queries on the UI path.
+      if (authEvent == AuthChangeEvent.signedIn) {
+        final sessionUserId = _authService.currentSession?.user.id;
+        if (_user != null &&
+            sessionUserId != null &&
+            _user!.id == sessionUserId) {
+          return;
+        }
+      }
+
       final currentUser = await _authService.getCurrentUser();
       if (currentUser == null || _authService.currentSession == null) return;
 
