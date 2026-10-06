@@ -7,10 +7,13 @@ import 'package:supabase_flutter/supabase_flutter.dart'
 import '../core/services/shared_preferences_service.dart';
 import '../features/auth/data/auth_service.dart';
 import '../features/auth/data/auth_result.dart';
+import '../features/auth/data/email_login_result.dart';
 import '../features/auth/data/trusted_device_store.dart';
 import '../features/auth/domain/account_mode.dart';
+import '../features/auth/domain/auth_error.dart';
 import '../features/auth/domain/auth_user.dart';
 import '../features/auth/domain/legal_documents.dart';
+import '../features/auth/domain/login_portal.dart';
 import '../features/auth/domain/phone_otp.dart';
 import '../features/auth/domain/trusted_device.dart';
 import '../models/enums.dart';
@@ -191,10 +194,11 @@ class AuthProvider extends ChangeNotifier {
       final currentUser = await _authService.getCurrentUser();
       if (currentUser != null && !currentUser.isPermanentlyDisabled) {
         _user = currentUser;
-        // TEMP: with the OTP bypass on, also clear any stale pending flag so
-        // the router doesn't get stuck on the OTP gate.
-        _emailOtpPending = _bypassOtp ? false : _prefs.isEmailOtpPending;
-        if (_bypassOtp) await _prefs.setEmailOtpPending(false);
+        // TEMP: debug OTP bypass clears pending for non-admins only.
+        final bypassOtpForUser = _bypassOtp && !currentUser.isAdmin;
+        _emailOtpPending =
+            bypassOtpForUser ? false : _prefs.isEmailOtpPending;
+        if (bypassOtpForUser) await _prefs.setEmailOtpPending(false);
         _syncActiveAccount(currentUser, restoreFromPrefs: true);
         await _saveSession(currentUser);
       } else {
@@ -301,12 +305,13 @@ class AuthProvider extends ChangeNotifier {
   /// Signs in with email and password after the user has accepted the legal
   /// documents.
   ///
-  /// Returns an error message on failure, or `null` on success.
-  Future<String?> loginWithEmail({
+  /// Returns [EmailLoginResult.success] or a safe failure message from the mapper.
+  Future<EmailLoginResult> loginWithEmail({
     required String email,
     required String password,
     required LegalConsent consent,
     required String turnstileToken,
+    LoginPortal loginPortal = LoginPortal.app,
   }) async {
     _isLoading = true;
     _resolvingTrustedDevice = true;
@@ -319,17 +324,23 @@ class AuthProvider extends ChangeNotifier {
         password: password,
         consent: consent,
         turnstileToken: turnstileToken,
+        loginPortal: loginPortal,
       );
 
       if (!result.success || result.user == null) {
         await _setEmailOtpPending(false);
-        return result.errorMessage ?? 'Sign-in failed. Please try again.';
+        return EmailLoginResult.failure(
+          result.errorMessage ?? emailLoginGenericFallbackMessage,
+          retryAfterSeconds: result.retryAfterSeconds,
+        );
       }
 
       if (result.user!.isPermanentlyDisabled) {
         await _authService.signOut();
         await _setEmailOtpPending(false);
-        return 'This account has been permanently disabled.';
+        return EmailLoginResult.failure(
+          'This account has been permanently disabled.',
+        );
       }
 
       _user = result.user;
@@ -347,9 +358,9 @@ class AuthProvider extends ChangeNotifier {
         serverTrusted = false;
       }
 
-      // TEMP: _bypassOtp forces the skip (debug builds only).
+      // TEMP: _bypassOtp forces the skip (debug builds only), never for admins.
       final skipOtp =
-          _bypassOtp ||
+          (_bypassOtp && !result.user!.isAdmin) ||
           shouldSkipEmailOtp(
             passwordAccepted: true,
             serverTrusted: serverTrusted,
@@ -360,7 +371,7 @@ class AuthProvider extends ChangeNotifier {
         await _setEmailOtpPending(true);
         await sendEmailOtp();
       }
-      return null;
+      return EmailLoginResult.success();
     } finally {
       _resolvingTrustedDevice = false;
       _isLoading = false;
@@ -567,8 +578,18 @@ class AuthProvider extends ChangeNotifier {
       if (error != null) return error;
     }
 
+    final wasAdmin = _user?.isAdmin ?? false;
+
     _isLoading = true;
     notifyListeners();
+
+    if (wasAdmin) {
+      try {
+        await _authService.recordAdminLogoutAudit();
+      } catch (_) {
+        debugPrint('AuthProvider.logout admin audit failed');
+      }
+    }
 
     await _authService.signOut();
     _user = null;
@@ -687,7 +708,16 @@ class AuthProvider extends ChangeNotifier {
           ? null
           : trustedDevicePlatformLabel(defaultTargetPlatform),
     );
-    if (error == null) await _setEmailOtpPending(false);
+    if (error == null) {
+      await _setEmailOtpPending(false);
+      if (_user?.isAdmin ?? false) {
+        try {
+          await _authService.recordAdminLoginCompletedAudit();
+        } catch (_) {
+          debugPrint('AuthProvider.verifyEmailOtp admin audit failed');
+        }
+      }
+    }
     return error;
   }
 

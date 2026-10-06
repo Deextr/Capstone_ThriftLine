@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/supabase_rpc.dart';
+import 'admin_audit_log_models.dart';
+import 'admin_audit_service.dart';
 import '../../buyer/domain/looking_for_lifecycle.dart';
 
 class LookingForAdminReport {
@@ -238,7 +240,18 @@ class LookingForModerationService {
         'review_looking_for_report',
         params: {'p_report_id': reportId, 'p_decision': decision},
       );
-      if (supabaseRpcSuccess(raw)) return null;
+      if (supabaseRpcSuccess(raw)) {
+        await AdminAuditService(_supabase).record(
+          category: AdminAuditCategory.reportsDisputes,
+          eventType: 'looking_for_report_decided',
+          status: 'success',
+          summary: 'Looking-for report decision saved',
+          targetType: 'looking_for_report',
+          targetId: reportId,
+          details: {'decision': decision},
+        );
+        return null;
+      }
       return supabaseRpcError(
         raw,
         fallback: 'Could not save this decision. Please try again.',

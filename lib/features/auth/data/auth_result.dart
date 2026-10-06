@@ -6,6 +6,7 @@ class AuthResult {
     required this.success,
     this.user,
     this.errorMessage,
+    this.retryAfterSeconds,
     this.requiresEmailVerification = false,
     this.requiresEmailOtp = false,
   });
@@ -13,6 +14,9 @@ class AuthResult {
   final bool success;
   final AuthUser? user;
   final String? errorMessage;
+
+  /// Server-enforced lockout (admin portal), when present.
+  final int? retryAfterSeconds;
 
   /// Supabase created the account but withheld a session until the address is
   /// confirmed via the link it emailed.
@@ -33,6 +37,12 @@ class AuthResult {
     requiresEmailOtp: requiresEmailOtp,
   );
 
-  factory AuthResult.failure(String message) =>
-      AuthResult._(success: false, errorMessage: message);
+  factory AuthResult.failure(
+    String message, {
+    int? retryAfterSeconds,
+  }) => AuthResult._(
+    success: false,
+    errorMessage: message,
+    retryAfterSeconds: retryAfterSeconds,
+  );
 }

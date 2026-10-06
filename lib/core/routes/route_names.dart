@@ -147,10 +147,23 @@ abstract final class RouteNames {
 
   static const String myShop = '/my-shop';
   static const String sellerAnalytics = '/seller-analytics';
+  /// Mobile-only: shown when an admin signs into the buyer/seller app.
+  static const String adminPortalRequired = '/admin-portal-required';
+
+  static const String adminLogin = '/admin/login';
+  static const String adminVerifyEmailOtp = '/admin/verify-email-otp';
+  static const String adminAccessDenied = '/admin/access-denied';
   static const String adminHome = '/admin';
+  static const String adminDashboard = '/admin/dashboard';
   static const String adminApplications = '/admin/applications';
+  static const String adminVerifications = '/admin/verifications';
+  static const String adminVerificationReview = '/admin/verifications/:id';
   static const String adminReview = '/admin/review/:id';
   static const String adminReports = '/admin/reports';
+  static const String adminLogs = '/admin/logs';
+  static const String adminReportsCommunity = '/admin/reports/community';
+  static const String adminReportsOrders = '/admin/reports/orders';
+  static const String adminReportsLookingFor = '/admin/reports/looking-for';
   static const String adminReportsQueue = '/admin/reports/queue/:kind';
   static const String adminReportDetail = '/admin/reports/:id';
   static const String adminDisputes = '/admin/disputes';
@@ -158,16 +171,35 @@ abstract final class RouteNames {
   static const String adminLookingForReport = '/admin/looking-for-reports/:id';
   static const String adminDisabledAccounts = '/admin/disabled-accounts';
   static const String adminBidRiskEvents = '/admin/bid-risk-events';
+  static const String adminUsers = '/admin/users';
+  static const String adminOrders = '/admin/orders';
+  static const String adminOrderDetail = '/admin/orders/:id';
+  static const String adminTransactions = '/admin/transactions';
+  static const String adminSettings = '/admin/settings';
 
-  static String adminReviewFor(String id) => '/admin/review/$id';
+  static String adminReviewFor(String id) => '/admin/verifications/$id';
+
+  static String adminLegacyReviewFor(String id) => '/admin/review/$id';
+
   static String adminReportDetailFor(String id) => '/admin/reports/$id';
 
   static String adminReportsQueueFor(AdminReportKind kind) =>
       '/admin/reports/queue/${adminReportQueuePathSegment(kind)}';
+
+  static String adminReportsCategoryFor(AdminReportKind kind) =>
+      switch (kind) {
+        AdminReportKind.community => adminReportsCommunity,
+        AdminReportKind.order => adminReportsOrders,
+        AdminReportKind.lookingFor => adminReportsLookingFor,
+        AdminReportKind.all => adminReports,
+      };
+
   static String adminDisputeDetailFor(String id) => '/admin/disputes/$id';
 
   static String adminLookingForReportFor(String id) =>
       '/admin/looking-for-reports/$id';
+
+  static String adminOrderDetailFor(String id) => '/admin/orders/$id';
   static const String verifyPhone = '/verify-phone';
 
   static String verifyPhoneForBidReturn(String productId) =>

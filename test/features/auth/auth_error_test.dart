@@ -73,11 +73,58 @@ void main() {
     });
   });
 
+  group('parseEdgeFunctionError', () {
+    test('reads error and code from JSON maps and strings', () {
+      expect(
+        parseEdgeFunctionError({
+          'error': 'Invalid email or password. Please try again.',
+          'code': 'invalid_credentials',
+        }).message,
+        'Invalid email or password. Please try again.',
+      );
+      expect(
+        parseEdgeFunctionError(
+          '{"message":"Invalid login credentials","code":"invalid_credentials"}',
+        ).code,
+        'invalid_credentials',
+      );
+    });
+  });
+
   group('emailLoginUiMessage', () {
     test('maps edge function codes to safe copy', () {
       expect(
         emailLoginUiMessage(code: 'invalid_credentials'),
-        'Invalid email or password. Please try again.',
+        emailLoginIncorrectCredentialsMessage,
+      );
+      expect(
+        emailLoginUiMessage(httpStatus: 401, serverError: 'Unauthorized'),
+        emailLoginIncorrectCredentialsMessage,
+      );
+      expect(
+        emailLoginUiMessage(
+          httpStatus: 0,
+          serverError: 'ClientException: Failed to fetch, uri=https://example.com',
+        ),
+        emailLoginNetworkMessage,
+      );
+      expect(
+        isEmailLoginTransportFailure(
+          httpStatus: 0,
+          message: 'ClientException: Failed to fetch',
+        ),
+        isTrue,
+      );
+      expect(
+        isEmailLoginTransportFailure(
+          httpStatus: 401,
+          errorCode: 'invalid_credentials',
+        ),
+        isFalse,
+      );
+      expect(
+        adminLoginLockoutMessage(272),
+        contains('4:32'),
       );
       expect(
         emailLoginUiMessage(code: 'turnstile_failed'),
@@ -92,7 +139,23 @@ void main() {
       );
       expect(
         emailLoginUiMessage(code: 'rate_limited'),
-        contains('Too many attempts'),
+        emailLoginRateLimitMessage,
+      );
+      expect(
+        adminLoginInvalidCredentialsMessage(3),
+        'Incorrect email or password.\n3 attempts remaining.',
+      );
+      expect(
+        emailLoginUiMessage(
+          code: 'invalid_credentials',
+          errorBody: {
+            'code': 'invalid_credentials',
+            'attempts_remaining': 2,
+            'failed_attempts': 3,
+            'max_attempts': 5,
+          },
+        ),
+        adminLoginInvalidCredentialsMessage(2),
       );
     });
   });

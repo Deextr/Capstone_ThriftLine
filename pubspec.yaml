@@ -33,6 +33,7 @@ dependencies:
   url_launcher: ^6.3.1
   app_links: ^6.4.0
   cloudflare_turnstile: ^3.8.1
+  fetch_client: ^1.2.1
 
 dev_dependencies:
   flutter_test:

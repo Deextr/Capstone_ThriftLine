@@ -1,0 +1,61 @@
+import 'package:flutter/foundation.dart';
+
+import '../../../core/services/supabase_service.dart';
+import '../data/admin_orders_service.dart';
+
+class AdminOrdersListController extends ChangeNotifier {
+  AdminOrdersListController({required SupabaseService supabase})
+    : _service = AdminOrdersService(supabase) {
+    load();
+  }
+
+  final AdminOrdersService _service;
+
+  List<AdminOrderRow> _rows = const [];
+  int _total = 0;
+  int _page = 0;
+  static const int pageSize = 25;
+  bool _loading = true;
+  String? _error;
+  String? _statusFilter;
+
+  List<AdminOrderRow> get rows => _rows;
+  int get total => _total;
+  int get page => _page;
+  bool get isLoading => _loading;
+  String? get errorMessage => _error;
+  String? get statusFilter => _statusFilter;
+
+  Future<void> load() async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final result = await _service.list(
+        page: _page,
+        pageSize: pageSize,
+        statusFilter: _statusFilter,
+      );
+      _rows = result.rows;
+      _total = result.total;
+    } catch (e) {
+      debugPrint('AdminOrdersListController.load error: $e');
+      _rows = const [];
+      _error = 'Unable to load orders. Check your connection and try again.';
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> setStatusFilter(String? value) async {
+    _statusFilter = value;
+    _page = 0;
+    await load();
+  }
+
+  Future<void> setPage(int page) async {
+    _page = page;
+    await load();
+  }
+}

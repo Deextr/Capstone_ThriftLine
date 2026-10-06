@@ -1,4 +1,6 @@
 import '../../../core/services/supabase_service.dart';
+import 'admin_audit_log_models.dart';
+import 'admin_audit_service.dart';
 
 class SellerApplication {
   const SellerApplication({
@@ -192,6 +194,22 @@ class AdminVerificationService {
         'p_verification_id': verificationId,
         'p_decision': decision,
         'p_reason': reason,
+      },
+    );
+    final approved = decision == 'approved';
+    await AdminAuditService(_supabase).record(
+      category: AdminAuditCategory.sellerVerification,
+      eventType: approved
+          ? 'seller_verification_approved'
+          : 'seller_verification_rejected',
+      status: 'success',
+      summary: approved
+          ? 'Seller verification approved'
+          : 'Seller verification rejected',
+      targetType: 'verification',
+      targetId: verificationId,
+      details: {
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
       },
     );
   }

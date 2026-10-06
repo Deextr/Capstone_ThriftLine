@@ -16,6 +16,7 @@ void main() {
         'range_days': 7,
         'active_window_minutes': 15,
         'counts': {
+          'total_users': 120,
           'period_users': 42,
           'period_active': 3,
           'active_now': 3,
@@ -25,7 +26,12 @@ void main() {
           'period_reports': 2,
           'period_orders': 5,
           'open_disputes': 4,
+          'gross_marketplace_sales': 15000,
+          'platform_revenue': 300,
         },
+        'sales_revenue_series': [
+          {'day': '2026-09-28', 'gross': 15000, 'platform_revenue': 300},
+        ],
         'registrations': [
           {'day': '2026-09-27', 'count': 2},
           {'day': '2026-09-28', 'count': 1},
@@ -151,9 +157,9 @@ void main() {
         expect(week.from, DateTime(2026, 9, 22));
         expect(week.toExclusive, DateTime(2026, 9, 29));
 
-        final month = AdminDateWindow.lastMonth(now);
-        expect(month.from, DateTime(2026, 8, 1));
-        expect(month.toExclusive, DateTime(2026, 9, 1));
+        final rolling30 = AdminDateWindow.last30Days(now);
+        expect(rolling30.from, DateTime(2026, 8, 30));
+        expect(rolling30.toExclusive, DateTime(2026, 9, 29));
 
         final year = AdminDateWindow.lastYear(now);
         expect(year.from, DateTime(2025, 1, 1));

@@ -8,13 +8,6 @@ import 'home_feed_query.dart';
 
 const catalogSearchPageSize = 40;
 
-String catalogSearchTextOrFilter(String sanitizedQuery) {
-  if (sanitizedQuery.isEmpty) return '';
-  final q = sanitizedQuery;
-  return 'name.ilike.%$q%,description.ilike.%$q%,brand.ilike.%$q%,'
-      'category.category_name.ilike.%$q%';
-}
-
 String? listingTypeDbValue(BuyerListingTypeFilter filter) {
   return switch (filter) {
     BuyerListingTypeFilter.all => null,
@@ -94,7 +87,9 @@ Future<List<dynamic>> fetchCatalogSearchRows(
 }) async {
   final listingType = listingTypeDbValue(filters.listingType);
   final order = catalogSearchOrder(filters.sort);
-  final textFilter = catalogSearchTextOrFilter(sanitizedQuery);
+  final textFilter = sanitizedQuery.isEmpty
+      ? ''
+      : catalogIlikeOrFilter(sanitizedQuery);
 
   Future<List<dynamic>> run(String select) async {
     var query = client.from('products').select(select).eq('status', 'active');

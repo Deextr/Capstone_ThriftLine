@@ -10,6 +10,8 @@ import '../../trust_safety/data/report_reasons.dart';
 import 'admin_delivery_dispute.dart';
 import 'admin_review_rules.dart';
 import 'delivery_payment_hold.dart';
+import 'admin_audit_log_models.dart';
+import 'admin_audit_service.dart';
 import 'delivery_payment_resolve.dart';
 
 class AdminReviewCounts {
@@ -285,6 +287,15 @@ class AdminReviewService {
           fallback: 'Could not save that decision.',
         );
       }
+      await AdminAuditService(_supabase).record(
+        category: AdminAuditCategory.reportsDisputes,
+        eventType: 'report_decided',
+        status: 'success',
+        summary: 'Community report decision saved',
+        targetType: 'report',
+        targetId: reportId,
+        details: {'decision': decision},
+      );
       return null;
     } catch (e) {
       debugPrint('decide_report error: $e');
@@ -307,6 +318,14 @@ class AdminReviewService {
           fallback: 'Could not close this delivery problem.',
         );
       }
+      await AdminAuditService(_supabase).record(
+        category: AdminAuditCategory.reportsDisputes,
+        eventType: 'delivery_dispute_closed',
+        status: 'success',
+        summary: 'Delivery dispute closed',
+        targetType: 'dispute',
+        targetId: disputeId,
+      );
       return null;
     } catch (e) {
       debugPrint('close_delivery_dispute error: $e');
@@ -333,25 +352,48 @@ class AdminReviewService {
   Future<DeliveryPaymentResult> releaseDeliveryPayment({
     required String disputeId,
     String? adminNote,
-  }) {
-    return resolveDeliveryRelease(
+  }) async {
+    final result = await resolveDeliveryRelease(
       _supabase,
       disputeId: disputeId,
       adminNote: adminNote,
     );
+    if (result.success) {
+      await AdminAuditService(_supabase).record(
+        category: AdminAuditCategory.paymentsEscrow,
+        eventType: 'delivery_payment_released',
+        status: 'success',
+        summary: 'Escrow payment released to seller',
+        targetType: 'dispute',
+        targetId: disputeId,
+      );
+    }
+    return result;
   }
 
   Future<DeliveryPaymentResult> refundDeliveryPayment({
     required String disputeId,
     String? adminNote,
     required bool returnRequired,
-  }) {
-    return resolveDeliveryRefund(
+  }) async {
+    final result = await resolveDeliveryRefund(
       _supabase,
       disputeId: disputeId,
       adminNote: adminNote,
       returnRequired: returnRequired,
     );
+    if (result.success) {
+      await AdminAuditService(_supabase).record(
+        category: AdminAuditCategory.paymentsEscrow,
+        eventType: 'delivery_payment_refunded',
+        status: 'success',
+        summary: 'Buyer refund approved for delivery dispute',
+        targetType: 'dispute',
+        targetId: disputeId,
+        details: {'return_required': returnRequired},
+      );
+    }
+    return result;
   }
 
   Future<String?> cancelItemReturn(String disputeId) async {

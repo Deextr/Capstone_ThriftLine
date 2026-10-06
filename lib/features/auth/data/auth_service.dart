@@ -3,11 +3,15 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
+import '../../../core/services/supabase_edge_function_client.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../admin/data/admin_audit_log_models.dart';
+import '../../admin/data/admin_audit_service.dart';
 import '../../../core/utils/validators.dart';
 import '../domain/auth_error.dart';
 import '../domain/auth_user.dart';
 import '../domain/legal_documents.dart';
+import '../domain/login_portal.dart';
 import '../domain/phone_otp.dart';
 import '../domain/signup_identity.dart';
 import '../domain/trusted_device.dart';
@@ -124,38 +128,61 @@ class AuthService {
     required String password,
     required LegalConsent consent,
     required String turnstileToken,
+    LoginPortal loginPortal = LoginPortal.app,
   }) async {
     try {
-      final response = await _supabaseService.client.functions.invoke(
-        'sign-in-with-email',
-        body: {
-          'email': email.trim(),
-          'password': password,
-          'turnstile_token': turnstileToken.trim(),
-        },
-      );
+      final body = {
+        'email': email.trim(),
+        'password': password,
+        'turnstile_token': turnstileToken.trim(),
+        'login_portal': loginPortal.apiValue,
+      };
 
-      final data = response.data;
+      late final int responseStatus;
+      late final dynamic data;
+
+      if (kIsWeb) {
+        final webResponse = await SupabaseEdgeFunctionClient.postJson(
+          'sign-in-with-email',
+          body: body,
+        );
+        responseStatus = webResponse.status;
+        data = webResponse.data;
+      } else {
+        final response = await _supabaseService.client.functions.invoke(
+          'sign-in-with-email',
+          body: body,
+        );
+        responseStatus = response.status;
+        data = response.data;
+      }
+
       if (data is Map) {
-        final code = data['code']?.toString();
-        final serverError = data['error']?.toString();
-        if (serverError != null && serverError.isNotEmpty) {
-          return AuthResult.failure(
-            emailLoginUiMessage(code: code, serverError: serverError),
+        final payload = parseEdgeFunctionError(data);
+        if (payload.message != null && payload.message!.isNotEmpty) {
+          return _emailLoginAuthFailure(
+            code: payload.code,
+            serverError: payload.message,
+            httpStatus: responseStatus,
+            errorBody: data,
           );
         }
-        if (response.status >= 400) {
-          return AuthResult.failure(emailLoginUiMessage(code: code));
+        if (responseStatus >= 400) {
+          return _emailLoginAuthFailure(
+            code: payload.code,
+            httpStatus: responseStatus,
+            errorBody: data,
+          );
         }
 
         final session = data['session'];
         if (session is! Map) {
-          return AuthResult.failure('Sign-in failed. Please try again.');
+          return AuthResult.failure(emailLoginGenericFallbackMessage);
         }
         final accessToken = session['access_token']?.toString() ?? '';
         final refreshToken = session['refresh_token']?.toString() ?? '';
         if (accessToken.isEmpty || refreshToken.isEmpty) {
-          return AuthResult.failure('Sign-in failed. Please try again.');
+          return AuthResult.failure(emailLoginGenericFallbackMessage);
         }
 
         final authResponse = await _auth.setSession(
@@ -165,7 +192,7 @@ class AuthService {
 
         final supabaseUser = authResponse.user;
         if (supabaseUser == null) {
-          return AuthResult.failure('Sign-in failed. Please try again.');
+          return AuthResult.failure(emailLoginGenericFallbackMessage);
         }
 
         await recordConsent(consent);
@@ -182,28 +209,60 @@ class AuthService {
         );
       }
 
-      if (response.status >= 400) {
+      if (responseStatus >= 400) {
         debugPrint(
-          'AuthService.signInWithEmail failed: status=${response.status}',
+          'AuthService.signInWithEmail failed: status=$responseStatus',
         );
-        return AuthResult.failure(emailLoginUiMessage());
+        return _emailLoginAuthFailure(
+          httpStatus: responseStatus,
+          errorBody: data,
+        );
       }
-      return AuthResult.failure('Sign-in failed. Please try again.');
+      return AuthResult.failure(emailLoginGenericFallbackMessage);
     } on FunctionException catch (e) {
-      debugPrint('AuthService.signInWithEmail failed: status=${e.status}');
-      return AuthResult.failure(
-        emailLoginUiMessage(
-          code: _functionExceptionCode(e),
-          serverError: _functionExceptionMessage(e),
-        ),
+      debugPrint(
+        'AuthService.signInWithEmail failed: status=${e.status} details=${e.details}',
+      );
+      final payload = parseEdgeFunctionError(e.details);
+      return _emailLoginAuthFailure(
+        code: payload.code,
+        serverError: payload.message,
+        httpStatus: e.status,
+        errorBody: e.details,
+        reasonPhrase: e.reasonPhrase,
       );
     } on AuthException catch (e) {
       debugPrint('AuthService.signInWithEmail failed: ${_describe(e)}');
-      return AuthResult.failure(_friendlyAuthError(e));
-    } catch (e) {
+      return AuthResult.failure(
+        mapGoTrueEmailLoginFailure(code: e.code, message: e.message),
+      );
+    } catch (e, stackTrace) {
       debugPrint('AuthService.signInWithEmail error: $e');
-      return AuthResult.failure('Something went wrong. Please try again.');
+      debugPrintStack(stackTrace: stackTrace);
+      return _emailLoginAuthFailure(
+        serverError: e.toString(),
+        httpStatus: isEmailLoginTransportFailure(message: e.toString()) ? 0 : null,
+      );
     }
+  }
+
+  AuthResult _emailLoginAuthFailure({
+    String? code,
+    String? serverError,
+    int? httpStatus,
+    Object? errorBody,
+    String? reasonPhrase,
+  }) {
+    final retry = retryAfterSecondsFromErrorBody(errorBody);
+    final message = mapEmailLoginFailure(
+      code: code,
+      serverError: serverError,
+      httpStatus: httpStatus,
+      errorBody: errorBody,
+      reasonPhrase: reasonPhrase,
+      retryAfterSeconds: retry,
+    );
+    return AuthResult.failure(message, retryAfterSeconds: retry);
   }
 
   /// Asks the `send-password-reset` Edge Function to email a recovery link.
@@ -680,22 +739,8 @@ class AuthService {
   }
 
   String? _functionExceptionMessage(FunctionException e) {
-    final details = e.details;
-    if (details is Map && details['error'] != null) {
-      return details['error'].toString();
-    }
-    if (details is String && details.trim().isNotEmpty) {
-      return details;
-    }
-    return e.reasonPhrase;
-  }
-
-  String? _functionExceptionCode(FunctionException e) {
-    final details = e.details;
-    if (details is Map && details['code'] != null) {
-      return details['code'].toString();
-    }
-    return null;
+    final payload = parseEdgeFunctionError(e.details);
+    return payload.message ?? e.reasonPhrase;
   }
 
   PhoneOtpResult _phoneOtpResult(
@@ -813,7 +858,7 @@ class AuthService {
     final parsed = parseGoTrueError(code: e.code, message: e.message);
     switch (parsed.code) {
       case 'invalid_credentials':
-        return 'Invalid email or password. Please try again.';
+        return emailLoginIncorrectCredentialsMessage;
       case 'email_not_confirmed':
         return 'Please confirm your email using the link we sent, '
             'then sign in again.';
@@ -844,8 +889,9 @@ class AuthService {
           'Please try again in a moment.';
     }
     if (msg.contains('invalid login credentials') ||
-        msg.contains('invalid_credentials')) {
-      return 'Invalid email or password. Please try again.';
+        msg.contains('invalid_credentials') ||
+        msg.contains('incorrect email or password')) {
+      return emailLoginIncorrectCredentialsMessage;
     }
     if (msg.contains('email not confirmed')) {
       return 'Please confirm your email using the link we sent, '
@@ -889,6 +935,24 @@ class AuthService {
   bool _isExistingAccountConflict(AuthException e) {
     return isExistingAccountAuthError(
       parseGoTrueError(code: e.code, message: e.message),
+    );
+  }
+
+  Future<void> recordAdminLogoutAudit() {
+    return AdminAuditService(_supabaseService).record(
+      category: AdminAuditCategory.authentication,
+      eventType: 'admin_logout',
+      status: 'success',
+      summary: 'Administrator signed out',
+    );
+  }
+
+  Future<void> recordAdminLoginCompletedAudit() {
+    return AdminAuditService(_supabaseService).record(
+      category: AdminAuditCategory.authentication,
+      eventType: 'admin_login_completed',
+      status: 'success',
+      summary: 'Successful administrator login',
     );
   }
 }

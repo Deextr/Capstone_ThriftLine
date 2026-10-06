@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/listing_shipping.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/enums.dart';
 import '../../../providers/auth_provider.dart';
@@ -87,8 +88,15 @@ class EditListingController extends ChangeNotifier {
   final TextEditingController brandCtrl = TextEditingController();
   final TextEditingController sizeCtrl = TextEditingController();
   final TextEditingController colorCtrl = TextEditingController();
-  final TextEditingController locationCtrl = TextEditingController();
   final TextEditingController stockCtrl = TextEditingController(text: '1');
+  final TextEditingController shippingFeeCtrl = TextEditingController(text: '80');
+  final TextEditingController qtyThresholdCtrl = TextEditingController(text: '3');
+  final TextEditingController bidThresholdCtrl = TextEditingController(text: '500');
+
+  bool showItemLocation = false;
+  ListingShippingMode shippingMode = ListingShippingMode.fixedFee;
+  String? sellerBarangay;
+  bool shippingConfigLocked = false;
 
   // â”€â”€ Selection state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   List<CategoryItem> categories = [];
@@ -111,7 +119,11 @@ class EditListingController extends ChangeNotifier {
   // â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<void> _init() async {
-    await Future.wait([_loadProduct(), _loadCategories()]);
+    await Future.wait([
+      _loadProduct(),
+      _loadCategories(),
+      loadSellerShopLocation(),
+    ]);
   }
 
   Future<void> _loadCategories() async {
@@ -144,7 +156,9 @@ class EditListingController extends ChangeNotifier {
           .from('products')
           .select(
             'product_id, name, description, price, condition, listing_type, '
-            'quantity_available, brand, size, color, location, category_id, '
+            'quantity_available, brand, size, color, category_id, '
+            'show_item_location, shipping_mode, shipping_fee, '
+            'free_shipping_qty_threshold, free_shipping_bid_threshold, '
             'categories(category_name), '
             'product_images(image_id, image_url, is_primary, display_order)',
           )
@@ -157,7 +171,14 @@ class EditListingController extends ChangeNotifier {
       brandCtrl.text = row['brand'] as String? ?? '';
       sizeCtrl.text = row['size'] as String? ?? '';
       colorCtrl.text = row['color'] as String? ?? '';
-      locationCtrl.text = row['location'] as String? ?? '';
+      showItemLocation = row['show_item_location'] as bool? ?? false;
+      shippingMode = ListingShippingMode.fromDb(row['shipping_mode'] as String?);
+      shippingFeeCtrl.text =
+          ((row['shipping_fee'] as num?)?.toDouble() ?? 80).toString();
+      final qtyTh = (row['free_shipping_qty_threshold'] as num?)?.toInt();
+      if (qtyTh != null) qtyThresholdCtrl.text = qtyTh.toString();
+      final bidTh = (row['free_shipping_bid_threshold'] as num?)?.toDouble();
+      if (bidTh != null) bidThresholdCtrl.text = bidTh.toString();
 
       // Category
       selectedCategoryId = row['category_id'] as String?;
@@ -187,10 +208,21 @@ class EditListingController extends ChangeNotifier {
         try {
           final auctionRow = await _supabase.client
               .from('auctions')
-              .select('minimum_increment, duration_days, starts_at, ends_at')
+              .select(
+                'auction_id, minimum_increment, duration_days, starts_at, ends_at',
+              )
               .eq('product_id', productId)
               .maybeSingle();
           if (auctionRow != null) {
+            final auctionId = auctionRow['auction_id'] as String?;
+            if (auctionId != null) {
+              final bidRows = await _supabase.client
+                  .from('bids')
+                  .select('bid_id')
+                  .eq('auction_id', auctionId)
+                  .limit(1);
+              shippingConfigLocked = (bidRows as List).isNotEmpty;
+            }
             bidIncrement =
                 (auctionRow['minimum_increment'] as num?)?.toDouble() ??
                 bidIncrement;
@@ -288,16 +320,57 @@ class EditListingController extends ChangeNotifier {
     selectedFormat = format;
     fieldErrors.remove('price');
     fieldErrors.remove('stock');
+    if (format == ListingFormat.auction &&
+        shippingMode == ListingShippingMode.quantityThreshold) {
+      shippingMode = ListingShippingMode.fixedFee;
+    }
+    if (format == ListingFormat.fixedPrice &&
+        shippingMode == ListingShippingMode.bidThreshold) {
+      shippingMode = ListingShippingMode.fixedFee;
+    }
     notifyListeners();
   }
 
+  Future<void> loadSellerShopLocation() async {
+    final sellerId = _auth.user?.id;
+    if (sellerId == null) return;
+    try {
+      final row = await _supabase.client
+          .from('seller_profiles')
+          .select('barangay')
+          .eq('seller_id', sellerId)
+          .maybeSingle();
+      sellerBarangay = (row?['barangay'] as String?)?.trim();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  void setShowItemLocation(bool value) {
+    showItemLocation = value;
+    notifyListeners();
+  }
+
+  void setShippingMode(ListingShippingMode mode) {
+    if (shippingConfigLocked) return;
+    shippingMode = mode;
+    fieldErrors.remove('shippingFee');
+    fieldErrors.remove('qtyThreshold');
+    fieldErrors.remove('bidThreshold');
+    notifyListeners();
+  }
+
+  DateTime get previewAuctionEndsAt =>
+      DateTime.now().add(Duration(days: auctionDurationDays));
+
   void selectAuctionDuration(int days) {
     auctionDurationDays = days;
+    fieldErrors.remove('duration');
     notifyListeners();
   }
 
   void selectBidIncrement(double increment) {
     bidIncrement = increment;
+    fieldErrors.remove('increment');
     notifyListeners();
   }
 
@@ -407,8 +480,75 @@ class EditListingController extends ChangeNotifier {
       }
     }
 
+    if (!shippingConfigLocked) {
+      _validateShippingFields();
+    }
+
     notifyListeners();
     return fieldErrors.isEmpty;
+  }
+
+  void _validateShippingFields() {
+    if (shippingMode == ListingShippingMode.free) return;
+
+    final fee = double.tryParse(shippingFeeCtrl.text.trim());
+    if (fee == null || fee <= 0) {
+      fieldErrors['shippingFee'] = 'Enter a shipping fee greater than zero.';
+    }
+
+    if (selectedFormat == ListingFormat.fixedPrice &&
+        shippingMode == ListingShippingMode.quantityThreshold) {
+      final qty = int.tryParse(qtyThresholdCtrl.text.trim());
+      if (qty == null || qty < 2) {
+        fieldErrors['qtyThreshold'] =
+            'Quantity must be at least 2 for this option.';
+      }
+    }
+
+    if (selectedFormat == ListingFormat.auction &&
+        shippingMode == ListingShippingMode.bidThreshold) {
+      final threshold = double.tryParse(bidThresholdCtrl.text.trim());
+      final startBid = double.tryParse(startBidCtrl.text.trim());
+      if (threshold == null || threshold <= 0) {
+        fieldErrors['bidThreshold'] = 'Enter a valid bid amount.';
+      } else if (startBid != null && threshold <= startBid) {
+        fieldErrors['bidThreshold'] =
+            'Free-shipping bid must be higher than the starting bid.';
+      }
+    }
+  }
+
+  ListingShippingMode _resolvedShippingMode() {
+    if (selectedFormat == ListingFormat.auction &&
+        shippingMode == ListingShippingMode.quantityThreshold) {
+      return ListingShippingMode.fixedFee;
+    }
+    if (selectedFormat == ListingFormat.fixedPrice &&
+        shippingMode == ListingShippingMode.bidThreshold) {
+      return ListingShippingMode.fixedFee;
+    }
+    return shippingMode;
+  }
+
+  double _resolvedShippingFee() {
+    if (shippingMode == ListingShippingMode.free) return 0;
+    return double.tryParse(shippingFeeCtrl.text.trim()) ?? 0;
+  }
+
+  int? _resolvedQtyThreshold() {
+    if (selectedFormat != ListingFormat.fixedPrice ||
+        shippingMode != ListingShippingMode.quantityThreshold) {
+      return null;
+    }
+    return int.tryParse(qtyThresholdCtrl.text.trim());
+  }
+
+  double? _resolvedBidThreshold() {
+    if (selectedFormat != ListingFormat.auction ||
+        shippingMode != ListingShippingMode.bidThreshold) {
+      return null;
+    }
+    return double.tryParse(bidThresholdCtrl.text.trim());
   }
 
   // â”€â”€ Save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -457,10 +597,13 @@ class EditListingController extends ChangeNotifier {
               'color': colorCtrl.text
             else
               'color': null,
-            if (locationCtrl.text.isNotEmpty)
-              'location': locationCtrl.text
-            else
-              'location': null,
+            'show_item_location': showItemLocation,
+            if (!shippingConfigLocked) ...{
+              'shipping_mode': _resolvedShippingMode().dbValue,
+              'shipping_fee': _resolvedShippingFee(),
+              'free_shipping_qty_threshold': _resolvedQtyThreshold(),
+              'free_shipping_bid_threshold': _resolvedBidThreshold(),
+            },
           })
           .eq('product_id', productId);
 
@@ -568,7 +711,9 @@ class EditListingController extends ChangeNotifier {
     brandCtrl.dispose();
     sizeCtrl.dispose();
     colorCtrl.dispose();
-    locationCtrl.dispose();
+    shippingFeeCtrl.dispose();
+    qtyThresholdCtrl.dispose();
+    bidThresholdCtrl.dispose();
     stockCtrl.dispose();
     super.dispose();
   }

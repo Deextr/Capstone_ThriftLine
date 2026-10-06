@@ -1,3 +1,5 @@
+import '../core/utils/listing_shipping.dart';
+import '../core/utils/public_item_location.dart';
 import '../core/utils/stock_limits.dart';
 import 'enums.dart';
 
@@ -38,6 +40,12 @@ class ProductModel {
     this.color,
     this.material,
     this.location,
+    this.showItemLocation = false,
+    this.shippingMode = ListingShippingMode.fixedFee,
+    this.shippingFee = 80,
+    this.freeShippingQtyThreshold,
+    this.freeShippingBidThreshold,
+    this.sellerBarangay,
     required this.createdAt,
     this.viewCount = 0,
     this.favoriteCount = 0,
@@ -191,6 +199,16 @@ class ProductModel {
       brand: row['brand'] as String?,
       color: row['color'] as String?,
       location: row['location'] as String?,
+      showItemLocation: row['show_item_location'] as bool? ?? false,
+      shippingMode: ListingShippingMode.fromDb(
+        row['shipping_mode'] as String?,
+      ),
+      shippingFee: (row['shipping_fee'] as num?)?.toDouble() ?? 80,
+      freeShippingQtyThreshold:
+          (row['free_shipping_qty_threshold'] as num?)?.toInt(),
+      freeShippingBidThreshold:
+          (row['free_shipping_bid_threshold'] as num?)?.toDouble(),
+      sellerBarangay: sellerProfile?['barangay'] as String?,
       createdAt: row['created_at'] != null
           ? DateTime.parse(row['created_at'] as String)
           : DateTime.now(),
@@ -227,6 +245,12 @@ class ProductModel {
   final String? color;
   final String? material;
   final String? location;
+  final bool showItemLocation;
+  final ListingShippingMode shippingMode;
+  final double shippingFee;
+  final int? freeShippingQtyThreshold;
+  final double? freeShippingBidThreshold;
+  final String? sellerBarangay;
   final DateTime createdAt;
   final int viewCount;
   final int favoriteCount;
@@ -253,6 +277,11 @@ class ProductModel {
 
   double get displayPrice =>
       hasActiveBid ? (currentBid ?? startingBid ?? price) : price;
+
+  String? get publicItemLocation => formatPublicItemLocation(
+        showItemLocation: showItemLocation,
+        sellerBarangay: sellerBarangay,
+      );
 
   /// Units a buyer may purchase right now. Auctions are always 0 or 1.
   int get maxPurchasableQuantity => maxPurchasableQuantityFor(

@@ -61,7 +61,7 @@ Future<void> main() async {
     passwordRecovery: passwordRecovery,
   );
 
-  final router = createAppRouter(
+  final router = createMobileAppRouter(
     authProvider: authProvider,
     appProvider: appProvider,
     paymongoReturn: paymongoReturn,

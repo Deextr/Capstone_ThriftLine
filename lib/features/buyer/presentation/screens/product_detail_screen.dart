@@ -7,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/listing_shipping.dart';
 import '../../../../core/utils/seller_trust.dart';
 import '../../../../core/utils/stock_limits.dart';
 import '../../../../models/product_model.dart';
@@ -18,7 +19,6 @@ import '../../../../widgets/countdown_timer.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../seller/presentation/widgets/end_auction_dialog.dart';
 import '../../controllers/product_detail_controller.dart';
-import '../../domain/bid_placement_result.dart';
 import '../widgets/bid_phone_verification_prompt.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -709,7 +709,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                       ],
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 12),
+                    _buildLocationShippingSummary(product, controller.isAuction),
+
+                    const SizedBox(height: 16),
 
                     // Seller Card
                     _buildSellerCard(product),
@@ -1125,6 +1128,93 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     );
   }
 
+  Widget _buildLocationShippingSummary(ProductModel product, bool isAuction) {
+    final location = product.publicItemLocation;
+    final shippingLabel = isAuction
+        ? auctionShippingBuyerLabel(product)
+        : fixedPriceShippingBuyerLabel(product);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (location != null) ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.location_on_outlined,
+                size: 18,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Location',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    Text(location, style: AppTypography.label),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+        ],
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.local_shipping_outlined,
+              size: 18,
+              color: AppColors.textSecondary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Shipping',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  Text(shippingLabel, style: AppTypography.label),
+                  if (isAuction &&
+                      product.shippingMode == ListingShippingMode.fixedFee &&
+                      product.shippingFee > 0)
+                    Text(
+                      'Fee: ${formatCurrency(product.shippingFee)}',
+                      style: AppTypography.caption,
+                    ),
+                  if (isAuction &&
+                      product.shippingMode == ListingShippingMode.bidThreshold &&
+                      product.shippingFee > 0)
+                    Text(
+                      'Standard fee: ${formatCurrency(product.shippingFee)}',
+                      style: AppTypography.caption,
+                    ),
+                  if (!isAuction &&
+                      product.shippingMode == ListingShippingMode.fixedFee &&
+                      product.shippingFee > 0)
+                    Text(
+                      'Fee: ${formatCurrency(product.shippingFee)} at checkout',
+                      style: AppTypography.caption,
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildSellerCard(ProductModel product) {
     return GestureDetector(
       onTap: () => context.push('/seller-profile/${product.sellerUsername}'),
@@ -1198,8 +1288,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                         ),
                       ],
                       const SizedBox(height: 4),
-                      if (product.location != null &&
-                          product.location!.isNotEmpty)
+                      if (product.publicItemLocation != null)
                         Row(
                           children: [
                             const Icon(
@@ -1208,10 +1297,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                               size: 14,
                             ),
                             const SizedBox(width: 4),
-                            Text(
-                              product.location!,
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.textSecondary,
+                            Expanded(
+                              child: Text(
+                                product.publicItemLocation!,
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],

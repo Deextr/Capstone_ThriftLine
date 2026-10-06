@@ -18,9 +18,14 @@ import '../widgets/admin_review_widgets.dart';
 final _countFormat = NumberFormat.decimalPattern();
 
 class AdminSellerApplicationsScreen extends StatelessWidget {
-  const AdminSellerApplicationsScreen({super.key, this.embedded = false});
+  const AdminSellerApplicationsScreen({
+    super.key,
+    this.embedded = false,
+    this.webEmbedded = false,
+  });
 
   final bool embedded;
+  final bool webEmbedded;
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +33,36 @@ class AdminSellerApplicationsScreen extends StatelessWidget {
     final wideNav =
         MediaQuery.sizeOf(context).width >= AppConstants.breakpointDesktop;
     final bottomPad = embedded && !wideNav ? 112.0 : 32.0;
+
+    final content = SafeArea(
+      child: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () =>
+            context.read<AdminSellerApplicationsController>().load(),
+        child: controller.isLoading && !controller.hasLoadedCounts
+            ? const _VerificationsSkeleton()
+            : controller.errorMessage != null && !controller.hasLoadedCounts
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  AdminErrorState(
+                    message: controller.errorMessage!,
+                    onRetry: () => context
+                        .read<AdminSellerApplicationsController>()
+                        .load(),
+                  ),
+                ],
+              )
+            : _VerificationsContent(
+                controller: controller,
+                bottomPad: bottomPad,
+              ),
+      ),
+    );
+
+    if (webEmbedded) {
+      return ColoredBox(color: AppColors.background, child: content);
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -42,31 +77,7 @@ class AdminSellerApplicationsScreen extends StatelessWidget {
                 onPressed: () => context.pop(),
               ),
       ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () =>
-              context.read<AdminSellerApplicationsController>().load(),
-          child: controller.isLoading && !controller.hasLoadedCounts
-              ? const _VerificationsSkeleton()
-              : controller.errorMessage != null && !controller.hasLoadedCounts
-              ? ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    AdminErrorState(
-                      message: controller.errorMessage!,
-                      onRetry: () => context
-                          .read<AdminSellerApplicationsController>()
-                          .load(),
-                    ),
-                  ],
-                )
-              : _VerificationsContent(
-                  controller: controller,
-                  bottomPad: bottomPad,
-                ),
-        ),
-      ),
+      body: content,
     );
   }
 }

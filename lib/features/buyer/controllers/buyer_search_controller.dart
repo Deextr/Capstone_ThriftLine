@@ -199,8 +199,9 @@ class BuyerSearchController extends ChangeNotifier {
       if (recordAnalytics && trimmed.length >= 2) {
         unawaited(_analytics.recordSubmittedSearch(trimmed));
       }
-    } catch (e) {
+    } catch (e, st) {
       debugPrint('BuyerSearchController.search error: $e');
+      debugPrint('$st');
       _errorMessage = 'Search failed. Please try again.';
       if (reset) _results = [];
     } finally {

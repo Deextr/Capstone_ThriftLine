@@ -15,6 +15,14 @@ void main() {
       expect(catalogIlikeOrFilter('tee'), contains('name.ilike.%tee%'));
       expect(isUniqueViolation(Exception('duplicate key value 23505')), isTrue);
     });
+
+    test('keyword or filter uses product columns only', () {
+      final filter = catalogIlikeOrFilter('Lacoste');
+      expect(filter, contains('name.ilike.%Lacoste%'));
+      expect(filter, contains('description.ilike.%Lacoste%'));
+      expect(filter, contains('brand.ilike.%Lacoste%'));
+      expect(filter, isNot(contains('category.')));
+    });
   });
 
   group('ProductModel.fromSupabase catalog fields', () {
