@@ -16,9 +16,7 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/bid_card.dart';
 import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/thrift_widgets.dart';
-import '../../../../providers/auth_provider.dart';
 import '../../controllers/buyer_bids_controller.dart';
-import '../../domain/bid_placement_result.dart';
 import '../widgets/bid_phone_verification_prompt.dart';
 import '../widgets/payment_deadline_text.dart';
 
@@ -205,9 +203,7 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
 
       if (tab == BidTab.active) {
         title = 'No active bids';
-        message = 'Find items you love and place real-time bids!';
-        actionLabel = 'Explore Auctions';
-        onAction = () => context.go(RouteNames.buyerHome);
+        message = "You don't have any active bids right now.";
       } else if (tab == BidTab.won) {
         title = 'No won auctions yet';
         message =

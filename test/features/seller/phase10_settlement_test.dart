@@ -7,6 +7,17 @@ import 'package:thriftline/features/trust_safety/data/report_appeal.dart';
 import 'package:thriftline/models/notification_model.dart';
 
 void main() {
+  group('dispute dismissal and earnings', () {
+    test('disputed escrow counts as held until backend clears the hold', () {
+      expect(deliveryHoldStatusLabel('disputed'), 'Payment on hold');
+      expect(
+        deliveryHoldHint('held'),
+        contains('not seller earnings yet'),
+      );
+      expect(deliveryHoldStatusLabel('released'), 'Released as earnings');
+    });
+  });
+
   group('financial hold mapping', () {
     test('a paid hold is not seller earnings yet', () {
       final hold = DeliveryPaymentHold.fromSupabase({

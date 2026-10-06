@@ -183,7 +183,8 @@ class _CloseForm extends StatelessWidget {
       title: 'Decision',
       children: [
         Text(
-          'Closing records your review. Payment does not change.',
+          'Dismiss the buyer\'s claim. The payment hold from this dispute is '
+          'removed and seller earnings update when the order is eligible.',
           style: AppTypography.body.copyWith(color: AppColors.textSecondary),
         ),
         const SizedBox(height: 12),
@@ -211,7 +212,9 @@ class _CloseForm extends StatelessWidget {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Close this delivery problem?'),
         content: const Text(
-          'The case will be marked resolved. Payment does not change.',
+          'The case will be marked resolved and the dispute hold on payment '
+          'will be cleared. Use “Release to seller” below if you need to '
+          'release earnings immediately while the order is still open.',
         ),
         actions: [
           TextButton(
