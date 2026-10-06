@@ -4,25 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../features/auth/domain/legal_documents.dart';
 import '../../features/auth/presentation/screens/legal_document_screen.dart';
-import '../../features/admin/controllers/admin_dashboard_controller.dart';
-import '../../features/admin/controllers/admin_disputes_controller.dart';
-import '../../features/admin/controllers/admin_reports_controller.dart';
-import '../../features/admin/controllers/admin_seller_applications_controller.dart';
-import '../../features/admin/presentation/screens/admin_dispute_detail_screen.dart';
-import '../../features/admin/presentation/screens/admin_disputes_queue_screen.dart';
-import '../../features/admin/controllers/admin_bid_risk_controller.dart';
-import '../../features/admin/controllers/admin_disabled_accounts_controller.dart';
-import '../../features/admin/controllers/admin_looking_for_report_controller.dart';
-import '../../features/admin/presentation/screens/admin_bid_risk_events_screen.dart';
-import '../../features/admin/presentation/screens/admin_disabled_accounts_screen.dart';
-import '../../features/admin/presentation/screens/admin_looking_for_report_detail_screen.dart';
-import '../../features/admin/presentation/screens/admin_report_detail_screen.dart';
-import '../../features/admin/data/admin_review_rules.dart';
-import '../../features/admin/presentation/screens/admin_reports_hub_screen.dart';
-import '../../features/admin/presentation/screens/admin_reports_queue_screen.dart';
-import '../../features/admin/presentation/screens/admin_review_screen.dart';
-import '../../features/admin/presentation/screens/admin_seller_applications_screen.dart';
-import '../../features/admin/presentation/screens/admin_shell_screen.dart';
+import '../../features/auth/presentation/screens/admin_portal_required_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/reset_password_screen.dart';
@@ -113,7 +95,7 @@ import 'password_recovery_coordinator.dart';
 import 'paymongo_return_coordinator.dart';
 import 'route_names.dart';
 
-GoRouter createAppRouter({
+GoRouter createMobileAppRouter({
   required AuthProvider authProvider,
   required AppProvider appProvider,
   PaymongoReturnCoordinator? paymongoReturn,
@@ -198,6 +180,7 @@ GoRouter createAppRouter({
             isVerifyEmailOtp ||
             isForgotPassword ||
             isResetPassword) {
+          if (authProvider.isAdmin) return RouteNames.adminPortalRequired;
           return authProvider.homeRoute;
         }
         return authenticatedWorkspaceRedirect(
@@ -641,123 +624,8 @@ GoRouter createAppRouter({
         ),
       ),
       GoRoute(
-        path: RouteNames.adminHome,
-        builder: (context, _) => MultiProvider(
-          providers: [
-            ChangeNotifierProvider(
-              create: (context) => AdminDashboardController(
-                supabase: context.read<SupabaseService>(),
-                prefs: context.read<SharedPreferencesService>(),
-              ),
-            ),
-            ChangeNotifierProvider(
-              create: (context) => AdminReportsController(
-                supabase: context.read<SupabaseService>(),
-              ),
-            ),
-            ChangeNotifierProvider(
-              create: (context) => AdminSellerApplicationsController(
-                supabase: context.read<SupabaseService>(),
-              ),
-            ),
-          ],
-          child: const AdminShellScreen(),
-        ),
-      ),
-      GoRoute(
-        path: RouteNames.adminApplications,
-        builder: (context, _) => ChangeNotifierProvider(
-          create: (context) => AdminSellerApplicationsController(
-            supabase: context.read<SupabaseService>(),
-          ),
-          child: const AdminSellerApplicationsScreen(),
-        ),
-      ),
-      GoRoute(
-        path: RouteNames.adminReview,
-        builder: (_, state) =>
-            AdminReviewScreen(verificationId: state.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: RouteNames.adminReports,
-        builder: (context, _) => ChangeNotifierProvider(
-          create: (context) =>
-              AdminReportsController(supabase: context.read<SupabaseService>()),
-          child: const AdminReportsHubScreen(),
-        ),
-      ),
-      GoRoute(
-        path: RouteNames.adminReportsQueue,
-        builder: (context, state) {
-          final kind = adminReportKindFromQueuePath(
-            state.pathParameters['kind'] ?? '',
-          );
-          if (kind == null) {
-            return const AdminReportsHubScreen();
-          }
-          return ChangeNotifierProvider(
-            create: (context) => AdminReportsController(
-              supabase: context.read<SupabaseService>(),
-            ),
-            child: AdminReportsQueueScreen(kind: kind),
-          );
-        },
-      ),
-      GoRoute(
-        path: RouteNames.adminReportDetail,
-        builder: (context, state) => ChangeNotifierProvider(
-          create: (context) => AdminReportsController(
-            supabase: context.read<SupabaseService>(),
-            reportId: state.pathParameters['id'],
-          ),
-          child: const AdminReportDetailScreen(),
-        ),
-      ),
-      GoRoute(
-        path: RouteNames.adminLookingForReport,
-        builder: (context, state) => ChangeNotifierProvider(
-          create: (context) => AdminLookingForReportController(
-            supabase: context.read<SupabaseService>(),
-            reportId: state.pathParameters['id']!,
-          ),
-          child: const AdminLookingForReportDetailScreen(),
-        ),
-      ),
-      GoRoute(
-        path: RouteNames.adminDisabledAccounts,
-        builder: (context, _) => ChangeNotifierProvider(
-          create: (context) => AdminDisabledAccountsController(
-            supabase: context.read<SupabaseService>(),
-          ),
-          child: const AdminDisabledAccountsScreen(),
-        ),
-      ),
-      GoRoute(
-        path: RouteNames.adminBidRiskEvents,
-        builder: (context, _) => ChangeNotifierProvider(
-          create: (context) =>
-              AdminBidRiskController(supabase: context.read<SupabaseService>()),
-          child: const AdminBidRiskEventsScreen(),
-        ),
-      ),
-      GoRoute(
-        path: RouteNames.adminDisputes,
-        builder: (context, _) => ChangeNotifierProvider(
-          create: (context) => AdminDisputesController(
-            supabase: context.read<SupabaseService>(),
-          ),
-          child: const AdminDisputesQueueScreen(),
-        ),
-      ),
-      GoRoute(
-        path: RouteNames.adminDisputeDetail,
-        builder: (context, state) => ChangeNotifierProvider(
-          create: (context) => AdminDisputesController(
-            supabase: context.read<SupabaseService>(),
-            disputeId: state.pathParameters['id'],
-          ),
-          child: const AdminDisputeDetailScreen(),
-        ),
+        path: RouteNames.adminPortalRequired,
+        builder: (_, _) => const AdminPortalRequiredScreen(),
       ),
       GoRoute(
         path: RouteNames.verifyPhone,
@@ -807,6 +675,20 @@ GoRouter createAppRouter({
         Scaffold(body: Center(child: Text('Page not found: ${state.uri}'))),
   );
 }
+
+/// Mobile buyer/seller application router.
+GoRouter createAppRouter({
+  required AuthProvider authProvider,
+  required AppProvider appProvider,
+  PaymongoReturnCoordinator? paymongoReturn,
+  PasswordRecoveryCoordinator? passwordRecovery,
+}) =>
+    createMobileAppRouter(
+      authProvider: authProvider,
+      appProvider: appProvider,
+      paymongoReturn: paymongoReturn,
+      passwordRecovery: passwordRecovery,
+    );
 
 List<GoRoute> _homeCollectionRoutes() {
   GoRoute collection(String path, HomeCollectionType type) {

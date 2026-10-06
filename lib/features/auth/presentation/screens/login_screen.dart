@@ -109,17 +109,21 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     final auth = context.read<AuthProvider>();
-    final error = await auth.loginWithEmail(
+    final loginResult = await auth.loginWithEmail(
       email: _emailController.text.trim(),
       password: _passwordController.text,
       consent: LegalConsent.now(),
       turnstileToken: token,
     );
     if (!mounted) return;
-    if (error != null) {
+    if (!loginResult.isSuccess) {
       _rateLimiter.recordFailure();
       _clearTurnstile();
-      showThriftSnackBar(context, error, isError: true);
+      showThriftSnackBar(
+        context,
+        loginResult.errorMessage!,
+        isError: true,
+      );
       return;
     }
 

@@ -6,14 +6,19 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../controllers/admin_dashboard_controller.dart';
 import '../../data/admin_dashboard_models.dart';
+import '../../data/admin_review_rules.dart';
+import '../../../../models/enums.dart';
 import '../widgets/admin_dashboard_widgets.dart';
 import '../widgets/admin_review_widgets.dart';
 import 'admin_tab_scope.dart';
 
 class AdminDashboardTab extends StatelessWidget {
-  const AdminDashboardTab({super.key});
+  const AdminDashboardTab({super.key, this.webEmbedded = false});
+
+  final bool webEmbedded;
 
   @override
   Widget build(BuildContext context) {
@@ -21,21 +26,7 @@ class AdminDashboardTab extends StatelessWidget {
     final wideNav =
         MediaQuery.sizeOf(context).width >= AppConstants.breakpointDesktop;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Dashboard'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh),
-            onPressed: controller.isLoading
-                ? null
-                : () => context.read<AdminDashboardController>().load(),
-          ),
-        ],
-      ),
-      body: SafeArea(
+    final body = SafeArea(
         child: RefreshIndicator(
           color: AppColors.primary,
           onRefresh: () => context.read<AdminDashboardController>().load(),
@@ -77,7 +68,13 @@ class AdminDashboardTab extends StatelessWidget {
                         const SizedBox(height: 20),
                         _OverviewCards(maxWidth: constraints.maxWidth),
                         const SizedBox(height: 28),
-                        const _PendingVerifications(),
+                        const _MarketplacePerformance(),
+                        const SizedBox(height: 28),
+                        _SalesChart(maxWidth: constraints.maxWidth),
+                        const SizedBox(height: 28),
+                        const _OrderOverview(),
+                        const SizedBox(height: 28),
+                        const _NeedsAttention(),
                       ],
                     ],
                   ),
@@ -86,7 +83,27 @@ class AdminDashboardTab extends StatelessWidget {
             },
           ),
         ),
+    );
+
+    if (webEmbedded) {
+      return ColoredBox(color: AppColors.background, child: body);
+    }
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Dashboard'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh),
+            onPressed: controller.isLoading
+                ? null
+                : () => context.read<AdminDashboardController>().load(),
+          ),
+        ],
       ),
+      body: body,
     );
   }
 }
@@ -130,7 +147,7 @@ class _DateFilters extends StatelessWidget {
     final next = switch (preset) {
       AdminDatePreset.today => AdminDateWindow.today(),
       AdminDatePreset.last7Days => AdminDateWindow.last7Days(),
-      AdminDatePreset.lastMonth => AdminDateWindow.lastMonth(),
+      AdminDatePreset.last30Days => AdminDateWindow.last30Days(),
       AdminDatePreset.lastYear => AdminDateWindow.lastYear(),
       AdminDatePreset.custom => controller.window,
     };
@@ -151,8 +168,8 @@ class _OverviewCards extends StatelessWidget {
     final cards = [
       AdminOverviewCard(
         label: 'Registered users',
-        value: counts.registeredInPeriod,
-        detail: 'Created in the selected period',
+        value: counts.totalUsers,
+        detail: 'Total registered accounts',
         icon: Icons.people_outline,
       ),
       AdminOverviewCard(
@@ -229,45 +246,152 @@ class _OverviewGrid extends StatelessWidget {
   }
 }
 
-class _PendingVerifications extends StatelessWidget {
-  const _PendingVerifications();
+class _MarketplacePerformance extends StatelessWidget {
+  const _MarketplacePerformance();
 
   @override
   Widget build(BuildContext context) {
-    final items =
-        context
-            .watch<AdminDashboardController>()
-            .snapshot
-            ?.pendingVerifications ??
-        const [];
+    final counts = context.watch<AdminDashboardController>().counts;
+    if (counts == null) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text('Marketplace performance', style: AppTypography.subheading),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: AdminOverviewCard(
+                label: 'Gross marketplace sales',
+                value: counts.grossMarketplaceSales.round(),
+                detail: formatCurrency(counts.grossMarketplaceSales),
+                icon: Icons.storefront_outlined,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: AdminOverviewCard(
+                label: 'Platform revenue',
+                value: counts.platformRevenue.round(),
+                detail: formatCurrency(counts.platformRevenue),
+                icon: Icons.account_balance_outlined,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SalesChart extends StatelessWidget {
+  const _SalesChart({required this.maxWidth});
+
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final snapshot = context.watch<AdminDashboardController>().snapshot;
+    if (snapshot == null) return const SizedBox.shrink();
+    final points = [
+      for (var i = 0; i < snapshot.salesRevenueSeries.length; i++)
+        AdminDashboardPoint(
+          day: snapshot.salesRevenueSeries[i].day,
+          count: snapshot.salesRevenueSeries[i].gross.round(),
+        ),
+    ];
+    return AdminTrendChart(
+      title: 'Sales & revenue overview',
+      points: points,
+      emptyMessage: 'No paid marketplace sales in this period.',
+    );
+  }
+}
+
+class _OrderOverview extends StatelessWidget {
+  const _OrderOverview();
+
+  @override
+  Widget build(BuildContext context) {
+    final snapshot = context.watch<AdminDashboardController>().snapshot;
+    if (snapshot == null) return const SizedBox.shrink();
+    return AdminTrendChart(
+      title: 'Order overview',
+      points: snapshot.ordersByDay,
+      emptyMessage: 'No orders in this period.',
+      breakdown: snapshot.ordersByStatus,
+      breakdownLabel: (status) => orderStatusLabel(orderStatusFromDb(status)),
+    );
+  }
+}
+
+class _NeedsAttention extends StatelessWidget {
+  const _NeedsAttention();
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<AdminDashboardController>();
+    final verifications = controller.snapshot?.pendingVerifications ?? const [];
+    final reports = controller.visibleReports
+        .where((r) => r.status == kAdminReportOpenStatus)
+        .take(5)
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Needs attention', style: AppTypography.subheading),
+        const SizedBox(height: 16),
         AdminDashboardSectionHeader(
           title: 'Pending seller verifications',
           actionLabel: 'View all',
           onAction: () =>
               AdminTabScope.open(context, AdminTabScope.verifications),
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Applications currently waiting for review.',
-          style: AppTypography.caption,
-        ),
-        const SizedBox(height: 12),
-        if (items.isEmpty)
-          const AdminDashboardEmptyLine('No pending verifications.')
+        const SizedBox(height: 8),
+        if (verifications.isEmpty)
+          const AdminDashboardEmptyLine('No pending seller verifications.')
         else
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) const SizedBox(height: 8),
-            AdminPendingVerificationCard(
-              shopName: items[i].shopName,
-              applicantName: items[i].applicantName,
-              submittedAt: items[i].submittedAt,
-              onReview: () =>
-                  _open(context, RouteNames.adminReviewFor(items[i].id)),
+          for (final item in verifications.take(5))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: AdminPendingVerificationCard(
+                shopName: item.shopName,
+                applicantName: item.applicantName,
+                submittedAt: item.submittedAt,
+                onReview: () =>
+                    _open(context, RouteNames.adminReviewFor(item.id)),
+              ),
             ),
-          ],
+        const SizedBox(height: 20),
+        AdminDashboardSectionHeader(
+          title: 'Open reports',
+          actionLabel: 'View all',
+          onAction: () => AdminTabScope.open(context, AdminTabScope.reports),
+        ),
+        const SizedBox(height: 8),
+        if (reports.isEmpty)
+          const AdminDashboardEmptyLine('No open reports for this period.')
+        else
+          for (final report in reports)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: const BorderSide(color: AppColors.border),
+                ),
+                title: Text(report.reasonLabel),
+                subtitle: Text('${report.reportedName} · ${report.roleLabel}'),
+                trailing: TextButton(
+                  onPressed: () => _open(
+                    context,
+                    RouteNames.adminReportDetailFor(report.id),
+                  ),
+                  child: const Text('Review report'),
+                ),
+              ),
+            ),
       ],
     );
   }

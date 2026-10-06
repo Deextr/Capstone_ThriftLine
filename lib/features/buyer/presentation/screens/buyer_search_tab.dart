@@ -148,6 +148,8 @@ class _BuyerSearchTabState extends State<BuyerSearchTab> {
                   ? _discoveryState(search)
                   : loading && results.isEmpty
                   ? const SearchResultsGridSkeleton()
+                  : results.isEmpty && search.errorMessage != null
+                  ? _searchErrorState(search)
                   : results.isEmpty
                   ? _noResultsState(search)
                   : RefreshIndicator(
@@ -271,16 +273,23 @@ class _BuyerSearchTabState extends State<BuyerSearchTab> {
   }
 
   Widget _noResultsState(BuyerSearchController search) {
+    final q = search.lastQuery.trim();
+    final headline = q.isEmpty
+        ? 'No products match your filters.'
+        : 'No products found for “$q”.';
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         const SizedBox(height: 48),
         Icon(Icons.search_off_rounded, size: 48, color: AppColors.textHint),
         const SizedBox(height: 12),
-        Text(
-          search.errorMessage ?? 'No products match your search.',
-          textAlign: TextAlign.center,
-          style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            headline,
+            textAlign: TextAlign.center,
+            style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+          ),
         ),
         const SizedBox(height: 8),
         Padding(
@@ -289,6 +298,35 @@ class _BuyerSearchTabState extends State<BuyerSearchTab> {
             'Try different keywords, clear filters, or browse all categories.',
             textAlign: TextAlign.center,
             style: AppTypography.caption,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _searchErrorState(BuyerSearchController search) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      children: [
+        const SizedBox(height: 48),
+        const Icon(
+          Icons.error_outline_rounded,
+          size: 48,
+          color: AppColors.error,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          search.errorMessage ?? 'Search failed. Please try again.',
+          textAlign: TextAlign.center,
+          style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 20),
+        Center(
+          child: ThriftButton(
+            label: 'Retry',
+            expand: false,
+            onPressed: () => search.submitSearch(search.lastQuery),
           ),
         ),
       ],

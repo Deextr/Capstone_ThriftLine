@@ -458,7 +458,7 @@ class AdminReportsListFilters extends StatelessWidget {
               for (final preset in [
                 AdminDatePreset.today,
                 AdminDatePreset.last7Days,
-                AdminDatePreset.lastMonth,
+                AdminDatePreset.last30Days,
                 AdminDatePreset.lastYear,
               ])
                 ListTile(
@@ -470,7 +470,7 @@ class AdminReportsListFilters extends StatelessWidget {
                     read.setDateWindow(switch (preset) {
                       AdminDatePreset.today => AdminDateWindow.today(),
                       AdminDatePreset.last7Days => AdminDateWindow.last7Days(),
-                      AdminDatePreset.lastMonth => AdminDateWindow.lastMonth(),
+                      AdminDatePreset.last30Days => AdminDateWindow.last30Days(),
                       AdminDatePreset.lastYear => AdminDateWindow.lastYear(),
                       AdminDatePreset.custom => AdminDateWindow.last7Days(),
                     });

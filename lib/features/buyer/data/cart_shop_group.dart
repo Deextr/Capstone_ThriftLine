@@ -1,3 +1,4 @@
+import '../../../core/utils/listing_shipping.dart';
 import '../../../providers/cart_provider.dart';
 import 'checkout_totals.dart';
 
@@ -20,7 +21,11 @@ class CartShopGroup {
 
   double get subtotal => items.fold(0.0, (sum, item) => sum + item.subtotal);
 
-  double get shippingFee => kCheckoutShippingPerSeller;
+  double get shippingFee => calculateShopFixedShippingPreview(
+        cartShippingLinesFromProducts(
+          items.map((item) => (product: item.product, quantity: item.quantity)),
+        ),
+      );
 
   double get platformFee => checkoutPlatformFee(subtotal);
 

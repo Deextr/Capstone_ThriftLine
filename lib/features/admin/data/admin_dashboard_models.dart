@@ -3,12 +3,12 @@ import '../../../models/enums.dart';
 import '../../trust_safety/data/report_reasons.dart';
 import 'admin_review_rules.dart';
 
-enum AdminDatePreset { today, last7Days, lastMonth, lastYear, custom }
+enum AdminDatePreset { today, last7Days, last30Days, lastYear, custom }
 
 String adminDatePresetLabel(AdminDatePreset preset) => switch (preset) {
   AdminDatePreset.today => 'Today',
   AdminDatePreset.last7Days => 'Last 7 Days',
-  AdminDatePreset.lastMonth => 'Last Month',
+  AdminDatePreset.last30Days => 'Last 30 Days',
   AdminDatePreset.lastYear => 'Last Year',
   AdminDatePreset.custom => 'Custom Range',
 };
@@ -44,15 +44,13 @@ class AdminDateWindow {
     );
   }
 
-  factory AdminDateWindow.lastMonth([DateTime? now]) {
+  factory AdminDateWindow.last30Days([DateTime? now]) {
     final clock = now ?? DateTime.now();
-    final firstThisMonth = DateTime(clock.year, clock.month, 1);
-    final lastMonthEnd = firstThisMonth.subtract(const Duration(days: 1));
-    final from = DateTime(lastMonthEnd.year, lastMonthEnd.month, 1);
+    final today = DateTime(clock.year, clock.month, clock.day);
     return AdminDateWindow(
-      preset: AdminDatePreset.lastMonth,
-      from: from,
-      toExclusive: firstThisMonth,
+      preset: AdminDatePreset.last30Days,
+      from: today.subtract(const Duration(days: 29)),
+      toExclusive: today.add(const Duration(days: 1)),
     );
   }
 
@@ -122,35 +120,64 @@ class AdminDashboardCounts {
     required this.registeredInPeriod,
     required this.activeInPeriod,
     required this.activeNow,
+    required this.totalUsers,
     required this.pendingVerifications,
     required this.verificationsSubmitted,
     required this.openReports,
     required this.reportsSubmitted,
     required this.ordersPlaced,
     required this.openDisputes,
+    required this.grossMarketplaceSales,
+    required this.platformRevenue,
   });
 
   final int registeredInPeriod;
   final int activeInPeriod;
   final int activeNow;
+  final int totalUsers;
   final int pendingVerifications;
   final int verificationsSubmitted;
   final int openReports;
   final int reportsSubmitted;
   final int ordersPlaced;
   final int openDisputes;
+  final double grossMarketplaceSales;
+  final double platformRevenue;
 
   factory AdminDashboardCounts.fromJson(Map<String, dynamic>? json) {
     return AdminDashboardCounts(
-      registeredInPeriod: _asInt(json?['period_users'] ?? json?['total_users']),
+      registeredInPeriod: _asInt(json?['period_users']),
       activeInPeriod: _asInt(json?['period_active'] ?? json?['active_users']),
       activeNow: _asInt(json?['active_now'] ?? json?['active_users']),
+      totalUsers: _asInt(json?['total_users']),
       pendingVerifications: _asInt(json?['pending_verifications']),
       verificationsSubmitted: _asInt(json?['period_verifications']),
       openReports: _asInt(json?['open_reports']),
       reportsSubmitted: _asInt(json?['period_reports']),
       ordersPlaced: _asInt(json?['period_orders']),
       openDisputes: _asInt(json?['open_disputes']),
+      grossMarketplaceSales: _asDouble(json?['gross_marketplace_sales']),
+      platformRevenue: _asDouble(json?['platform_revenue']),
+    );
+  }
+}
+
+class AdminDashboardSalesPoint {
+  const AdminDashboardSalesPoint({
+    required this.day,
+    required this.gross,
+    required this.platformRevenue,
+  });
+
+  final DateTime day;
+  final double gross;
+  final double platformRevenue;
+
+  factory AdminDashboardSalesPoint.fromJson(Map<String, dynamic> json) {
+    return AdminDashboardSalesPoint(
+      day: _asDate(json['day']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+      gross: _asDouble(json['gross']),
+      platformRevenue: _asDouble(json['platform_revenue']),
     );
   }
 }
@@ -303,6 +330,7 @@ class AdminDashboardSnapshot {
     required this.ordersByStatus,
     required this.reportsByDay,
     required this.reportsByStatus,
+    required this.salesRevenueSeries,
     required this.pendingVerifications,
     required this.recentReports,
     required this.recentOrders,
@@ -317,6 +345,7 @@ class AdminDashboardSnapshot {
   final List<AdminDashboardPoint> reportsByDay;
   final List<AdminDashboardStatusCount> reportsByStatus;
   final List<AdminDashboardVerification> pendingVerifications;
+  final List<AdminDashboardSalesPoint> salesRevenueSeries;
   final List<AdminDashboardReport> recentReports;
   final List<AdminDashboardOrder> recentOrders;
 
@@ -359,6 +388,10 @@ class AdminDashboardSnapshot {
       reportsByStatus: _mapList(
         json['reports_by_status'],
         AdminDashboardStatusCount.fromJson,
+      ),
+      salesRevenueSeries: _mapList(
+        json['sales_revenue_series'],
+        AdminDashboardSalesPoint.fromJson,
       ),
       pendingVerifications: _mapList(
         json['pending_verifications'],

@@ -1,3 +1,5 @@
+import 'package:fetch_client/fetch_client.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -32,9 +34,16 @@ abstract final class SupabaseConfig {
       );
     }
 
+    // On web, FetchClient (browser fetch + CORS) avoids opaque "Failed to fetch"
+    // errors from the default HTTP client when calling Edge Functions.
+    final httpClient = kIsWeb
+        ? FetchClient(mode: RequestMode.cors)
+        : null;
+
     await Supabase.initialize(
       url: url,
       publishableKey: anonKey,
+      httpClient: httpClient,
       authOptions: FlutterAuthClientOptions(
         detectSessionInUriPredicate: detectSessionInUriPredicate,
       ),

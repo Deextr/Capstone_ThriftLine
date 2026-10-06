@@ -116,20 +116,13 @@ class CheckoutController extends ChangeNotifier {
   int get remainingOtherSellerCount =>
       allCartItems.length - selectedItems.length;
 
-  double get subtotal =>
-      selectedItems.fold(0.0, (sum, item) => sum + item.subtotal);
+  double get subtotal => checkoutGroupsSubtotal(checkoutShops);
 
-  double get shippingFee => checkoutShippingFee(
-    checkoutSellerCount(selectedItems.map((item) => item.product.sellerId)),
-  );
+  double get shippingFee => checkoutGroupsShipping(checkoutShops);
 
-  double get platformFee => checkoutPlatformFee(subtotal);
+  double get platformFee => checkoutGroupsPlatformFee(checkoutShops);
 
-  double get total => checkoutTotal(
-    subtotal: subtotal,
-    shippingFee: shippingFee,
-    platformFee: platformFee,
-  );
+  double get total => checkoutGroupsTotal(checkoutShops);
 
   bool get hasUnpaidCheckouts => _awaitingPayment.isNotEmpty;
 

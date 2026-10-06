@@ -176,18 +176,22 @@ class AdminDashboardService {
         registeredInPeriod: (usersInPeriod as List).length,
         activeInPeriod: (activeInPeriod as List).length,
         activeNow: await _countActiveUsers(activeNowSince),
+        totalUsers: await _countAllUsers(),
         pendingVerifications: pending,
         verificationsSubmitted: (verificationsInPeriod as List).length,
         openReports: openReports,
         reportsSubmitted: (reportsInPeriod as List).length,
         ordersPlaced: (ordersInPeriod as List).length,
         openDisputes: disputes,
+        grossMarketplaceSales: 0,
+        platformRevenue: 0,
       ),
       registrations: _pointsFromRows(usersInPeriod, days, 'created_at'),
       ordersByDay: _pointsFromRows(ordersInPeriod, days, 'created_at'),
       ordersByStatus: _statusCounts(ordersInPeriod, 'order_status'),
       reportsByDay: _pointsFromRows(reportsInPeriod, days, 'created_at'),
       reportsByStatus: _statusCounts(reportsInPeriod, 'status'),
+      salesRevenueSeries: const [],
       pendingVerifications: lists.$1,
       recentReports: lists.$2,
       recentOrders: const [],
@@ -249,6 +253,15 @@ class AdminDashboardService {
     }
     final rows = await query;
     return (rows as List).length;
+  }
+
+  Future<int> _countAllUsers() async {
+    try {
+      final rows = await _supabase.client.from('users').select('user_id');
+      return (rows as List).length;
+    } catch (_) {
+      return 0;
+    }
   }
 
   Future<int> _countActiveUsers(String sinceIso) async {
@@ -337,6 +350,9 @@ class AdminDashboardService {
         'period_reports': snapshot.counts.reportsSubmitted,
         'period_orders': snapshot.counts.ordersPlaced,
         'open_disputes': snapshot.counts.openDisputes,
+        'total_users': snapshot.counts.totalUsers,
+        'gross_marketplace_sales': snapshot.counts.grossMarketplaceSales,
+        'platform_revenue': snapshot.counts.platformRevenue,
       },
       'registrations': [
         for (final point in snapshot.registrations)

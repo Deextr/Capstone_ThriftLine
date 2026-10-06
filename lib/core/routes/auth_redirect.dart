@@ -79,10 +79,13 @@ String? authenticatedWorkspaceRedirect({
   required String location,
   required String homeRoute,
 }) {
-  if (location.startsWith('/admin') && !isAdmin) {
+  if (isAdmin) {
+    if (location == RouteNames.adminPortalRequired) return null;
+    return RouteNames.adminPortalRequired;
+  }
+  if (location.startsWith('/admin')) {
     return homeRoute;
   }
-  if (isAdmin) return null;
   if (isSellerMode && location == RouteNames.buyerHome) {
     return RouteNames.sellerHome;
   }

@@ -9,6 +9,9 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../models/enums.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/add_listing_controller.dart';
+import '../widgets/add_listing_form_sections.dart';
+import '../widgets/listing_location_section.dart';
+import '../widgets/listing_shipping_section.dart';
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Screen
@@ -31,9 +34,10 @@ class AddListingScreen extends StatelessWidget {
       children: [
         Scaffold(
           backgroundColor: AppColors.background,
+          resizeToAvoidBottomInset: true,
           body: CustomScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             slivers: [
-              // â”€â”€ App bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverAppBar(
                 pinned: true,
                 title: const Text('Add Listing'),
@@ -45,8 +49,6 @@ class AddListingScreen extends StatelessWidget {
                 foregroundColor: AppColors.textPrimary,
                 elevation: 1,
               ),
-
-              // â”€â”€ Form sections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(
                   AppConstants.spacingMd,
@@ -56,83 +58,127 @@ class AddListingScreen extends StatelessWidget {
                 ),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    // 1. Photos strip
-                    _PhotosSection(controller: controller),
-                    const SizedBox(height: AppConstants.spacingLg),
-
-                    // 2. Product name
-                    ThriftTextField(
-                      label: 'Product Name',
-                      controller: controller.nameCtrl,
-                      onChanged: controller.onNameChanged,
-                      error: controller.fieldErrors['name'],
+                    ListingFormSection(
+                      title: 'Product photos',
+                      subtitle: 'Add up to 3 clear photos. The first is the cover.',
+                      child: _PhotosSection(controller: controller),
                     ),
-                    const SizedBox(height: AppConstants.spacingMd),
-
-                    // 3. Description + counter
-                    _DescriptionField(controller: controller),
-                    const SizedBox(height: AppConstants.spacingMd),
-
-                    // 4. Category
-                    _CategoryField(controller: controller),
-                    const SizedBox(height: AppConstants.spacingMd),
-
-                    // 5. Condition
-                    _ConditionField(controller: controller),
-                    const SizedBox(height: AppConstants.spacingMd),
-
-                    // 6. Brand (optional)
-                    ThriftTextField(
-                      label: 'Brand (optional)',
-                      controller: controller.brandCtrl,
+                    ListingFormSection(
+                      title: 'Product information',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ThriftTextField(
+                            label: 'Product name',
+                            hint: 'What are you selling?',
+                            controller: controller.nameCtrl,
+                            onChanged: controller.onNameChanged,
+                            error: controller.fieldErrors['name'],
+                          ),
+                          const SizedBox(height: AppConstants.spacingMd),
+                          _DescriptionField(controller: controller),
+                          const SizedBox(height: AppConstants.spacingMd),
+                          _CategoryField(controller: controller),
+                          const SizedBox(height: AppConstants.spacingMd),
+                          _ConditionField(controller: controller),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: AppConstants.spacingMd),
-
-                    // 7. Size (optional)
-                    ThriftTextField(
-                      label: 'Size (optional)',
-                      controller: controller.sizeCtrl,
+                    ListingFormSection(
+                      title: 'Item details',
+                      subtitle: 'Optional — helps buyers find your listing',
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius:
+                              BorderRadius.circular(AppConstants.radiusMd),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Column(
+                          children: [
+                            ThriftTextField(
+                              label: 'Brand',
+                              hint: 'Leave blank if unknown',
+                              controller: controller.brandCtrl,
+                            ),
+                            const SizedBox(height: AppConstants.spacingMd),
+                            ThriftTextField(
+                              label: 'Size',
+                              controller: controller.sizeCtrl,
+                            ),
+                            const SizedBox(height: AppConstants.spacingMd),
+                            ThriftTextField(
+                              label: 'Color',
+                              controller: controller.colorCtrl,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: AppConstants.spacingMd),
-
-                    // 8. Color (optional)
-                    ThriftTextField(
-                      label: 'Color (optional)',
-                      controller: controller.colorCtrl,
+                    ListingFormSection(
+                      title: 'Listing type',
+                      subtitle: 'Fixed price sells immediately. Auction accepts bids.',
+                      child: _ListingTypeSection(controller: controller),
                     ),
-                    const SizedBox(height: AppConstants.spacingMd),
-
-                    // 9. Selling format + pricing
-                    _SellingFormatSection(controller: controller),
-                    const SizedBox(height: AppConstants.spacingMd),
-
-                    // 10. Location (optional)
-                    ThriftTextField(
-                      label: 'Item Location (optional)',
-                      controller: controller.locationCtrl,
+                    ListingFormSection(
+                      title: controller.selectedFormat == ListingFormat.auction
+                          ? 'Auction pricing'
+                          : 'Pricing',
+                      child: _PricingSection(controller: controller),
                     ),
-                    const SizedBox(height: AppConstants.spacingMd),
+                    ListingFormSection(
+                      title: 'Item location',
+                      subtitle:
+                          'Uses your shop barangay from Become a Seller. Buyers never see your street address.',
+                      child: ListingLocationSection(
+                        showItemLocation: controller.showItemLocation,
+                        sellerBarangay: controller.sellerBarangay,
+                        onToggle: controller.setShowItemLocation,
+                        showHeading: false,
+                      ),
+                    ),
+                    ListingFormSection(
+                      title: 'Shipping',
+                      subtitle: 'Applied at checkout for this listing.',
+                      child: ListingShippingSection(
+                        listingFormat: controller.selectedFormat,
+                        shippingMode: controller.shippingMode,
+                        onModeChanged: controller.setShippingMode,
+                        shippingFeeController: controller.shippingFeeCtrl,
+                        qtyThresholdController: controller.qtyThresholdCtrl,
+                        bidThresholdController: controller.bidThresholdCtrl,
+                        startingBidText: controller.startBidCtrl.text,
+                        shippingFeeError: controller.fieldErrors['shippingFee'],
+                        qtyThresholdError:
+                            controller.fieldErrors['qtyThreshold'],
+                        bidThresholdError:
+                            controller.fieldErrors['bidThreshold'],
+                        showHeading: false,
+                      ),
+                    ),
                   ]),
                 ),
               ),
             ],
           ),
-
-          // â”€â”€ Persistent bottom action bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           bottomNavigationBar: BottomAppBar(
             color: AppColors.surface,
             elevation: 8,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppConstants.spacingMd,
-                vertical: AppConstants.spacingSm,
-              ),
-              child: ThriftButton(
-                label: 'Post Listing',
-                isLoading: controller.isLoading,
-                onPressed: controller.isLoading
-                    ? null
-                    : () => controller.postListing(context),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppConstants.spacingMd,
+                  vertical: AppConstants.spacingSm,
+                ),
+                child: ThriftButton(
+                  label: 'Publish listing',
+                  isLoading: controller.isLoading,
+                  onPressed: controller.isLoading
+                      ? null
+                      : () => controller.postListing(context),
+                ),
               ),
             ),
           ),
@@ -423,25 +469,17 @@ class _PhotosSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Photos',
-          style: AppTypography.label.copyWith(color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: AppConstants.spacingXs),
-        Text(
-          'Add up to 3 photos. First photo is the cover.',
-          style: AppTypography.caption,
-        ),
-        const SizedBox(height: AppConstants.spacingSm),
         SizedBox(
-          height: 90,
-          child: ReorderableListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: 3,
-            buildDefaultDragHandles: false,
-            onReorder: (oldIndex, newIndex) =>
-                controller.reorderImages(oldIndex, newIndex),
-            itemBuilder: (context, index) {
+          height: 96,
+          child: Material(
+            color: Colors.transparent,
+            child: ReorderableListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: 3,
+              buildDefaultDragHandles: false,
+              onReorder: (oldIndex, newIndex) =>
+                  controller.reorderImages(oldIndex, newIndex),
+              itemBuilder: (context, index) {
               final isFilled = index < controller.images.length;
               return ReorderableDragStartListener(
                 key: ValueKey('slot_$index'),
@@ -456,7 +494,8 @@ class _PhotosSection extends StatelessWidget {
                   ),
                 ),
               );
-            },
+              },
+            ),
           ),
         ),
         if (hasError)
@@ -520,8 +559,8 @@ class _ImageSlot extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Container(
-        width: 80,
-        height: 80,
+        width: 88,
+        height: 88,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: AppColors.primaryLight,
@@ -582,312 +621,127 @@ class _ImageSlot extends StatelessWidget {
 // Selling format cards + conditional price/auction fields (task 8.5)
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-class _SellingFormatSection extends StatelessWidget {
-  const _SellingFormatSection({required this.controller});
+class _ListingTypeSection extends StatelessWidget {
+  const _ListingTypeSection({required this.controller});
 
   final AddListingController controller;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Selling Format',
-          style: AppTypography.label.copyWith(color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: AppConstants.spacingSm),
-
-        // Format cards
-        Row(
-          children: [
-            _FormatCard(
-              label: 'Fixed Price',
-              icon: Icons.tag,
-              format: ListingFormat.fixedPrice,
-              controller: controller,
-            ),
-            const SizedBox(width: 8),
-            _FormatCard(
-              label: 'Auction',
-              icon: Icons.gavel,
-              format: ListingFormat.auction,
-              controller: controller,
-            ),
-          ],
-        ),
-        const SizedBox(height: AppConstants.spacingMd),
-
-        // Conditional price / auction fields
-        if (controller.selectedFormat != ListingFormat.auction) ...[
-          ThriftTextField(
-            label: 'Price (₱)',
-            controller: controller.priceCtrl,
-            onChanged: controller.onPriceChanged,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            error: controller.fieldErrors['price'],
-          ),
-          const SizedBox(height: AppConstants.spacingMd),
-          ThriftTextField(
-            label: 'Stock quantity',
-            hint: 'How many units are available',
-            controller: controller.stockCtrl,
-            onChanged: controller.onStockChanged,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            error: controller.fieldErrors['stock'],
-          ),
-        ] else ...[
-          ThriftTextField(
-            label: 'Starting Bid (₱)',
-            controller: controller.startBidCtrl,
-            onChanged: controller.onStartBidChanged,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            error: controller.fieldErrors['price'],
-          ),
-          const SizedBox(height: AppConstants.spacingMd),
-          const _AuctionQuantityNote(),
-          const SizedBox(height: AppConstants.spacingMd),
-          _SelectorField(
-            label: 'Auction Duration',
-            value: '${controller.auctionDurationDays} days',
-            icon: Icons.today_outlined,
-            onTap: () => _showDurationPicker(context, controller),
-          ),
-          const SizedBox(height: AppConstants.spacingMd),
-          _SelectorField(
-            label: 'Minimum Bid Increment',
-            value: '₱${controller.bidIncrement.toInt()}',
-            icon: Icons.add_circle_outline,
-            onTap: () => _showIncrementPicker(context, controller),
-          ),
-        ],
-      ],
-    );
-  }
-
-  void _showDurationPicker(
-    BuildContext context,
-    AddListingController controller,
-  ) {
-    ThriftBottomSheet.show(
-      context,
-      title: 'Auction Duration',
-      child: Column(
-        children: [1, 3, 5, 7].map((d) {
-          final isSelected = controller.auctionDurationDays == d;
-          return ListTile(
-            leading: Icon(
-              Icons.today,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            ),
-            title: Text(
-              '$d days',
-              style: TextStyle(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-            trailing: isSelected
-                ? const Icon(Icons.check, color: AppColors.primary)
-                : null,
-            onTap: () {
-              controller.selectAuctionDuration(d);
-              Navigator.pop(context);
-            },
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  void _showIncrementPicker(
-    BuildContext context,
-    AddListingController controller,
-  ) {
-    ThriftBottomSheet.show(
-      context,
-      title: 'Minimum Bid Increment',
-      child: Column(
-        children: [10.0, 20.0, 50.0, 100.0].map((v) {
-          final isSelected = controller.bidIncrement == v;
-          return ListTile(
-            leading: Icon(
-              Icons.add_circle_outline,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            ),
-            title: Text(
-              '₱${v.toInt()}',
-              style: TextStyle(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-            trailing: isSelected
-                ? const Icon(Icons.check, color: AppColors.primary)
-                : null,
-            onTap: () {
-              controller.selectBidIncrement(v);
-              Navigator.pop(context);
-            },
-          );
-        }).toList(),
-      ),
+    return ListingFormatTypeRow(
+      selectedFormat: controller.selectedFormat,
+      onFormatSelected: controller.selectFormat,
     );
   }
 }
 
-class _AuctionQuantityNote extends StatelessWidget {
-  const _AuctionQuantityNote();
+class _PricingSection extends StatelessWidget {
+  const _PricingSection({required this.controller});
+
+  final AddListingController controller;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.inventory_2_outlined,
-            size: 20,
-            color: AppColors.textSecondary,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Quantity is 1. Auction listings are a single unique item.',
-              style: AppTypography.caption.copyWith(
-                color: AppColors.textSecondary,
+    final isAuction = controller.selectedFormat == ListingFormat.auction;
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeInOut,
+      alignment: Alignment.topCenter,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: isAuction
+            ? _AuctionPricingFields(
+                key: const ValueKey('auction_pricing'),
+                controller: controller,
+              )
+            : _FixedPricePricingFields(
+                key: const ValueKey('fixed_pricing'),
+                controller: controller,
               ),
-            ),
-          ),
-        ],
       ),
     );
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Format card widget
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-class _FormatCard extends StatelessWidget {
-  const _FormatCard({
-    required this.label,
-    required this.icon,
-    required this.format,
+class _FixedPricePricingFields extends StatelessWidget {
+  const _FixedPricePricingFields({
+    super.key,
     required this.controller,
   });
 
-  final String label;
-  final IconData icon;
-  final ListingFormat format;
   final AddListingController controller;
 
   @override
   Widget build(BuildContext context) {
-    final isSelected = controller.selectedFormat == format;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => controller.selectFormat(format),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primaryLight : AppColors.surface,
-            borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-            border: Border.all(
-              color: isSelected ? AppColors.primary : AppColors.border,
-              width: isSelected ? 2 : 1,
-            ),
-          ),
-          child: Column(
-            children: [
-              Icon(
-                icon,
-                color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                size: 22,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: AppTypography.caption.copyWith(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected
-                      ? AppColors.primaryDark
-                      : AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Reusable selector field (tap-to-open pattern)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-class _SelectorField extends StatelessWidget {
-  const _SelectorField({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          label,
-          style: AppTypography.label.copyWith(color: AppColors.textPrimary),
+        ThriftTextField(
+          label: 'Price',
+          hint: 'Amount in pesos',
+          controller: controller.priceCtrl,
+          onChanged: controller.onPriceChanged,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          error: controller.fieldErrors['price'],
         ),
-        const SizedBox(height: AppConstants.spacingXs),
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                Icon(icon, color: AppColors.textHint, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    value,
-                    style: AppTypography.body.copyWith(
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                const Icon(
-                  Icons.arrow_drop_down,
-                  color: AppColors.textSecondary,
-                ),
-              ],
-            ),
-          ),
+        const SizedBox(height: AppConstants.spacingMd),
+        ThriftTextField(
+          label: 'Stock quantity',
+          hint: 'How many units you have',
+          controller: controller.stockCtrl,
+          onChanged: controller.onStockChanged,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          error: controller.fieldErrors['stock'],
         ),
       ],
     );
   }
 }
+
+class _AuctionPricingFields extends StatelessWidget {
+  const _AuctionPricingFields({
+    super.key,
+    required this.controller,
+  });
+
+  final AddListingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ThriftTextField(
+          label: 'Starting bid',
+          hint: 'Minimum opening bid in pesos',
+          controller: controller.startBidCtrl,
+          onChanged: controller.onStartBidChanged,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          error: controller.fieldErrors['price'],
+        ),
+        const SizedBox(height: AppConstants.spacingMd),
+        const ListingAuctionQuantityNote(),
+        const SizedBox(height: AppConstants.spacingLg),
+        Text('Auction duration', style: AppTypography.label),
+        const SizedBox(height: 4),
+        AuctionDurationSelector(
+          selectedDays: controller.auctionDurationDays,
+          onDaysSelected: controller.selectAuctionDuration,
+          previewEndsAt: controller.previewAuctionEndsAt,
+          durationError: controller.fieldErrors['duration'],
+        ),
+        const SizedBox(height: AppConstants.spacingLg),
+        Text('Minimum bid increment', style: AppTypography.label),
+        const SizedBox(height: 4),
+        BidIncrementSelector(
+          selectedIncrement: controller.bidIncrement,
+          onIncrementSelected: controller.selectBidIncrement,
+          incrementError: controller.fieldErrors['increment'],
+        ),
+      ],
+    );
+  }
+}
+

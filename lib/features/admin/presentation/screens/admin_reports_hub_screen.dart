@@ -149,6 +149,6 @@ class AdminReportsHubScreen extends StatelessWidget {
       onCategorySelected!(kind);
       return;
     }
-    context.push(RouteNames.adminReportsQueueFor(kind));
+    context.push(RouteNames.adminReportsCategoryFor(kind));
   }
 }
