@@ -113,12 +113,15 @@ class _ProductCardState extends State<ProductCard>
   }
 
   Widget _buildGrid(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
+    final isBuyer = context.select<AuthProvider, bool>((auth) => auth.isBuyer);
+    final viewerUserId = context.select<AuthProvider, String?>(
+      (auth) => auth.user?.id,
+    );
     final savedItems = context.watch<SavedItemsProvider>();
     final saved = savedItems.isSaved(widget.product.id);
     final showFavorite = canShowProductFavoriteAction(
-      isBuyerExperience: auth.isBuyer,
-      viewerUserId: auth.user?.id,
+      isBuyerExperience: isBuyer,
+      viewerUserId: viewerUserId,
       productSellerId: widget.product.sellerId,
     );
     final compact = widget.compact;
@@ -256,12 +259,15 @@ class _ProductCardState extends State<ProductCard>
   }
 
   Widget _buildList(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
+    final isBuyer = context.select<AuthProvider, bool>((auth) => auth.isBuyer);
+    final viewerUserId = context.select<AuthProvider, String?>(
+      (auth) => auth.user?.id,
+    );
     final savedItems = context.watch<SavedItemsProvider>();
     final saved = savedItems.isSaved(widget.product.id);
     final showFavorite = canShowProductFavoriteAction(
-      isBuyerExperience: auth.isBuyer,
-      viewerUserId: auth.user?.id,
+      isBuyerExperience: isBuyer,
+      viewerUserId: viewerUserId,
       productSellerId: widget.product.sellerId,
     );
 

@@ -98,12 +98,14 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _startSequence() async {
-    // Kick off intro + progress simultaneously
-    _introController.forward();
     _progressController.forward();
 
-    // Wait for the minimum splash display time
-    await Future<void>.delayed(const Duration(milliseconds: 2200));
+    // Auth is already initialized in main(); show branding without an extra
+    // fixed delay beyond the intro animation.
+    await Future.wait<void>([
+      _introController.forward(),
+      Future<void>.delayed(const Duration(milliseconds: 1500)),
+    ]);
 
     if (!mounted) return;
     _navigate();

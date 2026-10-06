@@ -10,6 +10,7 @@ import '../core/services/shared_preferences_service.dart';
 import '../core/services/supabase_service.dart';
 import '../core/theme/app_theme.dart';
 import '../features/auth/data/auth_service.dart';
+import '../features/auth/domain/account_mode.dart';
 import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
@@ -96,7 +97,11 @@ class _SessionBindings extends StatefulWidget {
 class _SessionBindingsState extends State<_SessionBindings>
     with WidgetsBindingObserver {
   String? _boundUserId;
+  AccountMode? _boundAccountMode;
+  bool? _boundHasSellerAccess;
   Timer? _presenceTimer;
+  AuthProvider? _auth;
+  VoidCallback? _authListener;
 
   @override
   void initState() {
@@ -106,6 +111,9 @@ class _SessionBindingsState extends State<_SessionBindings>
 
   @override
   void dispose() {
+    if (_authListener != null) {
+      _auth?.removeListener(_authListener!);
+    }
     WidgetsBinding.instance.removeObserver(this);
     _presenceTimer?.cancel();
     super.dispose();
@@ -133,42 +141,48 @@ class _SessionBindingsState extends State<_SessionBindings>
     });
   }
 
+  void _syncNotificationAudience(AuthProvider auth) {
+    final mode = auth.activeAccount;
+    final hasSellerAccess = auth.user?.hasSellerAccess ?? false;
+    if (_boundAccountMode == mode && _boundHasSellerAccess == hasSellerAccess) {
+      return;
+    }
+    _boundAccountMode = mode;
+    _boundHasSellerAccess = hasSellerAccess;
+    context.read<NotificationsProvider>().setAccountContext(
+      mode: mode,
+      hasSellerAccess: hasSellerAccess,
+    );
+  }
+
+  void _onAuthChanged() {
+    if (!mounted || _auth == null) return;
+    final userId = _auth!.user?.id;
+    if (userId != _boundUserId) {
+      _boundUserId = userId;
+      _bindSession(userId);
+    }
+    _syncNotificationAudience(_auth!);
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final userId = context.read<AuthProvider>().user?.id;
-    if (userId == _boundUserId) return;
-    _boundUserId = userId;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _bindSession(userId);
-    });
-  }
-
-  void _syncNotificationAudience() {
     final auth = context.read<AuthProvider>();
-    context.read<NotificationsProvider>().setAccountContext(
-      mode: auth.activeAccount,
-      hasSellerAccess: auth.user?.hasSellerAccess ?? false,
-    );
+    if (!identical(_auth, auth)) {
+      if (_authListener != null) {
+        _auth?.removeListener(_authListener!);
+      }
+      _auth = auth;
+      _authListener ??= _onAuthChanged;
+      auth.addListener(_authListener!);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _onAuthChanged();
+      });
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    final userId = auth.user?.id;
-    context.read<NotificationsProvider>().setAccountContext(
-      mode: auth.activeAccount,
-      hasSellerAccess: auth.user?.hasSellerAccess ?? false,
-    );
-    if (userId != _boundUserId) {
-      _boundUserId = userId;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _bindSession(userId);
-        _syncNotificationAudience();
-      });
-    }
-    return widget.child;
-  }
+  Widget build(BuildContext context) => widget.child;
 }

@@ -7,12 +7,31 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../widgets/product_card.dart';
 import '../../controllers/home_collection_controller.dart';
 import '../../controllers/home_controller.dart';
+import '../widgets/home_section_widgets.dart';
 import '../widgets/verified_seller_card.dart';
 
-class HomeCollectionScreen extends StatelessWidget {
+class HomeCollectionScreen extends StatefulWidget {
   const HomeCollectionScreen({super.key, required this.type});
 
   final HomeCollectionType type;
+
+  @override
+  State<HomeCollectionScreen> createState() => _HomeCollectionScreenState();
+}
+
+class _HomeCollectionScreenState extends State<HomeCollectionScreen> {
+  static const double _loadMoreTriggerPx = 280;
+
+  void _onScroll(ScrollNotification notification, HomeCollectionController c) {
+    if (!c.supportsInfiniteScroll || !c.hasMore || c.isLoadingMore) {
+      return;
+    }
+    if (notification.metrics.pixels <
+        notification.metrics.maxScrollExtent - _loadMoreTriggerPx) {
+      return;
+    }
+    c.loadMore();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,10 +60,7 @@ class HomeCollectionScreen extends StatelessWidget {
         controller.sellers.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
-          SizedBox(height: 120),
-          Center(child: CircularProgressIndicator(color: AppColors.primary)),
-        ],
+        children: const [SizedBox(height: 8), HomeGridShimmer()],
       );
     }
 
@@ -80,7 +96,7 @@ class HomeCollectionScreen extends StatelessWidget {
       );
     }
 
-    if (type == HomeCollectionType.verifiedSellers) {
+    if (widget.type == HomeCollectionType.verifiedSellers) {
       if (controller.sellers.isEmpty) {
         return ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -122,31 +138,72 @@ class HomeCollectionScreen extends StatelessWidget {
       );
     }
 
+    final footerCount =
+        (controller.isLoadingMore ? 1 : 0) +
+        (controller.loadMoreError != null && !controller.isLoadingMore ? 1 : 0);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final textScale = MediaQuery.textScalerOf(context).scale(1);
-        return GridView.builder(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          gridDelegate: ProductCard.gridDelegateFor(
-            maxWidth: constraints.maxWidth,
-            horizontalPadding: 32,
-            compact: true,
-            textScale: textScale,
-          ),
-          itemCount: controller.products.length,
-          itemBuilder: (_, i) {
-            final p = controller.products[i];
-            return ProductCard(
-              product: p,
-              compact: true,
-              showCountdown:
-                  type == HomeCollectionType.endingSoon ||
-                  type == HomeCollectionType.bidding,
-              cartAddCount: controller.cartCounts[p.id],
-              onTap: () => context.push('/product/${p.id}'),
-            );
+        return NotificationListener<ScrollNotification>(
+          onNotification: (n) {
+            if (n is ScrollUpdateNotification || n is ScrollEndNotification) {
+              _onScroll(n, controller);
+            }
+            return false;
           },
+          child: GridView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            gridDelegate: ProductCard.gridDelegateFor(
+              maxWidth: constraints.maxWidth,
+              horizontalPadding: 32,
+              compact: true,
+              textScale: textScale,
+            ),
+            itemCount: controller.products.length + footerCount,
+            itemBuilder: (_, i) {
+              if (i < controller.products.length) {
+                final p = controller.products[i];
+                return ProductCard(
+                  product: p,
+                  compact: true,
+                  showCountdown:
+                      widget.type == HomeCollectionType.endingSoon ||
+                      widget.type == HomeCollectionType.bidding,
+                  cartAddCount: controller.cartCounts[p.id],
+                  onTap: () => context.push('/product/${p.id}'),
+                );
+              }
+              if (controller.isLoadingMore && i == controller.products.length) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return Center(
+                child: TextButton(
+                  onPressed: controller.loadMore,
+                  child: Text(
+                    controller.loadMoreError ?? 'Load more',
+                    textAlign: TextAlign.center,
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
         );
       },
     );

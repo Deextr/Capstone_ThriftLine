@@ -55,6 +55,7 @@ bool isLiveBuyerHomeListing(ProductModel p) {
 Future<List<dynamic>> fetchCatalogProductRows(
   SupabaseClient client, {
   required int limit,
+  int offset = 0,
   String? listingType,
   List<String>? productIds,
   String orderColumn = 'created_at',
@@ -70,7 +71,13 @@ Future<List<dynamic>> fetchCatalogProductRows(
     if (productIds != null) {
       query = query.inFilter('product_id', productIds);
     }
-    return query.order(order, ascending: ascending).limit(limit);
+    final ordered = query
+        .order(order, ascending: ascending)
+        .order('product_id', ascending: true);
+    if (offset <= 0) {
+      return ordered.limit(limit);
+    }
+    return ordered.range(offset, offset + limit - 1);
   }
 
   try {
