@@ -29,7 +29,7 @@ enum SellerOrderBucket {
 
   String get emptyMessage => switch (this) {
     SellerOrderBucket.pendingPayment =>
-      'Orders waiting for the buyer to finish PayMongo checkout will appear here.',
+      'Auction wins waiting for the buyer to pay will appear here.',
     SellerOrderBucket.toShip =>
       'Paid orders that need preparation will appear here.',
     SellerOrderBucket.shipped =>
@@ -47,7 +47,11 @@ enum SellerOrderBucket {
 /// workspace tab. Every other order maps to exactly one bucket.
 SellerOrderBucket? sellerOrderBucketFor(OrderModel order) {
   if (order.isFailedCheckout) return null;
-  if (order.isPaymentPending) return SellerOrderBucket.pendingPayment;
+  if (order.isPaymentPending) {
+    // Fixed-price checkout reservations are not seller fulfillment orders.
+    if (!order.isAuctionObligation) return null;
+    return SellerOrderBucket.pendingPayment;
+  }
   if (order.isToShip) return SellerOrderBucket.toShip;
   if (order.isShippedTab) return SellerOrderBucket.shipped;
   if (order.isCompleted) return SellerOrderBucket.completed;

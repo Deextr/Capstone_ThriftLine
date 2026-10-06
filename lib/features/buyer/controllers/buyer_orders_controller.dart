@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -58,6 +59,11 @@ class BuyerOrdersController extends ChangeNotifier {
   int _returnGeneration = 0;
   int _loadGeneration = 0;
   bool _disposed = false;
+  bool _skipPaymentReconcileOnce = false;
+  bool _checkoutClosed = false;
+  bool _awaitingPaymongoReturn = false;
+  int _returnReconcileDepth = 0;
+  Timer? _returnReconcileTimer;
 
   List<OrderModel> get orders => _orders;
   List<OrderModel> get awaitingPayment => buyerAwaitingPayment(_orders);
@@ -77,12 +83,20 @@ class BuyerOrdersController extends ChangeNotifier {
   bool get isSavingAddress => _isSavingAddress;
   bool get isStartingPayment => _isStartingPayment;
   bool get isConfirmingPayment => _isConfirmingPayment;
+  bool get awaitingPaymongoReturn => _awaitingPaymongoReturn;
   bool get isAbandoning => _isAbandoning;
+  bool get checkoutClosed => _checkoutClosed;
   bool get isUpdatingDelivery => _isUpdatingDelivery;
   String? get errorMessage => _errorMessage;
   String? get deliveryPin => _deliveryPin;
   bool get isExpiredPayment =>
       _unsuccessfulOutcome == 'expired' || (_order?.isExpiredCheckout ?? false);
+
+  bool get showsPaymentFailureUi =>
+      !_checkoutClosed &&
+      (isExpiredPayment ||
+          _unsuccessfulOutcome == 'failed' ||
+          (_order?.isPaymongoPaymentFailure ?? false));
 
   Future<void> load({bool showSpinner = true}) async {
     final myId = _auth.user?.id;
@@ -118,8 +132,12 @@ class BuyerOrdersController extends ChangeNotifier {
         if (generation != _loadGeneration) return;
         _order = fetched;
         if (_order != null && _order!.needsBuyerPayment) {
-          await _reconcileOpenCheckout(orderId!);
-          if (generation != _loadGeneration) return;
+          if (_skipPaymentReconcileOnce) {
+            _skipPaymentReconcileOnce = false;
+          } else if (_returnReconcileDepth == 0) {
+            await _reconcileOpenCheckout(orderId!);
+            if (generation != _loadGeneration) return;
+          }
         }
         if (_order == null) {
           _errorMessage = 'Order not found.';
@@ -130,7 +148,7 @@ class BuyerOrdersController extends ChangeNotifier {
         if (generation != _loadGeneration) return;
         if (_order != null && !_order!.needsBuyerPayment) {
           _isConfirmingPayment = false;
-          if (_order!.isFailedCheckout) {
+          if (!_checkoutClosed && _order!.isPaymongoPaymentFailure) {
             _unsuccessfulOutcome = _order!.isExpiredCheckout
                 ? 'expired'
                 : 'failed';
@@ -228,12 +246,10 @@ class BuyerOrdersController extends ChangeNotifier {
         channel: channel,
       );
       if (result.alreadyPaid) {
+        _awaitingPaymongoReturn = false;
         _isConfirmingPayment = false;
         await load(showSpinner: false);
         return result;
-      }
-      if (result.success && result.checkoutUrl != null) {
-        _isConfirmingPayment = true;
       }
       return result;
     } finally {
@@ -242,71 +258,232 @@ class BuyerOrdersController extends ChangeNotifier {
     }
   }
 
-  Future<PaymongoAppReturnResult> handlePaymongoAppReturn() async {
+  /// Call after PayMongo hosted checkout opens in the external browser.
+  void markPaymongoBrowserOpened() {
+    _awaitingPaymongoReturn = true;
+    _isConfirmingPayment = true;
+    _unsuccessfulOutcome = null;
+    _notify();
+  }
+
+  void clearPaymongoAwaiting() {
+    _awaitingPaymongoReturn = false;
+    _isConfirmingPayment = false;
+    _notify();
+  }
+
+  Future<PaymongoAppReturnResult> handlePaymongoAppReturn({
+    String? returnStatus,
+    bool fromReturnRedirect = false,
+    bool hostedCheckoutOpened = false,
+  }) async {
     final id = orderId ?? _order?.id;
     if (id == null || id.isEmpty) return PaymongoAppReturnResult.pending;
     final generation = ++_returnGeneration;
+    _returnReconcileTimer?.cancel();
+    _returnReconcileTimer = null;
+
+    final fromHostedCheckout = _awaitingPaymongoReturn ||
+        hostedCheckoutOpened ||
+        fromReturnRedirect;
+
+    if (!fromHostedCheckout) {
+      return PaymongoAppReturnResult.pending;
+    }
 
     _isConfirmingPayment = true;
     _unsuccessfulOutcome = null;
     _notify();
 
-    for (var attempt = 0; attempt < 16; attempt++) {
-      if (attempt > 0) {
-        await Future<void>.delayed(const Duration(seconds: 2));
-      }
-      if (_disposed || generation != _returnGeneration) {
-        return PaymongoAppReturnResult.pending;
-      }
+    _returnReconcileDepth++;
+    try {
+      const retryDelaysMs = <int>[0, 400, 900, 1500];
+      for (var attempt = 0; attempt < retryDelaysMs.length; attempt++) {
+        if (retryDelaysMs[attempt] > 0) {
+          await Future<void>.delayed(
+            Duration(milliseconds: retryDelaysMs[attempt]),
+          );
+        }
+        if (_disposed || generation != _returnGeneration) {
+          return PaymongoAppReturnResult.pending;
+        }
 
-      final reconciled = await reconcilePaymongoCheckout(
-        _supabase,
-        orderId: id,
-      );
-      await load(showSpinner: false);
-      if (_disposed || generation != _returnGeneration) {
-        return PaymongoAppReturnResult.pending;
-      }
+        final started = DateTime.now();
+        if (kDebugMode) {
+          debugPrint(
+            '[Payment] reconcile attempt ${attempt + 1} order=$id',
+          );
+        }
 
-      final paidOnRecord =
-          _order != null &&
-          !_order!.isPaymentPending &&
-          !_order!.isFailedCheckout;
-      if (paidOnRecord) {
-        _isConfirmingPayment = false;
-        _unsuccessfulOutcome = null;
-        _notify();
-        return PaymongoAppReturnResult.paid;
-      }
-      if (reconciled.isPaid) {
-        continue;
-      }
+        final reconciled = await reconcilePaymongoCheckout(
+          _supabase,
+          orderId: id,
+        );
+        await _refreshOrderAfterReconcile(id);
+        if (_disposed || generation != _returnGeneration) {
+          return PaymongoAppReturnResult.pending;
+        }
 
-      if (reconciled.isUnsuccessful || _order?.isFailedCheckout == true) {
-        _isConfirmingPayment = false;
-        _unsuccessfulOutcome =
-            reconciled.isExpired || (_order?.isExpiredCheckout ?? false)
-            ? 'expired'
-            : 'failed';
-        _notify();
-        return PaymongoAppReturnResult.failed;
+        if (kDebugMode) {
+          debugPrint(
+            '[Payment] reconcile outcome=${reconciled.outcome} '
+            'elapsed=${DateTime.now().difference(started).inMilliseconds}ms',
+          );
+        }
+
+        if (_order?.isPaidCheckout == true || reconciled.isPaid) {
+          _awaitingPaymongoReturn = false;
+          _isConfirmingPayment = false;
+          _unsuccessfulOutcome = null;
+          _notify();
+          return PaymongoAppReturnResult.paid;
+        }
+
+        if (reconciled.isUnsuccessful ||
+            (_order?.isPaymongoPaymentFailure ?? false)) {
+          _awaitingPaymongoReturn = false;
+          return _completePaymongoFailure(
+            orderId: id,
+            generation: generation,
+            clientOutcome: reconciled.isExpired ? 'expired' : 'failed',
+            showFailureUiFirst: true,
+          );
+        }
       }
+    } finally {
+      _returnReconcileDepth--;
     }
 
     if (_disposed || generation != _returnGeneration) {
       return PaymongoAppReturnResult.pending;
     }
-    _isConfirmingPayment = false;
-    _notify();
+
+    _scheduleReturnReconcileFollowUp(
+      orderId: id,
+      generation: generation,
+    );
     return PaymongoAppReturnResult.pending;
   }
 
-  Future<void> _refreshAfterResume() async {
-    await load(showSpinner: false);
-    if (_disposed || orderId == null) return;
-    if (_isConfirmingPayment && _order?.needsBuyerPayment == true) {
-      await handlePaymongoAppReturn();
+  void _scheduleReturnReconcileFollowUp({
+    required String orderId,
+    required int generation,
+  }) {
+    _returnReconcileTimer?.cancel();
+    var followUp = 0;
+    _returnReconcileTimer = Timer.periodic(const Duration(seconds: 3), (
+      timer,
+    ) async {
+      followUp++;
+      if (_disposed ||
+          generation != _returnGeneration ||
+          followUp > 20 ||
+          !_awaitingPaymongoReturn) {
+        timer.cancel();
+        _returnReconcileTimer = null;
+        return;
+      }
+
+      final reconciled = await reconcilePaymongoCheckout(
+        _supabase,
+        orderId: orderId,
+      );
+      await _refreshOrderAfterReconcile(orderId);
+      if (_disposed || generation != _returnGeneration) {
+        timer.cancel();
+        _returnReconcileTimer = null;
+        return;
+      }
+
+      if (_order?.isPaidCheckout == true || reconciled.isPaid) {
+        timer.cancel();
+        _returnReconcileTimer = null;
+        _awaitingPaymongoReturn = false;
+        _isConfirmingPayment = false;
+        _unsuccessfulOutcome = null;
+        _notify();
+        return;
+      }
+
+      if (reconciled.isUnsuccessful ||
+          (_order?.isPaymongoPaymentFailure ?? false)) {
+        timer.cancel();
+        _returnReconcileTimer = null;
+        unawaited(
+          _completePaymongoFailure(
+            orderId: orderId,
+            generation: generation,
+            clientOutcome: reconciled.isExpired ? 'expired' : 'failed',
+            showFailureUiFirst: true,
+          ),
+        );
+      }
+    });
+  }
+
+  Future<void> _refreshOrderAfterReconcile(String id) async {
+    final myId = _auth.user?.id;
+    if (myId == null) return;
+    try {
+      _order = await fetchOrderById(_supabase, id, buyerId: myId);
+      await _loadPaymentGroup(myId);
+      _notify();
+    } catch (e) {
+      debugPrint('BuyerOrdersController._refreshOrderAfterReconcile error: $e');
     }
+  }
+
+  Future<PaymongoAppReturnResult> _completePaymongoFailure({
+    required String orderId,
+    required int generation,
+    required String clientOutcome,
+    bool showFailureUiFirst = false,
+  }) async {
+    if (_disposed || generation != _returnGeneration) {
+      return PaymongoAppReturnResult.pending;
+    }
+
+    if (showFailureUiFirst) {
+      _isConfirmingPayment = false;
+      _unsuccessfulOutcome = clientOutcome == 'expired' ? 'expired' : 'failed';
+      _notify();
+    }
+
+    if (_order == null || !_order!.isAuctionObligation) {
+      final restoreCart = !(_order?.isBuyNowCheckout ?? false);
+      await finalizeMyPaymongoCheckout(
+        _supabase,
+        orderId: orderId,
+        clientOutcome: clientOutcome,
+        restoreCart: restoreCart,
+      );
+      _skipPaymentReconcileOnce = true;
+      await _refreshOrderAfterReconcile(orderId);
+      if (_disposed || generation != _returnGeneration) {
+        return PaymongoAppReturnResult.pending;
+      }
+      if (restoreCart) {
+        unawaited(restoreAbandonedFixedPriceCheckouts(_supabase));
+      }
+    }
+
+    _awaitingPaymongoReturn = false;
+    _isConfirmingPayment = false;
+    _unsuccessfulOutcome = clientOutcome == 'expired' ? 'expired' : 'failed';
+    _notify();
+    return PaymongoAppReturnResult.failed;
+  }
+
+  Future<void> _refreshAfterResume() async {
+    if (_disposed || orderId == null) return;
+    if (_awaitingPaymongoReturn) {
+      if (kDebugMode) {
+        debugPrint('[Payment] App resumed (controller) order=$orderId');
+      }
+      await handlePaymongoAppReturn(hostedCheckoutOpened: true);
+      return;
+    }
+    await load(showSpinner: false);
   }
 
   Future<void> _loadPaymentGroup(String buyerId) async {
@@ -342,32 +519,114 @@ class BuyerOrdersController extends ChangeNotifier {
     _order = await fetchOrderById(_supabase, id, buyerId: _auth.user?.id);
   }
 
-  Future<String?> abandonUnpaidCheckout(String payOrderId) async {
+  /// Buyer intentionally leaves payment (not PayMongo failure).
+  Future<String?> abandonUnpaidCheckout(
+    String payOrderId, {
+    bool restoreCart = true,
+  }) async {
     if (_isAbandoning) return null;
     _isAbandoning = true;
     _notify();
+    final isAuction = (_order?.auctionId ?? '').isNotEmpty;
+    final restore = restoreCart && !isAuction;
+    final targetOrderId = _order?.id ?? payOrderId;
     try {
-      final rpcRes = await _supabase.client.rpc(
-        'abandon_unpaid_checkout',
-        params: {'p_order_id': payOrderId},
+      final rpcMap = await _rpcAbandonUnpaidCheckout(
+        targetOrderId,
+        restoreCart: restore,
       );
-      if (!supabaseRpcSuccess(rpcRes)) {
+      final rpcOk = supabaseRpcSuccess(rpcMap);
+      if (!rpcOk) {
+        debugPrint('abandonUnpaidCheckout RPC failed: $rpcMap');
+        _checkoutClosed = false;
+        await load(showSpinner: false);
+        if (_order?.isAbandonedCheckout == true ||
+            _order?.isFailedCheckout == true ||
+            !(_order?.needsBuyerPayment ?? true)) {
+          _isConfirmingPayment = false;
+          _unsuccessfulOutcome = null;
+          return null;
+        }
         return supabaseRpcError(
-          rpcRes,
-          fallback: 'Could not cancel this checkout.',
+          rpcMap,
+          fallback: 'We could not close this checkout yet. Please try again.',
         );
       }
+      if (rpcMap?['already_paid'] == true) {
+        _checkoutClosed = false;
+        await load(showSpinner: false);
+        return 'This order is already paid.';
+      }
+      _skipPaymentReconcileOnce = true;
+      _awaitingPaymongoReturn = false;
       _isConfirmingPayment = false;
-      await load(showSpinner: false);
+      _errorMessage = null;
       _unsuccessfulOutcome = null;
+      _checkoutClosed = true;
+      _notify();
+      await load(showSpinner: false);
       return null;
     } catch (e) {
-      debugPrint('BuyerOrdersController.abandonUnpaidCheckout error: $e');
-      return 'Could not cancel this checkout.';
+      _checkoutClosed = false;
+      if (e is PostgrestException) {
+        debugPrint(
+          'BuyerOrdersController.abandonUnpaidCheckout PostgrestException '
+          'code=${e.code} message=${e.message} details=${e.details}',
+        );
+      } else {
+        debugPrint('BuyerOrdersController.abandonUnpaidCheckout error: $e');
+      }
+      await load(showSpinner: false);
+      if (_order?.isAbandonedCheckout == true ||
+          _order?.isFailedCheckout == true ||
+          !(_order?.needsBuyerPayment ?? true)) {
+        return null;
+      }
+      if (e is PostgrestException) {
+        final msg = e.message.trim();
+        if (msg.isNotEmpty &&
+            (msg.contains('Could not find the function') ||
+                msg.contains('does not exist'))) {
+          return 'We could not close this checkout yet. The server checkout '
+              'update may be missing — apply the latest database migrations.';
+        }
+      }
+      return 'We could not close this checkout yet. Please try again.';
     } finally {
       _isAbandoning = false;
       _notify();
     }
+  }
+
+  void clearCheckoutLeaveState() {
+    _checkoutClosed = false;
+  }
+
+  Future<Map<String, dynamic>?> _rpcAbandonUnpaidCheckout(
+    String payOrderId, {
+    required bool restoreCart,
+  }) async {
+    Object? lastError;
+    for (final params in [
+      {'p_order_id': payOrderId, 'p_restore_cart': restoreCart},
+      {'p_order_id': payOrderId},
+    ]) {
+      try {
+        final rpcRes = await _supabase.client.rpc(
+          'abandon_unpaid_checkout',
+          params: params,
+        );
+        final map = supabaseRpcMap(rpcRes);
+        if (map != null) return map;
+      } catch (e) {
+        lastError = e;
+        debugPrint(
+          'BuyerOrdersController._rpcAbandonUnpaidCheckout params=$params error: $e',
+        );
+      }
+    }
+    if (lastError != null) throw lastError!;
+    return null;
   }
 
   Future<void> _completeExpiredInspections() async {
@@ -608,6 +867,8 @@ class BuyerOrdersController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _returnGeneration++;
+    _returnReconcileTimer?.cancel();
+    _returnReconcileTimer = null;
     _lifecycle?.dispose();
     final channel = _channel;
     _channel = null;

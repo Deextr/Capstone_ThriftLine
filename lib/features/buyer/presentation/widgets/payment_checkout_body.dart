@@ -22,14 +22,16 @@ class PaymentCheckoutBody extends StatelessWidget {
     required this.isAbandoning,
     required this.isSavingAddress,
     required this.windowOpen,
-    required this.returnLabel,
+    this.returnLabel = '',
     required this.onSelectChannel,
     required this.onChangeAddress,
     this.onReturnToCart,
     this.paymentDueAt,
+    this.payOrderId,
   });
 
   final OrderModel order;
+  final String? payOrderId;
   final List<OrderModel> groupOrders;
   final bool confirming;
   final String? selectedChannel;
@@ -125,6 +127,7 @@ class PaymentCheckoutBody extends StatelessWidget {
         ),
         _PaymentStickyBar(
           order: order,
+          payOrderId: payOrderId,
           totalLabel: totalLabel,
           confirming: confirming,
           selectedChannel: selectedChannel,
@@ -662,6 +665,7 @@ class _PaymentMethodOption extends StatelessWidget {
 class _PaymentStickyBar extends StatelessWidget {
   const _PaymentStickyBar({
     required this.order,
+    this.payOrderId,
     required this.totalLabel,
     required this.confirming,
     required this.selectedChannel,
@@ -674,6 +678,7 @@ class _PaymentStickyBar extends StatelessWidget {
   });
 
   final OrderModel order;
+  final String? payOrderId;
   final String totalLabel;
   final bool confirming;
   final String? selectedChannel;
@@ -764,7 +769,7 @@ class _PaymentStickyBar extends StatelessWidget {
                 )
               else
                 PayNowButton(
-                  orderId: order.id,
+                  orderId: (payOrderId ?? order.id).trim(),
                   channel: selectedChannel!,
                   amountLabel: totalLabel,
                 ),

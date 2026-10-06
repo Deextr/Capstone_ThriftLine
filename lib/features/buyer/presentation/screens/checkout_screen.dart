@@ -10,6 +10,7 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../providers/cart_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/checkout_controller.dart';
+import '../../domain/checkout_origin.dart';
 import '../widgets/awaiting_payment_tile.dart';
 import '../widgets/cart_checkout_shop_section.dart';
 
@@ -84,7 +85,9 @@ class CheckoutScreen extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'To change items or quantities, go back to your cart.',
+                        checkout.scopedProductId != null
+                            ? 'To change quantity, go back to the listing.'
+                            : 'To change items or quantities, go back to your cart.',
                         style: AppTypography.caption.copyWith(fontSize: 11),
                       ),
                     ),
@@ -470,7 +473,19 @@ class _CheckoutBottomBar extends StatelessWidget {
                           'Other cart items are still in your cart.',
                         );
                       }
-                      context.go(RouteNames.paymentForOrder(result.orderId!));
+                      final checkoutCtrl = context.read<CheckoutController>();
+                      final buyNow = checkoutCtrl.isBuyNowCheckout;
+                      context.go(
+                        RouteNames.paymentForOrder(
+                          result.orderId!,
+                          checkoutSource: buyNow
+                              ? CheckoutOrigin.buyNow.routeValue
+                              : CheckoutOrigin.cart.routeValue,
+                          productId: buyNow
+                              ? checkoutCtrl.scopedProductId
+                              : null,
+                        ),
+                      );
                     },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,

@@ -27,6 +27,57 @@ function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
+function resolveAnonKey(req: Request): string {
+  const fromEnv = (Deno.env.get("SUPABASE_ANON_KEY") ?? "").trim();
+  if (fromEnv.length > 0) return fromEnv;
+  const apiKeyHeader = (req.headers.get("apikey") ?? "").trim();
+  if (apiKeyHeader.length > 0) return apiKeyHeader;
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (authHeader.startsWith("Bearer ")) {
+    const token = authHeader.slice("Bearer ".length).trim();
+    if (token.length > 0) return token;
+  }
+  return "";
+}
+
+function asLowerString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value.toLowerCase();
+  return String(value).toLowerCase();
+}
+
+function goTrueErrorCode(payload: GoTrueTokenResponse): string {
+  return asLowerString(
+    payload.error_code ?? payload.code ?? payload.error ?? "",
+  );
+}
+
+function goTrueErrorMessage(payload: GoTrueTokenResponse): string {
+  return asLowerString(
+    payload.msg ?? payload.message ?? payload.error_description ?? "",
+  );
+}
+
+function goTrueInvalidCredentials(
+  payload: GoTrueTokenResponse,
+  status: number,
+): boolean {
+  const errorCode = goTrueErrorCode(payload);
+  const msg = goTrueErrorMessage(payload);
+  if (errorCode.includes("invalid") || errorCode.includes("invalid_grant")) {
+    return true;
+  }
+  if (
+    msg.includes("invalid login credentials") ||
+    msg.includes("invalid email or password") ||
+    msg.includes("incorrect email or password") ||
+    msg.includes("wrong password")
+  ) {
+    return true;
+  }
+  return status === 400 || status === 401 || status === 422;
+}
+
 function isEmail(value: string): boolean {
   if (value.length === 0 || value.length > 320) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -39,10 +90,11 @@ type GoTrueTokenResponse = {
   token_type?: string;
   user?: Record<string, unknown> & { id?: string };
   error?: string;
+  error_code?: string;
   error_description?: string;
   msg?: string;
   message?: string;
-  code?: string;
+  code?: string | number;
 };
 
 const ADMIN_MAX_LOGIN_ATTEMPTS = 5;
@@ -131,11 +183,66 @@ async function logAdminAuthAudit(
       p_ip_hash: params.ipHash ?? null,
     });
     if (error) {
+      if (isMissingAuditRpc(error)) {
+        console.warn(
+          "sign-in-with-email audit RPC missing; apply migration 20261006250000",
+        );
+        return;
+      }
       console.error("sign-in-with-email audit log failed", error);
     }
   } catch (error) {
     console.error("sign-in-with-email audit log threw", error);
   }
+}
+
+async function adminPortalInvalidPasswordResponse(
+  req: Request,
+  // deno-lint-ignore no-explicit-any
+  service: any,
+  params: {
+    email: string;
+    emailHash: string;
+    ipHash: string | null;
+  },
+): Promise<Response> {
+  const failureState = await recordAdminPortalFailure(
+    service,
+    params.emailHash,
+  );
+  if (failureState?.locked === true) {
+    void logAdminAuthAudit(service, {
+      eventType: "admin_login_lockout",
+      status: "blocked",
+      summary: "Admin login lockout triggered after failed attempts",
+      actorEmail: params.email,
+      ipHash: params.ipHash,
+      details: {
+        login_portal: "admin",
+        failed_attempts: failureState.failed_attempts ??
+          ADMIN_MAX_LOGIN_ATTEMPTS,
+        max_attempts: ADMIN_MAX_LOGIN_ATTEMPTS,
+      },
+    });
+    const locked = adminLockResponse(req, failureState);
+    if (locked) return locked;
+  }
+  const failed = failureState?.failed_attempts ?? 0;
+  void logAdminAuthAudit(service, {
+    eventType: "admin_login_failed",
+    status: "failed",
+    summary: "Failed admin login attempt",
+    actorEmail: params.email,
+    ipHash: params.ipHash,
+    details: {
+      login_portal: "admin",
+      reason: "invalid_credentials",
+      failed_attempts: failed,
+      max_attempts: ADMIN_MAX_LOGIN_ATTEMPTS,
+      attempt: `${failed} of ${ADMIN_MAX_LOGIN_ATTEMPTS}`,
+    },
+  });
+  return adminInvalidCredentialsResponse(req, failureState);
 }
 
 function isMissingAdminLockRpc(error: { message?: string; code?: string }) {
@@ -145,6 +252,10 @@ function isMissingAdminLockRpc(error: { message?: string; code?: string }) {
     code === "42883" ||
     msg.includes("could not find the function") ||
     msg.includes("does not exist");
+}
+
+function isMissingAuditRpc(error: { message?: string; code?: string }) {
+  return isMissingAdminLockRpc(error);
 }
 
 async function checkAdminPortalLock(
@@ -277,10 +388,17 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/$/, "");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const serviceKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+    const anonKey = resolveAnonKey(req);
     if (!supabaseUrl || !serviceKey || !anonKey) {
-      console.error("sign-in-with-email Supabase env is not configured");
+      console.error(
+        "sign-in-with-email Supabase env is not configured",
+        {
+          hasUrl: supabaseUrl.length > 0,
+          hasServiceKey: serviceKey.length > 0,
+          hasAnonKey: anonKey.length > 0,
+        },
+      );
       return json(req, 503, {
         error: "Sign-in is temporarily unavailable. Please try again.",
         code: "unavailable",
@@ -335,11 +453,12 @@ Deno.serve(async (req) => {
       { p_email_hash: emailHash, p_ip_hash: ipHash },
     );
     if (claimError) {
-      console.error("sign-in-with-email rate limit unavailable", claimError);
-      return json(req, 503, {
-        error: "Sign-in is temporarily unavailable. Please try again.",
-        code: "unavailable",
-      });
+      console.error("sign-in-with-email rate limit RPC failed", claimError);
+      if (!isMissingAdminLockRpc(claimError)) {
+        console.warn(
+          "sign-in-with-email continuing without email_login_abuse throttle",
+        );
+      }
     }
     if (claim === "cooldown") {
       return json(req, 429, {
@@ -362,6 +481,7 @@ Deno.serve(async (req) => {
           method: "POST",
           headers: {
             apikey: anonKey,
+            Authorization: `Bearer ${anonKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -390,10 +510,8 @@ Deno.serve(async (req) => {
     }
 
     if (!authResponse.ok || !payload.access_token || !payload.refresh_token) {
-      const code = (payload.code ?? payload.error ?? "").toLowerCase();
-      const msg = (payload.msg ?? payload.message ?? payload.error_description ??
-        "")
-        .toLowerCase();
+      const code = goTrueErrorCode(payload);
+      const msg = goTrueErrorMessage(payload);
 
       if (code.includes("captcha") || msg.includes("captcha")) {
         return json(req, 403, {
@@ -410,40 +528,21 @@ Deno.serve(async (req) => {
       }
 
       if (isAdminPortal) {
-        const failureState = await recordAdminPortalFailure(service, emailHash);
-        if (failureState?.locked === true) {
-          await logAdminAuthAudit(service, {
-            eventType: "admin_login_lockout",
-            status: "blocked",
-            summary: "Admin login lockout triggered after failed attempts",
-            actorEmail: email,
-            ipHash: ipHash,
-            details: {
-              login_portal: "admin",
-              failed_attempts: failureState.failed_attempts ??
-                ADMIN_MAX_LOGIN_ATTEMPTS,
-              max_attempts: ADMIN_MAX_LOGIN_ATTEMPTS,
-            },
+        if (goTrueInvalidCredentials(payload, authResponse.status)) {
+          return await adminPortalInvalidPasswordResponse(req, service, {
+            email,
+            emailHash,
+            ipHash,
           });
-          const locked = adminLockResponse(req, failureState);
-          if (locked) return locked;
         }
-        const failed = failureState?.failed_attempts ?? 0;
-        await logAdminAuthAudit(service, {
-          eventType: "admin_login_failed",
-          status: "failed",
-          summary: "Failed admin login attempt",
-          actorEmail: email,
-          ipHash: ipHash,
-          details: {
-            login_portal: "admin",
-            reason: "invalid_credentials",
-            failed_attempts: failed,
-            max_attempts: ADMIN_MAX_LOGIN_ATTEMPTS,
-            attempt: `${failed} of ${ADMIN_MAX_LOGIN_ATTEMPTS}`,
-          },
+        console.error(
+          "sign-in-with-email admin GoTrue non-credential failure",
+          { status: authResponse.status, payload },
+        );
+        return json(req, 503, {
+          error: "Sign-in is temporarily unavailable. Please try again.",
+          code: "unavailable",
         });
-        return adminInvalidCredentialsResponse(req, failureState);
       }
 
       return json(req, 401, {

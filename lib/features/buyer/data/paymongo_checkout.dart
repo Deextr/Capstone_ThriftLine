@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/supabase_rpc.dart';
+import '../../auth/domain/auth_error.dart';
 
 /// Result of verifying a PayMongo app return. The redirect itself is not proof.
 enum PaymongoAppReturnResult { paid, pending, failed }
@@ -90,12 +93,29 @@ class PaymongoReconcileResult {
         error: 'Unable to confirm payment status right now.',
       );
     }
-    final outcome = (map['outcome'] ?? '').toString().trim().toLowerCase();
+    final err = map['error']?.toString().trim();
+    var outcome = (map['outcome'] ?? '').toString().trim().toLowerCase();
+    final voidMap = supabaseRpcMap(map['void']);
+    if (outcome == 'pending' && voidMap != null && voidMap['success'] == true) {
+      outcome = 'failed';
+    }
     final allowed = {'paid', 'pending', 'expired', 'failed', 'cancelled'};
     return PaymongoReconcileResult(
       outcome: allowed.contains(outcome) ? outcome : 'pending',
-      error: map['error']?.toString(),
+      error: err != null && err.isNotEmpty ? err : null,
     );
+  }
+
+  factory PaymongoReconcileResult.fromFinalizeRpc(Map<String, dynamic>? map) {
+    if (map == null || map['success'] != true) {
+      final err = supabaseRpcError(
+        map,
+        fallback: 'Unable to finalize checkout.',
+      );
+      return PaymongoReconcileResult(outcome: 'pending', error: err);
+    }
+    final outcome = (map['outcome'] ?? 'pending').toString().trim().toLowerCase();
+    return PaymongoReconcileResult(outcome: outcome);
   }
 }
 
@@ -104,17 +124,49 @@ Future<PaymongoReconcileResult> reconcilePaymongoCheckout(
   required String orderId,
 }) async {
   try {
-    final response = await supabase.client.functions.invoke(
-      'reconcile-paymongo-checkout',
-      body: {'order_id': orderId},
-    );
+    final response = await supabase.client.functions
+        .invoke(
+          'reconcile-paymongo-checkout',
+          body: {'order_id': orderId},
+        )
+        .timeout(const Duration(seconds: 12));
     return PaymongoReconcileResult.fromMap(supabaseRpcMap(response.data));
   } on FunctionException catch (e) {
     return PaymongoReconcileResult.fromMap(_functionExceptionMap(e));
+  } on TimeoutException {
+    return const PaymongoReconcileResult(
+      outcome: 'pending',
+      error: 'Payment confirmation timed out.',
+    );
   } catch (_) {
     return const PaymongoReconcileResult(
       outcome: 'pending',
       error: 'Unable to confirm payment status right now.',
+    );
+  }
+}
+
+Future<PaymongoReconcileResult> finalizeMyPaymongoCheckout(
+  SupabaseService supabase, {
+  required String orderId,
+  required String clientOutcome,
+  bool restoreCart = true,
+}) async {
+  try {
+    final response = await supabase.client.rpc(
+      'finalize_my_paymongo_checkout',
+      params: {
+        'p_order_id': orderId,
+        'p_client_outcome': clientOutcome,
+        'p_restore_cart': restoreCart,
+      },
+    );
+    return PaymongoReconcileResult.fromFinalizeRpc(supabaseRpcMap(response));
+  } catch (e) {
+    debugPrint('finalize_my_paymongo_checkout error: $e');
+    return const PaymongoReconcileResult(
+      outcome: 'pending',
+      error: 'Unable to finalize checkout.',
     );
   }
 }
@@ -132,21 +184,71 @@ Future<PaymongoCheckoutResult> createPaymongoCheckout(
     );
   }
   try {
+    final prepRaw = await supabase.client.rpc(
+      'prepare_paymongo_checkout',
+      params: {'p_order_id': orderId, 'p_channel': parsed},
+    );
+    final prep = supabaseRpcMap(prepRaw);
+    if (prep == null || prep['success'] != true) {
+      final message = supabaseRpcError(
+        prep,
+        fallback: 'Unable to start payment right now. Please try again.',
+      );
+      debugPrint('prepare_paymongo_checkout failed: $prepRaw');
+      return PaymongoCheckoutResult(success: false, error: message);
+    }
+    if (prep['already_paid'] == true) {
+      return PaymongoCheckoutResult.fromMap(prep);
+    }
+    if (prep['reuse'] == true) {
+      final reuseUrl = prep['checkout_url']?.toString().trim();
+      if (reuseUrl != null &&
+          reuseUrl.isNotEmpty &&
+          isSafePaymongoCheckoutUrl(reuseUrl)) {
+        return PaymongoCheckoutResult.fromMap({
+          'success': true,
+          'already_paid': false,
+          'checkout_url': reuseUrl,
+          'session_id': prep['session_id'],
+        });
+      }
+    }
+
     final response = await supabase.client.functions.invoke(
       'create-paymongo-checkout',
       body: {'order_id': orderId, 'payment_method': parsed},
     );
     final map = supabaseRpcMap(response.data);
     if (map == null) {
+      debugPrint(
+        'create-paymongo-checkout empty body status=${response.status}',
+      );
       return const PaymongoCheckoutResult(
         success: false,
         error: 'Unable to start payment right now. Please try again.',
       );
     }
     return PaymongoCheckoutResult.fromMap(map);
+  } on PostgrestException catch (e) {
+    debugPrint(
+      'prepare_paymongo_checkout PostgrestException '
+      'code=${e.code} message=${e.message}',
+    );
+    final message = e.message.trim();
+    return PaymongoCheckoutResult(
+      success: false,
+      error: message.isNotEmpty
+          ? message
+          : 'Unable to start payment right now. Please try again.',
+    );
   } on FunctionException catch (e) {
+    debugPrint(
+      'create-paymongo-checkout FunctionException '
+      'status=${e.status} details=${e.details}',
+    );
     return PaymongoCheckoutResult.fromMap(_functionExceptionMap(e));
-  } catch (_) {
+  } catch (e, st) {
+    debugPrint('createPaymongoCheckout error: $e\n$st');
     return const PaymongoCheckoutResult(
       success: false,
       error: 'Unable to start payment right now. Please try again.',
@@ -155,6 +257,11 @@ Future<PaymongoCheckoutResult> createPaymongoCheckout(
 }
 
 Map<String, dynamic>? _functionExceptionMap(FunctionException error) {
+  final payload = parseEdgeFunctionError(error.details);
+  final message = payload.message?.trim();
+  if (message != null && message.isNotEmpty) {
+    return {'success': false, 'error': message};
+  }
   final details = error.details;
   if (details is Map) return supabaseRpcMap(details);
   if (details is String && details.trim().isNotEmpty) {

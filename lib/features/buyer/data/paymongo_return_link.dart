@@ -8,16 +8,19 @@ class PaymongoReturnLink {
     required this.orderId,
     required this.cancelled,
     this.expired = false,
+    this.failed = false,
   });
 
   final String orderId;
   final bool cancelled;
   final bool expired;
+  final bool failed;
 
   String get appLocation => RouteNames.paymentReturnFor(
     orderId,
     cancelled: cancelled,
     expired: expired,
+    failed: failed,
   );
 
   static PaymongoReturnLink? tryParse(Uri? uri) {
@@ -30,6 +33,7 @@ class PaymongoReturnLink {
       orderId: orderId,
       cancelled: status == 'cancel' || status == 'cancelled',
       expired: status == 'expired',
+      failed: status == 'failed' || status == 'fail',
     );
   }
 

@@ -23,7 +23,12 @@ void main() {
   group('seller order buckets', () {
     test('counts match the same filters used by each tab list', () {
       final orders = [
-        _order(id: 'pending', status: 'pending'),
+        _order(id: 'pending-fixed', status: 'pending'),
+        _order(
+          id: 'pending-auction',
+          status: 'pending',
+          auctionId: 'auction-1',
+        ),
         _order(id: 'to-ship-1', status: 'paid'),
         _order(
           id: 'to-ship-2',
@@ -44,6 +49,13 @@ void main() {
       ];
 
       expect(sellerOrderCount(orders, SellerOrderBucket.pendingPayment), 1);
+      expect(
+        sellerOrdersInBucket(
+          orders,
+          SellerOrderBucket.pendingPayment,
+        ).map((o) => o.id),
+        ['pending-auction'],
+      );
       expect(sellerOrderCount(orders, SellerOrderBucket.toShip), 2);
       expect(sellerOrderCount(orders, SellerOrderBucket.shipped), 1);
       expect(sellerOrderCount(orders, SellerOrderBucket.completed), 5);
@@ -106,9 +118,16 @@ void main() {
       expect(order.isShippedTab, isFalse);
     });
 
+    test('fixed-price unpaid checkout is hidden from seller buckets', () {
+      final order = _order(id: 'checkout', status: 'pending');
+      expect(order.isPaymentPending, isTrue);
+      expect(order.isAuctionObligation, isFalse);
+      expect(sellerOrderBucketFor(order), isNull);
+    });
+
     test('each visible order belongs to exactly one bucket', () {
       final orders = [
-        _order(id: 'pending', status: 'pending'),
+        _order(id: 'pending', status: 'pending', auctionId: 'auction-2'),
         _order(id: 'paid', status: 'paid'),
         _order(
           id: 'out',

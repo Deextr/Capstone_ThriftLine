@@ -61,6 +61,20 @@ class OrderConfirmationScreen extends StatelessWidget {
       );
     }
 
+    if (order.isAbandonedCheckout ||
+        (!order.isPaidCheckout && !order.isPaymentPending)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.go(RouteNames.buyerHome);
+        }
+      });
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(

@@ -4,6 +4,35 @@ import { basicAuthHeader, isPaymongoCheckoutUrl } from "../_shared/paymongo.ts";
 
 const PAYMONGO_CHECKOUT_URL = "https://api.paymongo.com/v2/checkout_sessions";
 
+function readString(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(Math.trunc(value));
+  }
+  return "";
+}
+
+function readUuid(value: unknown): string {
+  const raw = readString(value);
+  return isUuid(raw) ? raw : "";
+}
+
+function readInt(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value.trim());
+    if (Number.isFinite(parsed)) return Math.trunc(parsed);
+  }
+  return NaN;
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    .test(value);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -45,7 +74,7 @@ Deno.serve(async (req) => {
   } catch {
     return json(400, { success: false, error: "Order not found." });
   }
-  if (!orderId) {
+  if (!orderId || !isUuid(orderId)) {
     return json(400, { success: false, error: "Order not found." });
   }
   if (channel !== "card" && channel !== "gcash") {
@@ -63,13 +92,33 @@ Deno.serve(async (req) => {
   }
   const buyerId = userData.user.id;
 
-  const prepared = await supabase.rpc("prepare_paymongo_checkout", {
+  const service = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  let prepared = await supabase.rpc("prepare_paymongo_checkout", {
     p_order_id: orderId,
     p_channel: channel,
   });
+  const firstPrep = (prepared.data ?? {}) as Record<string, unknown>;
+  const firstPrepareOk = !prepared.error && firstPrep.success === true;
+  if (!firstPrepareOk) {
+    prepared = await service.rpc("prepare_paymongo_checkout", {
+      p_order_id: orderId,
+      p_channel: channel,
+      p_buyer_id: buyerId,
+    });
+  }
   if (prepared.error) {
     console.error("prepare_paymongo_checkout", prepared.error.message);
-    return json(400, { success: false, error: "Order not found." });
+    const detail = prepared.error.message?.trim();
+    return json(400, {
+      success: false,
+      error:
+        detail && detail.length > 0
+          ? detail
+          : "Unable to start payment right now. Please try again.",
+    });
   }
 
   const prep = (prepared.data ?? {}) as Record<string, unknown>;
@@ -98,11 +147,19 @@ Deno.serve(async (req) => {
     });
   }
 
-  const amountCentavos = Number(prep.amount_centavos);
-  const paymentId = String(prep.payment_id ?? "");
+  const amountCentavos = readInt(prep.amount_centavos);
+  const paymentId = readUuid(prep.payment_id);
   const orderNumber = String(prep.order_number ?? "ThriftLine order");
-  const orderCount = Number(prep.order_count ?? 1);
+  const orderCount = readInt(prep.order_count) || 1;
   if (!Number.isInteger(amountCentavos) || amountCentavos < 1 || !paymentId) {
+    console.error(
+      "prepare payload invalid",
+      JSON.stringify({
+        amount_centavos: prep.amount_centavos,
+        payment_id: prep.payment_id,
+        order_count: prep.order_count,
+      }),
+    );
     return json(400, {
       success: false,
       error: "Unable to start payment right now. Please try again.",
@@ -126,6 +183,8 @@ Deno.serve(async (req) => {
     }
   }
 
+  // PayMongo v2 checkout_sessions only support success_url and cancel_url.
+  // cancel_url is the hosted "return to merchant" link (no separate failed_url).
   const successUrl = Deno.env.get("PAYMONGO_SUCCESS_URL") ??
     `${supabaseUrl}/functions/v1/paymongo-return?status=success`;
   const cancelUrl = Deno.env.get("PAYMONGO_CANCEL_URL") ??
@@ -195,7 +254,11 @@ Deno.serve(async (req) => {
   }
 
   if (!paymongoRes.ok) {
-    console.error("paymongo create session failed", paymongoRes.status);
+    console.error(
+      "paymongo create session failed",
+      paymongoRes.status,
+      paymongoText.slice(0, 500),
+    );
     return json(502, {
       success: false,
       error: "Unable to start payment right now. Please try again.",
@@ -214,9 +277,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  const service = createClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
   const attached = await service.rpc("attach_paymongo_checkout", {
     p_payment_id: paymentId,
     p_session_id: sessionId,
@@ -225,9 +285,13 @@ Deno.serve(async (req) => {
   });
   if (attached.error) {
     console.error("attach_paymongo_checkout", attached.error.message);
+    const attachDetail = attached.error.message?.trim();
     return json(400, {
       success: false,
-      error: "Unable to start payment right now. Please try again.",
+      error:
+        attachDetail && attachDetail.length > 0
+          ? attachDetail
+          : "Unable to start payment right now. Please try again.",
     });
   }
   const attachMap = (attached.data ?? {}) as Record<string, unknown>;

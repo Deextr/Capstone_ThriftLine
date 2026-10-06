@@ -41,16 +41,39 @@ abstract final class RouteNames {
 
   static String orderConfirmFor(String orderId) => '/order-confirm/$orderId';
 
-  static String paymentForOrder(String orderId, {bool autostart = false}) =>
-      '/payment-proof/$orderId${autostart ? '?autostart=1' : ''}';
+  static String paymentForOrder(
+    String orderId, {
+    bool autostart = false,
+    String? checkoutSource,
+    String? productId,
+  }) {
+    final params = <String, String>{};
+    if (autostart) params['autostart'] = '1';
+    final source = checkoutSource?.trim();
+    if (source != null && source.isNotEmpty) {
+      params['source'] = source;
+    }
+    final product = productId?.trim();
+    if (product != null && product.isNotEmpty) {
+      params['product'] = product;
+    }
+    if (params.isEmpty) return '/payment-proof/$orderId';
+    return Uri(
+      path: '/payment-proof/$orderId',
+      queryParameters: params,
+    ).toString();
+  }
 
   static String paymentReturnFor(
     String orderId, {
     bool cancelled = false,
     bool expired = false,
+    bool failed = false,
   }) {
     final status = expired
         ? 'expired'
+        : failed
+        ? 'failed'
         : cancelled
         ? 'cancel'
         : 'success';
@@ -95,20 +118,26 @@ abstract final class RouteNames {
   static const String homeBidding = '/discover/bidding';
   static const String homeVerifiedSellers = '/discover/verified-sellers';
 
-  /// Opens checkout for one Buy Now product, or for the cart lines selected.
+  /// Opens checkout for Buy Now (`buyNow: true`) or selected cart lines.
   static String checkoutFor({
     String? productId,
     List<String> productIds = const [],
+    bool buyNow = false,
   }) {
     final single = productId?.trim();
-    if (single != null && single.isNotEmpty) {
-      return '$checkout?product=$single';
+    if (buyNow && single != null && single.isNotEmpty) {
+      return Uri(
+        path: checkout,
+        queryParameters: {'product': single, 'source': 'buy_now'},
+      ).toString();
     }
     final ids = productIds
         .map((id) => id.trim())
         .where((id) => id.isNotEmpty)
         .toList();
-    if (ids.length == 1) return '$checkout?product=${ids.first}';
+    if (ids.length == 1) {
+      return '$checkout?products=${ids.first}';
+    }
     if (ids.length > 1) return '$checkout?products=${ids.join(',')}';
     return checkout;
   }

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:thriftline/features/trust_safety/data/delivery_report_mapping.dart';
 import 'package:thriftline/features/trust_safety/data/report_order_eligibility.dart';
@@ -153,7 +154,11 @@ void main() {
       expect(reportStatusLabel('resolved'), 'Resolved');
       expect(reportStatusLabel('dismissed'), 'Dismissed');
       expect(reportStatusFromDb('Dismissed'), 'dismissed');
-      expect(reportStatusDescription('dismissed'), contains('dismissed'));
+      expect(reportStatusDescription('dismissed'), contains('enough evidence'));
+      expect(reportStatusIcon('under_review'), Icons.schedule_rounded);
+      expect(reportReferenceLabel('abcd1234-5678-90ab-cdef'), '#ABCD12');
+      expect(reportStatusIsClosed('under_review'), isFalse);
+      expect(reportStatusIsClosed('resolved'), isTrue);
     });
 
     test('keeps the newest linked report per order', () {

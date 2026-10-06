@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../models/community_report_model.dart';
+import '../../../models/order_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../buyer/data/order_query.dart';
 
@@ -30,11 +31,13 @@ class MyReportsController extends ChangeNotifier {
 
   List<CommunityReportModel> _reports = [];
   CommunityReportModel? _report;
+  OrderModel? _linkedOrder;
   bool _isLoading = true;
   String? _errorMessage;
 
   List<CommunityReportModel> get reports => _reports;
   CommunityReportModel? get report => _report;
+  OrderModel? get linkedOrder => _linkedOrder;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -108,14 +111,17 @@ class MyReportsController extends ChangeNotifier {
 
       if (reportId != null) {
         _report = mapped.isEmpty ? null : mapped.first;
+        _linkedOrder = null;
         if (_report == null) {
           _errorMessage = 'Report not found.';
         } else {
           _report = await _withSignedUrls(_report!);
+          _linkedOrder = await _loadLinkedOrder(_report!);
         }
         _reports = mapped;
       } else {
         _reports = mapped;
+        _linkedOrder = null;
       }
     } catch (e) {
       debugPrint('MyReportsController.load error: $e');
@@ -127,6 +133,20 @@ class MyReportsController extends ChangeNotifier {
         _isLoading = false;
         notifyListeners();
       }
+    }
+  }
+
+  Future<OrderModel?> _loadLinkedOrder(CommunityReportModel report) async {
+    final orderId = report.orderId;
+    final buyerId = _auth.user?.id;
+    if (orderId == null || orderId.isEmpty || buyerId == null) {
+      return null;
+    }
+    try {
+      return await fetchOrderById(_supabase, orderId, buyerId: buyerId);
+    } catch (e) {
+      debugPrint('MyReportsController linked order error: $e');
+      return null;
     }
   }
 

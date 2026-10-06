@@ -65,6 +65,16 @@
                     android:host="zakorrcmmswwzfihmcji.supabase.co"
                     android:pathPrefix="/storage/v1/object/public/app-links/"/>
             </intent-filter>
+            <!-- PayMongo cancel_url / success_url HTTPS bounce → app -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="zakorrcmmswwzfihmcji.supabase.co"
+                    android:pathPrefix="/functions/v1/paymongo-return"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

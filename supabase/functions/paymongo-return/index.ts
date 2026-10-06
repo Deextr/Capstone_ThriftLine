@@ -7,9 +7,12 @@ function readOrderId(url: URL): string {
   return UUID.test(raw) ? raw : "";
 }
 
-function readStatus(url: URL): "success" | "cancel" {
+function readStatus(url: URL): "success" | "cancel" | "failed" | "expired" {
   const raw = (url.searchParams.get("status") ?? "").trim().toLowerCase();
-  return raw === "cancel" || raw === "cancelled" ? "cancel" : "success";
+  if (raw === "cancel" || raw === "cancelled") return "cancel";
+  if (raw === "failed" || raw === "fail") return "failed";
+  if (raw === "expired") return "expired";
+  return "success";
 }
 
 Deno.serve((req) => {
@@ -21,7 +24,9 @@ Deno.serve((req) => {
   const intentUrl =
     `intent://paymongo-return?${query}#Intent;scheme=thriftline;package=${APP_PACKAGE};end`;
   const message = status === "cancel"
-    ? "Payment was not completed. Returning to ThriftLine…"
+    ? "Returning to ThriftLine…"
+    : status === "failed" || status === "expired"
+    ? "Returning to ThriftLine to confirm your payment…"
     : "Opening ThriftLine to confirm your payment…";
 
   // Shared *.supabase.co functions rewrite GET text/html → text/plain and add

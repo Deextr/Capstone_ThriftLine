@@ -77,6 +77,7 @@ class OrderModel {
     this.itemReturn,
     this.paymentDueAt,
     this.checkoutGroupId,
+    this.checkoutSource,
   });
 
   final String id;
@@ -116,6 +117,9 @@ class OrderModel {
   final ReturnShipment? itemReturn;
   final DateTime? paymentDueAt;
   final String? checkoutGroupId;
+  final String? checkoutSource;
+
+  bool get isBuyNowCheckout => checkoutSource == 'buy_now';
 
   bool get isAuctionObligation =>
       (auctionId != null && auctionId!.isNotEmpty) || source == 'auction';
@@ -134,12 +138,33 @@ class OrderModel {
   bool get isPaymentUnsuccessful =>
       paymentStatus == 'failed' || paymentStatus == 'expired';
 
-  /// Failed unpaid checkout — not a completed purchase or seller sale.
-  bool get isFailedCheckout =>
+  /// Buyer left before PayMongo — cancelled order, not a payment failure.
+  bool get isAbandonedCheckout =>
       !isRefundedSale &&
-      (isPaymentUnsuccessful ||
-          (status == OrderStatus.cancelled &&
-              (auctionId == null || auctionId!.isEmpty)));
+      !isAuctionObligation &&
+      status == OrderStatus.cancelled &&
+      !isPaymentUnsuccessful;
+
+  /// PayMongo/backend confirmed failure — show Payment Unsuccessful UI.
+  bool get isPaymongoPaymentFailure => isPaymentUnsuccessful;
+
+  /// Failed unpaid checkout — not a completed purchase or seller sale.
+  bool get isFailedCheckout => !isRefundedSale && isPaymongoPaymentFailure;
+
+  /// Authoritative completed PayMongo purchase — use for success UI/navigation only.
+  bool get isPaidCheckout =>
+      !isRefundedSale &&
+      !isAbandonedCheckout &&
+      !isPaymentPending &&
+      !isFailedCheckout &&
+      (paymentStatus == 'paid' ||
+          status == OrderStatus.paymentConfirmed ||
+          status == OrderStatus.preparing ||
+          status == OrderStatus.shipped ||
+          status == OrderStatus.outForDelivery ||
+          status == OrderStatus.delivered ||
+          status == OrderStatus.completed ||
+          status == OrderStatus.disputed);
 
   bool get isExpiredCheckout => paymentStatus == 'expired';
 
@@ -154,7 +179,8 @@ class OrderModel {
   /// Auction wins require payment. Abandoned fixed-price checkouts do not.
   bool get showsAsAwaitingPayment => needsBuyerPayment && isAuctionObligation;
 
-  bool get showsInPurchaseHistory => !isPaymentPending && !isFailedCheckout;
+  bool get showsInPurchaseHistory =>
+      !isPaymentPending && !isFailedCheckout && !isAbandonedCheckout;
 
   bool get isToShip {
     if (isFailedCheckout || isPaymentPending) return false;
@@ -194,7 +220,8 @@ class OrderModel {
       !isDisputed &&
       (shipment == null || shipment!.canEditRider);
 
-  bool get isSellerVisible => !isPaymentPending && !isFailedCheckout;
+  bool get isSellerVisible =>
+      !isPaymentPending && !isFailedCheckout && !isAbandonedCheckout;
 
   /// Paid orders still in fulfillment. Unpaid checkouts stay on To Pay;
   /// completed purchases stay in Purchase History.
@@ -313,6 +340,7 @@ class OrderModel {
           ? DateTime.tryParse(row['payment_due_at'] as String)
           : null,
       checkoutGroupId: row['checkout_group_id'] as String?,
+      checkoutSource: row['checkout_source'] as String?,
     );
   }
 
