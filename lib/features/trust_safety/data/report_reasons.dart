@@ -135,12 +135,43 @@ Color reportStatusColor(String status) {
 String reportStatusDescription(String status) {
   final normalized = reportStatusFromDb(status);
   return switch (normalized) {
-    'under_review' => 'Your report is currently being reviewed.',
-    'action_taken' => 'The review is complete and action was taken.',
-    'resolved' => 'The review has been completed.',
-    'dismissed' => 'The report was reviewed and dismissed.',
-    _ => 'Open report details for the latest update.',
+    'under_review' =>
+      "We're reviewing your report and the evidence you submitted. "
+          "You'll be notified when there is an update.",
+    'action_taken' =>
+      "We've completed our review and taken the appropriate action.",
+    'resolved' =>
+      "We've completed our review and taken the appropriate action.",
+    'dismissed' =>
+      "We reviewed your report, but there wasn't enough evidence to "
+          'support the claim.',
+    _ => 'Open this page anytime for the latest update on your report.',
   };
+}
+
+IconData reportStatusIcon(String status) {
+  final normalized = reportStatusFromDb(status);
+  return switch (normalized) {
+    'under_review' => Icons.schedule_rounded,
+    'action_taken' => Icons.gavel_rounded,
+    'resolved' => Icons.check_circle_outline_rounded,
+    'dismissed' => Icons.info_outline_rounded,
+    _ => Icons.flag_outlined,
+  };
+}
+
+/// Short, buyer-facing reference derived from the report UUID (not a DB column).
+String reportReferenceLabel(String reportId) {
+  final compact = reportId.replaceAll('-', '').trim();
+  if (compact.length < 6) return 'Report';
+  return '#${compact.substring(0, 6).toUpperCase()}';
+}
+
+bool reportStatusIsClosed(String status) {
+  final normalized = reportStatusFromDb(status);
+  return normalized == 'resolved' ||
+      normalized == 'dismissed' ||
+      normalized == 'action_taken';
 }
 
 String? reportDetailsError(String details) {

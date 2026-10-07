@@ -245,7 +245,7 @@ void main() {
       },
     );
 
-    test('failed checkout is not a purchase and not a seller sale', () {
+    test('abandoned checkout is not payment failure or seller sale', () {
       final order = OrderModel.fromSupabase({
         'order_id': 'order-voided',
         'order_number': 'TL-3',
@@ -259,12 +259,37 @@ void main() {
         'total_amount': 1100,
         'created_at': '2026-09-12T02:00:00Z',
       });
-      expect(order.isFailedCheckout, isTrue);
+      expect(order.isAbandonedCheckout, isTrue);
+      expect(order.isPaidCheckout, isFalse);
+      expect(order.isFailedCheckout, isFalse);
+      expect(order.isPaymongoPaymentFailure, isFalse);
       expect(order.isPaymentPending, isFalse);
       expect(order.needsBuyerPayment, isFalse);
       expect(order.showsInPurchaseHistory, isFalse);
-      expect(order.isSellerVisible, isFalse);
       expect(order.isToShip, isFalse);
+    });
+
+    test('PayMongo failed checkout is a payment failure not a sale', () {
+      final order = OrderModel.fromSupabase({
+        'order_id': 'order-failed-pay',
+        'order_number': 'TL-5',
+        'buyer_id': 'buyer-1',
+        'seller_id': 'seller-1',
+        'order_status': 'cancelled',
+        'order_type': 'fixed_price',
+        'payments': [
+          {'payment_status': 'failed'},
+        ],
+        'subtotal': 1000,
+        'shipping_fee': 80,
+        'platform_fee': 20,
+        'total_amount': 1100,
+        'created_at': '2026-09-12T02:00:00Z',
+      });
+      expect(order.isFailedCheckout, isTrue);
+      expect(order.isPaymongoPaymentFailure, isTrue);
+      expect(order.isAbandonedCheckout, isFalse);
+      expect(order.isSellerVisible, isFalse);
     });
 
     test('paid orders map to Paid / To ship and hide Pay Now', () {
@@ -283,6 +308,8 @@ void main() {
       expect(order.isPaymentPending, isFalse);
       expect(order.needsBuyerPayment, isFalse);
       expect(order.isFailedCheckout, isFalse);
+      expect(order.isPaidCheckout, isTrue);
+      expect(order.isAbandonedCheckout, isFalse);
       expect(order.isToShip, isTrue);
       expect(order.showsInPurchaseHistory, isTrue);
       expect(order.isSellerVisible, isTrue);

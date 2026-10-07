@@ -257,6 +257,16 @@ String emailLoginUiMessage({
   final resolvedError = parsed.message ?? serverError;
   final lockSeconds =
       retryAfterSeconds ?? retryAfterSecondsFromErrorBody(errorBody);
+  final attemptsRemaining = attemptsRemainingFromErrorBody(errorBody);
+
+  if (attemptsRemaining != null ||
+      normalizedCode == 'invalid_credentials' ||
+      normalizedCode == '401') {
+    if (attemptsRemaining != null) {
+      return adminLoginInvalidCredentialsMessage(attemptsRemaining);
+    }
+    return emailLoginIncorrectCredentialsMessage;
+  }
 
   switch (normalizedCode) {
     case 'admin_login_locked':
@@ -286,6 +296,9 @@ String emailLoginUiMessage({
           : emailLoginRateLimitMessage;
     case 'unavailable':
     case '503':
+      if (httpStatus == 401 || httpStatus == 403) {
+        return emailLoginIncorrectCredentialsMessage;
+      }
       return 'Sign-in is temporarily unavailable. Please try again.';
     case 'invalid_request':
     case '400':

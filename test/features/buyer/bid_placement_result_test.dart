@@ -27,6 +27,23 @@ void main() {
       });
       expect(result.code, 'bid_risk_rejected');
     });
+
+    test('maps low bid error from rpc', () {
+      final result = BidPlacementResult.fromRpc({
+        'success': false,
+        'error': 'Bid must be at least 1440.00',
+      });
+      expect(result.error, 'Bid must be at least 1440.00');
+    });
+  });
+
+  group('BidPlacementResult.fromFailure', () {
+    test('network errors get connection message', () {
+      final result = BidPlacementResult.fromFailure(
+        Exception('SocketException: failed host lookup'),
+      );
+      expect(result.error, contains('connection'));
+    });
   });
 
   group('supabaseRpcCode', () {

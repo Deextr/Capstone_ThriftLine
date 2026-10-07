@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/routes/paymongo_return_coordinator.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/buyer_orders_controller.dart';
 import '../../data/paymongo_checkout.dart';
@@ -66,7 +67,13 @@ Future<void> startPaymongoPayment({
       Uri.parse(checkoutUrl),
       mode: LaunchMode.externalApplication,
     );
-    if (!launched && context.mounted) {
+    if (!context.mounted) return;
+    if (launched) {
+      context.read<PaymongoReturnCoordinator>().markCheckoutOpened(orderId);
+      controller.markPaymongoBrowserOpened();
+    } else {
+      context.read<PaymongoReturnCoordinator>().clearCheckoutOpened();
+      controller.clearPaymongoAwaiting();
       showThriftSnackBar(
         context,
         'Unable to open PayMongo. Please try again.',

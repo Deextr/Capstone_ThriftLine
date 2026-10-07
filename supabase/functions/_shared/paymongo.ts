@@ -287,6 +287,14 @@ function intentAmountOf(attrs: Record<string, unknown> | null): number | null {
   return readAmount(intentAttrs?.amount);
 }
 
+/** PayMongo resets the intent to awaiting_payment_method after a failed attempt. */
+function intentHasRecordedFailure(attrs: Record<string, unknown> | null): boolean {
+  const intent = unwrapResource(attrs?.payment_intent);
+  const intentAttrs = resourceAttrs(intent);
+  const err = intentAttrs?.last_payment_error;
+  return err != null && typeof err === "object";
+}
+
 function paymentRecordStatus(raw: unknown): string {
   const resource = unwrapResource(raw);
   const attrs = resourceAttrs(resource);
@@ -368,20 +376,36 @@ export function checkoutSessionOutcome(
     return { ...base, outcome: "paid" };
   }
 
-  const inFlight = IN_FLIGHT_STATUSES.has(intentStatus) ||
-    payments.some((item) => IN_FLIGHT_STATUSES.has(paymentRecordStatus(item)));
+  const sessionExpired = sessionStatus === "expired";
+  const hasFailed = FAILED_STATUSES.has(intentStatus) ||
+    payments.some((item) => FAILED_STATUSES.has(paymentRecordStatus(item))) ||
+    intentHasRecordedFailure(attrs);
+  const hasExpiredPayment = EXPIRED_STATUSES.has(intentStatus) ||
+    payments.some((item) => EXPIRED_STATUSES.has(paymentRecordStatus(item)));
+
+  const inFlight = !hasFailed && !hasExpiredPayment &&
+    (IN_FLIGHT_STATUSES.has(intentStatus) ||
+      payments.some((item) => IN_FLIGHT_STATUSES.has(paymentRecordStatus(item))));
   if (inFlight) {
     return { ...base, outcome: "pending" };
   }
 
-  const sessionExpired = sessionStatus === "expired";
-  const hasFailed = FAILED_STATUSES.has(intentStatus) ||
-    payments.some((item) => FAILED_STATUSES.has(paymentRecordStatus(item)));
-  const hasExpiredPayment = EXPIRED_STATUSES.has(intentStatus) ||
-    payments.some((item) => EXPIRED_STATUSES.has(paymentRecordStatus(item)));
-
-  // An active session can still be retried after a failed attempt.
+  // Active sessions stay retryable in PayMongo, but a terminal failed/expired
+  // attempt must still be reported for merchant reconciliation.
   if (!sessionExpired && sessionStatus !== "inactive") {
+    if (hasFailed) {
+      const failedPayment = payments.find((item) =>
+        FAILED_STATUSES.has(paymentRecordStatus(item))
+      );
+      return {
+        ...base,
+        outcome: "failed",
+        paymentId: paymentId ?? paymentRecordId(failedPayment ?? null),
+      };
+    }
+    if (hasExpiredPayment || sessionStatus === "expired") {
+      return { ...base, outcome: "expired" };
+    }
     return { ...base, outcome: "pending" };
   }
 
@@ -397,6 +421,66 @@ export function checkoutSessionOutcome(
 
   // `inactive` with no payments yet is a race after authorization, not expiry.
   return { ...base, outcome: "pending" };
+}
+
+/**
+ * After the buyer returns from hosted PayMongo checkout, a failed attempt may
+ * still leave the session `active` (retryable in PayMongo). ThriftLine must
+ * still release inventory once the payment record is terminal failed.
+ */
+export function reconcileHostedCheckoutOutcome(
+  parsed: CheckoutSessionOutcome,
+  sessionPayload: unknown,
+): CheckoutSessionOutcome {
+  if (
+    parsed.outcome === "paid" ||
+    parsed.outcome === "expired" ||
+    parsed.outcome === "failed"
+  ) {
+    return parsed;
+  }
+
+  const root = asRecord(sessionPayload);
+  const data = asRecord(root?.data) ?? root;
+  const attrs = asRecord(data?.attributes);
+  const payments = collectPaymentRecords(attrs);
+  const intentStatus = intentStatusOf(attrs);
+  const sessionStatus = (readString(attrs?.status) ?? parsed.sessionStatus)
+    .toLowerCase();
+
+  const hasPaid = PAID_STATUSES.has(intentStatus) ||
+    payments.some((item) => PAID_STATUSES.has(paymentRecordStatus(item)));
+  if (hasPaid) {
+    return { ...parsed, outcome: "paid" };
+  }
+
+  const inFlight = IN_FLIGHT_STATUSES.has(intentStatus) ||
+    payments.some((item) => IN_FLIGHT_STATUSES.has(paymentRecordStatus(item)));
+  if (inFlight) {
+    return parsed;
+  }
+
+  const hasFailed = FAILED_STATUSES.has(intentStatus) ||
+    payments.some((item) => FAILED_STATUSES.has(paymentRecordStatus(item))) ||
+    intentHasRecordedFailure(attrs);
+  if (hasFailed) {
+    const failedPayment = payments.find((item) =>
+      FAILED_STATUSES.has(paymentRecordStatus(item))
+    );
+    return {
+      ...parsed,
+      outcome: "failed",
+      paymentId: parsed.paymentId ?? paymentRecordId(failedPayment ?? null),
+    };
+  }
+
+  const hasExpired = EXPIRED_STATUSES.has(intentStatus) ||
+    payments.some((item) => EXPIRED_STATUSES.has(paymentRecordStatus(item)));
+  if (hasExpired || sessionStatus === "expired") {
+    return { ...parsed, outcome: "expired" };
+  }
+
+  return parsed;
 }
 
 export function isPaymongoCheckoutUrl(url: string): boolean {

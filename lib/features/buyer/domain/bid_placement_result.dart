@@ -1,3 +1,5 @@
+import '../../../core/utils/supabase_errors.dart';
+
 class BidPlacementResult {
   const BidPlacementResult._({this.error, this.code});
 
@@ -10,6 +12,23 @@ class BidPlacementResult {
 
   static BidPlacementResult failure(String message, {String? code}) {
     return BidPlacementResult._(error: message, code: code);
+  }
+
+  /// Maps RPC JSON failures and transport/database exceptions to user-safe copy.
+  static BidPlacementResult fromFailure(
+    Object error, {
+    dynamic rpcRes,
+    String fallback = 'Failed to place bid. Please try again.',
+  }) {
+    if (rpcRes != null) {
+      return fromRpc(rpcRes, fallback: fallback);
+    }
+    if (isLikelyNetworkError(error)) {
+      return failure(
+        'Unable to place bid. Check your connection and try again.',
+      );
+    }
+    return failure(fallback);
   }
 
   static BidPlacementResult fromRpc(

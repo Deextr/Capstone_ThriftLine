@@ -6,8 +6,27 @@ import '../../features/buyer/data/paymongo_return_link.dart';
 /// Does not mark the order paid.
 class PaymongoReturnCoordinator extends ChangeNotifier {
   PaymongoReturnLink? _pending;
+  String? _checkoutOrderId;
 
   PaymongoReturnLink? get pending => _pending;
+
+  /// Set when the buyer opens PayMongo hosted checkout (survives route rebuilds).
+  String? get checkoutOrderId => _checkoutOrderId;
+
+  void markCheckoutOpened(String orderId) {
+    if (orderId.isEmpty) return;
+    _checkoutOrderId = orderId;
+    notifyListeners();
+  }
+
+  bool isAwaitingCheckout(String orderId) =>
+      _checkoutOrderId != null && _checkoutOrderId == orderId;
+
+  void clearCheckoutOpened() {
+    if (_checkoutOrderId == null) return;
+    _checkoutOrderId = null;
+    notifyListeners();
+  }
 
   void accept(Uri uri) {
     final parsed = PaymongoReturnLink.tryParse(uri);

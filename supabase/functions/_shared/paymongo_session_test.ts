@@ -1,4 +1,7 @@
-import { checkoutSessionOutcome } from "./paymongo.ts";
+import {
+  checkoutSessionOutcome,
+  reconcileHostedCheckoutOutcome,
+} from "./paymongo.ts";
 
 function sessionPayload(opts: {
   status: string;
@@ -92,13 +95,45 @@ Deno.test("inactive with no payments stays pending", () => {
   }
 });
 
-Deno.test("an active session after a failed attempt stays pending", () => {
+Deno.test("an active session after a failed attempt is failed", () => {
   const result = checkoutSessionOutcome(sessionPayload({
     status: "active",
     payments: [failedPayment()],
   }));
-  if (result.outcome !== "pending") {
-    throw new Error(`expected pending, got ${result.outcome}`);
+  if (result.outcome !== "failed") {
+    throw new Error(`expected failed, got ${result.outcome}`);
+  }
+});
+
+Deno.test("intent last_payment_error on active session is failed", () => {
+  const payload = sessionPayload({ status: "active", payments: [] });
+  const data = payload.data as Record<string, unknown>;
+  const attrs = data.attributes as Record<string, unknown>;
+  attrs.payment_intent = {
+    id: "pi_test",
+    type: "payment_intent",
+    attributes: {
+      status: "awaiting_payment_method",
+      amount: 150000,
+      currency: "PHP",
+      last_payment_error: { code: "card_declined" },
+    },
+  };
+  const result = checkoutSessionOutcome(payload);
+  if (result.outcome !== "failed") {
+    throw new Error(`expected failed, got ${result.outcome}`);
+  }
+});
+
+Deno.test("reconcile treats terminal failed payment on active session as failed", () => {
+  const payload = sessionPayload({
+    status: "active",
+    payments: [failedPayment()],
+  });
+  const pending = checkoutSessionOutcome(payload);
+  const result = reconcileHostedCheckoutOutcome(pending, payload);
+  if (result.outcome !== "failed") {
+    throw new Error(`expected failed, got ${result.outcome}`);
   }
 });
 

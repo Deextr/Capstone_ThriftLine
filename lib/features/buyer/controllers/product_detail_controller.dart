@@ -660,9 +660,7 @@ class ProductDetailController extends ChangeNotifier {
       return BidPlacementResult.fromRpc(rpcRes);
     } catch (e) {
       debugPrint('ProductDetailController.placeBid error: $e');
-      return BidPlacementResult.failure(
-        'Failed to place bid. Please try again.',
-      );
+      return BidPlacementResult.fromFailure(e);
     }
   }
 

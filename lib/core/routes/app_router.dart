@@ -523,12 +523,19 @@ GoRouter createMobileAppRouter({
               .map((id) => id.trim())
               .where((id) => id.isNotEmpty)
               .toList();
+          final checkoutSource =
+              state.uri.queryParameters['source']?.trim().toLowerCase();
+          final isBuyNowCheckout = checkoutSource == 'buy_now';
+          final scopedProduct = isBuyNowCheckout
+              ? state.uri.queryParameters['product']
+              : null;
           return ChangeNotifierProvider(
             create: (context) => CheckoutController(
               supabase: context.read<SupabaseService>(),
               auth: context.read<AuthProvider>(),
               cart: context.read<CartProvider>(),
-              buyNowProductId: state.uri.queryParameters['product'],
+              buyNowProductId: scopedProduct,
+              isBuyNowCheckout: isBuyNowCheckout,
               selectedProductIds: selected,
             ),
             child: const CheckoutScreen(),

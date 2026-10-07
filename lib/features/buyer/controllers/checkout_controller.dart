@@ -11,6 +11,7 @@ import '../../../providers/auth_provider.dart';
 import '../../../providers/cart_provider.dart';
 import '../../profile/data/address_service.dart';
 import '../data/order_query.dart';
+import '../data/paymongo_checkout.dart';
 
 class CheckoutController extends ChangeNotifier {
   CheckoutController({
@@ -19,6 +20,7 @@ class CheckoutController extends ChangeNotifier {
     required CartProvider cart,
     AddressService? addresses,
     this.buyNowProductId,
+    this.isBuyNowCheckout = false,
     List<String> selectedProductIds = const [],
   }) : _supabase = supabase,
        _auth = auth,
@@ -37,6 +39,7 @@ class CheckoutController extends ChangeNotifier {
   final CartProvider _cart;
   final AddressService _addresses;
   final String? buyNowProductId;
+  final bool isBuyNowCheckout;
   final List<String> _initialSelectedIds;
 
   List<AddressModel> _addressBook = [];
@@ -219,7 +222,8 @@ class CheckoutController extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      await restoreAbandonedFixedPriceCheckouts(_supabase);
+      // Do not restore abandoned checkouts here — that can void a pending order
+      // the buyer is still reviewing or paying for (see order_query.dart).
       await syncMyUnpaidCheckouts(_supabase);
       await _cart.refresh();
       await _loadAwaitingPayment();
@@ -285,13 +289,24 @@ class CheckoutController extends ChangeNotifier {
     try {
       final rpcRes = await _supabase.client.rpc(
         'abandon_unpaid_checkout',
-        params: {'p_order_id': orderId},
+        params: {'p_order_id': orderId, 'p_restore_cart': true},
       );
       if (!supabaseRpcSuccess(rpcRes)) {
-        return supabaseRpcError(
-          rpcRes,
-          fallback: 'Could not cancel unpaid checkout.',
+        final finalized = await finalizeMyPaymongoCheckout(
+          _supabase,
+          orderId: orderId,
+          clientOutcome: 'cancel',
+          restoreCart: true,
         );
+        if (finalized.isPaid) {
+          return 'This order was already paid.';
+        }
+        if (!finalized.isFailed && !finalized.isExpired) {
+          return supabaseRpcError(
+            rpcRes,
+            fallback: finalized.error ?? 'Could not cancel unpaid checkout.',
+          );
+        }
       }
       await _cart.refresh();
       await _loadAwaitingPayment();
@@ -316,7 +331,7 @@ class CheckoutController extends ChangeNotifier {
       for (final order in ordersToCancel) {
         await _supabase.client.rpc(
           'abandon_unpaid_checkout',
-          params: {'p_order_id': order.id},
+          params: {'p_order_id': order.id, 'p_restore_cart': true},
         );
       }
       await _cart.refresh();
@@ -434,6 +449,17 @@ class CheckoutController extends ChangeNotifier {
           count: 0,
           error: 'Checkout succeeded but no order was returned.',
         );
+      }
+      try {
+        await _supabase.client.rpc(
+          'set_my_order_checkout_source',
+          params: {
+            'p_order_id': orderId,
+            'p_checkout_source': isBuyNowCheckout ? 'buy_now' : 'cart',
+          },
+        );
+      } catch (e) {
+        debugPrint('set_my_order_checkout_source error: $e');
       }
       await _cart.refresh();
       _selectedProductIds.clear();

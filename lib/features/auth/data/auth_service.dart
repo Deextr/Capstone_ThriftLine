@@ -159,17 +159,16 @@ class AuthService {
 
       if (data is Map) {
         final payload = parseEdgeFunctionError(data);
-        if (payload.message != null && payload.message!.isNotEmpty) {
+        if (responseStatus >= 400) {
+          if (loginPortal == LoginPortal.admin) {
+            debugPrint(
+              'AuthService.signInWithEmail admin edge failure: '
+              'status=$responseStatus code=${payload.code}',
+            );
+          }
           return _emailLoginAuthFailure(
             code: payload.code,
             serverError: payload.message,
-            httpStatus: responseStatus,
-            errorBody: data,
-          );
-        }
-        if (responseStatus >= 400) {
-          return _emailLoginAuthFailure(
-            code: payload.code,
             httpStatus: responseStatus,
             errorBody: data,
           );

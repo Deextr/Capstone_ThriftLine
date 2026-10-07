@@ -69,8 +69,15 @@ Future<void> main() async {
   );
 
   runApp(
-    ChangeNotifierProvider<PasswordRecoveryCoordinator>.value(
-      value: passwordRecovery,
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<PasswordRecoveryCoordinator>.value(
+          value: passwordRecovery,
+        ),
+        ChangeNotifierProvider<PaymongoReturnCoordinator>.value(
+          value: paymongoReturn,
+        ),
+      ],
       child: ThriftlineApp(
         prefs: prefs,
         router: router,

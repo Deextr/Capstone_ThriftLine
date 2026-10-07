@@ -320,9 +320,7 @@ class BuyerBidsController extends ChangeNotifier {
       return BidPlacementResult.fromRpc(rpcRes);
     } catch (e) {
       debugPrint('place_bid RPC error: $e');
-      return BidPlacementResult.failure(
-        'Failed to place bid. Please try again.',
-      );
+      return BidPlacementResult.fromFailure(e);
     }
   }
 

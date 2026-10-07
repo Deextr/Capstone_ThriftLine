@@ -20,6 +20,7 @@ import '../../../../widgets/thrift_widgets.dart';
 import '../../../seller/presentation/widgets/end_auction_dialog.dart';
 import '../../controllers/product_detail_controller.dart';
 import '../widgets/bid_phone_verification_prompt.dart';
+import '../widgets/buy_now_quantity_selector.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({super.key, required this.productId});
@@ -35,6 +36,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
   final _bidController = TextEditingController();
   late final PageController _pageController;
   int _imageIndex = 0;
+  String? _buyNowQtyProductId;
+  int _buyNowQuantity = 1;
 
   @override
   void initState() {
@@ -1531,59 +1534,81 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     }
 
     if (listingUsesShoppingCart(product.sellingType) && !isAuction) {
-      return Row(
+      if (_buyNowQtyProductId != product.id) {
+        _buyNowQtyProductId = product.id;
+        _buyNowQuantity = product.maxPurchasableQuantity <= 0
+            ? 1
+            : clampCartQuantity(1, product.maxPurchasableQuantity);
+      }
+      final buyQty = clampCartQuantity(
+        _buyNowQuantity,
+        product.maxPurchasableQuantity,
+      );
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () => _addFixedPriceToCart(context, cart, product),
-              icon: const Icon(
-                Icons.add_shopping_cart_outlined,
-                color: AppColors.textPrimary,
-                size: 20,
-              ),
-              label: Text(
-                'Add to Cart',
-                style: AppTypography.body.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                  fontSize: 16,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                side: const BorderSide(color: AppColors.border, width: 1.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
+          BuyNowQuantitySelector(
+            quantity: buyQty,
+            maxPurchasable: product.maxPurchasableQuantity,
+            onChanged: (qty) => setState(() => _buyNowQuantity = qty),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () => _buyNow(context, cart, product),
-              icon: const Icon(
-                Icons.shopping_bag_outlined,
-                color: Colors.white,
-                size: 20,
-              ),
-              label: Text(
-                'Buy Now',
-                style: AppTypography.body.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  fontSize: 16,
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      _addFixedPriceToCart(context, cart, product),
+                  icon: const Icon(
+                    Icons.add_shopping_cart_outlined,
+                    color: AppColors.textPrimary,
+                    size: 20,
+                  ),
+                  label: Text(
+                    'Add to Cart',
+                    style: AppTypography.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                      fontSize: 16,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    side: const BorderSide(color: AppColors.border, width: 1.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _buyNow(context, cart, product),
+                  icon: const Icon(
+                    Icons.shopping_bag_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  label: Text(
+                    'Buy Now',
+                    style: AppTypography.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ],
       );
@@ -1903,7 +1928,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     CartProvider cart,
     ProductModel product,
   ) async {
-    if (product.maxPurchasableQuantity <= 0) {
+    final max = product.maxPurchasableQuantity;
+    if (max <= 0) {
       showThriftSnackBar(
         context,
         '${product.title} is no longer available.',
@@ -1911,20 +1937,40 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
       );
       return;
     }
-    if (!cart.isInCart(product.id)) {
-      await cart.addToCart(product);
-      if (!context.mounted) return;
-      final error = cart.errorMessage;
-      if (error != null || !cart.isInCart(product.id)) {
-        showThriftSnackBar(
-          context,
-          error ?? 'Could not start checkout for this item.',
-          isError: true,
-        );
-        return;
-      }
+    final quantity = clampCartQuantity(_buyNowQuantity, max);
+    final requested = _buyNowQuantity;
+    if (quantity <= 0 || requested > max) {
+      setState(() => _buyNowQuantity = quantity <= 0 ? 1 : quantity);
+      showThriftSnackBar(
+        context,
+        stockShortageMessage(
+              title: product.title,
+              requested: requested,
+              available: max,
+            ) ??
+            'Available stock has changed. Update the quantity and try again.',
+        isError: true,
+      );
+      return;
     }
-    context.push(RouteNames.checkoutFor(productId: product.id));
+    if (!cart.isInCart(product.id)) {
+      await cart.addToCart(product, quantity: quantity);
+    } else {
+      await cart.updateQuantity(product.id, quantity);
+    }
+    if (!context.mounted) return;
+    final error = cart.errorMessage;
+    if (error != null || !cart.isInCart(product.id)) {
+      showThriftSnackBar(
+        context,
+        error ?? 'Could not start checkout for this item.',
+        isError: true,
+      );
+      return;
+    }
+    context.push(
+      RouteNames.checkoutFor(productId: product.id, buyNow: true),
+    );
   }
 }
 

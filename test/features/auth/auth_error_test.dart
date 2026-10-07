@@ -157,6 +157,14 @@ void main() {
         ),
         adminLoginInvalidCredentialsMessage(2),
       );
+      expect(
+        emailLoginUiMessage(
+          code: 'unavailable',
+          httpStatus: 401,
+          serverError: 'Sign-in is temporarily unavailable. Please try again.',
+        ),
+        emailLoginIncorrectCredentialsMessage,
+      );
     });
   });
 

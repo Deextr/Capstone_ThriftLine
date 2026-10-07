@@ -3,6 +3,7 @@ import { corsHeaders, json } from "../_shared/cors.ts";
 import {
   basicAuthHeader,
   checkoutSessionOutcome,
+  reconcileHostedCheckoutOutcome,
   paymentIntentIdFromCheckout,
   type CheckoutSessionOutcome,
 } from "../_shared/paymongo.ts";
@@ -57,20 +58,45 @@ async function readPaymongoCheckout(
   sessionId: string,
 ): Promise<CheckoutSessionOutcome> {
   let parsed = checkoutSessionOutcome(null);
+  let sessionPayload: unknown = null;
+  let v1: unknown = null;
   const v2 = await paymongoGet(secret, `/v2/checkout_sessions/${sessionId}`);
-  if (v2) parsed = betterOutcome(parsed, checkoutSessionOutcome(v2));
-  if (parsed.outcome !== "paid") {
-    const v1 = await paymongoGet(secret, `/v1/checkout_sessions/${sessionId}`);
-    if (v1) parsed = betterOutcome(parsed, checkoutSessionOutcome(v1));
-    const intentId = paymentIntentIdFromCheckout(v2) ??
-      paymentIntentIdFromCheckout(v1);
-    if (intentId && parsed.outcome !== "paid") {
-      const intent = await paymongoGet(
-        secret,
-        `/v1/payment_intents/${intentId}`,
-      );
-      if (intent) parsed = betterOutcome(parsed, checkoutSessionOutcome(intent));
+  if (v2) {
+    sessionPayload = v2;
+    parsed = betterOutcome(parsed, checkoutSessionOutcome(v2));
+  }
+  const terminal = (o: CheckoutSessionOutcome["outcome"]) =>
+    o === "paid" || o === "failed" || o === "expired";
+
+  async function enrichFromPaymentIntent(
+    checkoutPayload: unknown,
+  ): Promise<void> {
+    const intentId = paymentIntentIdFromCheckout(checkoutPayload);
+    if (!intentId) return;
+    const intent = await paymongoGet(
+      secret,
+      `/v1/payment_intents/${intentId}`,
+    );
+    if (intent) {
+      parsed = betterOutcome(parsed, checkoutSessionOutcome(intent));
     }
+  }
+
+  if (!terminal(parsed.outcome)) {
+    await enrichFromPaymentIntent(v2);
+  }
+  if (!terminal(parsed.outcome)) {
+    v1 = await paymongoGet(secret, `/v1/checkout_sessions/${sessionId}`);
+    if (v1) {
+      sessionPayload = sessionPayload ?? v1;
+      parsed = betterOutcome(parsed, checkoutSessionOutcome(v1));
+    }
+  }
+  if (!terminal(parsed.outcome)) {
+    await enrichFromPaymentIntent(v1 ?? v2);
+  }
+  if (sessionPayload != null) {
+    parsed = reconcileHostedCheckoutOutcome(parsed, sessionPayload);
   }
   if (!parsed.sessionId) parsed = { ...parsed, sessionId };
   return parsed;
@@ -190,9 +216,18 @@ function dbOutcome(
 ): "paid" | "expired" | "failed" | "pending" {
   if (paymentStatus === "paid" || orderStatus === "paid") return "paid";
   if (paymentStatus === "failed") return "failed";
-  if (orderStatus === "cancelled" || paymentStatus === "expired") {
-    return paymentStatus === "expired" ? "expired" : "expired";
-  }
+  if (orderStatus === "cancelled") return "failed";
+  return "pending";
+}
+
+/** DB rows use `failed`; PayMongo may report `expired` before void completes. */
+function effectiveOutcome(
+  db: "paid" | "expired" | "failed" | "pending",
+  parsed: CheckoutSessionOutcome["outcome"],
+): "paid" | "expired" | "failed" | "pending" {
+  if (db === "paid" || parsed === "paid") return "paid";
+  if (parsed === "expired" || parsed === "failed") return parsed;
+  if (db === "failed") return "failed";
   return "pending";
 }
 
@@ -260,6 +295,43 @@ Deno.serve(async (req) => {
     return json(200, { success: true, outcome: "paid" });
   }
 
+  const service = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  if (
+    (recorded === "failed" || recorded === "expired") &&
+    orderStatus === "pending"
+  ) {
+    const sessionIdForVoid = readString(payment?.checkout_session_id);
+    await applyReconcileEvent(service, {
+      outcome: recorded,
+      sessionId: sessionIdForVoid.startsWith("cs_") ? sessionIdForVoid : null,
+      paymentId: null,
+      amountCentavos: null,
+      currency: "PHP",
+      metadataOrderId: orderId,
+      orderId,
+    });
+    const latestOrder = await supabase
+      .from("orders")
+      .select("order_status")
+      .eq("order_id", orderId)
+      .maybeSingle();
+    const latestPayment = await findCheckoutPayment(
+      supabase,
+      orderId,
+      checkoutGroupId,
+    );
+    orderStatus = readString(asRecord(latestOrder.data)?.order_status)
+      .toLowerCase();
+    paymentStatus = readString(latestPayment?.payment_status).toLowerCase();
+    return json(200, {
+      success: true,
+      outcome: dbOutcome(orderStatus, paymentStatus),
+    });
+  }
+
   const sessionId = readString(payment?.checkout_session_id);
   let parsed = checkoutSessionOutcome(null);
   if (sessionId.startsWith("cs_") && paymongoSecret) {
@@ -293,9 +365,6 @@ Deno.serve(async (req) => {
     parsed.outcome === "expired" ||
     parsed.outcome === "failed"
   ) {
-    const service = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
     const applyOpts = {
       outcome: parsed.outcome,
       sessionId: parsed.sessionId ??
@@ -338,7 +407,8 @@ Deno.serve(async (req) => {
   orderStatus = readString(asRecord(latestOrder.data)?.order_status)
     .toLowerCase();
   paymentStatus = readString(latestPayment?.payment_status).toLowerCase();
-  const outcome = dbOutcome(orderStatus, paymentStatus);
+  const db = dbOutcome(orderStatus, paymentStatus);
+  const outcome = effectiveOutcome(db, parsed.outcome);
   if (outcome !== "pending") {
     return json(200, { success: true, outcome });
   }
@@ -350,9 +420,6 @@ Deno.serve(async (req) => {
       outcome: "pending",
       error: "Payment is confirmed at PayMongo and is still being recorded.",
     });
-  }
-  if (parsed.outcome === "expired" || parsed.outcome === "failed") {
-    return json(200, { success: true, outcome: parsed.outcome });
   }
   return json(200, { success: true, outcome: "pending" });
 });

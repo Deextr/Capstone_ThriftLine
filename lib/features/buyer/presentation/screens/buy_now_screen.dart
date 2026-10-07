@@ -14,6 +14,7 @@ import '../../../../models/enums.dart';
 import '../../../../models/product_model.dart';
 import '../../../../providers/cart_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../widgets/buy_now_quantity_selector.dart';
 import '../../data/catalog_product_query.dart';
 import '../../data/checkout_totals.dart';
 
@@ -215,40 +216,10 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Quantity', style: AppTypography.body),
-                      if (product.maxPurchasableQuantity > 0)
-                        Text(
-                          product.maxPurchasableQuantity == 1
-                              ? '1 left'
-                              : '${product.maxPurchasableQuantity} left',
-                          style: AppTypography.caption,
-                        ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: _quantity > 1
-                            ? () => setState(() => _quantity--)
-                            : null,
-                        icon: const Icon(Icons.remove),
-                      ),
-                      Text('$_quantity', style: AppTypography.subheading),
-                      IconButton(
-                        onPressed: _quantity < product.maxPurchasableQuantity
-                            ? () => setState(() => _quantity++)
-                            : null,
-                        icon: const Icon(Icons.add),
-                      ),
-                    ],
-                  ),
-                ],
+              BuyNowQuantitySelector(
+                quantity: _quantity,
+                maxPurchasable: product.maxPurchasableQuantity,
+                onChanged: (qty) => setState(() => _quantity = qty),
               ),
               const Divider(),
               _row('Subtotal', formatCurrency(subtotal)),
