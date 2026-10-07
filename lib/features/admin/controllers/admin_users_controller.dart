@@ -14,7 +14,7 @@ class AdminUsersController extends ChangeNotifier {
   List<AdminUserRow> _rows = const [];
   int _total = 0;
   int _page = 0;
-  static const int pageSize = 25;
+  int _pageSize = 10;
   bool _loading = true;
   String? _error;
   String _search = '';
@@ -24,11 +24,15 @@ class AdminUsersController extends ChangeNotifier {
   List<AdminUserRow> get rows => _rows;
   int get total => _total;
   int get page => _page;
+  int get pageSize => _pageSize;
   bool get isLoading => _loading;
   String? get errorMessage => _error;
   String get search => _search;
   String? get roleFilter => _roleFilter;
   String? get statusFilter => _statusFilter;
+
+  bool get hasActiveFilters =>
+      _search.trim().isNotEmpty || _roleFilter != null || _statusFilter != null;
 
   Future<void> load() async {
     _loading = true;
@@ -37,7 +41,7 @@ class AdminUsersController extends ChangeNotifier {
     try {
       final result = await _service.list(
         page: _page,
-        pageSize: pageSize,
+        pageSize: _pageSize,
         search: _search,
         roleFilter: _roleFilter,
         statusFilter: _statusFilter,
@@ -74,6 +78,21 @@ class AdminUsersController extends ChangeNotifier {
 
   Future<void> setPage(int page) async {
     _page = page;
+    await load();
+  }
+
+  Future<void> setPageSize(int size) async {
+    if (_pageSize == size) return;
+    _pageSize = size;
+    _page = 0;
+    await load();
+  }
+
+  Future<void> resetFilters() async {
+    _search = '';
+    _roleFilter = null;
+    _statusFilter = null;
+    _page = 0;
     await load();
   }
 }

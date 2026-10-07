@@ -61,7 +61,7 @@ String deliveryHoldStatusLabel(String status) => switch (status) {
 String deliveryHoldHint(String status) => switch (status) {
   'held' => 'The buyer paid. This amount is not seller earnings yet.',
   'disputed' =>
-      'A delivery problem is holding this payment. Dismiss the case or choose a payment outcome.',
+    'A delivery problem is holding this payment. Dismiss the case or choose a payment outcome.',
   'released' => 'This amount is available as seller earnings.',
   'refunded' => 'This amount is not seller earnings.',
   _ => '',

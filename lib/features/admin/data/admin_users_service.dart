@@ -38,7 +38,8 @@ class AdminUserRow {
       accountStatus: (json['account_status'] as String?)?.trim() ?? 'active',
       trustScore: (json['trust_score'] as num?)?.toDouble() ?? 0,
       rating: (json['rating'] as num?)?.toDouble() ?? 0,
-      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
+      createdAt:
+          DateTime.tryParse(json['created_at'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
       lastActiveAt: json['last_active_at'] != null
           ? DateTime.tryParse(json['last_active_at'] as String)
@@ -69,10 +70,12 @@ class AdminUsersService {
     final from = page * pageSize;
     final to = from + pageSize - 1;
 
-    var filter = _supabase.client.from('users').select(
-      'user_id, full_name, email, username, role, account_status, '
-      'trust_score, rating, created_at, last_active_at',
-    );
+    var filter = _supabase.client
+        .from('users')
+        .select(
+          'user_id, full_name, email, username, role, account_status, '
+          'trust_score, rating, created_at, last_active_at',
+        );
 
     if (roleFilter != null && roleFilter.isNotEmpty) {
       filter = filter.eq('role', roleFilter);
@@ -94,7 +97,9 @@ class AdminUsersService {
 
     final data = response.data as List? ?? const [];
     final rows = data
-        .map((row) => AdminUserRow.fromJson(Map<String, dynamic>.from(row as Map)))
+        .map(
+          (row) => AdminUserRow.fromJson(Map<String, dynamic>.from(row as Map)),
+        )
         .toList();
     return AdminUsersPage(rows: rows, total: response.count);
   }

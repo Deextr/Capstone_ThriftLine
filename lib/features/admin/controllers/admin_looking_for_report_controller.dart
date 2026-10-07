@@ -1,6 +1,7 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../data/admin_review_rules.dart';
 import '../data/looking_for_moderation.dart';
 
 class AdminLookingForReportController extends ChangeNotifier {
@@ -20,6 +21,9 @@ class AdminLookingForReportController extends ChangeNotifier {
   bool _isLoading = true;
   bool _isSaving = false;
   String? _errorMessage;
+  String? _decision;
+  bool _violationConfirmed = false;
+  final TextEditingController responseController = TextEditingController();
 
   LookingForAdminReport? get report => _report;
   List<LookingForViolationRecord> get violations => _violations;
@@ -27,6 +31,32 @@ class AdminLookingForReportController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
   String? get errorMessage => _errorMessage;
+  String? get decision => _decision;
+  bool get violationConfirmed => _violationConfirmed;
+  String get response => responseController.text;
+
+  bool get canSubmitDecision =>
+      _report != null &&
+      _report!.canDecide &&
+      _decision != null &&
+      adminResponseError(response, decision: _decision) == null &&
+      !_isSaving;
+
+  @override
+  void dispose() {
+    responseController.dispose();
+    super.dispose();
+  }
+
+  void setDecision(String? value) {
+    _decision = value;
+    notifyListeners();
+  }
+
+  void setViolationConfirmed(bool value) {
+    _violationConfirmed = value;
+    notifyListeners();
+  }
 
   Future<void> load() async {
     _isLoading = true;
@@ -50,9 +80,13 @@ class AdminLookingForReportController extends ChangeNotifier {
     }
   }
 
-  Future<String?> decide(String decision) async {
+  Future<String?> submitDecision() async {
     final current = _report;
-    if (current == null || !current.canDecide || _isSaving) {
+    final selected = _decision;
+    if (current == null ||
+        selected == null ||
+        !current.canDecide ||
+        _isSaving) {
       return 'This report has already been reviewed.';
     }
     _isSaving = true;
@@ -60,7 +94,9 @@ class AdminLookingForReportController extends ChangeNotifier {
     try {
       final error = await _service.decide(
         reportId: current.id,
-        decision: decision,
+        decision: selected,
+        adminResponse: response.trim(),
+        violationConfirmed: selected == 'resolved' && _violationConfirmed,
       );
       if (error != null) return error;
       await load();

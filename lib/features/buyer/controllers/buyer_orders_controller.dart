@@ -17,6 +17,7 @@ import '../../../providers/auth_provider.dart';
 import '../../profile/data/address_service.dart';
 import '../../trust_safety/data/report_query.dart';
 import '../../trust_safety/data/review_query.dart';
+import '../data/checkout_payment_group.dart';
 import '../data/order_query.dart';
 import '../data/paymongo_checkout.dart';
 
@@ -96,7 +97,21 @@ class BuyerOrdersController extends ChangeNotifier {
       !_checkoutClosed &&
       (isExpiredPayment ||
           _unsuccessfulOutcome == 'failed' ||
+          checkoutPaymentGroupHasFailure(paymentGroup) ||
           (_order?.isPaymongoPaymentFailure ?? false));
+
+  /// Combined checkout is paid only when every seller order in the group is paid.
+  bool get isPaymentGroupPaid => isCheckoutPaymentGroupPaid(
+    paymentGroup.isNotEmpty
+        ? paymentGroup
+        : (_order == null ? const <OrderModel>[] : [_order!]),
+  );
+
+  bool get paymentGroupNeedsPayment => checkoutPaymentGroupNeedsPayment(
+    paymentGroup.isNotEmpty
+        ? paymentGroup
+        : (_order == null ? const <OrderModel>[] : [_order!]),
+  );
 
   Future<void> load({bool showSpinner = true}) async {
     final myId = _auth.user?.id;
@@ -283,9 +298,8 @@ class BuyerOrdersController extends ChangeNotifier {
     _returnReconcileTimer?.cancel();
     _returnReconcileTimer = null;
 
-    final fromHostedCheckout = _awaitingPaymongoReturn ||
-        hostedCheckoutOpened ||
-        fromReturnRedirect;
+    final fromHostedCheckout =
+        _awaitingPaymongoReturn || hostedCheckoutOpened || fromReturnRedirect;
 
     if (!fromHostedCheckout) {
       return PaymongoAppReturnResult.pending;
@@ -310,9 +324,7 @@ class BuyerOrdersController extends ChangeNotifier {
 
         final started = DateTime.now();
         if (kDebugMode) {
-          debugPrint(
-            '[Payment] reconcile attempt ${attempt + 1} order=$id',
-          );
+          debugPrint('[Payment] reconcile attempt ${attempt + 1} order=$id');
         }
 
         final reconciled = await reconcilePaymongoCheckout(
@@ -331,7 +343,7 @@ class BuyerOrdersController extends ChangeNotifier {
           );
         }
 
-        if (_order?.isPaidCheckout == true || reconciled.isPaid) {
+        if (_isReconcilePaid(reconciled)) {
           _awaitingPaymongoReturn = false;
           _isConfirmingPayment = false;
           _unsuccessfulOutcome = null;
@@ -340,6 +352,7 @@ class BuyerOrdersController extends ChangeNotifier {
         }
 
         if (reconciled.isUnsuccessful ||
+            checkoutPaymentGroupHasFailure(paymentGroup) ||
             (_order?.isPaymongoPaymentFailure ?? false)) {
           _awaitingPaymongoReturn = false;
           return _completePaymongoFailure(
@@ -358,11 +371,18 @@ class BuyerOrdersController extends ChangeNotifier {
       return PaymongoAppReturnResult.pending;
     }
 
-    _scheduleReturnReconcileFollowUp(
-      orderId: id,
-      generation: generation,
-    );
+    // Keep Confirming Payment visible while PayMongo/webhook catch up.
+    _isConfirmingPayment = true;
+    _awaitingPaymongoReturn = true;
+    _notify();
+    _scheduleReturnReconcileFollowUp(orderId: id, generation: generation);
     return PaymongoAppReturnResult.pending;
+  }
+
+  bool _isReconcilePaid(PaymongoReconcileResult reconciled) {
+    return reconciled.isPaid ||
+        isPaymentGroupPaid ||
+        (_order?.isPaidCheckout ?? false);
   }
 
   void _scheduleReturnReconcileFollowUp({
@@ -395,7 +415,7 @@ class BuyerOrdersController extends ChangeNotifier {
         return;
       }
 
-      if (_order?.isPaidCheckout == true || reconciled.isPaid) {
+      if (_isReconcilePaid(reconciled)) {
         timer.cancel();
         _returnReconcileTimer = null;
         _awaitingPaymongoReturn = false;
@@ -406,6 +426,7 @@ class BuyerOrdersController extends ChangeNotifier {
       }
 
       if (reconciled.isUnsuccessful ||
+          checkoutPaymentGroupHasFailure(paymentGroup) ||
           (_order?.isPaymongoPaymentFailure ?? false)) {
         timer.cancel();
         _returnReconcileTimer = null;
@@ -513,10 +534,23 @@ class BuyerOrdersController extends ChangeNotifier {
   Future<void> _reconcileOpenCheckout(String id) async {
     final reconciled = await reconcilePaymongoCheckout(_supabase, orderId: id);
     if (_disposed) return;
-    if (reconciled.isPending && _order?.needsBuyerPayment == true) {
+    await _refreshOrderAfterReconcile(id);
+    if (_disposed) return;
+    if (_isReconcilePaid(reconciled)) {
+      _awaitingPaymongoReturn = false;
+      _isConfirmingPayment = false;
+      _unsuccessfulOutcome = null;
+      _notify();
       return;
     }
-    _order = await fetchOrderById(_supabase, id, buyerId: _auth.user?.id);
+    if (reconciled.isPending && paymentGroupNeedsPayment) {
+      // Hosted checkout may already be paid at PayMongo; keep confirming UI.
+      if (_awaitingPaymongoReturn) {
+        _isConfirmingPayment = true;
+        _notify();
+      }
+      return;
+    }
   }
 
   /// Buyer intentionally leaves payment (not PayMongo failure).

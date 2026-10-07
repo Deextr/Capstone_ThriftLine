@@ -2,11 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
+import 'package:image_picker/image_picker.dart';
+
 import '../../../core/services/supabase_service.dart';
 import '../../../models/community_report_model.dart';
 import '../../../models/order_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../buyer/data/order_query.dart';
+import '../controllers/report_user_controller.dart';
+import '../data/report_evidence_upload.dart';
+import '../data/report_reasons.dart';
 
 class MyReportsController extends ChangeNotifier {
   MyReportsController({
@@ -33,13 +38,26 @@ class MyReportsController extends ChangeNotifier {
   CommunityReportModel? _report;
   OrderModel? _linkedOrder;
   bool _isLoading = true;
+  bool _isResubmitting = false;
   String? _errorMessage;
+  final List<ReportEvidenceDraft> _resubmitEvidence = [];
+  final ImagePicker _picker = ImagePicker();
 
   List<CommunityReportModel> get reports => _reports;
   CommunityReportModel? get report => _report;
   OrderModel? get linkedOrder => _linkedOrder;
   bool get isLoading => _isLoading;
+  bool get isResubmitting => _isResubmitting;
   String? get errorMessage => _errorMessage;
+  List<ReportEvidenceDraft> get resubmitEvidence =>
+      List.unmodifiable(_resubmitEvidence);
+
+  bool get canSubmitResubmit =>
+      _report != null &&
+      reportStatusAllowsResubmit(_report!.status) &&
+      _resubmitEvidence.length >= kReportEvidenceMinCount &&
+      (_report!.evidenceAttemptCount < kReportMaxEvidenceAttempts) &&
+      !_isResubmitting;
 
   Future<void> load({bool showSpinner = true}) async {
     final myId = _auth.user?.id;
@@ -168,6 +186,72 @@ class MyReportsController extends ChangeNotifier {
     } catch (e) {
       debugPrint('MyReportsController order numbers error: $e');
       return {};
+    }
+  }
+
+  Future<String?> addResubmitPhoto(ImageSource source) async {
+    if (_resubmitEvidence.length >= kReportEvidenceMaxCount) {
+      return 'You can attach up to $kReportEvidenceMaxCount photos.';
+    }
+    try {
+      final file = await _picker.pickImage(source: source, imageQuality: 80);
+      if (file == null) return null;
+      if (!isAllowedReportImageName(file.name)) {
+        return 'Please choose a JPG, PNG, or WebP photo.';
+      }
+      final bytes = await file.readAsBytes();
+      if (bytes.length > kReportEvidenceMaxBytes) {
+        return 'Each photo must be 5 MB or smaller.';
+      }
+      _resubmitEvidence.add(
+        ReportEvidenceDraft(
+          bytes: bytes,
+          name: file.name,
+          contentType: reportImageContentType(file.name),
+        ),
+      );
+      notifyListeners();
+      return null;
+    } catch (e) {
+      debugPrint('MyReportsController.addResubmitPhoto error: $e');
+      return 'Could not add that photo.';
+    }
+  }
+
+  void removeResubmitPhoto(int index) {
+    if (index < 0 || index >= _resubmitEvidence.length) return;
+    _resubmitEvidence.removeAt(index);
+    notifyListeners();
+  }
+
+  Future<String?> submitAdditionalEvidence() async {
+    final report = _report;
+    final uid = _auth.user?.id;
+    if (report == null || uid == null) return 'Report not found.';
+    if (!canSubmitResubmit) {
+      return 'You cannot submit additional evidence for this report.';
+    }
+    _isResubmitting = true;
+    notifyListeners();
+    try {
+      final uploadError = await uploadReportEvidence(
+        supabase: _supabase,
+        uid: uid,
+        reportId: report.id,
+        evidence: _resubmitEvidence,
+      );
+      if (uploadError != null) return uploadError;
+      final resubmitError = await resubmitReportEvidence(
+        supabase: _supabase,
+        reportId: report.id,
+      );
+      if (resubmitError != null) return resubmitError;
+      _resubmitEvidence.clear();
+      await load(showSpinner: false);
+      return null;
+    } finally {
+      _isResubmitting = false;
+      notifyListeners();
     }
   }
 

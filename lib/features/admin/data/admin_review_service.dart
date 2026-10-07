@@ -253,6 +253,111 @@ class AdminReviewService {
     );
   }
 
+  Future<AdminDeliveryDispute?> getDisputeForOrderReport({
+    String? disputeId,
+    String? orderId,
+  }) async {
+    if (disputeId != null && disputeId.isNotEmpty) {
+      return getDispute(disputeId);
+    }
+    if (orderId == null || orderId.isEmpty) return null;
+    try {
+      final row = await _supabase.client
+          .from('delivery_disputes')
+          .select()
+          .eq('order_id', orderId)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      if (row == null) return null;
+      final mapped = await _mapDisputes([row], hydrateOrders: true);
+      if (mapped.isEmpty) return null;
+      return mapped.first.copyWith(
+        paymentHold: await _loadPaymentHold(mapped.first.orderId),
+      );
+    } catch (e) {
+      debugPrint('AdminReviewService getDisputeForOrderReport error: $e');
+      return null;
+    }
+  }
+
+  Future<String?> requestOrderReportEvidence({
+    required String reportId,
+    required String party,
+    required String instruction,
+  }) async {
+    try {
+      final rpcRes = await _supabase.client.rpc(
+        'admin_request_order_report_evidence',
+        params: {
+          'p_report_id': reportId,
+          'p_party': party,
+          'p_instruction': instruction.trim(),
+        },
+      );
+      if (!supabaseRpcSuccess(rpcRes)) {
+        return supabaseRpcError(
+          rpcRes,
+          fallback: 'Could not send the evidence request.',
+        );
+      }
+      await AdminAuditService(_supabase).record(
+        category: AdminAuditCategory.reportsDisputes,
+        eventType: 'order_report_evidence_requested',
+        status: 'success',
+        summary: 'Additional evidence requested for order report',
+        targetType: 'report',
+        targetId: reportId,
+        details: {'party': party},
+      );
+      return null;
+    } catch (e) {
+      debugPrint('admin_request_order_report_evidence error: $e');
+      return adminFriendlyError(e, 'Could not send the evidence request.');
+    }
+  }
+
+  Future<String?> completeOrderReportResolution({
+    required String reportId,
+    required String financial,
+    required String adminResponse,
+    bool? returnRequired,
+  }) async {
+    try {
+      final rpcRes = await _supabase.client.rpc(
+        'complete_order_report_resolution',
+        params: {
+          'p_report_id': reportId,
+          'p_financial': financial,
+          'p_admin_response': adminResponse.trim(),
+          'p_return_required': returnRequired,
+        },
+      );
+      if (!supabaseRpcSuccess(rpcRes)) {
+        return supabaseRpcError(
+          rpcRes,
+          fallback: 'Could not close this order report.',
+        );
+      }
+      await AdminAuditService(_supabase).record(
+        category: AdminAuditCategory.reportsDisputes,
+        eventType: 'order_report_closed',
+        status: 'success',
+        summary: 'Order report closed after escrow decision',
+        targetType: 'report',
+        targetId: reportId,
+        details: {
+          'resolution_financial': financial,
+          if (returnRequired != null) 'return_required': returnRequired,
+        },
+      );
+      return null;
+    } catch (e) {
+      debugPrint('complete_order_report_resolution error: $e');
+      return adminFriendlyError(e, 'Could not close this order report.');
+    }
+  }
+
   Future<AdminDeliveryDispute?> getDispute(String disputeId) async {
     final row = await _supabase.client
         .from('delivery_disputes')
@@ -279,6 +384,7 @@ class AdminReviewService {
           'p_report_id': reportId,
           'p_decision': decision,
           'p_admin_response': adminResponse.trim(),
+          'p_violation_confirmed': false,
         },
       );
       if (!supabaseRpcSuccess(rpcRes)) {

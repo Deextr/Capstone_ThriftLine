@@ -61,6 +61,8 @@ class CheckoutScreen extends StatelessWidget {
               Text(
                 reviewCount == 0
                     ? 'Review your order'
+                    : reviewShops.length > 1
+                    ? '${reviewShops.length} orders from ${reviewShops.length} shops · $reviewCount ${reviewCount == 1 ? 'item' : 'items'}'
                     : '$reviewCount ${reviewCount == 1 ? 'item' : 'items'} to pay',
                 style: AppTypography.caption.copyWith(fontSize: 11),
               ),
@@ -81,7 +83,7 @@ class CheckoutScreen extends StatelessWidget {
                   if (reviewShops.length > 1)
                     _MultiSellerNotice(sellerCount: reviewShops.length),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
@@ -94,12 +96,14 @@ class CheckoutScreen extends StatelessWidget {
                   ),
                   Expanded(
                     child: ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
                       children: [
-                        for (final shop in reviewShops)
+                        for (var i = 0; i < reviewShops.length; i++)
                           CartCheckoutShopSection(
-                            shop: shop,
+                            shop: reviewShops[i],
                             mode: CartLineInteractionMode.checkoutReview,
+                            orderIndex: i,
+                            totalOrders: reviewShops.length,
                           ),
                       ],
                     ),
@@ -350,7 +354,7 @@ class _MultiSellerNotice extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Items from $sellerCount shops become separate orders, then you pay once.',
+                'Items from $sellerCount shops become $sellerCount separate orders. Shipping and platform fees are calculated per shop, and you pay once.',
                 style: AppTypography.caption.copyWith(
                   color: AppColors.textPrimary,
                   fontSize: 12,
@@ -371,21 +375,15 @@ class _CheckoutBottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final checkout = context.watch<CheckoutController>();
-    final subtotal = checkout.subtotal;
-    final shipping = checkout.shippingFee;
-    final platform = checkout.platformFee;
     final total = checkout.total;
-    final leftover = checkout.remainingOtherSellerCount;
     final blocked = checkout.hasUnpaidCheckouts;
-    final itemCount = checkout.selectedCount;
-    final shopCount = checkout.checkoutShops.length;
 
     return Container(
       padding: EdgeInsets.fromLTRB(
         20,
-        16,
+        14,
         20,
-        MediaQuery.of(context).padding.bottom + 16,
+        MediaQuery.of(context).padding.bottom + 14,
       ),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -393,182 +391,172 @@ class _CheckoutBottomBar extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 20,
+            blurRadius: 18,
             offset: const Offset(0, -4),
           ),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _SummaryRow(
-            label: shopCount > 1
-                ? 'Subtotal ($itemCount items, $shopCount shops)'
-                : 'Subtotal ($itemCount ${itemCount == 1 ? 'item' : 'items'})',
-            value: formatCurrency(subtotal),
-          ),
-          const SizedBox(height: 4),
-          _SummaryRow(label: 'Shipping', value: formatCurrency(shipping)),
-          const SizedBox(height: 4),
-          _SummaryRow(
-            label: 'Platform fee (2%)',
-            value: formatCurrency(platform),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Divider(height: 1),
-          ),
-          _SummaryRow(label: 'Total', value: formatCurrency(total), bold: true),
-          const SizedBox(height: 8),
-          Text(
-            blocked
-                ? 'Pay your auction win before starting a new checkout.'
-                : leftover > 0
-                ? '$leftover other ${leftover == 1 ? 'item stays' : 'items stay'} in your cart. Edit them from the cart screen.'
-                : 'Selected shops become separate orders. You pay once through PayMongo.',
-            style: AppTypography.caption.copyWith(
-              fontSize: 11,
-              color: blocked ? AppColors.error : null,
+          if (blocked) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.error.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 16,
+                    color: AppColors.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Pay your auction win before starting a new checkout.',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.error,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
+            const SizedBox(height: 10),
+          ],
           if (checkout.errorMessage != null) ...[
-            const SizedBox(height: 8),
             Text(
               checkout.errorMessage!,
               style: AppTypography.caption.copyWith(color: AppColors.error),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 10),
           ],
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed:
-                  blocked ||
-                      checkout.isLoading ||
-                      checkout.isSubmitting ||
-                      checkout.isContinuingToPayment
-                  ? null
-                  : () async {
-                      final leftoverCount = context
-                          .read<CheckoutController>()
-                          .remainingOtherSellerCount;
-                      final result = await context
-                          .read<CheckoutController>()
-                          .continueToPayment();
-                      if (!context.mounted) return;
-                      if (result.error != null) {
-                        showThriftSnackBar(
-                          context,
-                          result.error!,
-                          isError: true,
-                        );
-                        return;
-                      }
-                      if (leftoverCount > 0) {
-                        showThriftSnackBar(
-                          context,
-                          'Other cart items are still in your cart.',
-                        );
-                      }
-                      final checkoutCtrl = context.read<CheckoutController>();
-                      final buyNow = checkoutCtrl.isBuyNowCheckout;
-                      context.go(
-                        RouteNames.paymentForOrder(
-                          result.orderId!,
-                          checkoutSource: buyNow
-                              ? CheckoutOrigin.buyNow.routeValue
-                              : CheckoutOrigin.cart.routeValue,
-                          productId: buyNow
-                              ? checkoutCtrl.scopedProductId
-                              : null,
-                        ),
-                      );
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: AppColors.textHint,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                shadowColor: AppColors.primary.withValues(alpha: 0.3),
-              ),
-              child: checkout.isSubmitting || checkout.isContinuingToPayment
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Total payment',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
                       ),
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          blocked ? Icons.block_rounded : Icons.lock_rounded,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          blocked
-                              ? 'Pay auction win first'
-                              : 'Continue to payment (${formatCurrency(total)})',
-                          style: AppTypography.subheading.copyWith(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
                     ),
-            ),
+                    const SizedBox(height: 2),
+                    Text(
+                      formatCurrency(total),
+                      style: AppTypography.heading.copyWith(
+                        fontSize: 20,
+                        color: AppColors.primaryDark,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              ElevatedButton(
+                onPressed:
+                    blocked ||
+                            checkout.isLoading ||
+                            checkout.isSubmitting ||
+                            checkout.isContinuingToPayment
+                        ? null
+                        : () async {
+                            final leftoverCount = context
+                                .read<CheckoutController>()
+                                .remainingOtherSellerCount;
+                            final result = await context
+                                .read<CheckoutController>()
+                                .continueToPayment();
+                            if (!context.mounted) return;
+                            if (result.error != null) {
+                              showThriftSnackBar(
+                                context,
+                                result.error!,
+                                isError: true,
+                              );
+                              return;
+                            }
+                            if (leftoverCount > 0) {
+                              showThriftSnackBar(
+                                context,
+                                'Other cart items are still in your cart.',
+                              );
+                            }
+                            final checkoutCtrl =
+                                context.read<CheckoutController>();
+                            final buyNow = checkoutCtrl.isBuyNowCheckout;
+                            context.go(
+                              RouteNames.paymentForOrder(
+                                result.orderId!,
+                                checkoutSource: buyNow
+                                    ? CheckoutOrigin.buyNow.routeValue
+                                    : CheckoutOrigin.cart.routeValue,
+                                productId: buyNow
+                                    ? checkoutCtrl.scopedProductId
+                                    : null,
+                              ),
+                            );
+                          },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: AppColors.textHint,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 22,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: checkout.isSubmitting || checkout.isContinuingToPayment
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            blocked ? Icons.block_rounded : Icons.lock_rounded,
+                            size: 17,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            blocked ? 'Pay auction win' : 'Continue to payment',
+                            style: AppTypography.subheading.copyWith(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ],
           ),
         ],
       ),
-    );
-  }
-}
-
-class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({
-    required this.label,
-    required this.value,
-    this.bold = false,
-  });
-  final String label;
-  final String value;
-  final bool bold;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: bold
-              ? AppTypography.subheading.copyWith(fontSize: 15)
-              : AppTypography.body.copyWith(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
-        ),
-        Text(
-          value,
-          style: bold
-              ? AppTypography.subheading.copyWith(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.primary,
-                )
-              : AppTypography.body.copyWith(fontSize: 13),
-        ),
-      ],
     );
   }
 }

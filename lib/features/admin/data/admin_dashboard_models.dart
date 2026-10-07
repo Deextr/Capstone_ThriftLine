@@ -3,14 +3,31 @@ import '../../../models/enums.dart';
 import '../../trust_safety/data/report_reasons.dart';
 import 'admin_review_rules.dart';
 
-enum AdminDatePreset { today, last7Days, last30Days, lastYear, custom }
+enum AdminDatePreset {
+  today,
+  last7Days,
+  last30Days,
+  thisMonth,
+  lastYear,
+  custom,
+}
 
 String adminDatePresetLabel(AdminDatePreset preset) => switch (preset) {
   AdminDatePreset.today => 'Today',
   AdminDatePreset.last7Days => 'Last 7 Days',
   AdminDatePreset.last30Days => 'Last 30 Days',
+  AdminDatePreset.thisMonth => 'This Month',
   AdminDatePreset.lastYear => 'Last Year',
   AdminDatePreset.custom => 'Custom Range',
+};
+
+String adminDatePresetSegmentLabel(AdminDatePreset preset) => switch (preset) {
+  AdminDatePreset.today => 'Today',
+  AdminDatePreset.last7Days => '7 Days',
+  AdminDatePreset.last30Days => '30 Days',
+  AdminDatePreset.thisMonth => 'This Month',
+  AdminDatePreset.lastYear => '1 Year',
+  AdminDatePreset.custom => 'Custom',
 };
 
 class AdminDateWindow {
@@ -51,6 +68,19 @@ class AdminDateWindow {
       preset: AdminDatePreset.last30Days,
       from: today.subtract(const Duration(days: 29)),
       toExclusive: today.add(const Duration(days: 1)),
+    );
+  }
+
+  factory AdminDateWindow.thisMonth([DateTime? now]) {
+    final clock = now ?? DateTime.now();
+    final start = DateTime(clock.year, clock.month, 1);
+    final nextMonth = clock.month == 12
+        ? DateTime(clock.year + 1, 1, 1)
+        : DateTime(clock.year, clock.month + 1, 1);
+    return AdminDateWindow(
+      preset: AdminDatePreset.thisMonth,
+      from: start,
+      toExclusive: nextMonth,
     );
   }
 

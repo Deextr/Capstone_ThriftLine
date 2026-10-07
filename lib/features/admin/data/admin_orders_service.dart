@@ -39,7 +39,8 @@ class AdminOrderRow {
       totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
       paymentStatus: _paymentFromRow(json),
       orderStatus: (json['order_status'] as String?)?.trim() ?? 'pending',
-      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
+      createdAt:
+          DateTime.tryParse(json['created_at'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
     );
   }
@@ -78,11 +79,13 @@ class AdminOrdersService {
     final from = page * pageSize;
     final to = from + pageSize - 1;
 
-    var filter = _supabase.client.from('orders').select(
-      'order_id, order_number, total_amount, order_status, created_at, '
-      'buyer:buyer_id(full_name), seller:seller_id(full_name), '
-      'payments(payment_status)',
-    );
+    var filter = _supabase.client
+        .from('orders')
+        .select(
+          'order_id, order_number, total_amount, order_status, created_at, '
+          'buyer:buyer_id(full_name), seller:seller_id(full_name), '
+          'payments(payment_status)',
+        );
 
     if (statusFilter != null && statusFilter.isNotEmpty) {
       filter = filter.eq('order_status', statusFilter);
@@ -95,7 +98,10 @@ class AdminOrdersService {
 
     final data = response.data as List? ?? const [];
     final rows = data
-        .map((row) => AdminOrderRow.fromJson(Map<String, dynamic>.from(row as Map)))
+        .map(
+          (row) =>
+              AdminOrderRow.fromJson(Map<String, dynamic>.from(row as Map)),
+        )
         .toList();
     return AdminOrdersPage(rows: rows, total: response.count);
   }

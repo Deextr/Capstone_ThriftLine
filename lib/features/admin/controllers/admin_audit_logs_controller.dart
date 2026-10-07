@@ -16,7 +16,7 @@ class AdminAuditLogsController extends ChangeNotifier {
   AdminAuditLogRow? _selected;
   int _total = 0;
   int _page = 0;
-  static const int pageSize = 25;
+  int _pageSize = 10;
   bool _loading = true;
   String? _error;
 
@@ -29,8 +29,9 @@ class AdminAuditLogsController extends ChangeNotifier {
   AdminAuditLogRow? get selected => _selected;
   int get total => _total;
   int get page => _page;
+  int get pageSize => _pageSize;
   int get pageCount =>
-      _total <= 0 ? 1 : ((_total + pageSize - 1) ~/ pageSize);
+      _total <= 0 ? 1 : ((_total + _pageSize - 1) ~/ _pageSize);
   bool get isLoading => _loading;
   String? get errorMessage => _error;
   String get search => _search;
@@ -55,13 +56,12 @@ class AdminAuditLogsController extends ChangeNotifier {
         status: _status,
         from: _window?.from,
         toExclusive: _window?.toExclusive,
-        limit: pageSize,
-        offset: _page * pageSize,
+        limit: _pageSize,
+        offset: _page * _pageSize,
       );
       _rows = result.rows;
       _total = result.total;
-      if (_selected != null &&
-          !_rows.any((r) => r.logId == _selected!.logId)) {
+      if (_selected != null && !_rows.any((r) => r.logId == _selected!.logId)) {
         _selected = null;
       }
     } catch (e) {
@@ -115,6 +115,13 @@ class AdminAuditLogsController extends ChangeNotifier {
 
   Future<void> setPage(int page) async {
     _page = page.clamp(0, pageCount - 1);
+    await load();
+  }
+
+  Future<void> setPageSize(int size) async {
+    if (_pageSize == size) return;
+    _pageSize = size;
+    _page = 0;
     await load();
   }
 }

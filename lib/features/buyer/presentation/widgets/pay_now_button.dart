@@ -56,6 +56,7 @@ Future<void> startPaymongoPayment({
 
   if (result.alreadyPaid) {
     showThriftSnackBar(context, 'This order is already paid.');
+    await controller.load(showSpinner: false);
     return;
   }
 
@@ -69,7 +70,10 @@ Future<void> startPaymongoPayment({
     );
     if (!context.mounted) return;
     if (launched) {
-      context.read<PaymongoReturnCoordinator>().markCheckoutOpened(orderId);
+      context.read<PaymongoReturnCoordinator>().markCheckoutOpened(
+        orderId,
+        checkoutGroupId: controller.order?.checkoutGroupId,
+      );
       controller.markPaymongoBrowserOpened();
     } else {
       context.read<PaymongoReturnCoordinator>().clearCheckoutOpened();

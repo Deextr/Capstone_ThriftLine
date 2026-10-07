@@ -61,7 +61,8 @@ class LookingForAdminReport {
   final String reportedAccountStatus;
   final int confirmedViolations;
 
-  bool get canDecide => status == 'under_review';
+  bool get canDecide =>
+      status == 'under_review' || status == 'needs_more_evidence';
 
   String lifecycleLabel(DateTime serverNow) {
     final life = classifyLookingFor(
@@ -178,7 +179,9 @@ class LookingForViolationRecord {
 
 String lookingForAdminStatusLabel(String status) => switch (status) {
   'under_review' => 'Under review',
-  'action_taken' => 'Confirmed violation',
+  'needs_more_evidence' => 'Needs more evidence',
+  'resolved' => 'Resolved',
+  'action_taken' => 'Resolved',
   'dismissed' => 'Dismissed',
   _ => 'Under review',
 };
@@ -234,11 +237,18 @@ class LookingForModerationService {
   Future<String?> decide({
     required String reportId,
     required String decision,
+    required String adminResponse,
+    bool violationConfirmed = false,
   }) async {
     try {
       final raw = await _supabase.client.rpc(
         'review_looking_for_report',
-        params: {'p_report_id': reportId, 'p_decision': decision},
+        params: {
+          'p_report_id': reportId,
+          'p_decision': decision,
+          'p_admin_response': adminResponse.trim(),
+          'p_violation_confirmed': violationConfirmed,
+        },
       );
       if (supabaseRpcSuccess(raw)) {
         await AdminAuditService(_supabase).record(

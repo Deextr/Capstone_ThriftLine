@@ -19,11 +19,14 @@ class CartShopGroup {
 
   int get quantity => items.fold(0, (sum, item) => sum + item.quantity);
 
-  double get subtotal => items.fold(0.0, (sum, item) => sum + item.subtotal);
+  double get subtotal =>
+      checkoutRoundCurrency(items.fold(0.0, (sum, item) => sum + item.subtotal));
 
-  double get shippingFee => calculateShopFixedShippingPreview(
-        cartShippingLinesFromProducts(
-          items.map((item) => (product: item.product, quantity: item.quantity)),
+  double get shippingFee => checkoutRoundCurrency(
+        calculateShopFixedShippingPreview(
+          cartShippingLinesFromProducts(
+            items.map((item) => (product: item.product, quantity: item.quantity)),
+          ),
         ),
       );
 
@@ -70,13 +73,13 @@ List<CartShopGroup> groupCartItemsByShop(Iterable<CartItem> items) {
 }
 
 double checkoutGroupsSubtotal(Iterable<CartShopGroup> groups) =>
-    groups.fold(0.0, (sum, group) => sum + group.subtotal);
+    checkoutRoundCurrency(groups.fold(0.0, (sum, group) => sum + group.subtotal));
 
 double checkoutGroupsShipping(Iterable<CartShopGroup> groups) =>
-    groups.fold(0.0, (sum, group) => sum + group.shippingFee);
+    checkoutRoundCurrency(groups.fold(0.0, (sum, group) => sum + group.shippingFee));
 
 double checkoutGroupsPlatformFee(Iterable<CartShopGroup> groups) =>
-    groups.fold(0.0, (sum, group) => sum + group.platformFee);
+    checkoutRoundCurrency(groups.fold(0.0, (sum, group) => sum + group.platformFee));
 
 double checkoutGroupsTotal(Iterable<CartShopGroup> groups) =>
-    groups.fold(0.0, (sum, group) => sum + group.total);
+    checkoutRoundCurrency(groups.fold(0.0, (sum, group) => sum + group.total));

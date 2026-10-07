@@ -12,6 +12,7 @@ import 'core/routes/paymongo_return_coordinator.dart';
 import 'core/services/shared_preferences_service.dart';
 import 'core/services/supabase_service.dart';
 import 'features/auth/data/auth_service.dart';
+import 'features/buyer/data/paymongo_pending_checkout_store.dart';
 import 'providers/app_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
@@ -51,7 +52,10 @@ Future<void> main() async {
 
   await authProvider.init();
 
-  final paymongoReturn = PaymongoReturnCoordinator();
+  final paymongoReturn = PaymongoReturnCoordinator(
+    pendingStore: PaymongoPendingCheckoutStore(prefs),
+  );
+  await paymongoReturn.restorePersistedCheckout();
   final passwordRecovery = PasswordRecoveryCoordinator(
     onRecoveryLinkAccepted: authProvider.markPasswordRecoveryPending,
     onRecoveryLinkFailed: authProvider.abandonPasswordRecoveryLinkAttempt,

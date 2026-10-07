@@ -114,8 +114,9 @@ class _AdminVerifyEmailOtpScreenState extends State<AdminVerifyEmailOtpScreen> {
                       Align(
                         alignment: Alignment.centerLeft,
                         child: TextButton.icon(
-                          onPressed:
-                              auth.isLoading || _verifying ? null : _cancel,
+                          onPressed: auth.isLoading || _verifying
+                              ? null
+                              : _cancel,
                           icon: const Icon(Icons.arrow_back, size: 18),
                           label: const Text('Back to sign in'),
                         ),
@@ -152,11 +153,15 @@ class _AdminVerifyEmailOtpScreenState extends State<AdminVerifyEmailOtpScreen> {
                           fillColor: AppColors.background,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: AppColors.border),
+                            borderSide: const BorderSide(
+                              color: AppColors.border,
+                            ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: AppColors.border),
+                            borderSide: const BorderSide(
+                              color: AppColors.border,
+                            ),
                           ),
                         ),
                         inputFormatters: [
@@ -170,16 +175,14 @@ class _AdminVerifyEmailOtpScreenState extends State<AdminVerifyEmailOtpScreen> {
                       const SizedBox(height: 24),
                       ThriftButton(
                         label: 'Verify code',
-                        onPressed:
-                            _verifying || _sending ? null : _verify,
+                        onPressed: _verifying || _sending ? null : _verify,
                         isLoading: _verifying,
                       ),
                       const SizedBox(height: 12),
                       ThriftButton(
                         label: 'Resend code',
                         variant: ThriftButtonVariant.outline,
-                        onPressed:
-                            _verifying || _sending ? null : _resend,
+                        onPressed: _verifying || _sending ? null : _resend,
                         isLoading: _sending,
                       ),
                     ],

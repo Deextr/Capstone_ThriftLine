@@ -6,6 +6,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
+import '../../../../models/community_report_model.dart';
 import '../../../../widgets/empty_state.dart';
 import '../../../buyer/domain/looking_for_lifecycle.dart';
 import '../../../trust_safety/data/report_reasons.dart';
@@ -14,6 +15,7 @@ import '../../data/admin_review_rules.dart';
 import '../../data/looking_for_moderation.dart';
 import '../widgets/admin_reports_widgets.dart';
 import '../widgets/admin_review_widgets.dart';
+import '../widgets/admin_ui_components.dart';
 
 class AdminReportsQueueScreen extends StatefulWidget {
   const AdminReportsQueueScreen({
@@ -33,6 +35,9 @@ class AdminReportsQueueScreen extends StatefulWidget {
 }
 
 class _AdminReportsQueueScreenState extends State<AdminReportsQueueScreen> {
+  int _page = 0;
+  int _pageSize = 10;
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +49,7 @@ class _AdminReportsQueueScreenState extends State<AdminReportsQueueScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.kind != widget.kind) {
       _syncKind();
+      setState(() => _page = 0);
     }
   }
 
@@ -154,73 +160,128 @@ class _AdminReportsQueueScreenState extends State<AdminReportsQueueScreen> {
                     message: _emptyMessage(controller, widget.kind),
                   ),
                 )
-              else
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(16, 4, 16, bottomPad),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        if (showingLookingFor) {
-                          if (index.isOdd) return const SizedBox(height: 10);
-                          final report = lookingFor[index ~/ 2];
-                          return AdminReportCard(
-                            reportId: report.id,
-                            kindLabel: 'Looking For',
-                            reporterName: adminHandle(
-                              report.reporterUsername,
-                              report.reporterName,
-                            ),
-                            reporterRole: accountRoleLabel(report.reporterRole),
-                            reportedName: adminHandle(
-                              report.reportedUsername,
-                              report.reportedName,
-                            ),
-                            reportedRole: accountRoleLabel(report.reportedRole),
-                            reason:
-                                lookingForReportReasonLabel(report.reason) ??
-                                report.reason,
-                            preview: report.postTitle,
-                            status: report.status,
-                            statusLabel: lookingForAdminStatusLabel(
-                              report.status,
-                            ),
-                            createdAt: report.createdAt,
-                            onView: () => _openLookingFor(context, report.id),
-                          );
-                        }
-                        if (index.isOdd) return const SizedBox(height: 10);
-                        final report = visible[index ~/ 2];
-                        return AdminReportCard(
-                          reportId: report.id,
-                          kindLabel: adminReportKindOf(
-                            category: report.category,
-                            orderId: report.orderId,
-                          ),
-                          reporterName: adminHandle(
-                            report.reporterUsername,
-                            report.reporterDisplayName,
-                          ),
-                          reporterRole: accountRoleLabel(report.reporterRole),
-                          reportedName: adminHandle(
-                            report.reportedUsername,
-                            report.reportedDisplayName,
-                          ),
-                          reportedRole: accountRoleLabel(report.reportedRole),
-                          reason: reportReasonLabel(report.category),
-                          preview: adminReportPreview(report.details),
-                          status: report.status,
-                          statusLabel: reportStatusLabel(report.status),
-                          createdAt: report.createdAt,
-                          orderNumber: report.orderNumber,
-                          onView: () => _open(context, report.id),
-                        );
-                      },
-                      childCount: showingLookingFor
-                          ? (lookingFor.isEmpty ? 0 : lookingFor.length * 2 - 1)
-                          : (visible.isEmpty ? 0 : visible.length * 2 - 1),
+              else ...[
+                Builder(
+                  builder: (context) {
+                    final allItems = showingLookingFor ? lookingFor : visible;
+                    final totalCount = allItems.length;
+                    final maxPage = totalCount <= 0
+                        ? 0
+                        : (totalCount - 1) ~/ _pageSize;
+                    final safePage = _page.clamp(0, maxPage);
+                    final startIndex = safePage * _pageSize;
+                    final endIndex = (startIndex + _pageSize).clamp(
+                      0,
+                      totalCount,
+                    );
+                    final pageItems = totalCount == 0
+                        ? <dynamic>[]
+                        : allItems.sublist(startIndex, endIndex);
+
+                    return SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            if (index.isOdd) return const SizedBox(height: 10);
+                            final itemIndex = index ~/ 2;
+                            if (itemIndex >= pageItems.length) return null;
+
+                            if (showingLookingFor) {
+                              final report =
+                                  pageItems[itemIndex] as LookingForAdminReport;
+                              return AdminReportCard(
+                                reportId: report.id,
+                                kindLabel: 'Looking For',
+                                reporterName: adminHandle(
+                                  report.reporterUsername,
+                                  report.reporterName,
+                                ),
+                                reporterRole: accountRoleLabel(
+                                  report.reporterRole,
+                                ),
+                                reportedName: adminHandle(
+                                  report.reportedUsername,
+                                  report.reportedName,
+                                ),
+                                reportedRole: accountRoleLabel(
+                                  report.reportedRole,
+                                ),
+                                reason:
+                                    lookingForReportReasonLabel(
+                                      report.reason,
+                                    ) ??
+                                    report.reason,
+                                preview: report.postTitle,
+                                status: report.status,
+                                statusLabel: lookingForAdminStatusLabel(
+                                  report.status,
+                                ),
+                                createdAt: report.createdAt,
+                                onView: () =>
+                                    _openLookingFor(context, report.id),
+                              );
+                            }
+
+                            final report =
+                                pageItems[itemIndex] as CommunityReportModel;
+                            return AdminReportCard(
+                              reportId: report.id,
+                              kindLabel: adminReportKindOf(
+                                category: report.category,
+                                orderId: report.orderId,
+                              ),
+                              reporterName: adminHandle(
+                                report.reporterUsername,
+                                report.reporterDisplayName,
+                              ),
+                              reporterRole: accountRoleLabel(
+                                report.reporterRole,
+                              ),
+                              reportedName: adminHandle(
+                                report.reportedUsername,
+                                report.reportedDisplayName,
+                              ),
+                              reportedRole: accountRoleLabel(
+                                report.reportedRole,
+                              ),
+                              reason: reportReasonLabel(report.category),
+                              preview: adminReportPreview(report.details),
+                              status: report.status,
+                              statusLabel: reportStatusLabel(report.status),
+                              createdAt: report.createdAt,
+                              orderNumber: report.orderNumber,
+                              onView: () => _open(context, report.id),
+                            );
+                          },
+                          childCount: pageItems.isEmpty
+                              ? 0
+                              : pageItems.length * 2 - 1,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPad),
+                    child: AdminPagination(
+                      currentPage: _page,
+                      totalItems: showingLookingFor
+                          ? lookingFor.length
+                          : visible.length,
+                      pageSize: _pageSize,
+                      pageSizeOptions: const [10, 25, 50],
+                      onPageChanged: (newPage) =>
+                          setState(() => _page = newPage),
+                      onPageSizeChanged: (newSize) => setState(() {
+                        _pageSize = newSize;
+                        _page = 0;
+                      }),
                     ),
                   ),
                 ),
+              ],
             ],
           ),
         ),

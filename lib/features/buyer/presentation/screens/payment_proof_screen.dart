@@ -44,6 +44,20 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final coord = context.read<PaymongoReturnCoordinator>();
+      final controller = context.read<BuyerOrdersController>();
+      // Process death: durable store still marks this checkout as awaiting return.
+      if (coord.isAwaitingCheckout(widget.orderId) &&
+          !controller.awaitingPaymongoReturn) {
+        controller.markPaymongoBrowserOpened();
+        _runPaymongoReturnReconciliation(
+          returnStatus: null,
+          fromReturnRedirect: true,
+        );
+      }
+    });
   }
 
   @override
@@ -91,21 +105,25 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
     if (!mounted) return;
     final coord = context.read<PaymongoReturnCoordinator>();
     final controller = context.read<BuyerOrdersController>();
-    if (!controller.awaitingPaymongoReturn &&
-        !coord.isAwaitingCheckout(widget.orderId)) {
-      return;
-    }
+    final returnUri = GoRouterState.of(context).uri;
+    final returned = returnUri.queryParameters['returned'] == '1';
+    final awaitingCheckout =
+        controller.awaitingPaymongoReturn ||
+        coord.isAwaitingCheckout(widget.orderId) ||
+        returned;
+    if (!awaitingCheckout) return;
     assert(() {
-      debugPrint('[Payment] App resumed (payment screen) order=${widget.orderId}');
+      debugPrint(
+        '[Payment] App resumed (payment screen) order=${widget.orderId} '
+        'returned=$returned awaiting=${controller.awaitingPaymongoReturn} '
+        'coord=${coord.isAwaitingCheckout(widget.orderId)}',
+      );
       return true;
     }());
-    final returnUri = GoRouterState.of(context).uri;
-    final status = returnUri.queryParameters['returned'] == '1'
-        ? returnUri.queryParameters['status']
-        : null;
+    final status = returned ? returnUri.queryParameters['status'] : null;
     _runPaymongoReturnReconciliation(
       returnStatus: status,
-      fromReturnRedirect: returnUri.queryParameters['returned'] == '1',
+      fromReturnRedirect: true,
     );
   }
 
@@ -166,8 +184,10 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
 
     final origin = _origin(order);
     final isAuction = (order.auctionId ?? '').isNotEmpty;
-    final awaiting = order.needsBuyerPayment;
-    final paid = order.isPaidCheckout;
+    final paid = controller.isPaymentGroupPaid || order.isPaidCheckout;
+    final awaiting =
+        !paid &&
+        (controller.paymentGroupNeedsPayment || order.needsBuyerPayment);
     final closing = controller.isAbandoning || controller.checkoutClosed;
     final returnUri = GoRouterState.of(context).uri;
     final returned = returnUri.queryParameters['returned'] == '1';
@@ -222,19 +242,34 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            failed
-                ? (controller.isExpiredPayment
-                      ? 'Payment Expired'
-                      : 'Payment Failed')
-                : confirming
-                ? 'Confirming your payment...'
-                : awaiting
-                ? 'Complete payment'
-                : paid
-                ? 'Payment Successful'
-                : 'Complete payment',
+          title: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                failed
+                    ? (controller.isExpiredPayment
+                          ? 'Payment Expired'
+                          : 'Payment Failed')
+                    : confirming
+                    ? 'Confirming your payment...'
+                    : awaiting
+                    ? 'Complete payment'
+                    : paid
+                    ? 'Payment Successful'
+                    : 'Complete payment',
+                style: AppTypography.heading.copyWith(fontSize: 18),
+              ),
+              if (awaiting &&
+                  !failed &&
+                  !confirming &&
+                  controller.paymentGroup.length > 1)
+                Text(
+                  '${controller.paymentGroup.length} orders from ${controller.paymentGroup.length} shops',
+                  style: AppTypography.caption.copyWith(fontSize: 11),
+                ),
+            ],
           ),
+          centerTitle: true,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => _onAppBarBack(
@@ -494,7 +529,8 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
       hostedCheckoutOpened: coord.isAwaitingCheckout(widget.orderId),
     );
     if (!mounted) return;
-    if (result != PaymongoAppReturnResult.pending) {
+    if (result == PaymongoAppReturnResult.paid ||
+        result == PaymongoAppReturnResult.failed) {
       coord.clearCheckoutOpened();
     }
   }

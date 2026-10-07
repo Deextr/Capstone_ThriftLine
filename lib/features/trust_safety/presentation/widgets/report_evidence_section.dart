@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/report_user_controller.dart';
 import '../../data/report_reasons.dart';
 
@@ -29,35 +30,20 @@ class ReportEvidenceSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final count = evidence.length;
     final atMax = count >= kReportEvidenceMaxCount;
+    final meetsMin = count >= kReportEvidenceMinCount;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                required ? 'Photo evidence' : 'Photo evidence (optional)',
-                style: AppTypography.subheading,
-              ),
-            ),
-            Text(
-              'Evidence: $count/$kReportEvidenceMaxCount photos',
-              style: AppTypography.caption.copyWith(
-                fontWeight: FontWeight.w600,
-                color: count >= kReportEvidenceMinCount
-                    ? AppColors.primary
-                    : AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
+        Text('Photo Evidence', style: AppTypography.subheading),
         const SizedBox(height: 4),
         Text(
-          atMax
-              ? 'Maximum of $kReportEvidenceMaxCount photos reached.'
-              : 'JPG, PNG, or WebP · 5 MB each · ${required ? 'At least 1 required' : 'Optional'}',
-          style: AppTypography.caption,
+          required
+              ? 'Add at least one photo that helps us review your report.'
+              : 'Add photos that help us review your report (optional).',
+          style: AppTypography.caption.copyWith(
+            color: AppColors.textSecondary,
+          ),
         ),
         if (evidenceError != null) ...[
           const SizedBox(height: 6),
@@ -67,52 +53,95 @@ class ReportEvidenceSection extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 12),
-        SizedBox(
-          height: 88,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: count + (atMax ? 0 : 1),
-            separatorBuilder: (_, _) => const SizedBox(width: 10),
-            itemBuilder: (context, index) {
-              if (index < count) {
-                return _EvidenceThumb(
-                  bytes: evidence[index].bytes,
-                  onRemove: () => onRemove(index),
-                );
-              }
-              return _AddEvidenceButton(
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (var i = 0; i < count; i++)
+              _EvidenceThumb(
+                bytes: evidence[i].bytes,
+                onRemove: () => onRemove(i),
+                onPreview: () => _showPreview(context, evidence[i].bytes),
+              ),
+            if (!atMax)
+              _AddEvidenceButton(
                 onGallery: onAddGallery,
                 onCamera: onAddCamera,
-              );
-            },
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '$count of $kReportEvidenceMaxCount photos added',
+          style: AppTypography.caption.copyWith(
+            fontWeight: FontWeight.w600,
+            color: meetsMin ? AppColors.primary : AppColors.textSecondary,
           ),
         ),
+        if (atMax)
+          Text(
+            'You can upload up to $kReportEvidenceMaxCount photos.',
+            style: AppTypography.caption,
+          ),
       ],
+    );
+  }
+
+  void _showPreview(BuildContext context, Uint8List bytes) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.all(20),
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              child: Image.memory(bytes, fit: BoxFit.contain),
+            ),
+            Positioned(
+              top: 4,
+              right: 4,
+              child: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
 class _EvidenceThumb extends StatelessWidget {
-  const _EvidenceThumb({required this.bytes, required this.onRemove});
+  const _EvidenceThumb({
+    required this.bytes,
+    required this.onRemove,
+    required this.onPreview,
+  });
 
   final Uint8List bytes;
   final VoidCallback onRemove;
+  final VoidCallback onPreview;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 80,
-      height: 80,
+      width: 88,
+      height: 88,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          ClipRRect(
+          Material(
             borderRadius: BorderRadius.circular(12),
-            child: Image.memory(
-              bytes,
-              width: 80,
-              height: 80,
-              fit: BoxFit.cover,
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onPreview,
+              child: Image.memory(
+                bytes,
+                width: 88,
+                height: 88,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
           Positioned(
@@ -144,44 +173,37 @@ class _AddEvidenceButton extends StatelessWidget {
   final Future<String?> Function() onGallery;
   final Future<String?> Function()? onCamera;
 
+  Future<void> _pick(BuildContext context, Future<String?> Function() pick) async {
+    final err = await pick();
+    if (err != null && context.mounted) {
+      showThriftSnackBar(context, err, isError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () async {
-        final err = await onGallery();
-        if (err != null && context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(err)));
-        }
-      },
+      onTap: () => _pick(context, onGallery),
       onLongPress: onCamera == null
           ? null
-          : () async {
-              final err = await onCamera!();
-              if (err != null && context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(err)));
-              }
-            },
+          : () => _pick(context, onCamera!),
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        width: 80,
-        height: 80,
+        width: 88,
+        height: 88,
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+          border: Border.all(color: AppColors.border),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(Icons.add_a_photo_outlined, color: AppColors.primary),
+            const SizedBox(height: 4),
             Text(
-              onCamera != null ? 'Tap / hold' : 'Add photo',
-              style: AppTypography.caption.copyWith(fontSize: 10),
-              textAlign: TextAlign.center,
+              'Add Photo',
+              style: AppTypography.caption.copyWith(fontSize: 11),
             ),
           ],
         ),

@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/routes/route_names.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/supabase_rpc.dart';
+import '../data/listing_limit.dart';
 import '../data/seller_listings_refresh.dart';
 import '../../../core/utils/listing_shipping.dart';
 import '../../../models/enums.dart';
@@ -354,6 +355,9 @@ class AddListingController extends ChangeNotifier {
     // 2. Validate
     if (!_validateForPost()) return;
 
+    final limitBlocked = await _ensureCanPublishActiveListing(context);
+    if (limitBlocked) return;
+
     // 3. Set loading state
     isLoading = true;
     uploadStatusMessage = 'Preparing listing…';
@@ -471,11 +475,16 @@ class AddListingController extends ChangeNotifier {
     } catch (e) {
       debugPrint('AddListingController.postListing error: $e');
       if (context.mounted) {
-        showThriftSnackBar(
-          context,
-          'Failed to post listing. Please try again.',
-          isError: true,
-        );
+        final limitMessage = listingLimitMessageFromError(e);
+        if (limitMessage != null) {
+          await _showListingLimitDialog(context, limitMessage);
+        } else {
+          showThriftSnackBar(
+            context,
+            'Failed to post listing. Please try again.',
+            isError: true,
+          );
+        }
       }
     } finally {
       if (isLoading) {
@@ -488,6 +497,42 @@ class AddListingController extends ChangeNotifier {
 
   void _safeNotify() {
     if (!_disposed) notifyListeners();
+  }
+
+  Future<bool> _ensureCanPublishActiveListing(BuildContext context) async {
+    try {
+      final rpcRes = await _supabase.client.rpc('seller_listing_limit_status');
+      if (!supabaseRpcSuccess(rpcRes)) return false;
+      final map = supabaseRpcMap(rpcRes);
+      final canPublish = map?['can_publish'] == true;
+      if (canPublish) return false;
+      if (context.mounted) {
+        await _showListingLimitDialog(context, kListingLimitReachedMessage);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('AddListingController listing limit check error: $e');
+      return false;
+    }
+  }
+
+  Future<void> _showListingLimitDialog(
+    BuildContext context,
+    String message,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text(kListingLimitReachedTitle),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   // â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

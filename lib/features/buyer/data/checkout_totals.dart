@@ -27,9 +27,13 @@ double checkoutShippingFee(int sellerCount) {
   return sellerCount * kCheckoutShippingPerSeller;
 }
 
+double checkoutRoundCurrency(double value) {
+  return double.parse(value.toStringAsFixed(2));
+}
+
 double checkoutPlatformFee(double subtotal) {
   if (subtotal <= 0) return 0;
-  return double.parse((subtotal * kCheckoutPlatformFeeRate).toStringAsFixed(2));
+  return checkoutRoundCurrency(subtotal * kCheckoutPlatformFeeRate);
 }
 
 double checkoutTotal({
@@ -37,5 +41,5 @@ double checkoutTotal({
   required double shippingFee,
   required double platformFee,
 }) {
-  return subtotal + shippingFee + platformFee;
+  return checkoutRoundCurrency(subtotal + shippingFee + platformFee);
 }

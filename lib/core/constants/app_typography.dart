@@ -40,6 +40,64 @@ abstract final class AppTypography {
     color: AppColors.textSecondary,
   );
 
+  // --- Admin Web Dashboard Typography Scale ---
+  static final TextStyle pageTitle = GoogleFonts.inter(
+    fontSize: 22,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.4,
+    color: AppColors.textPrimary,
+  );
+
+  static final TextStyle sectionTitle = GoogleFonts.inter(
+    fontSize: 16,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.2,
+    color: AppColors.textPrimary,
+  );
+
+  static final TextStyle cardTitle = GoogleFonts.inter(
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    color: AppColors.textPrimary,
+  );
+
+  static final TextStyle tableHeader = GoogleFonts.inter(
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.3,
+    color: AppColors.textSecondary,
+  );
+
+  static final TextStyle tableBody = GoogleFonts.inter(
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
+    color: AppColors.textPrimary,
+  );
+
+  static final TextStyle tableBodyMedium = GoogleFonts.inter(
+    fontSize: 13,
+    fontWeight: FontWeight.w500,
+    color: AppColors.textPrimary,
+  );
+
+  static final TextStyle badge = GoogleFonts.inter(
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.2,
+  );
+
+  static final TextStyle helper = GoogleFonts.inter(
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    color: AppColors.textSecondary,
+  );
+
+  static final TextStyle button = GoogleFonts.inter(
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.2,
+  );
+
   static TextTheme get textTheme => GoogleFonts.interTextTheme().copyWith(
     displayMedium: display,
     headlineMedium: heading,

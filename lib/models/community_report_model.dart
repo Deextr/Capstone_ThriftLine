@@ -58,6 +58,12 @@ class CommunityReportModel extends BaseModel {
     required this.createdAt,
     this.resolvedAt,
     this.evidence = const [],
+    this.evidenceAttemptCount = 1,
+    this.reporterInstruction,
+    this.productId,
+    this.disputeId,
+    this.resolutionFinancial,
+    this.resolutionReturnRequired,
   });
 
   final String id;
@@ -81,6 +87,12 @@ class CommunityReportModel extends BaseModel {
   final DateTime createdAt;
   final DateTime? resolvedAt;
   final List<ReportEvidenceItem> evidence;
+  final int evidenceAttemptCount;
+  final String? reporterInstruction;
+  final String? productId;
+  final String? disputeId;
+  final String? resolutionFinancial;
+  final bool? resolutionReturnRequired;
 
   factory CommunityReportModel.fromSupabase(
     Map<String, dynamic> row, {
@@ -134,6 +146,12 @@ class CommunityReportModel extends BaseModel {
       createdAt: parseTime(row['created_at']) ?? DateTime.now(),
       resolvedAt: parseTime(row['resolved_at']),
       evidence: evidence,
+      evidenceAttemptCount: (row['evidence_attempt_count'] as num?)?.toInt() ?? 1,
+      reporterInstruction: row['reporter_instruction'] as String?,
+      productId: row['product_id'] as String?,
+      disputeId: row['dispute_id'] as String?,
+      resolutionFinancial: row['resolution_financial'] as String?,
+      resolutionReturnRequired: row['resolution_return_required'] as bool?,
     );
   }
 

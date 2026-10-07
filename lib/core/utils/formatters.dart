@@ -37,6 +37,19 @@ String formatCompactDate(DateTime dateTime, {DateTime? now}) {
 String formatFullDate(DateTime dateTime) =>
     DateFormat('MMM d, yyyy').format(dateTime.toLocal());
 
+/// Admin tables: always include year (e.g. Oct 7, 2026).
+String formatAdminTableDate(DateTime dateTime) => formatFullDate(dateTime);
+
+/// Admin tables when time matters (e.g. audit logs).
+String formatAdminTableDateTime(DateTime dateTime) {
+  final local = dateTime.toLocal();
+  return '${DateFormat('MMM d, yyyy').format(local)} · '
+      '${DateFormat('h:mm a').format(local)}';
+}
+
+String formatTimeOfDay(DateTime dateTime) =>
+    DateFormat('h:mm a').format(dateTime.toLocal());
+
 String formatRelativeTime(DateTime dateTime) {
   final diff = DateTime.now().difference(dateTime);
   if (diff.inMinutes < 1) return 'Just now';

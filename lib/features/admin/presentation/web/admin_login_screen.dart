@@ -153,7 +153,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         if (mounted) context.go(RouteNames.adminVerifyEmailOtp);
         return;
       }
-      final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
+      final redirect = GoRouterState.of(
+        context,
+      ).uri.queryParameters['redirect'];
       if (redirect != null && redirect.startsWith('/admin')) {
         context.go(Uri.decodeComponent(redirect));
       } else {
@@ -182,124 +184,127 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
           child: ScrollConfiguration(
             behavior: const _AdminLoginScrollBehavior(),
             child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: compact ? 20 : 32,
-              vertical: 32,
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: compact ? 440 : 420),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.textPrimary.withValues(alpha: 0.04),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    compact ? 24 : 32,
-                    32,
-                    compact ? 24 : 32,
-                    28,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _Header(compact: compact),
-                      const SizedBox(height: 28),
-                      if (_error != null) ...[
-                        _ErrorBanner(message: _error!),
-                        const SizedBox(height: 20),
-                      ],
-                      Form(
-                        key: _formKey,
-                        autovalidateMode: _submitted
-                            ? AutovalidateMode.onUserInteraction
-                            : AutovalidateMode.disabled,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            TextFormField(
-                              controller: _emailController,
-                              focusNode: _emailFocus,
-                              enabled: !_busy,
-                              keyboardType: TextInputType.emailAddress,
-                              textInputAction: TextInputAction.next,
-                              autofillHints: const [AutofillHints.username],
-                              decoration: _fieldDecoration(
-                                label: 'Email',
-                                hint: 'admin@example.com',
-                              ),
-                              validator: Validators.email,
-                              onFieldSubmitted: (_) =>
-                                  _passwordFocus.requestFocus(),
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _passwordController,
-                              focusNode: _passwordFocus,
-                              enabled: !_busy,
-                              obscureText: _obscure,
-                              textInputAction: TextInputAction.done,
-                              autofillHints: const [AutofillHints.password],
-                              decoration: _fieldDecoration(
-                                label: 'Password',
-                                suffix: IconButton(
-                                  tooltip: _obscure
-                                      ? 'Show password'
-                                      : 'Hide password',
-                                  icon: Icon(
-                                    _obscure
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                    size: 20,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  onPressed: _busy
-                                      ? null
-                                      : () => setState(() => _obscure = !_obscure),
-                                ),
-                              ),
-                              validator: (v) => (v == null || v.isEmpty)
-                                  ? 'Enter your password'
-                                  : null,
-                              onFieldSubmitted: (_) {
-                                if (_canSubmit) _submit();
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (TurnstileConfig.isConfigured) ...[
-                        const SizedBox(height: 24),
-                        TurnstileChallenge(
-                          key: _turnstileKey,
-                          action: _turnstileAction,
-                          appearance: TurnstileChallengeAppearance.lightSurface,
-                          showSuccessMessage: false,
-                          showLoadingMessage: false,
-                          onToken: _onTurnstileToken,
-                          onError: (_) => _onTurnstileError(),
-                          onExpired: _onTurnstileError,
-                        ),
-                      ],
-                      const SizedBox(height: 28),
-                      ThriftButton(
-                        label: _busy ? 'Signing in…' : 'Sign in',
-                        onPressed: _canSubmit ? _submit : null,
+              padding: EdgeInsets.symmetric(
+                horizontal: compact ? 20 : 32,
+                vertical: 32,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: compact ? 440 : 420),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.textPrimary.withValues(alpha: 0.04),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
                       ),
                     ],
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      compact ? 24 : 32,
+                      32,
+                      compact ? 24 : 32,
+                      28,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _Header(compact: compact),
+                        const SizedBox(height: 28),
+                        if (_error != null) ...[
+                          _ErrorBanner(message: _error!),
+                          const SizedBox(height: 20),
+                        ],
+                        Form(
+                          key: _formKey,
+                          autovalidateMode: _submitted
+                              ? AutovalidateMode.onUserInteraction
+                              : AutovalidateMode.disabled,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              TextFormField(
+                                controller: _emailController,
+                                focusNode: _emailFocus,
+                                enabled: !_busy,
+                                keyboardType: TextInputType.emailAddress,
+                                textInputAction: TextInputAction.next,
+                                autofillHints: const [AutofillHints.username],
+                                decoration: _fieldDecoration(
+                                  label: 'Email',
+                                  hint: 'admin@example.com',
+                                ),
+                                validator: Validators.email,
+                                onFieldSubmitted: (_) =>
+                                    _passwordFocus.requestFocus(),
+                              ),
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                controller: _passwordController,
+                                focusNode: _passwordFocus,
+                                enabled: !_busy,
+                                obscureText: _obscure,
+                                textInputAction: TextInputAction.done,
+                                autofillHints: const [AutofillHints.password],
+                                decoration: _fieldDecoration(
+                                  label: 'Password',
+                                  suffix: IconButton(
+                                    tooltip: _obscure
+                                        ? 'Show password'
+                                        : 'Hide password',
+                                    icon: Icon(
+                                      _obscure
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                      size: 20,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    onPressed: _busy
+                                        ? null
+                                        : () => setState(
+                                            () => _obscure = !_obscure,
+                                          ),
+                                  ),
+                                ),
+                                validator: (v) => (v == null || v.isEmpty)
+                                    ? 'Enter your password'
+                                    : null,
+                                onFieldSubmitted: (_) {
+                                  if (_canSubmit) _submit();
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (TurnstileConfig.isConfigured) ...[
+                          const SizedBox(height: 24),
+                          TurnstileChallenge(
+                            key: _turnstileKey,
+                            action: _turnstileAction,
+                            appearance:
+                                TurnstileChallengeAppearance.lightSurface,
+                            showSuccessMessage: false,
+                            showLoadingMessage: false,
+                            onToken: _onTurnstileToken,
+                            onError: (_) => _onTurnstileError(),
+                            onExpired: _onTurnstileError,
+                          ),
+                        ],
+                        const SizedBox(height: 28),
+                        ThriftButton(
+                          label: _busy ? 'Signing in…' : 'Sign in',
+                          onPressed: _canSubmit ? _submit : null,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
           ),
         ),
       ),

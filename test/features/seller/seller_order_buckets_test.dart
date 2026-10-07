@@ -87,6 +87,21 @@ void main() {
       }
     });
 
+    test('abandoned fixed-price voids are hidden from seller buckets', () {
+      final order = _order(
+        id: 'abandoned',
+        status: 'cancelled',
+        payment: 'pending',
+      );
+      expect(order.isAbandonedCheckout, isTrue);
+      expect(sellerOrderBucketFor(order), isNull);
+    });
+
+    test('cancelled without payment row is hidden for fixed-price sellers', () {
+      final order = _order(id: 'void-unpaid', status: 'cancelled');
+      expect(sellerOrderBucketFor(order), isNull);
+    });
+
     test('paid preparing orders stay in To Ship, not Shipped', () {
       final order = _order(
         id: 'paid',

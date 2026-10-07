@@ -271,6 +271,7 @@ const List<({String value, String label})> lookingForReportReasons = [
   (value: 'spam', label: 'Spam'),
   (value: 'unrelated_content', label: 'Unrelated content'),
   (value: 'inappropriate_content', label: 'Inappropriate content'),
+  (value: 'explicit_content', label: 'Explicit content'),
   (value: 'scam_or_suspicious', label: 'Scam / Suspicious'),
   (value: 'other', label: 'Other'),
 ];

@@ -8,6 +8,8 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../providers/cart_provider.dart';
 import '../../data/cart_shop_group.dart';
 
+import 'order_cost_breakdown_section.dart';
+
 /// Interactive cart editing vs read-only checkout review for the same line layout.
 enum CartLineInteractionMode { cart, checkoutReview }
 
@@ -17,35 +19,50 @@ class CartCheckoutShopSection extends StatelessWidget {
     required this.shop,
     required this.mode,
     this.cart,
+    this.orderIndex,
+    this.totalOrders,
   });
 
   final CartShopGroup shop;
   final CartLineInteractionMode mode;
   final CartProvider? cart;
+  final int? orderIndex;
+  final int? totalOrders;
 
   @override
   Widget build(BuildContext context) {
-    final cartProvider = cart ?? context.read<CartProvider>();
+    final cartProvider = mode == CartLineInteractionMode.cart
+        ? (cart ?? context.read<CartProvider>())
+        : null;
     final shopState = mode == CartLineInteractionMode.cart
-        ? cartProvider.shopCheckboxValue(shop.sellerKey)
+        ? cartProvider!.shopCheckboxValue(shop.sellerKey)
         : null;
 
+    final isReview = mode == CartLineInteractionMode.checkoutReview;
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+          border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           children: [
             Padding(
               padding: EdgeInsets.fromLTRB(
-                mode == CartLineInteractionMode.cart ? 4 : 12,
-                4,
-                12,
-                4,
+                mode == CartLineInteractionMode.cart ? 4 : 14,
+                10,
+                14,
+                10,
               ),
               child: Row(
                 children: [
@@ -54,7 +71,7 @@ class CartCheckoutShopSection extends StatelessWidget {
                       tristate: true,
                       value: shopState,
                       activeColor: AppColors.primary,
-                      onChanged: (_) => cartProvider.setShopSelected(
+                      onChanged: (_) => cartProvider!.setShopSelected(
                         shop.sellerKey,
                         shopState != true,
                       ),
@@ -62,7 +79,7 @@ class CartCheckoutShopSection extends StatelessWidget {
                   ],
                   const Icon(
                     Icons.storefront_outlined,
-                    size: 18,
+                    size: 20,
                     color: AppColors.primary,
                   ),
                   const SizedBox(width: 8),
@@ -71,15 +88,44 @@ class CartCheckoutShopSection extends StatelessWidget {
                       shop.shopName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTypography.subheading.copyWith(fontSize: 15),
+                      style: AppTypography.subheading.copyWith(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                  if (shop.sellerVerified)
+                  if (shop.sellerVerified && !isReview) ...[
+                    const SizedBox(width: 4),
                     const Icon(
                       Icons.verified_rounded,
                       size: 16,
                       color: AppColors.primary,
                     ),
+                  ],
+                  if (isReview &&
+                      totalOrders != null &&
+                      totalOrders! > 1 &&
+                      orderIndex != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Order ${orderIndex! + 1} of $totalOrders',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.primaryDark,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -89,10 +135,20 @@ class CartCheckoutShopSection extends StatelessWidget {
                 item: shop.items[i],
                 mode: mode,
                 selected: mode == CartLineInteractionMode.cart
-                    ? cartProvider.isSelected(shop.items[i].product.id)
+                    ? (cartProvider?.isSelected(shop.items[i].product.id) ?? false)
                     : false,
                 isLast: i == shop.items.length - 1,
               ),
+            if (isReview) ...[
+              const Divider(height: 1),
+              OrderCostBreakdown(
+                subtotal: shop.subtotal,
+                shippingFee: shop.shippingFee,
+                platformFee: shop.platformFee,
+                total: shop.total,
+                itemCount: shop.quantity,
+              ),
+            ],
           ],
         ),
       ),
@@ -119,11 +175,11 @@ class CartCheckoutProductLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final product = item.product;
-    final cart = context.read<CartProvider>();
+    final readOnly = mode == CartLineInteractionMode.checkoutReview;
+    final cart = readOnly ? null : context.read<CartProvider>();
     final unitPrice = product.displayPrice > 0
         ? product.displayPrice
         : product.price;
-    final readOnly = mode == CartLineInteractionMode.checkoutReview;
 
     return Column(
       children: [
@@ -142,7 +198,7 @@ class CartCheckoutProductLine extends StatelessWidget {
                   value: selected,
                   activeColor: AppColors.primary,
                   onChanged: (value) =>
-                      cart.toggleSelected(product.id, value ?? false),
+                      cart?.toggleSelected(product.id, value ?? false),
                 ),
               ClipRRect(
                 borderRadius: BorderRadius.circular(14),
@@ -176,7 +232,18 @@ class CartCheckoutProductLine extends StatelessWidget {
                         fontSize: 14,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    if (product.size != null &&
+                        product.size!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Size ${product.size!.trim()}',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
                     Text(
                       formatCurrency(unitPrice),
                       style: AppTypography.subheading.copyWith(
@@ -189,7 +256,7 @@ class CartCheckoutProductLine extends StatelessWidget {
               ),
               if (!readOnly)
                 IconButton(
-                  onPressed: () => cart.removeFromCart(product.id),
+                  onPressed: () => cart?.removeFromCart(product.id),
                   icon: const Icon(
                     Icons.close_rounded,
                     color: AppColors.error,

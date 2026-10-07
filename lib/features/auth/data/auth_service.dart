@@ -240,7 +240,9 @@ class AuthService {
       debugPrintStack(stackTrace: stackTrace);
       return _emailLoginAuthFailure(
         serverError: e.toString(),
-        httpStatus: isEmailLoginTransportFailure(message: e.toString()) ? 0 : null,
+        httpStatus: isEmailLoginTransportFailure(message: e.toString())
+            ? 0
+            : null,
       );
     }
   }
@@ -296,6 +298,50 @@ class AuthService {
     } catch (e) {
       debugPrint('AuthService.requestPasswordReset failed');
       return passwordResetUiMessage(null);
+    }
+  }
+
+  /// Updates the signed-in user's password after verifying the current one.
+  Future<String?> updatePasswordInSession({
+    required String email,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    if (_auth.currentSession == null) {
+      return 'Your session expired. Sign in again and try updating your password.';
+    }
+    final currentError = Validators.password(currentPassword);
+    if (currentError != null) {
+      return 'Enter your current password.';
+    }
+    final newError = Validators.password(newPassword);
+    if (newError != null) return newError;
+
+    try {
+      await _auth.signInWithPassword(
+        email: email.trim(),
+        password: currentPassword,
+      );
+      await _auth.updateUser(UserAttributes(password: newPassword));
+      return null;
+    } on AuthException catch (e) {
+      debugPrint('AuthService.updatePasswordInSession failed: ${_describe(e)}');
+      final parsed = parseGoTrueError(code: e.code, message: e.message);
+      if (parsed.code == 'weak_password') {
+        return 'Password must be at least 6 characters.';
+      }
+      final msg = parsed.message.toLowerCase();
+      if (msg.contains('invalid login') ||
+          msg.contains('invalid credentials')) {
+        return 'Your current password is incorrect.';
+      }
+      if (msg.contains('same password') || msg.contains('different')) {
+        return 'Choose a new password that is different from your old one.';
+      }
+      return 'Could not update your password. Please try again.';
+    } catch (e) {
+      debugPrint('AuthService.updatePasswordInSession error: $e');
+      return 'Could not update your password. Please try again.';
     }
   }
 
