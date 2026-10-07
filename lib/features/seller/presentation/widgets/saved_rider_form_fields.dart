@@ -79,8 +79,10 @@ class SavedRiderFormFields extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         ThriftTextField(
-          label: 'Plate number',
-          hint: 'ABC 1234',
+          label: vehicle.requiresPlate
+              ? 'Plate number'
+              : 'Plate number (optional)',
+          hint: vehicle.requiresPlate ? 'ABC 1234' : 'No plate required',
           controller: plateController,
           error: plateError,
           readOnly: readOnly,

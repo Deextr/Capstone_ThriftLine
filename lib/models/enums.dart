@@ -238,6 +238,9 @@ enum DeliveryVehicleType {
   final String dbValue;
   final String label;
 
+  bool get requiresPlate =>
+      this == motorcycle || this == car || this == van;
+
   static DeliveryVehicleType fromDb(String? value) =>
       DeliveryVehicleType.values.firstWhere(
         (e) => e.dbValue == value,

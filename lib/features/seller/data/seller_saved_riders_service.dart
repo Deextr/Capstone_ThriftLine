@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/ph_phone.dart';
@@ -51,7 +52,9 @@ class SellerSavedRidersService {
     if (nameError != null) return nameError;
     final phoneError = phMobileValidationError(riderPhone);
     if (phoneError != null) return phoneError;
-    if (plateNumber.trim().isEmpty) return 'Enter the plate number.';
+    if (vehicle.requiresPlate && plateNumber.trim().isEmpty) {
+      return 'Enter the plate number.';
+    }
     return null;
   }
 
@@ -100,6 +103,9 @@ class SellerSavedRidersService {
         rider: SellerSavedRider.fromRow(Map<String, dynamic>.from(row)),
         error: null,
       );
+    } on PostgrestException catch (e) {
+      debugPrint('SellerSavedRidersService.create: $e');
+      return (rider: null, error: _writeErrorMessage(e));
     } catch (e) {
       debugPrint('SellerSavedRidersService.create: $e');
       return (rider: null, error: 'Could not save rider. Please try again.');
@@ -157,10 +163,28 @@ class SellerSavedRidersService {
         rider: SellerSavedRider.fromRow(Map<String, dynamic>.from(row)),
         error: null,
       );
+    } on PostgrestException catch (e) {
+      debugPrint('SellerSavedRidersService.update: $e');
+      return (rider: null, error: _writeErrorMessage(e));
     } catch (e) {
       debugPrint('SellerSavedRidersService.update: $e');
       return (rider: null, error: 'Could not update rider. Please try again.');
     }
+  }
+
+  String _writeErrorMessage(PostgrestException error) {
+    if (error.code == '23505' ||
+        error.message.contains('seller_saved_riders_rider_phone') ||
+        error.message.contains('seller_saved_riders_plate_number')) {
+      if (error.message.contains('rider_phone')) {
+        return 'That contact number is already assigned to another rider.';
+      }
+      if (error.message.contains('plate_number')) {
+        return 'That plate number is already assigned to another rider.';
+      }
+      return 'A rider with that contact number or plate number already exists.';
+    }
+    return 'Could not save rider. Please try again.';
   }
 
   Future<String?> delete(String savedRiderId) async {
