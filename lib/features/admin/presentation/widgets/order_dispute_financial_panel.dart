@@ -6,12 +6,15 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../models/community_report_model.dart';
 import '../../../../models/order_model.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../trust_safety/data/report_evidence_attempt_rules.dart';
+import '../../../trust_safety/data/report_reasons.dart';
 import '../../data/admin_report_decision_content.dart';
 import '../../data/admin_review_rules.dart';
 import '../../data/delivery_payment_hold.dart';
 import '../../data/delivery_payment_resolve.dart';
 import '../widgets/admin_review_widgets.dart';
 import 'admin_report_decision_widgets.dart';
+import 'community_dispute_decision_cards.dart';
 
 enum OrderDisputeFinancialChoice { refundBuyer, releaseSeller, requestEvidence }
 
@@ -84,38 +87,73 @@ class _OrderDisputeFinancialPanelState
       );
     }
 
+    final report = widget.report;
+    final canRequestEvidence = report == null
+        ? true
+        : canAdminRequestMoreReportEvidence(
+            status: report.status,
+            evidenceAttemptCount: report.evidenceAttemptCount,
+          );
+    final evidenceDisabledReason = report == null
+        ? null
+        : adminEvidenceRequestDisabledReason(
+            status: report.status,
+            evidenceAttemptCount: report.evidenceAttemptCount,
+          );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Choose action',
-          style: AppTypography.subheading.copyWith(fontSize: 15),
+        if (report != null)
+          Text(
+            'Evidence rounds completed: ${report.evidenceAttemptCount} of $kReportMaxEvidenceAttempts',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        const SizedBox(height: 12),
+        CommunityDisputeDecisionCardGroup(
+          selectedValue: _choice == null
+              ? null
+              : switch (_choice!) {
+                  OrderDisputeFinancialChoice.requestEvidence =>
+                    'request_evidence',
+                  OrderDisputeFinancialChoice.refundBuyer => 'refund_buyer',
+                  OrderDisputeFinancialChoice.releaseSeller => 'release_seller',
+                },
+          onSelected: (value) {
+            if (widget.isSaving) return;
+            final choice = switch (value) {
+              'request_evidence' => OrderDisputeFinancialChoice.requestEvidence,
+              'refund_buyer' => OrderDisputeFinancialChoice.refundBuyer,
+              'release_seller' => OrderDisputeFinancialChoice.releaseSeller,
+              _ => null,
+            };
+            if (choice != null) _select(choice);
+          },
+          options: [
+            for (final option in kOrderDisputeDecisionOptions)
+              CommunityDisputeDecisionOptionData(
+                value: option.value,
+                title: option.title,
+                description: option.description,
+                icon: option.icon,
+                enabled: option.value == 'request_evidence'
+                    ? canRequestEvidence
+                    : true,
+              ),
+          ],
         ),
-        const SizedBox(height: 8),
-        AdminChoiceRow(
-          label: 'Request more evidence',
-          hint: 'Escrow stays held · case stays open',
-          selected: _choice == OrderDisputeFinancialChoice.requestEvidence,
-          onTap: widget.isSaving
-              ? () {}
-              : () => _select(OrderDisputeFinancialChoice.requestEvidence),
-        ),
-        AdminChoiceRow(
-          label: 'Refund buyer',
-          hint: 'Refund escrow · closes report',
-          selected: _choice == OrderDisputeFinancialChoice.refundBuyer,
-          onTap: widget.isSaving
-              ? () {}
-              : () => _select(OrderDisputeFinancialChoice.refundBuyer),
-        ),
-        AdminChoiceRow(
-          label: 'Release payment to seller',
-          hint: 'Pay seller · closes report',
-          selected: _choice == OrderDisputeFinancialChoice.releaseSeller,
-          onTap: widget.isSaving
-              ? () {}
-              : () => _select(OrderDisputeFinancialChoice.releaseSeller),
-        ),
+        if (!canRequestEvidence && evidenceDisabledReason != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            evidenceDisabledReason,
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+        ],
         if (_choice == OrderDisputeFinancialChoice.requestEvidence)
           _buildEvidenceRequestSection(),
         if (_choice == OrderDisputeFinancialChoice.refundBuyer)

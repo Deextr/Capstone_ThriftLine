@@ -10,6 +10,9 @@ import '../../data/admin_dashboard_models.dart';
 import '../../data/admin_moderation_queue_service.dart';
 import '../../data/admin_review_rules.dart';
 import '../widgets/admin_ui_components.dart';
+import '../widgets/community_dispute_review_modal.dart';
+import '../widgets/looking_for_dispute_review_modal.dart';
+import '../widgets/order_dispute_review_modal.dart';
 
 class AdminWebDisputesPage extends StatefulWidget {
   const AdminWebDisputesPage({super.key});
@@ -35,19 +38,64 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
 
   void _syncRouteCategory() {
     if (!mounted) return;
-    final category = GoRouterState.of(context).uri.queryParameters['category'];
-    context.read<AdminDisputesHubController>().applyCategoryFromRoute(category);
+    final path = GoRouterState.of(context).uri.path;
+    if (path == RouteNames.adminReportsAll) {
+      context.read<AdminDisputesHubController>().applyCategoryFromRoute('all');
+    } else if (path == RouteNames.adminReportsCommunity) {
+      context.read<AdminDisputesHubController>().applyCategoryFromRoute(
+        'community',
+      );
+    } else if (path == RouteNames.adminReportsOrders) {
+      context.read<AdminDisputesHubController>().applyCategoryFromRoute(
+        'order',
+      );
+    } else if (path == RouteNames.adminReportsLookingFor) {
+      context.read<AdminDisputesHubController>().applyCategoryFromRoute(
+        'looking_for',
+      );
+    } else {
+      final category = GoRouterState.of(
+        context,
+      ).uri.queryParameters['category'];
+      context.read<AdminDisputesHubController>().applyCategoryFromRoute(
+        category,
+      );
+    }
   }
 
   Future<void> _openCase(AdminModerationCaseRow row) async {
+    final bool? result = switch (row.caseKind) {
+      'community_report' => await showCommunityDisputeReviewModal(
+        context: context,
+        reportId: row.caseId,
+      ),
+      'order_report' => await showOrderDisputeReviewModal(
+        context: context,
+        reportId: row.caseId,
+      ),
+      'looking_for_report' => await showLookingForDisputeReviewModal(
+        context: context,
+        reportId: row.caseId,
+      ),
+      _ => await _openLegacyDisputeRoute(row),
+    };
+
+    if (result == true && mounted) {
+      await context.read<AdminDisputesHubController>().load();
+    }
+  }
+
+  Future<bool?> _openLegacyDisputeRoute(AdminModerationCaseRow row) async {
     final route = switch (row.source) {
+      'delivery_dispute' => RouteNames.adminDisputeDetailFor(row.caseId),
       'looking_for' => RouteNames.adminLookingForReportFor(row.caseId),
+      _ when row.caseKind == 'order_report' => RouteNames.adminReportDetailFor(
+        row.caseId,
+      ),
       _ => RouteNames.adminReportDetailFor(row.caseId),
     };
     await context.push(route);
-    if (mounted) {
-      await context.read<AdminDisputesHubController>().load();
-    }
+    return null;
   }
 
   @override
@@ -59,27 +107,13 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final cat in AdminModerationCategory.values)
-                _CategoryChip(
-                  label: adminModerationCategoryLabel(cat),
-                  selected: controller.category == cat,
-                  onTap: () {
-                    controller.setCategory(cat);
-                    context.go(switch (cat) {
-                      AdminModerationCategory.community =>
-                        RouteNames.adminReportsCommunity,
-                      AdminModerationCategory.order =>
-                        RouteNames.adminReportsOrders,
-                      AdminModerationCategory.lookingFor =>
-                        RouteNames.adminReportsLookingFor,
-                    });
-                  },
-                ),
-            ],
+          // Segmented Tab Navigation for Disputes categories
+          DisputeCategorySegmentedNav(
+            selectedCategory: controller.category,
+            onCategorySelected: (cat) {
+              controller.setCategory(cat);
+              context.go(RouteNames.adminDisputesForCategory(cat));
+            },
           ),
           const SizedBox(height: 16),
           AdminFilterBar(
@@ -87,7 +121,7 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
             onReset: () {
               _searchController.clear();
               controller.resetFilters();
-              context.go(RouteNames.adminReportsCommunity);
+              context.go(RouteNames.adminReportsAll);
             },
             trailing: OutlinedButton.icon(
               onPressed: controller.isLoading ? null : () => controller.load(),
@@ -210,11 +244,11 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
           ],
           AdminDataTable(
             isLoading: controller.isLoading,
-            minWidth: 820,
+            minWidth: 840,
             columnFlex: const [2, 2, 3, 2, 2, 1],
             emptyTitle: 'No disputes found',
             emptyMessage:
-                'Try adjusting your search or filters. New reports and delivery problems appear here when submitted.',
+                'Try adjusting your search or filters. New disputes and reports appear here when submitted.',
             onResetFilters: controller.hasActiveFilters
                 ? controller.resetFilters
                 : null,
@@ -223,9 +257,9 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
             ],
             columns: const [
               'Case',
-              'Type',
-              'Reported by',
-              'Submitted',
+              'Dispute Type',
+              'Reporter',
+              'Date Submitted',
               'Status',
               'Action',
             ],
@@ -278,41 +312,79 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
   }
 }
 
-class _CategoryChip extends StatelessWidget {
-  const _CategoryChip({
+class DisputeCategorySegmentedNav extends StatelessWidget {
+  const DisputeCategorySegmentedNav({
+    super.key,
+    required this.selectedCategory,
+    required this.onCategorySelected,
+  });
+
+  final AdminModerationCategory selectedCategory;
+  final ValueChanged<AdminModerationCategory> onCategorySelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+        ),
+        padding: const EdgeInsets.all(4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final cat in AdminModerationCategory.values)
+              _CategoryTabItem(
+                label: adminModerationCategoryLabel(cat),
+                isSelected: selectedCategory == cat,
+                onTap: () => onCategorySelected(cat),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryTabItem extends StatelessWidget {
+  const _CategoryTabItem({
     required this.label,
-    required this.selected,
+    required this.isSelected,
     required this.onTap,
   });
 
   final String label;
-  final bool selected;
+  final bool isSelected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected
-          ? AppColors.primary.withValues(alpha: 0.1)
-          : AppColors.surface,
-      borderRadius: BorderRadius.circular(20),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            color: isSelected
+                ? AppColors.primary.withValues(alpha: 0.12)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
-              width: selected ? 1.5 : 1,
+              color: isSelected ? AppColors.primary : Colors.transparent,
+              width: 1.2,
             ),
           ),
           child: Text(
             label,
             style: AppTypography.label.copyWith(
-              color: selected ? AppColors.primary : AppColors.textSecondary,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             ),
           ),
         ),

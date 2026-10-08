@@ -8,7 +8,7 @@ import '../data/admin_review_rules.dart';
 class AdminDisputesHubController extends ChangeNotifier {
   AdminDisputesHubController({
     required SupabaseService supabase,
-    AdminModerationCategory initialCategory = AdminModerationCategory.community,
+    AdminModerationCategory initialCategory = AdminModerationCategory.all,
   }) : _service = AdminModerationQueueService(supabase),
        _category = initialCategory {
     load();
@@ -90,7 +90,7 @@ class AdminDisputesHubController extends ChangeNotifier {
   }
 
   void resetFilters() {
-    _category = AdminModerationCategory.community;
+    _category = AdminModerationCategory.all;
     _statusFilter = AdminReportListFilter.all;
     _dateWindow = null;
     searchController.clear();

@@ -11,6 +11,7 @@ import '../../../providers/auth_provider.dart';
 import '../../buyer/data/order_query.dart';
 import '../controllers/report_user_controller.dart';
 import '../data/report_evidence_upload.dart';
+import '../data/report_evidence_attempt_rules.dart';
 import '../data/report_reasons.dart';
 
 class MyReportsController extends ChangeNotifier {
@@ -54,9 +55,11 @@ class MyReportsController extends ChangeNotifier {
 
   bool get canSubmitResubmit =>
       _report != null &&
-      reportStatusAllowsResubmit(_report!.status) &&
+      canReporterSubmitAdditionalEvidence(
+        status: _report!.status,
+        evidenceAttemptCount: _report!.evidenceAttemptCount,
+      ) &&
       _resubmitEvidence.length >= kReportEvidenceMinCount &&
-      (_report!.evidenceAttemptCount < kReportMaxEvidenceAttempts) &&
       !_isResubmitting;
 
   Future<void> load({bool showSpinner = true}) async {

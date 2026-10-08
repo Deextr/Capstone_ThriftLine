@@ -191,6 +191,7 @@ abstract final class RouteNames {
   static const String adminReview = '/admin/review/:id';
   static const String adminReports = '/admin/reports';
   static const String adminLogs = '/admin/logs';
+  static const String adminReportsAll = '/admin/reports/all';
   static const String adminReportsCommunity = '/admin/reports/community';
   static const String adminReportsOrders = '/admin/reports/orders';
   static const String adminReportsLookingFor = '/admin/reports/looking-for';
@@ -219,10 +220,10 @@ abstract final class RouteNames {
       '/admin/reports/queue/${adminReportQueuePathSegment(kind)}';
 
   static String adminReportsCategoryFor(AdminReportKind kind) => switch (kind) {
+    AdminReportKind.all => adminReportsAll,
     AdminReportKind.community => adminReportsCommunity,
     AdminReportKind.order => adminReportsOrders,
     AdminReportKind.lookingFor => adminReportsLookingFor,
-    AdminReportKind.all => adminReports,
   };
 
   static String adminDisputeDetailFor(String id) => '/admin/disputes/$id';
@@ -234,6 +235,7 @@ abstract final class RouteNames {
 
   static String adminDisputesForCategory(AdminModerationCategory category) =>
       switch (category) {
+        AdminModerationCategory.all => adminReportsAll,
         AdminModerationCategory.community => adminReportsCommunity,
         AdminModerationCategory.order => adminReportsOrders,
         AdminModerationCategory.lookingFor => adminReportsLookingFor,

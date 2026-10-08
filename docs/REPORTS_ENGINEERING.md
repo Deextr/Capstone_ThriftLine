@@ -10,7 +10,12 @@
 
 `under_review` → (`needs_more_evidence` ↔ resubmit) → `resolved` | `dismissed`
 
-Max **3** evidence submission attempts per case (`evidence_attempt_count`), enforced in RPCs.
+Max **3** reporter evidence **submission rounds** per case (`evidence_attempt_count`),
+enforced in RPCs via `report_max_evidence_attempts()` (keep in sync with
+`kReportMaxEvidenceAttempts`). The counter increments only on successful
+`resubmit_report_evidence`. Admin `needs_more_evidence` decisions do not increment
+it; admins may send a new request only while status is `under_review` and the
+reporter still has submission capacity.
 
 ## Key migration
 

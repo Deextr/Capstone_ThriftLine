@@ -14,6 +14,7 @@ import '../../../../models/enums.dart';
 import '../../../../models/order_model.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/my_reports_controller.dart';
+import '../../data/report_evidence_attempt_rules.dart';
 import '../../data/report_reasons.dart';
 import '../widgets/report_evidence_section.dart';
 
@@ -586,14 +587,13 @@ class _AdminResponseSection extends StatelessWidget {
             style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
-          Text(
-            instruction,
-            style: AppTypography.body.copyWith(height: 1.45),
-          ),
+          Text(instruction, style: AppTypography.body.copyWith(height: 1.45)),
           const SizedBox(height: 8),
           Text(
             'Attempt ${report.evidenceAttemptCount} of $kReportMaxEvidenceAttempts used',
-            style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
         ] else if (!hasResponse && !closed)
           Text(
@@ -665,21 +665,18 @@ class _ResubmitEvidenceSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<MyReportsController>();
-    final nextAttempt = report.evidenceAttemptCount + 1;
-    final isFinal = nextAttempt >= kReportMaxEvidenceAttempts;
+    final showFinalNotice = isReporterFinalEvidenceSubmissionPending(
+      status: report.status,
+      evidenceAttemptCount: report.evidenceAttemptCount,
+    );
 
     return _Section(
       title: 'Submit additional evidence',
       children: [
-        if (isFinal)
-          Text(
-            'This is your final evidence submission for this report.',
-            style: AppTypography.body.copyWith(
-              color: AppColors.textSecondary,
-              height: 1.4,
-            ),
-          ),
-        const SizedBox(height: 12),
+        if (showFinalNotice) ...[
+          const _FinalEvidenceSubmissionNotice(),
+          const SizedBox(height: 16),
+        ],
         ReportEvidenceSection(
           evidence: controller.resubmitEvidence,
           evidenceError: null,
@@ -709,6 +706,59 @@ class _ResubmitEvidenceSection extends StatelessWidget {
               : null,
         ),
       ],
+    );
+  }
+}
+
+class _FinalEvidenceSubmissionNotice extends StatelessWidget {
+  const _FinalEvidenceSubmissionNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            size: 20,
+            color: AppColors.warning.withValues(alpha: 0.95),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Final Evidence Submission',
+                  style: AppTypography.body.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'This is your last opportunity to submit additional evidence '
+                  'for this report. Please review your information and attachments '
+                  'carefully before submitting. You will not be able to submit '
+                  'more evidence after this.',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -39,7 +39,12 @@ class _AdminWebShellState extends State<AdminWebShell> {
         location.startsWith('/admin/review/')) {
       return 'Seller verifications';
     }
-    if (location.startsWith(RouteNames.adminReports)) return 'Reports';
+    if (location == RouteNames.adminReports) return 'Analytics';
+    if (location.startsWith('/admin/reports/') ||
+        location.startsWith(RouteNames.adminDisputes) ||
+        location.startsWith('/admin/looking-for-reports')) {
+      return 'Disputes';
+    }
     if (location.startsWith(RouteNames.adminLogs)) return 'Logs';
     if (location.startsWith(RouteNames.adminUsers)) return 'Users';
     if (location.startsWith(RouteNames.adminOrdersTransactions) ||
@@ -63,8 +68,11 @@ class _AdminWebShellState extends State<AdminWebShell> {
           location == RouteNames.adminOrders ||
           location.startsWith(RouteNames.adminTransactions);
     }
-    if (target == RouteNames.adminReportsCommunity) {
-      return location.startsWith(RouteNames.adminReports) ||
+    if (target == RouteNames.adminReportsAll ||
+        target == RouteNames.adminReportsCommunity) {
+      return (location.startsWith('/admin/reports/') &&
+              location != RouteNames.adminReports) ||
+          location.startsWith(RouteNames.adminDisputes) ||
           location.startsWith('/admin/looking-for-reports');
     }
     return location.startsWith(target);
@@ -104,10 +112,10 @@ class _AdminWebShellState extends State<AdminWebShell> {
         route: RouteNames.adminLogs,
       ),
       _NavItem(
-        label: 'Reports',
-        icon: Icons.flag_outlined,
-        selectedIcon: Icons.flag_rounded,
-        route: RouteNames.adminReportsCommunity,
+        label: 'Disputes',
+        icon: Icons.gavel_outlined,
+        selectedIcon: Icons.gavel_rounded,
+        route: RouteNames.adminReportsAll,
         badge: openCases,
       ),
     ];

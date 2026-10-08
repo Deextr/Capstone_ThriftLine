@@ -198,7 +198,7 @@ class _OverviewCards extends StatelessWidget {
         attention: counts.openReports + counts.openDisputes > 0,
         onTap: () {
           if (webEmbedded) {
-            context.go(RouteNames.adminReportsCommunity);
+            context.go(RouteNames.adminReportsAll);
           } else {
             AdminTabScope.open(context, AdminTabScope.reports);
           }
@@ -379,7 +379,7 @@ class _NeedsAttention extends StatelessWidget {
           actionLabel: 'View all',
           onAction: () {
             if (webEmbedded) {
-              context.go(RouteNames.adminReportsCommunity);
+              context.go(RouteNames.adminReportsAll);
             } else {
               AdminTabScope.open(context, AdminTabScope.reports);
             }

@@ -29,6 +29,7 @@ class LookingForAdminReport {
     required this.reportedRole,
     required this.reportedAccountStatus,
     required this.confirmedViolations,
+    this.evidenceAttemptCount = 1,
     this.imageUrl,
     this.resolvedAt,
     this.moderationRemovedAt,
@@ -60,6 +61,7 @@ class LookingForAdminReport {
   final String reportedRole;
   final String reportedAccountStatus;
   final int confirmedViolations;
+  final int evidenceAttemptCount;
 
   bool get canDecide =>
       status == 'under_review' || status == 'needs_more_evidence';
@@ -106,6 +108,8 @@ class LookingForAdminReport {
       reportedRole: row['reported_role'] as String? ?? '',
       reportedAccountStatus: row['reported_account_status'] as String? ?? '',
       confirmedViolations: (row['confirmed_violations'] as num?)?.toInt() ?? 0,
+      evidenceAttemptCount:
+          (row['evidence_attempt_count'] as num?)?.toInt() ?? 1,
     );
   }
 }

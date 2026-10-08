@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 /// Predefined admin response templates and evidence types for report decisions.
 
 class AdminResponseTemplate {
@@ -62,6 +64,118 @@ const List<AdminResponseTemplate> kAdminEvidenceRequestTemplates = [
     label: 'Additional evidence required',
     message:
         'We need more supporting evidence before we can continue investigating this report.',
+  ),
+];
+
+/// Short labels for the Community Dispute Review modal primary actions.
+String communityDisputeModalActionLabel(String decision) => switch (decision) {
+  'resolved' => 'Resolve Dispute',
+  'needs_more_evidence' => 'Send Evidence Request',
+  'dismissed' => 'Dismiss Dispute',
+  _ => 'Submit decision',
+};
+
+String communityDisputeDecisionFormTitle(String decision) => switch (decision) {
+  'resolved' => 'Resolution message',
+  'needs_more_evidence' => 'Evidence request instructions',
+  'dismissed' => 'Dismissal message',
+  _ => 'Message to reporter',
+};
+
+String communityDisputeDecisionFormHint(String decision) => switch (decision) {
+  'resolved' =>
+    'Confirm the outcome and explain what action was taken on this dispute.',
+  'needs_more_evidence' =>
+    'Tell the reporter exactly what photos or details to submit next.',
+  'dismissed' =>
+    'Explain why this report is closed without a policy violation.',
+  _ => '',
+};
+
+/// Templates shown for the selected community dispute decision only.
+List<AdminResponseTemplate> adminCommunityDecisionTemplatesFor(
+  String decision,
+) {
+  const custom = AdminResponseTemplate(
+    id: 'custom',
+    label: 'Write custom message',
+    message: '',
+  );
+  return switch (decision) {
+    'resolved' => [
+      kAdminCommunityDecisionTemplates.firstWhere((t) => t.id == 'resolved'),
+      custom,
+    ],
+    'dismissed' => [
+      kAdminCommunityDecisionTemplates.firstWhere((t) => t.id == 'dismissed'),
+      custom,
+    ],
+    'needs_more_evidence' => [...kAdminEvidenceRequestTemplates, custom],
+    _ => kAdminCommunityDecisionTemplates,
+  };
+}
+
+class CommunityDisputeDecisionOptionData {
+  const CommunityDisputeDecisionOptionData({
+    required this.value,
+    required this.title,
+    required this.description,
+    required this.icon,
+    this.enabled = true,
+  });
+
+  final String value;
+  final String title;
+  final String description;
+  final IconData icon;
+  final bool enabled;
+}
+
+const List<CommunityDisputeDecisionOptionData> kOrderDisputeDecisionOptions = [
+  CommunityDisputeDecisionOptionData(
+    value: 'request_evidence',
+    title: 'Request Evidence',
+    description:
+        'Hold escrow and ask a party for more proof before a final payment outcome.',
+    icon: Icons.add_photo_alternate_outlined,
+  ),
+  CommunityDisputeDecisionOptionData(
+    value: 'refund_buyer',
+    title: 'Refund Buyer',
+    description: 'Return escrow to the buyer and close this order report.',
+    icon: Icons.replay_outlined,
+  ),
+  CommunityDisputeDecisionOptionData(
+    value: 'release_seller',
+    title: 'Release to Seller',
+    description:
+        'Release held payment to the seller and close this order report.',
+    icon: Icons.payments_outlined,
+  ),
+];
+
+const List<CommunityDisputeDecisionOptionData>
+kCommunityDisputeDecisionOptions = [
+  CommunityDisputeDecisionOptionData(
+    value: 'resolved',
+    title: 'Resolve Dispute',
+    description:
+        'Close the case with a supported resolution after confirming a violation.',
+    icon: Icons.check_circle_outline_rounded,
+  ),
+  CommunityDisputeDecisionOptionData(
+    value: 'needs_more_evidence',
+    title: 'Request Evidence',
+    description:
+        'Ask the reporter for more proof before you make a final decision.',
+    icon: Icons.add_photo_alternate_outlined,
+  ),
+  CommunityDisputeDecisionOptionData(
+    value: 'dismissed',
+    title: 'Dismiss Dispute',
+    description:
+        'Close the report when evidence does not support a policy violation.',
+    icon: Icons.cancel_outlined,
   ),
 ];
 

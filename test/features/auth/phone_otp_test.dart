@@ -79,6 +79,24 @@ void main() {
   });
 
   group('edit profile phone validation', () {
+    test('accepts Globe and TM numbers in local 09 form', () {
+      expect(phMobile09EditProfileValidationError('09171234567'), isNull);
+      expect(phMobile09EditProfileValidationError('09051234567'), isNull);
+      expect(phMobile09EditProfileValidationError('09151234567'), isNull);
+    });
+
+    test('accepts +63 and spaced forms before the 09 rule', () {
+      expect(phMobile09EditProfileValidationError('+639171234567'), isNull);
+      expect(phMobile09EditProfileValidationError('639171234567'), isNull);
+      expect(phMobile09EditProfileValidationError('0917 123 4567'), isNull);
+      expect(collapsePhMobileFieldText('+639171234567'), '09171234567');
+      expect(collapsePhMobileFieldText('639171234567'), '09171234567');
+      expect(
+        collapsePhMobileFieldText('6391712345678', previous: '09171234567'),
+        '09171234567',
+      );
+    });
+
     test('rejects overlong paste safely', () {
       expect(
         phMobile09EditProfileValidationError('12093129032193'),
@@ -86,12 +104,53 @@ void main() {
       );
     });
 
-    test('requires 09 prefix', () {
+    test(
+      'rejects short numbers, letters, and numbers that do not start with 09',
+      () {
+        expect(
+          phMobile09EditProfileValidationError('0917123456'),
+          'Phone number must contain exactly 11 digits.',
+        );
+        expect(
+          phMobile09EditProfileValidationError('0917abc4567'),
+          'Phone number must contain exactly 11 digits.',
+        );
+        expect(
+          phMobile09EditProfileValidationError('08171234567'),
+          'Enter a valid 11-digit Philippine mobile number starting with 09.',
+        );
+      },
+    );
+
+    test('does not treat a truncated +63 value as a finished 09 number', () {
+      expect(normalizePhMobile('63917123456'), isNull);
       expect(
-        phMobile09EditProfileValidationError('08171234567'),
-        'Enter a valid 11-digit Philippine mobile number starting with 09.',
+        phMobile09EditProfileValidationError('63917123456'),
+        'Phone number must contain exactly 11 digits.',
       );
     });
+  });
+
+  group('SMS delivery errors stay separate from format errors', () {
+    test(
+      'provider credit and auth failures are not shown as an invalid number',
+      () {
+        const credits = PhoneOtpResult.failure(
+          'Insufficient sms credits',
+          code: PhoneOtpErrorCode.providerCredits,
+        );
+        const auth = PhoneOtpResult.failure(
+          '{"error":"invalid api key"}',
+          code: PhoneOtpErrorCode.providerAuth,
+        );
+        expect(phoneOtpUserMessage(credits), kSmsDeliveryUnavailableMessage);
+        expect(phoneOtpUserMessage(auth), kSmsDeliveryUnavailableMessage);
+        expect(
+          phoneOtpUserMessage(credits),
+          isNot(contains('Enter a valid 11-digit Philippine mobile number')),
+        );
+      },
+    );
   });
 
   group('AuthUser.hasVerifiedAccountPhone', () {

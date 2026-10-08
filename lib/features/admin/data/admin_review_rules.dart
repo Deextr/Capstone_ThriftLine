@@ -32,17 +32,19 @@ enum AdminReportListFilter {
 
 enum AdminReportKind { all, community, order, lookingFor }
 
-enum AdminModerationCategory { community, order, lookingFor }
+enum AdminModerationCategory { all, community, order, lookingFor }
 
 String adminModerationCategoryLabel(AdminModerationCategory category) =>
     switch (category) {
-      AdminModerationCategory.community => 'Community Reports',
-      AdminModerationCategory.order => 'Order Reports',
-      AdminModerationCategory.lookingFor => 'Looking For Reports',
+      AdminModerationCategory.all => 'All',
+      AdminModerationCategory.community => 'Community Disputes',
+      AdminModerationCategory.order => 'Order Disputes',
+      AdminModerationCategory.lookingFor => 'Looking For Disputes',
     };
 
 String adminModerationCategoryParam(AdminModerationCategory category) =>
     switch (category) {
+      AdminModerationCategory.all => 'all',
       AdminModerationCategory.community => 'community',
       AdminModerationCategory.order => 'order',
       AdminModerationCategory.lookingFor => 'looking_for',
@@ -50,6 +52,7 @@ String adminModerationCategoryParam(AdminModerationCategory category) =>
 
 AdminModerationCategory? adminModerationCategoryFromParam(String? raw) =>
     switch (raw?.trim().toLowerCase()) {
+      'all' => AdminModerationCategory.all,
       'community' => AdminModerationCategory.community,
       'order' || 'orders' => AdminModerationCategory.order,
       'looking_for' || 'looking-for' => AdminModerationCategory.lookingFor,
@@ -59,24 +62,24 @@ AdminModerationCategory? adminModerationCategoryFromParam(String? raw) =>
 AdminModerationCategory adminModerationCategoryFromReportKind(
   AdminReportKind kind,
 ) => switch (kind) {
+  AdminReportKind.all => AdminModerationCategory.all,
   AdminReportKind.community => AdminModerationCategory.community,
   AdminReportKind.order => AdminModerationCategory.order,
   AdminReportKind.lookingFor => AdminModerationCategory.lookingFor,
-  AdminReportKind.all => AdminModerationCategory.community,
 };
 
 String adminModerationCaseKindLabel(String caseKind) => switch (caseKind) {
-  'community_report' => 'Community Report',
-  'order_report' => 'Order Report',
-  'looking_for_report' => 'Looking For Report',
-  _ => 'Case',
+  'community_report' => 'Community Dispute',
+  'order_report' => 'Order Dispute',
+  'looking_for_report' => 'Looking For Dispute',
+  _ => 'Dispute',
 };
 
 String adminModerationCaseKindShortLabel(String caseKind) => switch (caseKind) {
   'community_report' => 'Community',
   'order_report' => 'Order',
   'looking_for_report' => 'Looking For',
-  _ => 'Case',
+  _ => 'Dispute',
 };
 
 String adminModerationCaseRef(String caseId) =>
@@ -115,10 +118,10 @@ bool isAdminOrderReport({required String category, String? orderId}) {
 }
 
 String adminReportKindLabel(AdminReportKind kind) => switch (kind) {
-  AdminReportKind.all => 'All Reports',
-  AdminReportKind.community => 'Community Reports',
-  AdminReportKind.order => 'Order Reports',
-  AdminReportKind.lookingFor => 'Looking For Reports',
+  AdminReportKind.all => 'All Disputes',
+  AdminReportKind.community => 'Community Disputes',
+  AdminReportKind.order => 'Order Disputes',
+  AdminReportKind.lookingFor => 'Looking For Disputes',
 };
 
 String adminReportKindHubSubtitle(AdminReportKind kind) => switch (kind) {

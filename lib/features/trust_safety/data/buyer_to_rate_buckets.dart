@@ -1,3 +1,4 @@
+import '../../../models/enums.dart';
 import '../../../models/order_model.dart';
 import '../../../models/review_model.dart';
 import '../../buyer/data/buyer_purchase_category.dart';
@@ -29,6 +30,33 @@ class BuyerRatedPurchase {
   final ReviewModel review;
 }
 
+OrderModel _fallbackOrderForReview(ReviewModel review) {
+  final shortOrderNum = review.orderId.length > 8
+      ? review.orderId.substring(0, 8).toUpperCase()
+      : review.orderId.toUpperCase();
+  return OrderModel(
+    id: review.orderId,
+    orderNumber: shortOrderNum,
+    productId: '',
+    buyerId: review.reviewerId,
+    sellerId: review.reviewedUserId,
+    productTitle: 'Completed Order #$shortOrderNum',
+    productImage: '',
+    sellerName: 'Seller',
+    buyerName: review.reviewerName,
+    buyerAvatar: review.reviewerAvatar,
+    amount: 0,
+    shippingFee: 0,
+    platformFee: 0,
+    total: 0,
+    status: OrderStatus.completed,
+    paymentMethod: PaymentMethod.gcash,
+    deliveryMethod: DeliveryMethod.standard,
+    shippingAddress: '',
+    createdAt: review.createdAt,
+  );
+}
+
 /// Submitted buyer-to-seller reviews paired with their orders.
 List<BuyerRatedPurchase> buyerReviewHistory(
   Iterable<OrderModel> orders,
@@ -38,12 +66,11 @@ List<BuyerRatedPurchase> buyerReviewHistory(
   final entries = myReviews.values
       .where((review) => review.reviewType == 'buyer_to_seller')
       .map((review) {
-        final order = byId[review.orderId];
-        if (order == null) return null;
+        final order = byId[review.orderId] ?? _fallbackOrderForReview(review);
         return BuyerRatedPurchase(order: order, review: review);
       })
-      .whereType<BuyerRatedPurchase>()
       .toList();
   entries.sort((a, b) => b.review.createdAt.compareTo(a.review.createdAt));
   return entries;
 }
+

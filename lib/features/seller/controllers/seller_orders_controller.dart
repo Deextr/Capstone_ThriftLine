@@ -295,6 +295,20 @@ class SellerOrdersController extends ChangeNotifier {
           ),
           callback: (_) => unawaited(load(showSpinner: false)),
         );
+      } else {
+        channel = channel.onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'reviews',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'reviewed_user_id',
+            value: myId,
+          ),
+          callback: (_) {
+            unawaited(_auth.reloadUser());
+          },
+        );
       }
       _channel = channel.subscribe();
     } catch (e) {

@@ -1,27 +1,50 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../models/review_model.dart';
 import '../../buyer/data/order_query.dart';
 import 'review_photo_upload.dart';
 
-const _reviewSelect =
+const String _reviewSelectWithPhotos =
     '*, review_photos(review_photo_id, file_path, display_order, created_at)';
+const String _reviewSelectSimple = '*';
+
+/// Runs a reviews select with photo embed; retries without photos when schema
+/// cache or RLS prevents the nested read.
+Future<T> runReviewSelect<T>(Future<T> Function(String select) run) async {
+  try {
+    return await run(_reviewSelectWithPhotos);
+  } on PostgrestException catch (e) {
+    debugPrint(
+      'Review select with review_photos failed ($e); retrying simple select',
+    );
+    return await run(_reviewSelectSimple);
+  } catch (e) {
+    debugPrint('Review select error: $e');
+    return await run(_reviewSelectSimple);
+  }
+}
 
 Future<Map<String, ReviewModel>> fetchMyReviewsForOrders(
   SupabaseService supabase,
   String reviewerId,
   Iterable<String> orderIds,
 ) async {
+  if (reviewerId.isEmpty) return {};
   final ids = orderIds.where((id) => id.isNotEmpty).toSet().toList();
-  if (ids.isEmpty || reviewerId.isEmpty) return {};
 
   try {
-    final rows = await supabase.client
-        .from('reviews')
-        .select(_reviewSelect)
-        .eq('reviewer_id', reviewerId)
-        .inFilter('order_id', ids);
+    final rows = await runReviewSelect((select) {
+      var query = supabase.client
+          .from('reviews')
+          .select(select)
+          .eq('reviewer_id', reviewerId);
+      if (ids.isNotEmpty) {
+        query = query.inFilter('order_id', ids);
+      }
+      return query;
+    });
 
     final out = <String, ReviewModel>{};
     for (final raw in rows as List<dynamic>) {
@@ -40,6 +63,39 @@ Future<Map<String, ReviewModel>> fetchMyReviewsForOrders(
   }
 }
 
+Future<Map<String, ReviewModel>> fetchMyBuyerReviewsMap(
+  SupabaseService supabase,
+  String reviewerId,
+) async {
+  if (reviewerId.isEmpty) return {};
+
+  try {
+    final rows = await runReviewSelect((select) {
+      return supabase.client
+          .from('reviews')
+          .select(select)
+          .eq('reviewer_id', reviewerId)
+          .eq('review_type', 'buyer_to_seller')
+          .order('created_at', ascending: false);
+    });
+
+    final out = <String, ReviewModel>{};
+    for (final raw in rows as List<dynamic>) {
+      final review = _withPhotoUrls(
+        supabase,
+        ReviewModel.fromSupabase(raw as Map<String, dynamic>),
+      );
+      if (review.orderId.isNotEmpty) {
+        out[review.orderId] = review;
+      }
+    }
+    return out;
+  } catch (e) {
+    debugPrint('fetchMyBuyerReviewsMap error: $e');
+    return {};
+  }
+}
+
 Future<List<ReviewModel>> fetchReviewsForUser(
   SupabaseService supabase,
   String reviewedUserId, {
@@ -48,12 +104,14 @@ Future<List<ReviewModel>> fetchReviewsForUser(
   if (reviewedUserId.isEmpty) return [];
 
   try {
-    final rows = await supabase.client
-        .from('reviews')
-        .select(_reviewSelect)
-        .eq('reviewed_user_id', reviewedUserId)
-        .order('created_at', ascending: false)
-        .limit(limit);
+    final rows = await runReviewSelect((select) {
+      return supabase.client
+          .from('reviews')
+          .select(select)
+          .eq('reviewed_user_id', reviewedUserId)
+          .order('created_at', ascending: false)
+          .limit(limit);
+    });
 
     final reviews = (rows as List<dynamic>)
         .map(
@@ -106,12 +164,14 @@ Future<List<ReviewModel>> fetchMyBuyerToSellerReviews(
   if (reviewerId.isEmpty) return [];
 
   try {
-    final rows = await supabase.client
-        .from('reviews')
-        .select(_reviewSelect)
-        .eq('reviewer_id', reviewerId)
-        .eq('review_type', 'buyer_to_seller')
-        .order('created_at', ascending: false);
+    final rows = await runReviewSelect((select) {
+      return supabase.client
+          .from('reviews')
+          .select(select)
+          .eq('reviewer_id', reviewerId)
+          .eq('review_type', 'buyer_to_seller')
+          .order('created_at', ascending: false);
+    });
 
     return (rows as List<dynamic>)
         .map(

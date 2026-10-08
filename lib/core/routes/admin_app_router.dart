@@ -100,7 +100,7 @@ GoRouter createAdminAppRouter({required AuthProvider authProvider}) {
           final kind = adminReportKindFromQueuePath(
             state.pathParameters['kind'] ?? '',
           );
-          if (kind == null) return RouteNames.adminReportsCommunity;
+          if (kind == null) return RouteNames.adminReportsAll;
           return RouteNames.adminReportsCategoryFor(kind);
         },
       ),
@@ -145,6 +145,16 @@ GoRouter createAdminAppRouter({required AuthProvider authProvider}) {
                 supabase: context.read<SupabaseService>(),
               ),
               child: const AdminWebAnalyticsReportsPage(),
+            ),
+          ),
+          GoRoute(
+            path: RouteNames.adminReportsAll,
+            builder: (context, _) => ChangeNotifierProvider(
+              create: (context) => AdminDisputesHubController(
+                supabase: context.read<SupabaseService>(),
+                initialCategory: AdminModerationCategory.all,
+              ),
+              child: const AdminWebDisputesPage(),
             ),
           ),
           GoRoute(
@@ -253,7 +263,7 @@ GoRouter createAdminAppRouter({required AuthProvider authProvider}) {
           ),
           GoRoute(
             path: RouteNames.adminDisputes,
-            redirect: (_, _) => RouteNames.adminReportsCommunity,
+            redirect: (_, _) => RouteNames.adminReportsAll,
           ),
           GoRoute(
             path: RouteNames.adminDisputeDetail,

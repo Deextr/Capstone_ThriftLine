@@ -44,6 +44,7 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
     }
 
     return GestureDetector(
+      behavior: HitTestBehavior.translucent,
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         backgroundColor: AppColors.background,
@@ -66,118 +67,211 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(AppConstants.spacingLg),
-                    child: Text(
-                      controller.errorMessage ?? 'Order not found.',
-                      style: AppTypography.body,
-                      textAlign: TextAlign.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.error_outline_rounded,
+                          size: 48,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          controller.errorMessage ?? 'Order not found.',
+                          style: AppTypography.body,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ThriftButton(
+                          label: 'Go Back',
+                          variant: ThriftButtonVariant.outline,
+                          onPressed: () => context.pop(),
+                        ),
+                      ],
                     ),
                   ),
                 )
-              : Column(
-                  children: [
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                        children: [
-                          Text(
-                            'Rate your experience',
-                            style: AppTypography.heading.copyWith(fontSize: 22),
+              : SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        controller.existing == null
+                            ? 'Rate your experience'
+                            : 'Edit your review',
+                        style: AppTypography.heading.copyWith(fontSize: 22),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        reviewPrompt(
+                          ratingBuyer: controller.isSellerReviewingBuyer,
+                        ),
+                        style: AppTypography.body.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      _OrderContextCard(controller: controller),
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 20,
+                          horizontal: 16,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(
+                            AppConstants.radiusLg,
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            reviewPrompt(
-                              ratingBuyer: controller.isSellerReviewingBuyer,
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Column(
+                          children: [
+                            StarRatingInput(
+                              value: controller.rating,
+                              readOnly: controller.readOnly,
+                              size: 42,
+                              onChanged: controller.setRating,
                             ),
-                            style: AppTypography.body.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          _OrderContext(controller: controller),
-                          const SizedBox(height: 28),
-                          StarRatingInput(
-                            value: controller.rating,
-                            readOnly: controller.readOnly,
-                            onChanged: controller.setRating,
-                          ),
-                          if (controller.rating > 0) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              '${controller.rating} / 5',
-                              textAlign: TextAlign.center,
-                              style: AppTypography.caption.copyWith(
-                                fontWeight: FontWeight.w600,
+                            if (controller.readOnly) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceVariant,
+                                  borderRadius: BorderRadius.circular(
+                                    AppConstants.radiusSm,
+                                  ),
+                                ),
+                                child: Text(
+                                  'The 24-hour edit window has ended.',
+                                  textAlign: TextAlign.center,
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           ],
-                          if (controller.readOnly) ...[
-                            const SizedBox(height: 12),
-                            Text(
-                              'The 24-hour edit window has ended.',
-                              textAlign: TextAlign.center,
-                              style: AppTypography.caption,
-                            ),
-                          ],
-                          const SizedBox(height: 28),
-                          ThriftTextField(
-                            label: 'Comment (optional)',
-                            hint: 'Write your review...',
-                            controller: _comment,
-                            maxLines: 5,
-                            readOnly: controller.readOnly,
-                            onChanged: controller.setComment,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Your review',
+                                style: AppTypography.subheading,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '(optional)',
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                '${controller.comment.trim().length}/$kReviewCommentMaxLength',
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Text(
-                              '${controller.comment.trim().length}/$kReviewCommentMaxLength',
-                              style: AppTypography.caption,
-                            ),
-                          ),
-                          if (!controller.isSellerReviewingBuyer) ...[
-                            const SizedBox(height: 24),
-                            ReviewPhotoSection(
-                              existingPhotos: controller.existingPhotos,
-                              newDrafts: controller.photoDrafts,
-                              readOnly: controller.readOnly,
-                              onAddGallery: () => context
-                                  .read<LeaveReviewController>()
-                                  .addPhotoFromGallery(),
-                              onAddCamera: () => context
-                                  .read<LeaveReviewController>()
-                                  .addPhotoFromCamera(),
-                              onRemoveExisting: (photo) => context
-                                  .read<LeaveReviewController>()
-                                  .markExistingPhotoRemoved(photo),
-                              onRemoveDraft: (i) => context
-                                  .read<LeaveReviewController>()
-                                  .removePhotoDraft(i),
-                            ),
-                          ],
-                          if (controller.errorMessage != null &&
-                              controller.order != null &&
-                              !controller.order!.isCompleted) ...[
-                            const SizedBox(height: 16),
-                            Text(
-                              controller.errorMessage!,
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.error,
+                          TextFormField(
+                            controller: _comment,
+                            readOnly: controller.readOnly,
+                            maxLines: 5,
+                            maxLength: kReviewCommentMaxLength,
+                            style: AppTypography.body,
+                            decoration: InputDecoration(
+                              counterText: '',
+                              hintText: controller.isSellerReviewingBuyer
+                                  ? 'Share how smooth the transaction and communication was...'
+                                  : 'Share details of the item condition, packaging, and communication...',
+                              hintStyle: AppTypography.body.copyWith(
+                                color: AppColors.textHint,
+                              ),
+                              filled: true,
+                              fillColor: AppColors.surface,
+                              contentPadding: const EdgeInsets.all(16),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(
+                                  AppConstants.radiusMd,
+                                ),
+                                borderSide: const BorderSide(
+                                  color: AppColors.border,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(
+                                  AppConstants.radiusMd,
+                                ),
+                                borderSide: const BorderSide(
+                                  color: AppColors.border,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(
+                                  AppConstants.radiusMd,
+                                ),
+                                borderSide: const BorderSide(
+                                  color: AppColors.primary,
+                                  width: 1.5,
+                                ),
                               ),
                             ),
-                          ],
+                            onChanged: controller.setComment,
+                          ),
                         ],
                       ),
-                    ),
-                    if (!controller.readOnly)
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          20,
-                          8,
-                          20,
-                          16 + MediaQuery.viewInsetsOf(context).bottom,
+                      if (!controller.isSellerReviewingBuyer) ...[
+                        const SizedBox(height: 20),
+                        ReviewPhotoSection(
+                          existingPhotos: controller.existingPhotos,
+                          newDrafts: controller.photoDrafts,
+                          readOnly: controller.readOnly,
+                          onAddGallery: () => context
+                              .read<LeaveReviewController>()
+                              .addPhotoFromGallery(),
+                          onAddCamera: () => context
+                              .read<LeaveReviewController>()
+                              .addPhotoFromCamera(),
+                          onRemoveExisting: (photo) => context
+                              .read<LeaveReviewController>()
+                              .markExistingPhotoRemoved(photo),
+                          onRemoveDraft: (i) => context
+                              .read<LeaveReviewController>()
+                              .removePhotoDraft(i),
                         ),
-                        child: ThriftButton(
+                      ],
+                      if (controller.errorMessage != null &&
+                          controller.order != null &&
+                          !controller.order!.isCompleted) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          controller.errorMessage!,
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.error,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                      const SizedBox(height: 28),
+                      if (!controller.readOnly) ...[
+                        ThriftButton(
                           label: controller.existing == null
                               ? 'Submit Review'
                               : 'Save Changes',
@@ -204,15 +298,26 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
                                   showThriftSnackBar(
                                     context,
                                     wasNew
-                                        ? 'Review submitted'
-                                        : 'Review updated',
+                                        ? 'Review submitted successfully!'
+                                        : 'Review updated successfully!',
                                   );
-                                  context.pop();
+                                  context.pop(true);
                                 }
                               : null,
                         ),
-                      ),
-                  ],
+                        if (controller.rating == 0) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Please select a star rating to submit your review',
+                            textAlign: TextAlign.center,
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ],
+                  ),
                 ),
         ),
       ),
@@ -220,55 +325,110 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
   }
 }
 
-class _OrderContext extends StatelessWidget {
-  const _OrderContext({required this.controller});
+class _OrderContextCard extends StatelessWidget {
+  const _OrderContextCard({required this.controller});
 
   final LeaveReviewController controller;
 
   @override
   Widget build(BuildContext context) {
     final order = controller.order!;
-    return Row(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: order.productImage.isEmpty
-              ? Container(
-                  width: 64,
-                  height: 64,
-                  color: AppColors.surfaceVariant,
-                  child: const Icon(
-                    Icons.checkroom_outlined,
-                    color: AppColors.textHint,
+    final isSeller = controller.isSellerReviewingBuyer;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppConstants.radiusLg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: order.productImage.isEmpty
+                ? Container(
+                    width: 64,
+                    height: 64,
+                    color: AppColors.surfaceVariant,
+                    child: const Icon(
+                      Icons.checkroom_outlined,
+                      color: AppColors.textHint,
+                    ),
+                  )
+                : CachedNetworkImage(
+                    imageUrl: order.productImage,
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
+                    placeholder: (_, _) => Container(
+                      width: 64,
+                      height: 64,
+                      color: AppColors.surfaceVariant,
+                    ),
+                    errorWidget: (_, _, _) => Container(
+                      width: 64,
+                      height: 64,
+                      color: AppColors.surfaceVariant,
+                      child: const Icon(
+                        Icons.image_not_supported_outlined,
+                        color: AppColors.textHint,
+                      ),
+                    ),
                   ),
-                )
-              : CachedNetworkImage(
-                  imageUrl: order.productImage,
-                  width: 64,
-                  height: 64,
-                  fit: BoxFit.cover,
-                ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                order.productTitle,
-                style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '#${order.orderNumber} · ${controller.counterpartName}',
-                style: AppTypography.caption,
-              ),
-            ],
           ),
-        ),
-      ],
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  order.productTitle,
+                  style: AppTypography.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      isSeller
+                          ? Icons.person_outline_rounded
+                          : Icons.storefront_outlined,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        controller.counterpartName,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Order #${order.orderNumber}',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textHint,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

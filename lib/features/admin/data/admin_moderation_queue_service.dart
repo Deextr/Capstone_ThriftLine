@@ -235,7 +235,8 @@ class AdminModerationQueueService {
       }
     }
 
-    if (category == AdminModerationCategory.lookingFor) {
+    if (category == AdminModerationCategory.all ||
+        category == AdminModerationCategory.lookingFor) {
       try {
         final lfReports = await _lookingFor.listReports();
         for (final report in lfReports) {
@@ -250,7 +251,16 @@ class AdminModerationQueueService {
       }
     }
 
-    final filtered = rows.where((row) {
+    final seenCaseKeys = <String>{};
+    final uniqueRows = <AdminModerationCaseRow>[];
+    for (final row in rows) {
+      final key = '${row.source}:${row.caseId}';
+      if (seenCaseKeys.add(key)) {
+        uniqueRows.add(row);
+      }
+    }
+
+    final filtered = uniqueRows.where((row) {
       if (!_matchesStatusFilter(row, statusFilter)) return false;
       return _matchesSearch(row, search);
     }).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));

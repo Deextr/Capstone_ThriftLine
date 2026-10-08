@@ -38,7 +38,16 @@ abstract final class PhoneOtpErrorCode {
   static const String alreadyUsed = 'already_used';
   static const String tooManyAttempts = 'too_many_attempts';
   static const String phoneAlreadyInUse = 'phone_already_in_use';
+  static const String providerAuth = 'provider_auth';
+  static const String providerCredits = 'provider_credits';
+  static const String providerError = 'provider_error';
+  static const String providerTimeout = 'provider_timeout';
+  static const String sendFailed = 'send_failed';
+  static const String unavailable = 'unavailable';
 }
+
+const String kSmsDeliveryUnavailableMessage =
+    'Unable to send a verification code right now. Please try again later.';
 
 const String kPhoneAlreadyInUseMessage =
     'This phone number is already in use. Please use a different phone number.';
@@ -72,20 +81,33 @@ String phoneOtpUserMessage(PhoneOtpResult result, {String? fallback}) {
       return kSmsNetworkUnavailableMessage;
     case PhoneOtpErrorCode.phoneAlreadyInUse:
       return kPhoneAlreadyInUseMessage;
+    case PhoneOtpErrorCode.providerAuth:
+    case PhoneOtpErrorCode.providerCredits:
+    case PhoneOtpErrorCode.providerError:
+    case PhoneOtpErrorCode.providerTimeout:
+    case PhoneOtpErrorCode.sendFailed:
+    case PhoneOtpErrorCode.unavailable:
+      return kSmsDeliveryUnavailableMessage;
     default:
       final text = result.error?.trim();
       if (text != null && text.isNotEmpty) {
-        if (text.toLowerCase().contains('connection') ||
-            text.toLowerCase().contains('network')) {
+        final lower = text.toLowerCase();
+        if (lower.contains('{') ||
+            lower.contains('unisms') ||
+            lower.contains('secret') ||
+            lower.contains('fail_reason') ||
+            lower.contains('api key')) {
+          return kSmsDeliveryUnavailableMessage;
+        }
+        if (lower.contains('connection') || lower.contains('network')) {
           return 'Check your internet connection and try again.';
         }
-        if (text.toLowerCase().contains('send')) {
-          return 'We couldn\'t send the verification code. Please try again.';
+        if (lower.contains('send')) {
+          return kSmsDeliveryUnavailableMessage;
         }
+        return text;
       }
-      return fallback ??
-          result.error ??
-          'We couldn\'t send the verification code. Please try again.';
+      return fallback ?? kSmsDeliveryUnavailableMessage;
   }
 }
 

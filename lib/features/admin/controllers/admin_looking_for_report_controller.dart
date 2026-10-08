@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/services/supabase_service.dart';
 import '../data/admin_review_rules.dart';
 import '../data/looking_for_moderation.dart';
+import '../data/looking_for_moderation_decision_content.dart';
 
 class AdminLookingForReportController extends ChangeNotifier {
   AdminLookingForReportController({
@@ -33,14 +34,23 @@ class AdminLookingForReportController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String? get decision => _decision;
   bool get violationConfirmed => _violationConfirmed;
+  String? get rpcDecision =>
+      lookingForDecisionToRpc(_decision) ??
+      (_decision == 'resolved' ||
+              _decision == 'dismissed' ||
+              _decision == 'needs_more_evidence'
+          ? _decision
+          : null);
   String get response => responseController.text;
 
-  bool get canSubmitDecision =>
-      _report != null &&
-      _report!.canDecide &&
-      _decision != null &&
-      adminResponseError(response, decision: _decision) == null &&
-      !_isSaving;
+  bool get canSubmitDecision {
+    final rpc = rpcDecision;
+    return _report != null &&
+        _report!.canDecide &&
+        rpc != null &&
+        adminResponseError(response, decision: rpc) == null &&
+        !_isSaving;
+  }
 
   @override
   void dispose() {
@@ -57,6 +67,8 @@ class AdminLookingForReportController extends ChangeNotifier {
     _violationConfirmed = value;
     notifyListeners();
   }
+
+  void onResponseChanged(String _) => notifyListeners();
 
   Future<void> load() async {
     _isLoading = true;
@@ -83,8 +95,10 @@ class AdminLookingForReportController extends ChangeNotifier {
   Future<String?> submitDecision() async {
     final current = _report;
     final selected = _decision;
+    final rpc = rpcDecision;
     if (current == null ||
         selected == null ||
+        rpc == null ||
         !current.canDecide ||
         _isSaving) {
       return 'This report has already been reviewed.';
@@ -92,11 +106,13 @@ class AdminLookingForReportController extends ChangeNotifier {
     _isSaving = true;
     notifyListeners();
     try {
+      final removePost = lookingForDecisionRequiresViolation(selected);
       final error = await _service.decide(
         reportId: current.id,
-        decision: selected,
+        decision: rpc,
         adminResponse: response.trim(),
-        violationConfirmed: selected == 'resolved' && _violationConfirmed,
+        violationConfirmed:
+            rpc == 'resolved' && (removePost || _violationConfirmed),
       );
       if (error != null) return error;
       await load();
