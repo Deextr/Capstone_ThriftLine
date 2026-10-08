@@ -1,10 +1,15 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/routes/route_names.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../seller/domain/seller_id_type.dart';
 import '../../../seller/domain/external_selling.dart';
@@ -12,6 +17,7 @@ import '../../data/admin_review_rules.dart';
 import '../../data/admin_verification_service.dart';
 import '../../data/external_history_service.dart';
 import '../widgets/admin_review_widgets.dart';
+import '../widgets/admin_ui_components.dart';
 import '../widgets/external_selling_history_section.dart';
 import '../widgets/seller_application_reject_dialog.dart';
 
@@ -82,7 +88,7 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _error = 'Unable to load this application.';
+          _error = 'Unable to load this seller application.';
           _loading = false;
         });
       }
@@ -101,7 +107,7 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
       showThriftSnackBar(
         context,
         decision == 'approved'
-            ? 'Seller approved. They can start listing.'
+            ? 'Seller approved. Their storefront is now active.'
             : 'Application rejected.',
       );
       context.pop();
@@ -133,7 +139,7 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
           maxLines: 3,
           decoration: const InputDecoration(
             labelText: 'Note (optional)',
-            hintText: 'Only other admins see this',
+            hintText: 'Visible only to fellow administrators',
           ),
         ),
         actions: [
@@ -141,7 +147,7 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Save'),
           ),
@@ -161,7 +167,7 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
       final history = await _historyService.load(widget.verificationId);
       if (!mounted) return;
       setState(() => _history = history);
-      showThriftSnackBar(context, 'External transaction updated.');
+      showThriftSnackBar(context, 'External transaction review updated.');
     } catch (e) {
       if (mounted) {
         showThriftSnackBar(
@@ -184,16 +190,17 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
       builder: (dialogCtx) => AlertDialog(
         title: const Text('Approve this seller?'),
         content: const Text(
-          'They will be able to list items. This does not change payments or trust score.',
+          'Approving this application will grant seller privileges. The user will be able to publish listings on ThriftLine.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx, false),
             child: const Text('Keep pending'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.pop(dialogCtx, true),
-            child: const Text('Approve seller'),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Approve Seller'),
           ),
         ],
       ),
@@ -208,19 +215,89 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
     await _review('rejected', reason: reason);
   }
 
+  void _showImageLightbox(String title, String? imageUrl) {
+    if (imageUrl == null || imageUrl.isEmpty) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(24),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 800, maxHeight: 680),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppConstants.radiusLg),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+                child: Row(
+                  children: [
+                    Text(
+                      title,
+                      style: AppTypography.heading.copyWith(fontSize: 16),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: Container(
+                  color: const Color(0xFF0F172A),
+                  padding: const EdgeInsets.all(16),
+                  child: Center(
+                    child: InteractiveViewer(
+                      maxScale: 4.0,
+                      child: CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.contain,
+                        placeholder: (_, _) => const Center(
+                          child: CircularProgressIndicator(color: Colors.white),
+                        ),
+                        errorWidget: (_, _, _) => const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.broken_image,
+                              size: 48,
+                              color: Colors.white54,
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Unable to display document image',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = _application;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isDesktop = screenWidth >= 1024;
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Seller application'),
-        leading: IconButton(
-          tooltip: 'Back',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
-      ),
       body: SafeArea(
         child: _loading
             ? const AdminDetailSkeleton()
@@ -228,99 +305,505 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
             ? AdminErrorState(message: _error!, onRetry: _load)
             : app == null
             ? const AdminEmptyState(
-                title: 'This application is no longer available.',
-                message: 'It may already have been removed.',
+                title: 'Application not found',
+                message: 'This application is no longer available.',
               )
             : ListView(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
                 children: [
-                  AdminStatusChip(
-                    status: app.status,
-                    label: verificationStatusLabel(app.status),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(app.shopName, style: AppTypography.heading),
-                  const SizedBox(height: 4),
-                  Text(
-                    app.applicantName ?? 'Applicant',
-                    style: AppTypography.body.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    [
-                      app.shopAddress,
-                      app.barangay,
-                      app.city,
-                    ].where((part) => part.trim().isNotEmpty).join(', '),
-                    style: AppTypography.caption,
-                  ),
-                  const SizedBox(height: 28),
-                  AdminDetailBlock(
-                    label: 'Identity',
-                    children: [
-                      if (SellerIdType.tryParse(app.idType) case final idType?)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(idType.label, style: AppTypography.body),
-                        ),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          AdminPhotoThumb(label: 'ID front', url: _idUrl),
-                          if (_showIdBack(app))
-                            AdminPhotoThumb(label: 'ID back', url: _idBackUrl),
-                          AdminPhotoThumb(label: 'Selfie', url: _selfieUrl),
-                        ],
-                      ),
-                    ],
-                  ),
-                  AdminDetailBlock(
-                    label: 'Liveness checks',
-                    children: [_LivenessChips(result: app.livenessResult)],
-                  ),
-                  ExternalSellingHistorySection(
-                    claimedRange: app.claimedSellingRange,
-                    items: _history,
-                    busy: _busy,
-                    onReview: _reviewExternal,
-                  ),
-                  if (app.status == 'pending')
-                    AdminDecisionSection(
-                      title: 'Decision',
+                  // Breadcrumbs & Top Bar
+                  _buildBreadcrumbs(app),
+                  const SizedBox(height: 16),
+
+                  // Header banner
+                  _buildHeaderBanner(app),
+                  const SizedBox(height: 24),
+
+                  // Responsive 2-column or 1-column layout
+                  if (isDesktop)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ThriftButton(
-                          label: 'Approve seller',
-                          isLoading: _busy,
-                          onPressed: _busy ? null : _approve,
+                        // Left Column: Applicant, Store, Identity, Liveness
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildApplicantCard(app),
+                              const SizedBox(height: 20),
+                              _buildStoreCard(app),
+                              const SizedBox(height: 20),
+                              _buildIdentityDocumentsCard(app),
+                              const SizedBox(height: 20),
+                              _buildLivenessCard(app),
+                              const SizedBox(height: 20),
+                              ExternalSellingHistorySection(
+                                claimedRange: app.claimedSellingRange,
+                                items: _history,
+                                busy: _busy,
+                                onReview: _reviewExternal,
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 4),
-                        ThriftButton(
-                          label: 'Reject application',
-                          variant: ThriftButtonVariant.ghost,
-                          color: AppColors.error,
-                          onPressed: _busy ? null : _reject,
+                        const SizedBox(width: 24),
+                        // Right Column: Decision card & Actions
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [_buildDecisionCard(app)],
+                          ),
                         ),
                       ],
                     )
                   else
-                    AdminDetailBlock(
-                      label: 'Decision',
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          app.status == 'rejected'
-                              ? (app.rejectionReason?.trim().isNotEmpty == true
-                                    ? app.rejectionReason!.trim()
-                                    : 'This application was rejected.')
-                              : 'This application was approved.',
-                          style: AppTypography.body,
+                        _buildDecisionCard(app),
+                        const SizedBox(height: 20),
+                        _buildApplicantCard(app),
+                        const SizedBox(height: 20),
+                        _buildStoreCard(app),
+                        const SizedBox(height: 20),
+                        _buildIdentityDocumentsCard(app),
+                        const SizedBox(height: 20),
+                        _buildLivenessCard(app),
+                        const SizedBox(height: 20),
+                        ExternalSellingHistorySection(
+                          claimedRange: app.claimedSellingRange,
+                          items: _history,
+                          busy: _busy,
+                          onReview: _reviewExternal,
                         ),
                       ],
                     ),
                 ],
               ),
+      ),
+    );
+  }
+
+  Widget _buildBreadcrumbs(SellerApplication app) {
+    return Row(
+      children: [
+        InkWell(
+          onTap: () => context.go(RouteNames.adminVerifications),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.arrow_back, size: 16, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Text(
+                'Seller Verifications',
+                style: AppTypography.label.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        const Text('/', style: TextStyle(color: AppColors.textHint)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            app.shopName,
+            style: AppTypography.label.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderBanner(SellerApplication app) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ThriftAvatar(
+            imageUrl: '',
+            name: app.applicantName ?? app.shopName,
+            size: 48,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        app.shopName,
+                        style: AppTypography.pageTitle.copyWith(fontSize: 20),
+                      ),
+                    ),
+                    AdminStatusBadge(status: app.status),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Submitted by ${app.applicantName ?? 'Applicant'} on ${formatFullDate(app.submittedAt)} at ${formatTimeOfDay(app.submittedAt)}',
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildApplicantCard(SellerApplication app) {
+    return _SectionCard(
+      title: 'Applicant Information',
+      icon: Icons.person_outline_rounded,
+      children: [
+        _InfoGrid(
+          items: [
+            _InfoGridItem(
+              label: 'Full Name',
+              value: app.applicantName ?? 'Not specified',
+            ),
+            _InfoGridItem(
+              label: 'Username',
+              value: (app.applicantUsername?.trim().isNotEmpty ?? false)
+                  ? '@${app.applicantUsername!.trim()}'
+                  : '—',
+            ),
+            _InfoGridItem(
+              label: 'Email',
+              value: (app.applicantEmail?.trim().isNotEmpty ?? false)
+                  ? app.applicantEmail!.trim()
+                  : '—',
+            ),
+            _InfoGridItem(label: 'User ID', value: app.userId, copyable: true),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStoreCard(SellerApplication app) {
+    return _SectionCard(
+      title: 'Seller & Store Information',
+      icon: Icons.storefront_outlined,
+      children: [
+        _InfoGrid(
+          items: [
+            _InfoGridItem(label: 'Store Name', value: app.shopName),
+            _InfoGridItem(
+              label: 'Barangay & City',
+              value: '${app.barangay}, ${app.city}',
+            ),
+            _InfoGridItem(
+              label: 'Complete Address',
+              value: app.shopAddress.isNotEmpty ? app.shopAddress : '—',
+            ),
+            if (app.claimedSellingRange != null &&
+                app.claimedSellingRange!.isNotEmpty)
+              _InfoGridItem(
+                label: 'Claimed Selling Experience',
+                value: app.claimedSellingRange!,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIdentityDocumentsCard(SellerApplication app) {
+    final parsedId = SellerIdType.tryParse(app.idType);
+
+    return _SectionCard(
+      title: 'Identity Verification Documents',
+      icon: Icons.badge_outlined,
+      trailing: parsedId != null
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Text(
+                parsedId.label,
+                style: AppTypography.caption.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            )
+          : null,
+      children: [
+        Text(
+          'Click any document to inspect the image in high resolution.',
+          style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: [
+            _DocumentPreviewCard(
+              label: 'Government ID (Front)',
+              url: _idUrl,
+              onTap: () => _showImageLightbox('Government ID (Front)', _idUrl),
+            ),
+            if (_showIdBack(app))
+              _DocumentPreviewCard(
+                label: 'Government ID (Back)',
+                url: _idBackUrl,
+                onTap: () =>
+                    _showImageLightbox('Government ID (Back)', _idBackUrl),
+              ),
+            _DocumentPreviewCard(
+              label: 'Applicant Selfie',
+              url: _selfieUrl,
+              onTap: () => _showImageLightbox('Applicant Selfie', _selfieUrl),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLivenessCard(SellerApplication app) {
+    final checks = {
+      'Face Detected': app.livenessResult['face'] == true,
+      'Looked Right': app.livenessResult['lookRight'] == true,
+      'Looked Left': app.livenessResult['lookLeft'] == true,
+      'Blinked Eyes': app.livenessResult['blink'] == true,
+    };
+
+    return _SectionCard(
+      title: 'Face / Liveness Verification',
+      icon: Icons.face_retouching_natural_rounded,
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: app.livenessPassed
+              ? AppColors.success.withValues(alpha: 0.12)
+              : AppColors.error.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              app.livenessPassed ? Icons.check_circle : Icons.cancel,
+              size: 14,
+              color: app.livenessPassed ? AppColors.success : AppColors.error,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              app.livenessPassed ? 'Liveness Passed' : 'Liveness Failed',
+              style: AppTypography.caption.copyWith(
+                fontWeight: FontWeight.w700,
+                color: app.livenessPassed ? AppColors.success : AppColors.error,
+              ),
+            ),
+          ],
+        ),
+      ),
+      children: [
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: checks.entries.map((entry) {
+            final passed = entry.value;
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: passed
+                    ? AppColors.success.withValues(alpha: 0.08)
+                    : AppColors.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+                border: Border.all(
+                  color: passed
+                      ? AppColors.success.withValues(alpha: 0.3)
+                      : AppColors.error.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    passed ? Icons.check : Icons.close,
+                    size: 14,
+                    color: passed ? AppColors.success : AppColors.error,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    entry.key,
+                    style: AppTypography.caption.copyWith(
+                      color: passed ? AppColors.textPrimary : AppColors.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDecisionCard(SellerApplication app) {
+    final isPending = app.status == 'pending';
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+        border: Border.all(
+          color: isPending
+              ? AppColors.primary.withValues(alpha: 0.4)
+              : AppColors.border,
+          width: isPending ? 1.5 : 1.0,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.gavel_rounded,
+                size: 20,
+                color: isPending ? AppColors.primary : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Text('Verification Decision', style: AppTypography.sectionTitle),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (isPending) ...[
+            Text(
+              'Review the applicant credentials, government ID, and face verification above before taking action.',
+              style: AppTypography.body.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: _busy ? null : _approve,
+              icon: const Icon(Icons.check, size: 18),
+              label: const Text('Approve Seller Application'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                textStyle: AppTypography.button,
+              ),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _reject,
+              icon: const Icon(Icons.close, size: 18),
+              label: const Text('Reject Application'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                textStyle: AppTypography.button.copyWith(
+                  color: AppColors.error,
+                ),
+              ),
+            ),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: app.status == 'approved'
+                    ? AppColors.success.withValues(alpha: 0.08)
+                    : AppColors.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+                border: Border.all(
+                  color: app.status == 'approved'
+                      ? AppColors.success.withValues(alpha: 0.25)
+                      : AppColors.error.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        app.status == 'approved'
+                            ? Icons.check_circle
+                            : Icons.cancel,
+                        color: app.status == 'approved'
+                            ? AppColors.success
+                            : AppColors.error,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        app.status == 'approved'
+                            ? 'This seller was approved'
+                            : 'This application was rejected',
+                        style: AppTypography.cardTitle.copyWith(
+                          color: app.status == 'approved'
+                              ? AppColors.success
+                              : AppColors.error,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (app.status == 'rejected' &&
+                      (app.rejectionReason?.trim().isNotEmpty ?? false)) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Rejection Reason:',
+                      style: AppTypography.caption.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      app.rejectionReason!.trim(),
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -332,31 +815,223 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
   }
 }
 
-class _LivenessChips extends StatelessWidget {
-  const _LivenessChips({required this.result});
-  final Map<String, dynamic> result;
+// ============================================================================
+// HELPER SUBWIDGETS
+// ============================================================================
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({
+    required this.title,
+    required this.icon,
+    required this.children,
+    this.trailing,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    final items = {
-      'Face': result['face'] == true,
-      'Look right': result['lookRight'] == true,
-      'Look left': result['lookLeft'] == true,
-      'Blink': result['blink'] == true,
-    };
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: items.entries
-          .map(
-            (entry) => ThriftBadge(
-              label: entry.value
-                  ? '${entry.key} passed'
-                  : '${entry.key} not passed',
-              variant: entry.value ? BadgeVariant.success : BadgeVariant.error,
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Expanded(child: Text(title, style: AppTypography.sectionTitle)),
+              ?trailing,
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoGrid extends StatelessWidget {
+  const _InfoGrid({required this.items});
+
+  final List<_InfoGridItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 480;
+        return Wrap(
+          spacing: 16,
+          runSpacing: 14,
+          children: items.map((item) {
+            final width = isWide
+                ? (constraints.maxWidth - 16) / 2
+                : constraints.maxWidth;
+            return SizedBox(
+              width: width,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.label,
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          item.value,
+                          style: AppTypography.body.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      if (item.copyable) ...[
+                        const SizedBox(width: 6),
+                        InkWell(
+                          onTap: () {
+                            Clipboard.setData(ClipboardData(text: item.value));
+                            showThriftSnackBar(context, 'Copied to clipboard');
+                          },
+                          child: const Icon(
+                            Icons.copy,
+                            size: 14,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+}
+
+class _InfoGridItem {
+  const _InfoGridItem({
+    required this.label,
+    required this.value,
+    this.copyable = false,
+  });
+
+  final String label;
+  final String value;
+  final bool copyable;
+}
+
+class _DocumentPreviewCard extends StatelessWidget {
+  const _DocumentPreviewCard({
+    required this.label,
+    required this.url,
+    required this.onTap,
+  });
+
+  final String label;
+  final String? url;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasUrl = url != null && url!.isNotEmpty;
+
+    return InkWell(
+      onTap: hasUrl ? onTap : null,
+      borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+      child: Container(
+        width: 180,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceVariant,
+          borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 120,
+              clipBehavior: Clip.antiAlias,
+              decoration: const BoxDecoration(
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(AppConstants.radiusSm - 1),
+                ),
+              ),
+              child: hasUrl
+                  ? Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CachedNetworkImage(
+                          imageUrl: url!,
+                          fit: BoxFit.cover,
+                          placeholder: (_, _) => const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          errorWidget: (_, _, _) => const Icon(
+                            Icons.broken_image,
+                            size: 32,
+                            color: AppColors.textHint,
+                          ),
+                        ),
+                        Positioned(
+                          right: 6,
+                          bottom: 6,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Icon(
+                              Icons.zoom_in,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : const Center(
+                      child: Icon(
+                        Icons.image_not_supported,
+                        size: 32,
+                        color: AppColors.textHint,
+                      ),
+                    ),
             ),
-          )
-          .toList(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Text(
+                label,
+                style: AppTypography.caption.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

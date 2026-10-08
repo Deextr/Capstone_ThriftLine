@@ -43,9 +43,7 @@ class AdminWebTable extends StatelessWidget {
             minWidth: MediaQuery.sizeOf(context).width - 48,
           ),
           child: DataTable(
-            headingRowColor: WidgetStateProperty.all(
-              AppColors.background,
-            ),
+            headingRowColor: WidgetStateProperty.all(AppColors.background),
             columns: [
               for (final label in columns)
                 DataColumn(

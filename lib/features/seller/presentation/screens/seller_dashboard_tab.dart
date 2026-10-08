@@ -51,6 +51,7 @@ class SellerDashboardTab extends StatelessWidget {
           strokeWidth: 2.5,
           onRefresh: () async {
             await Future.wait([
+              context.read<AuthProvider>().reloadUser(),
               context.read<LookingForController>().refresh(),
               context.read<SellerOrdersController>().load(),
               context.read<SellerEarningsController>().load(),
@@ -93,6 +94,15 @@ class SellerDashboardTab extends StatelessWidget {
                 child: _YourShopSection(
                   listingCount: listingsCount,
                   ratingSummary: _ratingSummary(user),
+                  onRatingTap:
+                      user?.username != null && user!.username.isNotEmpty
+                          ? () => context.push(
+                                RouteNames.sellerProfile.replaceFirst(
+                                  ':username',
+                                  user.username,
+                                ),
+                              )
+                          : null,
                 ),
               ),
               SliverToBoxAdapter(
@@ -446,10 +456,12 @@ class _YourShopSection extends StatelessWidget {
   const _YourShopSection({
     required this.listingCount,
     required this.ratingSummary,
+    this.onRatingTap,
   });
 
   final String listingCount;
   final String ratingSummary;
+  final VoidCallback? onRatingTap;
 
   @override
   Widget build(BuildContext context) {
@@ -498,6 +510,7 @@ class _YourShopSection extends StatelessWidget {
                   iconColor: AppColors.warning,
                   label: 'Seller rating',
                   value: ratingSummary,
+                  onTap: onRatingTap,
                 ),
               ],
             ),

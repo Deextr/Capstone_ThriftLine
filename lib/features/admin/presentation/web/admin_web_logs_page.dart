@@ -4,11 +4,10 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../controllers/admin_audit_logs_controller.dart';
 import '../../data/admin_audit_log_models.dart';
-import '../../data/admin_dashboard_models.dart';
-import '../widgets/admin_dashboard_widgets.dart';
-import 'admin_web_table.dart';
+import '../widgets/admin_ui_components.dart';
 
 class AdminWebLogsPage extends StatefulWidget {
   const AdminWebLogsPage({super.key});
@@ -38,10 +37,7 @@ class _AdminWebLogsPageState extends State<AdminWebLogsPage> {
         maxChildSize: 0.92,
         builder: (_, scrollController) => SingleChildScrollView(
           controller: scrollController,
-          child: _DetailPanel(
-            row: row,
-            onClose: () => Navigator.of(ctx).pop(),
-          ),
+          child: _DetailPanel(row: row, onClose: () => Navigator.of(ctx).pop()),
         ),
       ),
     );
@@ -67,279 +63,175 @@ class _AdminWebLogsPageState extends State<AdminWebLogsPage> {
             child: ListView(
               padding: const EdgeInsets.all(24),
               children: [
-                Text(
-                  'Logs',
-                  style: AppTypography.heading.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                AdminPageHeader(
+                  title: 'Audit Logs',
+                  subtitle:
+                      'Monitor platform security events, administrative actions, and system activity.',
+                  actions: [
+                    OutlinedButton.icon(
+                      onPressed: controller.isLoading
+                          ? null
+                          : () => controller.load(),
+                      icon: const Icon(Icons.refresh, size: 16),
+                      label: const Text('Refresh'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.textPrimary,
+                        side: const BorderSide(color: AppColors.border),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'Monitor security events and administrative activity.',
-                  style: AppTypography.body.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                _FilterBar(
-                  searchController: _searchController,
-                  controller: controller,
+                AdminFilterBar(
+                  hasActiveFilters: controller.hasActiveFilters,
+                  onReset: () {
+                    _searchController.clear();
+                    controller.resetFilters();
+                  },
+                  children: [
+                    AdminSearchField(
+                      controller: _searchController,
+                      hintText: 'Search audit logs...',
+                      width: 260,
+                      onSubmitted: controller.setSearch,
+                      onClear: () => controller.setSearch(''),
+                    ),
+                    AdminFilterDropdown<String>(
+                      value: controller.category,
+                      items: [
+                        for (final opt in AdminAuditCategory.filterOptions)
+                          DropdownMenuItem(
+                            value: opt.value,
+                            child: Text(opt.label),
+                          ),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) controller.setCategory(v);
+                      },
+                    ),
+                    AdminFilterDropdown<String>(
+                      value: controller.status,
+                      items: const [
+                        DropdownMenuItem(
+                          value: AdminAuditStatusFilter.all,
+                          child: Text('All statuses'),
+                        ),
+                        DropdownMenuItem(
+                          value: AdminAuditStatusFilter.success,
+                          child: Text('Success'),
+                        ),
+                        DropdownMenuItem(
+                          value: AdminAuditStatusFilter.failed,
+                          child: Text('Failed'),
+                        ),
+                        DropdownMenuItem(
+                          value: AdminAuditStatusFilter.blocked,
+                          child: Text('Blocked'),
+                        ),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) controller.setStatus(v);
+                      },
+                    ),
+                    AdminDateFilter(
+                      window: controller.window,
+                      onChanged: controller.setWindow,
+                    ),
+                  ],
                 ),
                 if (controller.errorMessage != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    controller.errorMessage!,
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.error,
-                      fontWeight: FontWeight.w600,
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
                     ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                AdminWebTable(
-                  isLoading: controller.isLoading,
-                  emptyMessage: 'No audit events match your filters.',
-                  columns: const ['Time', 'Event', 'Status'],
-                  rows: [
-                    for (final row in controller.rows)
-                      [
-                        InkWell(
-                          onTap: () => _openDetail(context, controller, row),
-                          child: Text(
-                            DateFormat('h:mm a')
-                                .format(row.createdAt.toLocal()),
-                            style: AppTypography.body,
-                          ),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.error.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          size: 20,
+                          color: AppColors.error,
                         ),
-                        InkWell(
-                          onTap: () => _openDetail(context, controller, row),
+                        const SizedBox(width: 12),
+                        Expanded(
                           child: Text(
-                            row.displayEvent,
+                            controller.errorMessage!,
                             style: AppTypography.body.copyWith(
-                              fontWeight: FontWeight.w600,
+                              color: AppColors.error,
                             ),
                           ),
                         ),
-                        InkWell(
-                          onTap: () => _openDetail(context, controller, row),
-                          child: _StatusChip(status: row.status),
+                        TextButton(
+                          onPressed: controller.load,
+                          child: const Text('Retry'),
                         ),
+                      ],
+                    ),
+                  ),
+                ],
+                AdminDataTable(
+                  isLoading: controller.isLoading,
+                  columnFlex: const [2, 4, 2, 1],
+                  onRowTap: [
+                    for (final row in controller.rows)
+                      () => _openDetail(context, controller, row),
+                  ],
+                  emptyTitle: 'No audit logs found',
+                  emptyMessage: controller.hasActiveFilters
+                      ? 'No audit events match your filters. Try clearing some filters.'
+                      : 'Audit logs will appear here as system events occur.',
+                  onResetFilters: controller.hasActiveFilters
+                      ? () {
+                          _searchController.clear();
+                          controller.resetFilters();
+                        }
+                      : null,
+                  columns: const ['Time', 'Event', 'Category', 'Status'],
+                  rows: [
+                    for (final row in controller.rows)
+                      [
+                        Text(
+                          formatAdminTableDateTime(row.createdAt),
+                          style: AppTypography.tableBody,
+                        ),
+                        AdminTableCellText(primary: row.displayEvent),
+                        AdminTableCellText(
+                          primary: AdminAuditCategory.labelFor(row.category),
+                          primaryStyle: AppTypography.caption.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        AdminStatusBadge(status: row.status),
                       ],
                   ],
                 ),
                 const SizedBox(height: 16),
-                _PaginationBar(controller: controller),
+                AdminPagination(
+                  currentPage: controller.page,
+                  totalItems: controller.total,
+                  pageSize: controller.pageSize,
+                  pageSizeOptions: const [10, 25, 50],
+                  isLoading: controller.isLoading,
+                  onPageChanged: controller.setPage,
+                  onPageSizeChanged: controller.setPageSize,
+                ),
               ],
             ),
           ),
           if (selected != null && MediaQuery.sizeOf(context).width >= 960)
-            _DetailPanel(
-              row: selected,
-              onClose: () => controller.select(null),
-            ),
+            _DetailPanel(row: selected, onClose: () => controller.select(null)),
         ],
-      ),
-    );
-  }
-}
-
-class _FilterBar extends StatelessWidget {
-  const _FilterBar({
-    required this.searchController,
-    required this.controller,
-  });
-
-  final TextEditingController searchController;
-  final AdminAuditLogsController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        SizedBox(
-          width: 280,
-          child: TextField(
-            controller: searchController,
-            decoration: const InputDecoration(
-              labelText: 'Search logs',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            onSubmitted: controller.setSearch,
-          ),
-        ),
-        DropdownButton<String>(
-          value: controller.category,
-          items: [
-            for (final opt in AdminAuditCategory.filterOptions)
-              DropdownMenuItem(value: opt.value, child: Text(opt.label)),
-          ],
-          onChanged: (v) {
-            if (v != null) controller.setCategory(v);
-          },
-        ),
-        DropdownButton<String>(
-          value: controller.status,
-          items: const [
-            DropdownMenuItem(
-              value: AdminAuditStatusFilter.all,
-              child: Text('All statuses'),
-            ),
-            DropdownMenuItem(
-              value: AdminAuditStatusFilter.success,
-              child: Text('Success'),
-            ),
-            DropdownMenuItem(
-              value: AdminAuditStatusFilter.failed,
-              child: Text('Failed'),
-            ),
-            DropdownMenuItem(
-              value: AdminAuditStatusFilter.blocked,
-              child: Text('Blocked'),
-            ),
-          ],
-          onChanged: (v) {
-            if (v != null) controller.setStatus(v);
-          },
-        ),
-        PopupMenuButton<AdminDatePreset>(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Text(_dateLabel(controller.window)),
-          ),
-          onSelected: (preset) async {
-            if (preset == AdminDatePreset.custom) {
-              final picked = await showAdminCustomRangePicker(
-                context,
-                initial: controller.window,
-              );
-              if (picked != null) await controller.setWindow(picked);
-              return;
-            }
-            final window = switch (preset) {
-              AdminDatePreset.today => AdminDateWindow.today(),
-              AdminDatePreset.last7Days => AdminDateWindow.last7Days(),
-              AdminDatePreset.last30Days => AdminDateWindow.last30Days(),
-              AdminDatePreset.lastYear => AdminDateWindow.lastYear(),
-              AdminDatePreset.custom => AdminDateWindow.last7Days(),
-            };
-            await controller.setWindow(window);
-          },
-          itemBuilder: (context) => const [
-            PopupMenuItem(
-              value: AdminDatePreset.today,
-              child: Text('Today'),
-            ),
-            PopupMenuItem(
-              value: AdminDatePreset.last7Days,
-              child: Text('Last 7 days'),
-            ),
-            PopupMenuItem(
-              value: AdminDatePreset.last30Days,
-              child: Text('Last month'),
-            ),
-            PopupMenuItem(
-              value: AdminDatePreset.custom,
-              child: Text('Custom range'),
-            ),
-          ],
-        ),
-        TextButton(
-          onPressed: () {
-            searchController.clear();
-            controller.resetFilters();
-          },
-          child: const Text('Reset filters'),
-        ),
-        FilledButton(
-          onPressed: () => controller.setSearch(searchController.text),
-          child: const Text('Search'),
-        ),
-      ],
-    );
-  }
-
-  String _dateLabel(AdminDateWindow? window) {
-    if (window == null) return 'All dates';
-    return switch (window.preset) {
-      AdminDatePreset.today => 'Today',
-      AdminDatePreset.last7Days => 'Last 7 days',
-      AdminDatePreset.last30Days => 'Last month',
-      AdminDatePreset.lastYear => 'Last year',
-      AdminDatePreset.custom => 'Custom range',
-    };
-  }
-}
-
-class _PaginationBar extends StatelessWidget {
-  const _PaginationBar({required this.controller});
-
-  final AdminAuditLogsController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final page = controller.page;
-    final total = controller.pageCount;
-    return Row(
-      children: [
-        Text(
-          '${controller.total} event${controller.total == 1 ? '' : 's'}',
-          style: AppTypography.caption.copyWith(
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const Spacer(),
-        IconButton(
-          tooltip: 'Previous page',
-          onPressed: page > 0 && !controller.isLoading
-              ? () => controller.setPage(page - 1)
-              : null,
-          icon: const Icon(Icons.chevron_left),
-        ),
-        Text(
-          'Page ${page + 1} of $total',
-          style: AppTypography.caption,
-        ),
-        IconButton(
-          tooltip: 'Next page',
-          onPressed: page + 1 < total && !controller.isLoading
-              ? () => controller.setPage(page + 1)
-              : null,
-          icon: const Icon(Icons.chevron_right),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status});
-
-  final String status;
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, color) = switch (status) {
-      'success' => ('Success', AppColors.success),
-      'failed' => ('Failed', AppColors.error),
-      'blocked' => ('Blocked', AppColors.warning),
-      _ => (AdminAuditLogRow.titleCase(status), AppColors.textSecondary),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        label,
-        style: AppTypography.caption.copyWith(
-          color: color,
-          fontWeight: FontWeight.w700,
-        ),
       ),
     );
   }
@@ -380,14 +272,12 @@ class _DetailPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          _DetailLine(
-            label: 'Event',
-            value: row.displayEvent,
-          ),
+          _DetailLine(label: 'Event', value: row.displayEvent),
           _DetailLine(
             label: 'Time',
-            value: DateFormat('MMM d, yyyy • h:mm a')
-                .format(row.createdAt.toLocal()),
+            value: DateFormat(
+              'MMM d, yyyy • h:mm a',
+            ).format(row.createdAt.toLocal()),
           ),
           _DetailLine(
             label: 'Category',
@@ -401,10 +291,7 @@ class _DetailPanel extends StatelessWidget {
           if (row.targetId != null)
             _DetailLine(label: 'Target ID', value: row.targetId!),
           const SizedBox(height: 8),
-          Text(
-            row.summary,
-            style: AppTypography.body.copyWith(height: 1.4),
-          ),
+          Text(row.summary, style: AppTypography.body.copyWith(height: 1.4)),
           if (row.details.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(

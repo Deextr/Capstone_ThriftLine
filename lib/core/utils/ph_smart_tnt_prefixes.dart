@@ -49,9 +49,12 @@ bool isKnownSmartOrTntPrefix(String local11) {
   return kSmartTntMobilePrefixesFourDigit.contains(local11.substring(0, 4));
 }
 
-/// After format is valid, returns a block message for Smart/TNT prefixes, else null.
+/// Prefix lists are not used to block OTP.
+///
+/// TM (Touch Mobile) and Smart/TNT publish overlapping `09XX` blocks, and
+/// mobile number portability means the live network can differ from the
+/// original prefix. Carrier failures come from the UniSMS response instead.
 String? smartTntPrefixOtpBlockMessage(String local11) {
   if (!isPhMobile09Format(local11)) return null;
-  if (!isKnownSmartOrTntPrefix(local11)) return null;
-  return kSmartTntPrefixUnavailableMessage;
+  return null;
 }

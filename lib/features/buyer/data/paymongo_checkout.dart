@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../auth/domain/auth_error.dart';
+import 'checkout_payment_errors.dart';
 
 /// Result of verifying a PayMongo app return. The redirect itself is not proof.
 enum PaymongoAppReturnResult { paid, pending, failed }
@@ -114,7 +115,10 @@ class PaymongoReconcileResult {
       );
       return PaymongoReconcileResult(outcome: 'pending', error: err);
     }
-    final outcome = (map['outcome'] ?? 'pending').toString().trim().toLowerCase();
+    final outcome = (map['outcome'] ?? 'pending')
+        .toString()
+        .trim()
+        .toLowerCase();
     return PaymongoReconcileResult(outcome: outcome);
   }
 }
@@ -125,10 +129,7 @@ Future<PaymongoReconcileResult> reconcilePaymongoCheckout(
 }) async {
   try {
     final response = await supabase.client.functions
-        .invoke(
-          'reconcile-paymongo-checkout',
-          body: {'order_id': orderId},
-        )
+        .invoke('reconcile-paymongo-checkout', body: {'order_id': orderId})
         .timeout(const Duration(seconds: 12));
     return PaymongoReconcileResult.fromMap(supabaseRpcMap(response.data));
   } on FunctionException catch (e) {
@@ -190,9 +191,11 @@ Future<PaymongoCheckoutResult> createPaymongoCheckout(
     );
     final prep = supabaseRpcMap(prepRaw);
     if (prep == null || prep['success'] != true) {
-      final message = supabaseRpcError(
-        prep,
-        fallback: 'Unable to start payment right now. Please try again.',
+      final message = buyerFacingPaymentStartError(
+        supabaseRpcError(
+          prep,
+          fallback: 'Unable to start payment right now. Please try again.',
+        ),
       );
       debugPrint('prepare_paymongo_checkout failed: $prepRaw');
       return PaymongoCheckoutResult(success: false, error: message);
@@ -234,12 +237,9 @@ Future<PaymongoCheckoutResult> createPaymongoCheckout(
       'prepare_paymongo_checkout PostgrestException '
       'code=${e.code} message=${e.message}',
     );
-    final message = e.message.trim();
     return PaymongoCheckoutResult(
       success: false,
-      error: message.isNotEmpty
-          ? message
-          : 'Unable to start payment right now. Please try again.',
+      error: buyerFacingPaymentStartError(e.message),
     );
   } on FunctionException catch (e) {
     debugPrint(

@@ -16,7 +16,8 @@ class ReportReason {
   final IconData icon;
 }
 
-const List<ReportReason> kReportReasons = [
+/// Community reports — seller/listing conduct without a specific order issue.
+const List<ReportReason> kCommunityReportReasons = [
   ReportReason(
     slug: 'scam_or_fraud',
     label: 'Scam or Fraud',
@@ -24,45 +25,33 @@ const List<ReportReason> kReportReasons = [
     icon: Icons.warning_amber_rounded,
   ),
   ReportReason(
-    slug: 'fake_product',
-    label: 'Fake or Misrepresented Item',
-    description: 'The item is fake or not what was listed',
-    icon: Icons.cancel_outlined,
-  ),
-  ReportReason(
     slug: 'counterfeit_item',
-    label: 'Counterfeit Item',
-    description: 'A counterfeit of a known brand',
+    label: 'Counterfeit or Fake Items',
+    description: 'Listings appear counterfeit, fake, or not genuine',
     icon: Icons.content_copy_outlined,
   ),
   ReportReason(
     slug: 'harassment',
-    label: 'Harassment',
-    description: 'Threatening, hostile, or harassing behavior',
+    label: 'Harassment or Abusive Behavior',
+    description: 'Threatening, harassing, or abusive conduct',
     icon: Icons.mood_bad_outlined,
   ),
   ReportReason(
-    slug: 'inappropriate_messages',
-    label: 'Abusive Behavior',
-    description: 'Offensive, abusive, or inappropriate messages',
-    icon: Icons.chat_bubble_outline,
-  ),
-  ReportReason(
-    slug: 'failure_to_ship',
+    slug: 'suspicious_activity',
     label: 'Suspicious Activity',
-    description: 'Avoiding fulfillment or other suspicious conduct',
+    description: 'Suspicious marketplace or account behavior',
     icon: Icons.visibility_outlined,
   ),
   ReportReason(
-    slug: 'item_not_as_described',
-    label: 'Item Not as Described',
-    description: 'The item does not match the listing',
-    icon: Icons.difference_outlined,
+    slug: 'misleading_listing',
+    label: 'Misleading Listing or Information',
+    description: 'Listing or profile information appears misleading',
+    icon: Icons.info_outline,
   ),
   ReportReason(
     slug: 'fake_identity',
-    label: 'Fake Identity',
-    description: 'Using a fake identity or stolen photos',
+    label: 'Fake Identity or Impersonation',
+    description: 'Fake identity, stolen photos, or impersonation',
     icon: Icons.person_off_outlined,
   ),
   ReportReason(
@@ -72,6 +61,60 @@ const List<ReportReason> kReportReasons = [
     icon: Icons.more_horiz_outlined,
   ),
 ];
+
+/// Order reports — buyer or seller issues tied to a purchase.
+const List<ReportReason> kOrderBuyerReportReasons = [
+  ReportReason(
+    slug: 'seller_not_processing_order',
+    label: 'Seller Did Not Process Order',
+    description: 'Order stuck preparing or not shipped for too long',
+    icon: Icons.hourglass_empty_outlined,
+  ),
+  ReportReason(
+    slug: 'counterfeit_received',
+    label: 'Fake / Counterfeit Item Received',
+    description: 'Item received appears fake or counterfeit',
+    icon: Icons.content_copy_outlined,
+  ),
+  ReportReason(
+    slug: 'item_not_as_described',
+    label: 'Item Not as Described',
+    description: 'Item differs materially from the listing',
+    icon: Icons.difference_outlined,
+  ),
+  ReportReason(
+    slug: 'undisclosed_damage',
+    label: 'Undisclosed Damage',
+    description: 'Damage was not disclosed before purchase',
+    icon: Icons.broken_image_outlined,
+  ),
+  ReportReason(
+    slug: 'other',
+    label: 'Other',
+    description: 'Another order-related problem',
+    icon: Icons.more_horiz_outlined,
+  ),
+];
+
+const List<ReportReason> kOrderSellerReportReasons = [
+  ReportReason(
+    slug: 'buyer_delivery_pin_issue',
+    label: 'Buyer Did Not Provide Delivery PIN',
+    description: 'Buyer refused or failed to provide the delivery PIN',
+    icon: Icons.pin_outlined,
+  ),
+  ReportReason(
+    slug: 'other',
+    label: 'Other',
+    description: 'Another order-related problem',
+    icon: Icons.more_horiz_outlined,
+  ),
+];
+
+/// Legacy alias for screens still importing [kReportReasons].
+const List<ReportReason> kReportReasons = kCommunityReportReasons;
+
+const int kReportMaxEvidenceAttempts = 3;
 
 const int kReportDetailsMinLength = 10;
 const int kReportDetailsMaxLength = 1000;
@@ -92,10 +135,24 @@ const Set<String> kReportImageMimeTypes = {
 };
 
 ReportReason? reportReasonBySlug(String slug) {
-  for (final reason in kReportReasons) {
+  for (final reason in [
+    ...kCommunityReportReasons,
+    ...kOrderBuyerReportReasons,
+    ...kOrderSellerReportReasons,
+  ]) {
     if (reason.slug == slug) return reason;
   }
-  return null;
+  return switch (slug) {
+    'fake_item' ||
+    'fake_product' =>
+      kCommunityReportReasons.firstWhere((r) => r.slug == 'counterfeit_item'),
+    'abusive_behavior' ||
+    'inappropriate_messages' =>
+      kCommunityReportReasons.firstWhere((r) => r.slug == 'harassment'),
+    'failure_to_ship' =>
+      kCommunityReportReasons.firstWhere((r) => r.slug == 'suspicious_activity'),
+    _ => null,
+  };
 }
 
 String reportReasonLabel(String slug) {
@@ -106,7 +163,8 @@ String reportStatusLabel(String status) {
   final normalized = reportStatusFromDb(status);
   return switch (normalized) {
     'under_review' => 'Under Review',
-    'action_taken' => 'Action Taken',
+    'needs_more_evidence' => 'Needs More Evidence',
+    'action_taken' => 'Resolved',
     'resolved' => 'Resolved',
     'dismissed' => 'Dismissed',
     _ =>
@@ -125,6 +183,7 @@ Color reportStatusColor(String status) {
   final normalized = reportStatusFromDb(status);
   return switch (normalized) {
     'under_review' => const Color(0xFFF59E0B),
+    'needs_more_evidence' => const Color(0xFFF59E0B),
     'action_taken' => const Color(0xFF10B981),
     'resolved' => const Color(0xFF10B981),
     'dismissed' => const Color(0xFF64748B),
@@ -138,10 +197,13 @@ String reportStatusDescription(String status) {
     'under_review' =>
       "We're reviewing your report and the evidence you submitted. "
           "You'll be notified when there is an update.",
+    'needs_more_evidence' =>
+      'More evidence is required. Read the admin message below and '
+          'submit additional evidence if you still have attempts left.',
     'action_taken' =>
       "We've completed our review and taken the appropriate action.",
     'resolved' =>
-      "We've completed our review and taken the appropriate action.",
+      "We've completed our review and closed your report.",
     'dismissed' =>
       "We reviewed your report, but there wasn't enough evidence to "
           'support the claim.',
@@ -153,6 +215,7 @@ IconData reportStatusIcon(String status) {
   final normalized = reportStatusFromDb(status);
   return switch (normalized) {
     'under_review' => Icons.schedule_rounded,
+    'needs_more_evidence' => Icons.add_photo_alternate_outlined,
     'action_taken' => Icons.gavel_rounded,
     'resolved' => Icons.check_circle_outline_rounded,
     'dismissed' => Icons.info_outline_rounded,
@@ -174,6 +237,9 @@ bool reportStatusIsClosed(String status) {
       normalized == 'action_taken';
 }
 
+bool reportStatusAllowsResubmit(String status) =>
+    reportStatusFromDb(status) == 'needs_more_evidence';
+
 String? reportDetailsError(String details) {
   final trimmed = details.trim();
   if (trimmed.length < kReportDetailsMinLength) {
@@ -181,6 +247,18 @@ String? reportDetailsError(String details) {
   }
   if (trimmed.length > kReportDetailsMaxLength) {
     return 'Keep your report under 1,000 characters.';
+  }
+  return null;
+}
+
+/// Community seller reports: details optional unless reason is [other].
+String? communityReportDetailsError(String details, String? categorySlug) {
+  final trimmed = details.trim();
+  if (trimmed.length > kReportDetailsMaxLength) {
+    return 'Keep your report under 1,000 characters.';
+  }
+  if (categorySlug == 'other' && trimmed.length < kReportDetailsMinLength) {
+    return 'Please describe the issue.';
   }
   return null;
 }

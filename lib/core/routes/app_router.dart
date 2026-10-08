@@ -548,9 +548,9 @@ GoRouter createMobileAppRouter({
           create: (context) => ReportUserController(
             supabase: context.read<SupabaseService>(),
             auth: context.read<AuthProvider>(),
+            followingShops: context.read<FollowingShopsProvider>(),
             username: state.uri.queryParameters['seller'],
             userId: state.uri.queryParameters['user'],
-            orderId: state.uri.queryParameters['order'],
           ),
           child: const ReportSellerScreen(),
         ),

@@ -46,23 +46,27 @@ class AdminOverviewCard extends StatelessWidget {
     required this.value,
     required this.detail,
     required this.icon,
+    this.displayValue,
     this.onTap,
     this.attention = false,
   });
 
   final String label;
   final int value;
+  final String? displayValue;
   final String detail;
   final IconData icon;
   final VoidCallback? onTap;
   final bool attention;
 
-  static const double cardHeight = 132;
+  static const double cardHeight = 118;
 
   @override
   Widget build(BuildContext context) {
+    final primaryFigure = displayValue ?? _countFormat.format(value);
+
     final content = Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -82,14 +86,14 @@ class AdminOverviewCard extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
-            _countFormat.format(value),
+            primaryFigure,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppTypography.heading.copyWith(fontSize: 22),
+            style: AppTypography.heading.copyWith(fontSize: 20),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             label,
             maxLines: 1,
@@ -114,7 +118,7 @@ class AdminOverviewCard extends StatelessWidget {
 
     return Semantics(
       button: onTap != null,
-      label: '$label, ${_countFormat.format(value)}. $detail',
+      label: '$label, $primaryFigure. $detail',
       child: SizedBox(
         height: cardHeight,
         child: Material(
@@ -202,6 +206,128 @@ class AdminDashboardFilterBar<T> extends StatelessWidget {
             onTap: () => onSelected(value),
           ),
       ],
+    );
+  }
+}
+
+class AdminDashboardDateRangeBar extends StatelessWidget {
+  const AdminDashboardDateRangeBar({
+    super.key,
+    required this.window,
+    required this.onPresetSelected,
+  });
+
+  final AdminDateWindow window;
+  final Future<void> Function(AdminDatePreset preset) onPresetSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final customCaption = window.preset == AdminDatePreset.custom
+        ? window.chipLabel
+        : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < AdminDatePreset.values.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 4),
+                    _AdminDateSegment(
+                      label: adminDatePresetSegmentLabel(
+                        AdminDatePreset.values[i],
+                      ),
+                      selected: window.preset == AdminDatePreset.values[i],
+                      onTap: () => onPresetSelected(AdminDatePreset.values[i]),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (customCaption != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            customCaption,
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _AdminDateSegment extends StatefulWidget {
+  const _AdminDateSegment({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_AdminDateSegment> createState() => _AdminDateSegmentState();
+}
+
+class _AdminDateSegmentState extends State<_AdminDateSegment> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = widget.selected;
+    final background = selected
+        ? AppColors.primary.withValues(alpha: 0.12)
+        : _hovered
+        ? AppColors.surfaceVariant
+        : Colors.transparent;
+    final borderColor = selected ? AppColors.primary : Colors.transparent;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: widget.label,
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+        child: InkWell(
+          onTap: widget.onTap,
+          onHover: (hover) => setState(() => _hovered = hover),
+          borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+              border: Border.all(color: borderColor, width: selected ? 1 : 0),
+            ),
+            child: Text(
+              widget.label,
+              style: AppTypography.body.copyWith(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                color: selected ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

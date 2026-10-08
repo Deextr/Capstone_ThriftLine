@@ -42,4 +42,29 @@ void main() {
     expect(history.first.order.id, 'o2');
     expect(history.first.review.id, 'r-o2');
   });
+
+  test('synthesizes fallback order so submitted reviews are never lost', () {
+    final orders = <OrderModel>[]; // empty orders list
+    final reviews = {'o99': _buyerReview('o99')};
+
+    final history = buyerReviewHistory(orders, reviews);
+    expect(history, hasLength(1));
+    expect(history.first.order.id, 'o99');
+    expect(history.first.order.isCompleted, isTrue);
+    expect(history.first.review.id, 'r-o99');
+  });
+
+  test('orders pending buyer review excludes any completed order that already has a review', () {
+    final o1 = _completedOrder('o1');
+    final o2 = _completedOrder('o2');
+    final o3 = _completedOrder('o3');
+    final reviews = {
+      'o1': _buyerReview('o1'),
+      'o3': _buyerReview('o3'),
+    };
+
+    final pending = ordersPendingBuyerReview([o1, o2, o3], reviews);
+    expect(pending.map((o) => o.id), ['o2']);
+  });
+
 }

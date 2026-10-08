@@ -9,14 +9,32 @@ import '../../../../core/utils/formatters.dart';
 import '../../controllers/admin_disputes_controller.dart';
 import '../../data/admin_review_rules.dart';
 import '../widgets/admin_review_widgets.dart';
+import '../widgets/admin_ui_components.dart' hide AdminFilterBar;
 
-class AdminDisputesQueueScreen extends StatelessWidget {
+class AdminDisputesQueueScreen extends StatefulWidget {
   const AdminDisputesQueueScreen({super.key});
+
+  @override
+  State<AdminDisputesQueueScreen> createState() =>
+      _AdminDisputesQueueScreenState();
+}
+
+class _AdminDisputesQueueScreenState extends State<AdminDisputesQueueScreen> {
+  int _page = 0;
+  int _pageSize = 10;
 
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AdminDisputesController>();
     final open = controller.filter == AdminQueueFilter.open;
+    final total = controller.disputes.length;
+    final maxPage = total <= 0 ? 0 : (total - 1) ~/ _pageSize;
+    final safePage = _page.clamp(0, maxPage);
+    final startIndex = safePage * _pageSize;
+    final endIndex = (startIndex + _pageSize).clamp(0, total);
+    final pageDisputes = total == 0
+        ? const []
+        : controller.disputes.sublist(startIndex, endIndex);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -36,8 +54,10 @@ class AdminDisputesQueueScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
               child: AdminFilterBar(
                 value: controller.filter,
-                onChanged: (filter) =>
-                    context.read<AdminDisputesController>().setFilter(filter),
+                onChanged: (filter) {
+                  setState(() => _page = 0);
+                  context.read<AdminDisputesController>().setFilter(filter);
+                },
               ),
             ),
             Expanded(
@@ -83,14 +103,23 @@ class AdminDisputesQueueScreen extends StatelessWidget {
                             style: AppTypography.subheading,
                           ),
                           const SizedBox(height: 4),
-                          for (
-                            var i = 0;
-                            i < controller.disputes.length;
-                            i++
-                          ) ...[
+                          for (var i = 0; i < pageDisputes.length; i++) ...[
                             if (i > 0) const Divider(height: 1),
-                            _DisputeRow(index: i, open: open),
+                            _DisputeRow(dispute: pageDisputes[i], open: open),
                           ],
+                          const SizedBox(height: 16),
+                          AdminPagination(
+                            currentPage: safePage,
+                            totalItems: total,
+                            pageSize: _pageSize,
+                            pageSizeOptions: const [10, 25, 50],
+                            onPageChanged: (newPage) =>
+                                setState(() => _page = newPage),
+                            onPageSizeChanged: (newSize) => setState(() {
+                              _pageSize = newSize;
+                              _page = 0;
+                            }),
+                          ),
                         ],
                       ),
               ),
@@ -103,15 +132,13 @@ class AdminDisputesQueueScreen extends StatelessWidget {
 }
 
 class _DisputeRow extends StatelessWidget {
-  const _DisputeRow({required this.index, required this.open});
+  const _DisputeRow({required this.dispute, required this.open});
 
-  final int index;
+  final dynamic dispute;
   final bool open;
 
   @override
   Widget build(BuildContext context) {
-    final controller = context.watch<AdminDisputesController>();
-    final dispute = controller.disputes[index];
     final seller = adminHandle(
       dispute.sellerUsername,
       dispute.sellerDisplayName,

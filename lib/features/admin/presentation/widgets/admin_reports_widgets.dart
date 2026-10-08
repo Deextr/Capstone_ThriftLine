@@ -131,7 +131,8 @@ class _StatRow extends StatelessWidget {
           highlight: summary.underReview > 0,
         ),
         _MiniStat(label: 'Resolved', value: summary.resolved),
-        _MiniStat(label: 'Closed', value: summary.closed),
+        _MiniStat(label: 'Needs evidence', value: summary.needsMoreEvidence),
+        _MiniStat(label: 'Dismissed', value: summary.dismissed),
       ],
     );
   }
@@ -200,15 +201,21 @@ class AdminReportStatusOverview extends StatelessWidget {
         icon: Icons.hourglass_top_outlined,
       ),
       _StatusCardData(
+        filter: AdminReportListFilter.needsMoreEvidence,
+        label: 'Needs evidence',
+        value: summary.needsMoreEvidence,
+        icon: Icons.add_photo_alternate_outlined,
+      ),
+      _StatusCardData(
         filter: AdminReportListFilter.resolved,
         label: 'Resolved',
         value: summary.resolved,
         icon: Icons.check_circle_outline,
       ),
       _StatusCardData(
-        filter: AdminReportListFilter.closed,
-        label: 'Closed',
-        value: summary.closed,
+        filter: AdminReportListFilter.dismissed,
+        label: 'Dismissed',
+        value: summary.dismissed,
         icon: Icons.archive_outlined,
       ),
     ];
@@ -470,7 +477,9 @@ class AdminReportsListFilters extends StatelessWidget {
                     read.setDateWindow(switch (preset) {
                       AdminDatePreset.today => AdminDateWindow.today(),
                       AdminDatePreset.last7Days => AdminDateWindow.last7Days(),
-                      AdminDatePreset.last30Days => AdminDateWindow.last30Days(),
+                      AdminDatePreset.last30Days =>
+                        AdminDateWindow.last30Days(),
+                      AdminDatePreset.thisMonth => AdminDateWindow.thisMonth(),
                       AdminDatePreset.lastYear => AdminDateWindow.lastYear(),
                       AdminDatePreset.custom => AdminDateWindow.last7Days(),
                     });

@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -13,7 +14,9 @@ import '../../../../models/enums.dart';
 import '../../../../models/order_model.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/my_reports_controller.dart';
+import '../../data/report_evidence_attempt_rules.dart';
 import '../../data/report_reasons.dart';
+import '../widgets/report_evidence_section.dart';
 
 class ReportDetailScreen extends StatelessWidget {
   const ReportDetailScreen({super.key});
@@ -108,6 +111,10 @@ class ReportDetailScreen extends StatelessWidget {
                     ],
                     const SizedBox(height: 20),
                     _AdminResponseSection(report: report),
+                    if (reportStatusAllowsResubmit(report.status)) ...[
+                      const SizedBox(height: 20),
+                      _ResubmitEvidenceSection(report: report),
+                    ],
                   ],
                 ),
               ),
@@ -564,7 +571,9 @@ class _AdminResponseSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final instruction = report.reporterInstruction?.trim();
     final response = report.adminResponse?.trim();
+    final hasInstruction = instruction != null && instruction.isNotEmpty;
     final hasResponse = response != null && response.isNotEmpty;
     final closed = reportStatusIsClosed(report.status);
     final statusColor = reportStatusColor(report.status);
@@ -572,7 +581,21 @@ class _AdminResponseSection extends StatelessWidget {
     return _Section(
       title: 'Admin response',
       children: [
-        if (!hasResponse && !closed)
+        if (hasInstruction) ...[
+          Text(
+            'More evidence is required',
+            style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(instruction, style: AppTypography.body.copyWith(height: 1.45)),
+          const SizedBox(height: 8),
+          Text(
+            'Attempt ${report.evidenceAttemptCount} of $kReportMaxEvidenceAttempts used',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ] else if (!hasResponse && !closed)
           Text(
             'No response yet.\nOur team is still reviewing your report.',
             style: AppTypography.body.copyWith(
@@ -630,6 +653,112 @@ class _AdminResponseSection extends StatelessWidget {
           ],
         ],
       ],
+    );
+  }
+}
+
+class _ResubmitEvidenceSection extends StatelessWidget {
+  const _ResubmitEvidenceSection({required this.report});
+
+  final CommunityReportModel report;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<MyReportsController>();
+    final showFinalNotice = isReporterFinalEvidenceSubmissionPending(
+      status: report.status,
+      evidenceAttemptCount: report.evidenceAttemptCount,
+    );
+
+    return _Section(
+      title: 'Submit additional evidence',
+      children: [
+        if (showFinalNotice) ...[
+          const _FinalEvidenceSubmissionNotice(),
+          const SizedBox(height: 16),
+        ],
+        ReportEvidenceSection(
+          evidence: controller.resubmitEvidence,
+          evidenceError: null,
+          onAddGallery: () => controller.addResubmitPhoto(ImageSource.gallery),
+          onAddCamera: () => controller.addResubmitPhoto(ImageSource.camera),
+          onRemove: controller.removeResubmitPhoto,
+        ),
+        const SizedBox(height: 16),
+        ThriftButton(
+          label: 'Submit additional evidence',
+          isLoading: controller.isResubmitting,
+          onPressed: controller.canSubmitResubmit
+              ? () async {
+                  final error = await context
+                      .read<MyReportsController>()
+                      .submitAdditionalEvidence();
+                  if (!context.mounted) return;
+                  if (error != null) {
+                    showThriftSnackBar(context, error, isError: true);
+                    return;
+                  }
+                  showThriftSnackBar(
+                    context,
+                    'Your additional evidence has been submitted.',
+                  );
+                }
+              : null,
+        ),
+      ],
+    );
+  }
+}
+
+class _FinalEvidenceSubmissionNotice extends StatelessWidget {
+  const _FinalEvidenceSubmissionNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            size: 20,
+            color: AppColors.warning.withValues(alpha: 0.95),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Final Evidence Submission',
+                  style: AppTypography.body.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'This is your last opportunity to submit additional evidence '
+                  'for this report. Please review your information and attachments '
+                  'carefully before submitting. You will not be able to submit '
+                  'more evidence after this.',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

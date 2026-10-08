@@ -23,7 +23,11 @@ class AdminAccessDeniedScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.lock_outline, size: 48, color: AppColors.textSecondary),
+                Icon(
+                  Icons.lock_outline,
+                  size: 48,
+                  color: AppColors.textSecondary,
+                ),
                 const SizedBox(height: 20),
                 Text(
                   'Access denied',

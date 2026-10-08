@@ -14,8 +14,7 @@ import 'phone_otp_code_input.dart';
 
 /// Account-level phone on `users.phone_number` with SMS OTP (Edge Functions).
 ///
-/// Shared by Edit Profile and Become a Seller so validation, Smart/TNT rules,
-/// and OTP UX stay identical.
+/// Shared by Edit Profile and Become a Seller so validation and OTP UX stay identical.
 class AccountPhoneVerificationSection extends StatefulWidget {
   const AccountPhoneVerificationSection({
     super.key,
@@ -216,11 +215,11 @@ class _AccountPhoneVerificationSectionState
                     child: TextFormField(
                       focusNode: _phoneFocus,
                       controller: widget.phoneController,
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(11),
-                      ],
+                      keyboardType: const TextInputType.numberWithOptions(
+                        signed: false,
+                        decimal: false,
+                      ),
+                      inputFormatters: const [_PhMobileFieldFormatter()],
                       onChanged: (value) {
                         _otp.syncPhoneFromField(value);
                         setState(() {});
@@ -421,6 +420,29 @@ class _PhoneVerifyTrailing extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
+    );
+  }
+}
+
+/// Collapses `+639…` / `639…` to `09XXXXXXXXX` before the 11-digit check.
+class _PhMobileFieldFormatter extends TextInputFormatter {
+  const _PhMobileFieldFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = collapsePhMobileFieldText(
+      newValue.text,
+      previous: oldValue.text,
+    );
+    if (text == newValue.text) {
+      return newValue;
+    }
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
   }
 }

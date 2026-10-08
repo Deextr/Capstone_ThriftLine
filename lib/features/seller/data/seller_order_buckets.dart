@@ -45,8 +45,16 @@ enum SellerOrderBucket {
 
 /// Failed unpaid checkouts are not seller sales and must not appear in any
 /// workspace tab. Every other order maps to exactly one bucket.
+bool _isUnpaidFixedPriceCheckoutVoid(OrderModel order) {
+  if (order.isAuctionObligation) return false;
+  if (order.status != OrderStatus.cancelled) return false;
+  final pay = order.paymentStatus;
+  return pay != 'paid' && pay != 'refunded';
+}
+
 SellerOrderBucket? sellerOrderBucketFor(OrderModel order) {
   if (order.isFailedCheckout) return null;
+  if (_isUnpaidFixedPriceCheckoutVoid(order)) return null;
   if (order.isPaymentPending) {
     // Fixed-price checkout reservations are not seller fulfillment orders.
     if (!order.isAuctionObligation) return null;

@@ -1,6 +1,10 @@
 export const NETWORK_UNAVAILABLE_MESSAGE =
   "SMS verification is currently unavailable for this mobile number. Please use another supported number or try again later.";
 
+/** Buyer-facing copy for UniSMS auth, credit, SID, and transport failures. */
+export const SMS_DELIVERY_UNAVAILABLE_MESSAGE =
+  "Unable to send a verification code right now. Please try again later.";
+
 /** @deprecated Use [NETWORK_UNAVAILABLE_MESSAGE] for new provider errors. */
 export const DITO_UNAVAILABLE_MESSAGE = NETWORK_UNAVAILABLE_MESSAGE;
 
@@ -64,7 +68,8 @@ export class PhoneOtpHttpError extends Error {
 
 export function normalizePhPhone(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
-  if (digits.startsWith("63") && digits.length === 12) {
+  // +639XXXXXXXXX / 639XXXXXXXXX → 09XXXXXXXXX. Other +63 numbers are not mobiles.
+  if (digits.startsWith("639") && digits.length === 12) {
     return `0${digits.slice(2)}`;
   }
   if (digits.startsWith("0") && digits.length === 11 && digits[1] === "9") {
@@ -195,6 +200,17 @@ export type SmsSendResult = {
 /** @deprecated Use [SmsSendResult]. */
 export type FmcsmsSendResult = SmsSendResult;
 
+function asProviderText(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(asProviderText).filter((part) => part.length > 0).join(" ");
+  }
+  return "";
+}
+
 function providerText(
   parsed: Record<string, unknown> | null,
   raw: string,
@@ -205,17 +221,15 @@ function providerText(
       ? (message as Record<string, unknown>).fail_reason
       : null;
   const parts = [
-    parsed?.error,
-    parsed?.errors,
-    parsed?.message,
-    parsed?.detail,
-    parsed?.status,
-    failReason,
-    raw,
-  ]
-    .filter((value) => typeof value === "string" && value.trim().length > 0)
-    .join(" ");
-  return parts.toLowerCase();
+    asProviderText(parsed?.error),
+    asProviderText(parsed?.errors),
+    asProviderText(parsed?.message),
+    asProviderText(parsed?.detail),
+    asProviderText(parsed?.status),
+    asProviderText(failReason),
+    raw.trim(),
+  ].filter((value) => value.length > 0);
+  return parts.join(" ").toLowerCase();
 }
 
 function isNetworkUnavailableText(text: string): boolean {
@@ -286,6 +300,24 @@ export function classifyFmcsmsFailure(
   };
 }
 
+function isUnismsCreditFailure(text: string): boolean {
+  return /sms[_\s-]?credits?|\bcredits?\b|\bbalance\b|insufficient (sms|credit|balance|sid)|out of (sms )?credits?|no sms|sid[_\s-]?tokens?/.test(
+    text,
+  );
+}
+
+function isUnismsSenderFailure(text: string): boolean {
+  return /sender[_\s-]?id|unknown sender|invalid sender|unregistered sender/.test(
+    text,
+  );
+}
+
+function isUnismsInvalidRecipient(text: string): boolean {
+  return /invalid (phone|mobile|recipient|number)|invalid.*(recipient|phone number)|unknown number|malformed recipient|(recipient|phone number).*(invalid|malformed)/.test(
+    text,
+  );
+}
+
 export function classifyUnismsFailure(
   status: number,
   parsed: Record<string, unknown> | null,
@@ -296,50 +328,61 @@ export function classifyUnismsFailure(
     .join(" ")
     .toLowerCase();
 
+  // HTTP 400/422 is not proof of a bad phone number. UniSMS uses those statuses
+  // for sender ID, SID token, and credit failures as well as bad recipients.
   if (isNetworkUnavailableText(text)) {
     return classifyNetworkUnavailableFailure();
   }
-  if (status === 401) {
+  if (
+    status === 401 ||
+    /unauthorized|invalid api key|invalid secret|authentication failed/.test(text)
+  ) {
     return {
       code: "provider_auth",
-      userMessage:
-        "We couldn't send the verification code right now. Please try again later.",
+      userMessage: SMS_DELIVERY_UNAVAILABLE_MESSAGE,
     };
   }
-  if (status === 429) {
+  if (isUnismsCreditFailure(text)) {
+    console.error("send-phone-otp unisms credits or sid tokens", {
+      status,
+      fail_reason: failReason ?? null,
+    });
     return {
-      code: "rate_limited",
-      userMessage:
-        "We couldn't send the verification code right now. Please try again later.",
+      code: "provider_credits",
+      userMessage: SMS_DELIVERY_UNAVAILABLE_MESSAGE,
     };
   }
-  if (
-    status === 422 ||
-    status === 400 ||
-    /invalid.*(number|phone|recipient)|unknown number|malformed/.test(text)
-  ) {
+  if (isUnismsSenderFailure(text)) {
+    console.error("send-phone-otp unisms sender id rejected", {
+      status,
+      fail_reason: failReason ?? null,
+    });
+    return {
+      code: "provider_error",
+      userMessage: SMS_DELIVERY_UNAVAILABLE_MESSAGE,
+    };
+  }
+  if (isUnismsInvalidRecipient(text)) {
     return {
       code: "invalid_phone",
       userMessage: "Enter a valid Philippine mobile number.",
     };
   }
-  if (/credit|balance|insufficient|no sms|out of/.test(text)) {
+  if (status === 429) {
     return {
-      code: "provider_credits",
-      userMessage:
-        "We couldn't send the verification code right now. Please try again later.",
+      code: "rate_limited",
+      userMessage: SMS_DELIVERY_UNAVAILABLE_MESSAGE,
     };
   }
-  if (status >= 500) {
+  if (status >= 500 || status === 400 || status === 422) {
     return {
       code: "provider_error",
-      userMessage:
-        "We couldn't send the verification code right now. Please try again later.",
+      userMessage: SMS_DELIVERY_UNAVAILABLE_MESSAGE,
     };
   }
   return {
     code: "send_failed",
-    userMessage: "We couldn't send the verification code right now. Please try again later.",
+    userMessage: SMS_DELIVERY_UNAVAILABLE_MESSAGE,
   };
 }
 
@@ -417,6 +460,9 @@ export async function sendUnisms(
     };
   }
 
+  // POST /sms bills sms_credits (1 credit per 160-character segment).
+  // sid_tokens register a custom Sender ID; they are not spent per OTP.
+  // https://unismsapi.com/docs/sms — recipient is E.164 (+639XXXXXXXXX).
   const payload = {
     recipient: toE164Ph(phone),
     content: message,

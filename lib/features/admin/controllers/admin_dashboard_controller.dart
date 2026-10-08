@@ -27,6 +27,7 @@ class AdminDashboardController extends ChangeNotifier {
   bool _isOffline = false;
   bool _showingCachedData = false;
   String? _errorMessage;
+  int _loadEpoch = 0;
 
   AdminDashboardSnapshot? get snapshot => _snapshot;
   AdminDashboardCounts? get counts => _snapshot?.counts;
@@ -50,6 +51,7 @@ class AdminDashboardController extends ChangeNotifier {
   );
 
   Future<void> load() async {
+    final epoch = ++_loadEpoch;
     if (_snapshot == null) {
       final cached = _service.readCachedSnapshot();
       if (cached != null) {
@@ -66,7 +68,9 @@ class AdminDashboardController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final snapshot = await _service.loadSnapshot(window: _window);
+      final window = _window;
+      final snapshot = await _service.loadSnapshot(window: window);
+      if (epoch != _loadEpoch) return;
       _snapshot = snapshot;
       _showingCachedData = false;
       _isOffline = false;
@@ -77,6 +81,7 @@ class AdminDashboardController extends ChangeNotifier {
         await _reloadVerifications();
       }
     } catch (e) {
+      if (epoch != _loadEpoch) return;
       debugPrint('AdminDashboardController.load error: $e');
       _isOffline = isAdminDashboardOfflineError(e);
       if (_snapshot != null) {
@@ -90,9 +95,11 @@ class AdminDashboardController extends ChangeNotifier {
             : 'Unable to load the dashboard.';
       }
     } finally {
-      _isLoading = false;
-      _isRefreshing = false;
-      notifyListeners();
+      if (epoch == _loadEpoch) {
+        _isLoading = false;
+        _isRefreshing = false;
+        notifyListeners();
+      }
     }
   }
 

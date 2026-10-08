@@ -14,6 +14,7 @@ import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/buyer_to_rate_controller.dart';
 import '../../data/buyer_to_rate_buckets.dart';
 import '../../data/review_rules.dart';
+import '../widgets/star_rating_input.dart';
 
 class BuyerToRateScreen extends StatefulWidget {
   const BuyerToRateScreen({super.key, this.initialTab = 0});
@@ -45,14 +46,20 @@ class _BuyerToRateScreenState extends State<BuyerToRateScreen>
   }
 
   Future<void> _openReview(BuildContext context, String orderId) async {
-    await context.push(RouteNames.leaveReviewFor(orderId));
+    final didSubmit = await context.push<bool>(
+      RouteNames.leaveReviewFor(orderId),
+    );
     if (!context.mounted) return;
-    await context.read<BuyerToRateController>().load();
+    await context.read<BuyerToRateController>().load(showSpinner: false);
+    if (didSubmit == true) {
+      _tabs.animateTo(1);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<BuyerToRateController>();
+    final pendingCount = controller.pendingCount;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -62,15 +69,61 @@ class _BuyerToRateScreenState extends State<BuyerToRateScreen>
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
-        bottom: TabBar(
-          controller: _tabs,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textSecondary,
-          indicatorColor: AppColors.primary,
-          tabs: [
-            Tab(text: 'To Rate (${controller.pendingCount})'),
-            const Tab(text: 'My Reviews'),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.border)),
+            ),
+            child: TabBar(
+              controller: _tabs,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: AppColors.textSecondary,
+              indicatorColor: AppColors.primary,
+              indicatorWeight: 3,
+              labelStyle: AppTypography.label.copyWith(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+              unselectedLabelStyle: AppTypography.label.copyWith(
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+              ),
+              tabs: [
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('To Rate'),
+                      if (pendingCount > 0) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '$pendingCount',
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Tab(text: 'My Reviews'),
+              ],
+            ),
+          ),
         ),
       ),
       body: SafeArea(
@@ -125,17 +178,30 @@ class _PendingList extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 32),
         children: [
           const SizedBox(height: 96),
-          Icon(Icons.star_outline_rounded, size: 44, color: AppColors.textHint),
-          const SizedBox(height: 16),
+          Center(
+            child: Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle_outline_rounded,
+                size: 38,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
           Text(
-            'Nothing to rate right now',
+            'All caught up!',
             textAlign: TextAlign.center,
             style: AppTypography.heading.copyWith(fontSize: 20),
           ),
           const SizedBox(height: 8),
           Text(
-            errorMessage ??
-                'Completed orders you have not reviewed yet will show up here.',
+            errorMessage ?? 'You have no orders waiting for a review.',
             textAlign: TextAlign.center,
             style: AppTypography.body.copyWith(color: AppColors.textSecondary),
           ),
@@ -145,9 +211,9 @@ class _PendingList extends StatelessWidget {
 
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
       itemCount: orders.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (_, index) {
         final order = orders[index];
         return _PendingOrderCard(order: order, onRate: () => onRate(order.id));
@@ -175,8 +241,22 @@ class _ReviewHistoryList extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 32),
         children: [
           const SizedBox(height: 96),
-          Icon(Icons.rate_review_outlined, size: 44, color: AppColors.textHint),
-          const SizedBox(height: 16),
+          Center(
+            child: Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.rate_review_outlined,
+                size: 38,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
           Text(
             'No reviews yet',
             textAlign: TextAlign.center,
@@ -185,7 +265,7 @@ class _ReviewHistoryList extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             errorMessage ??
-                'After you rate a seller, your review will appear in this list.',
+                'Completed purchases you\'ve reviewed will appear here.',
             textAlign: TextAlign.center,
             style: AppTypography.body.copyWith(color: AppColors.textSecondary),
           ),
@@ -195,9 +275,9 @@ class _ReviewHistoryList extends StatelessWidget {
 
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
       itemCount: entries.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (_, index) {
         final entry = entries[index];
         final canEdit = canEditReview(entry.review.createdAt);
@@ -219,23 +299,121 @@ class _PendingOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _OrderSellerRow(order: order),
-            const SizedBox(height: 14),
-            ThriftButton(label: 'Rate Now', onPressed: onRate),
-          ],
-        ),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppConstants.radiusLg),
+        border: Border.all(color: AppColors.border),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: order.productImage.isEmpty
+                    ? Container(
+                        width: 64,
+                        height: 64,
+                        color: AppColors.surfaceVariant,
+                        child: const Icon(
+                          Icons.checkroom_outlined,
+                          color: AppColors.textHint,
+                        ),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: order.productImage,
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                        placeholder: (_, _) => Container(
+                          width: 64,
+                          height: 64,
+                          color: AppColors.surfaceVariant,
+                        ),
+                        errorWidget: (_, _, _) => Container(
+                          width: 64,
+                          height: 64,
+                          color: AppColors.surfaceVariant,
+                          child: const Icon(
+                            Icons.image_not_supported_outlined,
+                            color: AppColors.textHint,
+                          ),
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      order.productTitle,
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.storefront_outlined,
+                          size: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            order.sellerName,
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${formatCurrency(order.total)} · Delivered ${formatCompactDate(order.createdAt)}',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.primaryDark,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: AppColors.border),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Order #${order.orderNumber}',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textHint,
+                ),
+              ),
+              ThriftButton(
+                label: 'Rate Now',
+                icon: Icons.star_outline_rounded,
+                expand: false,
+                onPressed: onRate,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -254,121 +432,162 @@ class _SubmittedReviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final order = entry.order;
     final review = entry.review;
     final comment = review.comment.trim();
 
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _OrderSellerRow(order: entry.order),
-            const SizedBox(height: 12),
-            _ReadOnlyStars(rating: review.rating),
-            if (comment.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(comment, style: AppTypography.body),
-            ],
-            if (review.photos.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              _ReviewPhotoStrip(photos: review.photos),
-            ],
-            const SizedBox(height: 10),
-            Text(
-              'Submitted ${formatFullDate(review.createdAt)}',
-              style: AppTypography.caption,
-            ),
-            if (canEdit) ...[
-              const SizedBox(height: 12),
-              ThriftButton(
-                label: 'Edit Review',
-                variant: ThriftButtonVariant.outline,
-                onPressed: onEdit,
-              ),
-            ],
-          ],
-        ),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppConstants.radiusLg),
+        border: Border.all(color: AppColors.border),
       ),
-    );
-  }
-}
-
-class _OrderSellerRow extends StatelessWidget {
-  const _OrderSellerRow({required this.order});
-
-  final OrderModel order;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: order.productImage.isEmpty
-              ? Container(
-                  width: 56,
-                  height: 56,
-                  color: AppColors.surfaceVariant,
-                  child: const Icon(
-                    Icons.checkroom_outlined,
-                    color: AppColors.textHint,
-                  ),
-                )
-              : CachedNetworkImage(
-                  imageUrl: order.productImage,
-                  width: 56,
-                  height: 56,
-                  fit: BoxFit.cover,
-                ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                order.productTitle,
-                style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: order.productImage.isEmpty
+                    ? Container(
+                        width: 44,
+                        height: 44,
+                        color: AppColors.surfaceVariant,
+                        child: const Icon(
+                          Icons.checkroom_outlined,
+                          size: 20,
+                          color: AppColors.textHint,
+                        ),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: order.productImage,
+                        width: 44,
+                        height: 44,
+                        fit: BoxFit.cover,
+                        placeholder: (_, _) => Container(
+                          width: 44,
+                          height: 44,
+                          color: AppColors.surfaceVariant,
+                        ),
+                        errorWidget: (_, _, _) => Container(
+                          width: 44,
+                          height: 44,
+                          color: AppColors.surfaceVariant,
+                          child: const Icon(
+                            Icons.image_not_supported_outlined,
+                            size: 20,
+                            color: AppColors.textHint,
+                          ),
+                        ),
+                      ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      order.productTitle,
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.storefront_outlined,
+                          size: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            order.sellerName,
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (canEdit)
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(Icons.edit_outlined, size: 14),
+                  label: const Text(
+                    'Edit',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  onPressed: onEdit,
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Divider(height: 1, color: AppColors.border),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              StarRatingReadout(
+                value: review.rating.toDouble(),
+                size: 18,
+                showNumber: true,
+              ),
               Text(
-                'Seller · ${order.sellerName}',
-                style: AppTypography.caption,
+                formatFullDate(review.createdAt),
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ReadOnlyStars extends StatelessWidget {
-  const _ReadOnlyStars({required this.rating});
-
-  final int rating;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: List.generate(5, (index) {
-        final filled = index < rating;
-        return Icon(
-          filled ? Icons.star_rounded : Icons.star_border_rounded,
-          size: 22,
-          color: filled ? AppColors.primary : AppColors.textHint,
-        );
-      }),
+          if (comment.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                comment,
+                style: AppTypography.body.copyWith(
+                  color: AppColors.textPrimary,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+          if (review.photos.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _ReviewPhotoStrip(photos: review.photos),
+          ],
+        ],
+      ),
     );
   }
 }

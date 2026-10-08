@@ -8,44 +8,64 @@ import 'package:thriftline/models/enums.dart';
 
 void main() {
   group('admin report decisions', () {
-    test('only under_review can be decided', () {
+    test('active reports can be decided', () {
       expect(canDecideReport('under_review'), isTrue);
-      expect(canDecideReport('action_taken'), isFalse);
+      expect(canDecideReport('needs_more_evidence'), isTrue);
       expect(canDecideReport('resolved'), isFalse);
       expect(canDecideReport('dismissed'), isFalse);
     });
 
-    test('accepts only Phase 8 decision values', () {
-      expect(isAllowedReportDecision('action_taken'), isTrue);
+    test('accepts simplified admin decision values', () {
+      expect(isAllowedReportDecision('needs_more_evidence'), isTrue);
       expect(isAllowedReportDecision('resolved'), isTrue);
       expect(isAllowedReportDecision('dismissed'), isTrue);
-      expect(isAllowedReportDecision('accepted'), isFalse);
-      expect(isAllowedReportDecision('closed'), isFalse);
+      expect(isAllowedReportDecision('action_taken'), isFalse);
       expect(isAllowedReportDecision('under_review'), isFalse);
     });
 
-    test('open queue uses the same status as hub counts', () {
+    test('open statuses include needs_more_evidence', () {
       expect(isOpenReportStatus(kAdminReportOpenStatus), isTrue);
-      expect(kAdminReportOpenStatus, 'under_review');
-      expect(kAdminReportClosedStatuses, [
-        'action_taken',
-        'resolved',
-        'dismissed',
-      ]);
+      expect(isOpenReportStatus('needs_more_evidence'), isTrue);
+      expect(kAdminReportClosedStatuses, ['resolved', 'dismissed']);
     });
 
     test('requires a bounded admin response', () {
       expect(adminResponseError('short'), isNotNull);
       expect(adminResponseError('We reviewed this report.'), isNull);
+      expect(
+        adminResponseError('short', decision: 'needs_more_evidence'),
+        isNotNull,
+      );
+      expect(
+        adminResponseError('Please upload a clear photo of the label on the box.', decision: 'needs_more_evidence'),
+        isNull,
+      );
       expect(adminResponseError('a' * 2001), isNotNull);
     });
 
-    test('reuses Phase 8 status labels', () {
+    test('status and decision labels', () {
       expect(reportStatusLabel('under_review'), 'Under Review');
-      expect(reportStatusLabel('action_taken'), 'Action Taken');
-      expect(reportDecisionLabel('action_taken'), 'Action Taken');
+      expect(reportStatusLabel('needs_more_evidence'), 'Needs More Evidence');
+      expect(reportStatusLabel('action_taken'), 'Resolved');
+      expect(reportDecisionLabel('needs_more_evidence'), 'Request More Evidence');
       expect(reportDecisionLabel('resolved'), 'Resolved');
       expect(reportDecisionLabel('dismissed'), 'Dismissed');
+    });
+
+    test('dismissed order report confirm mentions delivery hold removal', () {
+      final body = adminReportDecisionConfirmBody(
+        decision: 'dismissed',
+        orderId: '11111111-1111-4111-8111-111111111111',
+      );
+      expect(body, contains('payment hold'));
+      expect(body, contains('not refunded'));
+
+      final community = adminReportDecisionConfirmBody(
+        decision: 'dismissed',
+        orderId: null,
+      );
+      expect(community, contains('does not ban'));
+      expect(community, isNot(contains('payment hold')));
     });
 
     test('classifies existing report reasons without inventing types', () {
@@ -74,8 +94,13 @@ void main() {
         'Community',
       );
       expect(
-        adminReportKindOf(category: 'fake_product', orderId: null),
+        adminReportKindOf(category: 'fake_product', orderId: 'ord-1'),
         'Order',
+      );
+      expect(orderReportFinancialLabel('refund_buyer'), 'Refund buyer');
+      expect(
+        orderReportFinancialLabel('release_seller'),
+        'Release payment to seller',
       );
     });
 
@@ -202,8 +227,8 @@ void main() {
       expect(reportDecisionCta('resolved'), 'Resolve report');
       expect(reportDecisionCta('dismissed'), 'Dismiss report');
       expect(
-        adminReportActivityTitle('action_taken'),
-        'Action taken on a report',
+        adminReportActivityTitle('needs_more_evidence'),
+        'More evidence requested',
       );
       expect(
         adminApplicationActivityTitle('approved'),

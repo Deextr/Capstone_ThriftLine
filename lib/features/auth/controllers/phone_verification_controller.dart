@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/utils/ph_phone.dart';
-import '../../../core/utils/ph_smart_tnt_prefixes.dart';
 import '../../../providers/auth_provider.dart';
 import '../domain/phone_otp.dart';
 import '../domain/trusted_device.dart';
@@ -64,8 +63,9 @@ class PhoneVerificationController extends ChangeNotifier {
   String get maskedPhone => maskPhMobileForOtp(phone);
 
   void syncPhoneFromField(String raw) {
+    final normalized = normalizePhMobile(raw);
     final digits = raw.replaceAll(RegExp(r'\D'), '');
-    phone = digits.length > 11 ? digits.substring(0, 11) : digits;
+    phone = normalized ?? digits;
     phoneError = null;
     if (codeSent && !isVerifiedForEnteredPhone) {
       changePhoneNumber();
@@ -99,18 +99,12 @@ class PhoneVerificationController extends ChangeNotifier {
   }
 
   Future<bool> sendCode({bool editProfileCopy = false}) async {
+    final canonical = normalizePhMobile(phone);
+    if (canonical != null) phone = canonical;
     phoneError = editProfileCopy
         ? phMobile09EditProfileValidationError(phone)
         : phMobile09FormatValidationError(phone);
     if (phoneError != null) {
-      notifyListeners();
-      return false;
-    }
-
-    final smartTntBlock = smartTntPrefixOtpBlockMessage(phone);
-    if (smartTntBlock != null) {
-      phoneError = smartTntBlock;
-      errorMessage = null;
       notifyListeners();
       return false;
     }
@@ -133,9 +127,7 @@ class PhoneVerificationController extends ChangeNotifier {
         fallback: 'We couldn\'t send the verification code. Please try again.',
       );
       if (result.code == PhoneOtpErrorCode.invalidPhone ||
-          result.code == PhoneOtpErrorCode.phoneAlreadyInUse ||
-          result.code == PhoneOtpErrorCode.networkUnavailable ||
-          result.code == PhoneOtpErrorCode.ditoUnavailable) {
+          result.code == PhoneOtpErrorCode.phoneAlreadyInUse) {
         phoneError = errorMessage;
         errorMessage = null;
       }

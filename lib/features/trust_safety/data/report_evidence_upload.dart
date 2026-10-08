@@ -31,7 +31,7 @@ Future<String?> uploadReportEvidence({
           );
     } catch (e) {
       debugPrint('report evidence upload error: $e');
-      return 'A photo could not be uploaded. Please try again.';
+      return 'We couldn\'t upload your evidence. Please try again.';
     }
 
     try {
@@ -55,6 +55,28 @@ Future<String?> uploadReportEvidence({
   return null;
 }
 
+Future<String?> resubmitReportEvidence({
+  required SupabaseService supabase,
+  required String reportId,
+}) async {
+  try {
+    final rpcRes = await supabase.client.rpc(
+      'resubmit_report_evidence',
+      params: {'p_report_id': reportId},
+    );
+    if (!supabaseRpcSuccess(rpcRes)) {
+      return supabaseRpcError(
+        rpcRes,
+        fallback: 'Could not submit additional evidence.',
+      );
+    }
+    return null;
+  } catch (e) {
+    debugPrint('resubmit_report_evidence error: $e');
+    return 'Could not submit additional evidence.';
+  }
+}
+
 Future<void> abandonOpenReport(
   SupabaseService supabase,
   String reportId,
@@ -66,6 +88,28 @@ Future<void> abandonOpenReport(
     );
   } catch (e) {
     debugPrint('abandon_open_report error: $e');
+  }
+}
+
+Future<String?> confirmCommunityReportSubmission(
+  SupabaseService supabase,
+  String reportId,
+) async {
+  try {
+    final rpcRes = await supabase.client.rpc(
+      'confirm_community_report_submission',
+      params: {'p_report_id': reportId},
+    );
+    if (!supabaseRpcSuccess(rpcRes)) {
+      return supabaseRpcError(
+        rpcRes,
+        fallback: 'We couldn\'t submit your report. Please try again.',
+      );
+    }
+    return null;
+  } catch (e) {
+    debugPrint('confirm_community_report_submission error: $e');
+    return 'We couldn\'t submit your report. Please try again.';
   }
 }
 

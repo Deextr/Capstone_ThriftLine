@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../core/services/supabase_service.dart';
 import 'admin_audit_log_models.dart';
 import 'admin_audit_service.dart';
@@ -19,8 +22,11 @@ class SellerApplication {
     this.idType,
     this.selfiePath,
     this.applicantName,
+    this.applicantEmail,
+    this.applicantUsername,
     this.rejectionReason,
     this.claimedSellingRange,
+    this.reviewedAt,
   });
 
   final String id;
@@ -38,8 +44,11 @@ class SellerApplication {
   final String? idType;
   final String? selfiePath;
   final String? applicantName;
+  final String? applicantEmail;
+  final String? applicantUsername;
   final String? rejectionReason;
   final String? claimedSellingRange;
+  final DateTime? reviewedAt;
 
   factory SellerApplication.fromJson(Map<String, dynamic> json) {
     final user = json['users'];
@@ -63,12 +72,25 @@ class SellerApplication {
       idType: json['government_id_type'] as String?,
       selfiePath: json['selfie_image'] as String?,
       applicantName: user is Map ? user['full_name'] as String? : null,
+      applicantEmail: user is Map ? user['email'] as String? : null,
+      applicantUsername: user is Map ? user['username'] as String? : null,
       rejectionReason: json['rejection_reason'] as String?,
       claimedSellingRange: json['claimed_selling_range'] as String?,
+      reviewedAt: json['reviewed_at'] != null
+          ? DateTime.tryParse(json['reviewed_at'] as String)
+          : null,
     );
   }
 
   SellerApplication withApplicantName(String? name) {
+    return withApplicantProfile(name: name);
+  }
+
+  SellerApplication withApplicantProfile({
+    String? name,
+    String? email,
+    String? username,
+  }) {
     return SellerApplication(
       id: id,
       userId: userId,
@@ -87,8 +109,15 @@ class SellerApplication {
       applicantName: (name != null && name.trim().isNotEmpty)
           ? name
           : applicantName,
+      applicantEmail: (email != null && email.trim().isNotEmpty)
+          ? email
+          : applicantEmail,
+      applicantUsername: (username != null && username.trim().isNotEmpty)
+          ? username
+          : applicantUsername,
       rejectionReason: rejectionReason,
       claimedSellingRange: claimedSellingRange,
+      reviewedAt: reviewedAt,
     );
   }
 }
@@ -109,12 +138,15 @@ class AdminVerificationService {
     try {
       final profile = await _supabase.client
           .from('user_public_profiles')
-          .select('full_name')
+          .select('full_name, username')
           .eq('user_id', application.userId)
           .maybeSingle();
-      application = application.withApplicantName(
-        profile?['full_name'] as String?,
-      );
+      if (profile != null) {
+        application = application.withApplicantProfile(
+          name: profile['full_name'] as String?,
+          username: profile['username'] as String?,
+        );
+      }
     } catch (_) {}
     return application;
   }
@@ -124,40 +156,230 @@ class AdminVerificationService {
   }
 
   Future<List<SellerApplication>> listByStatus(String status) async {
-    final rows = await _supabase.client
-        .from('user_verifications')
-        .select()
-        .eq('verification_status', status)
-        .order('submitted_at', ascending: false);
-    final applications = (rows as List)
+    final res = await listPaged(page: 0, pageSize: 100, status: status);
+    return res.items;
+  }
+
+  /// Server-side filtered and paginated seller verification query.
+  Future<({List<SellerApplication> items, int total})> listPaged({
+    required int page,
+    required int pageSize,
+    String status = 'all',
+    String? search,
+    DateTime? from,
+    DateTime? toExclusive,
+  }) async {
+    try {
+      return await _listPagedWithProfileJoin(
+        page: page,
+        pageSize: pageSize,
+        status: status,
+        search: search,
+        from: from,
+        toExclusive: toExclusive,
+      );
+    } catch (e, st) {
+      debugPrint(
+        'AdminVerificationService.listPaged embed query failed: $e\n$st',
+      );
+      return _listPagedWithUserLookup(
+        page: page,
+        pageSize: pageSize,
+        status: status,
+        search: search,
+        from: from,
+        toExclusive: toExclusive,
+      );
+    }
+  }
+
+  Future<({List<SellerApplication> items, int total})>
+  _listPagedWithProfileJoin({
+    required int page,
+    required int pageSize,
+    String status = 'all',
+    String? search,
+    DateTime? from,
+    DateTime? toExclusive,
+  }) async {
+    final fromIndex = page * pageSize;
+    final toIndex = fromIndex + pageSize - 1;
+
+    var query = _applyVerificationFilters(
+      _supabase.client
+          .from('user_verifications')
+          .select('*, users(full_name, email, username)'),
+      status: status,
+      search: search,
+      from: from,
+      toExclusive: toExclusive,
+      searchOnUsersJoin: true,
+    );
+
+    final response = await query
+        .order('submitted_at', ascending: false)
+        .order('verification_id', ascending: false)
+        .range(fromIndex, toIndex)
+        .count(CountOption.exact);
+
+    final data = response.data as List? ?? const [];
+    final applications = data
         .map(
           (row) =>
               SellerApplication.fromJson(Map<String, dynamic>.from(row as Map)),
         )
         .toList();
-    if (applications.isEmpty) return applications;
 
-    final ids = applications.map((app) => app.userId).toSet().toList();
+    return (items: applications, total: response.count);
+  }
+
+  Future<({List<SellerApplication> items, int total})>
+  _listPagedWithUserLookup({
+    required int page,
+    required int pageSize,
+    String status = 'all',
+    String? search,
+    DateTime? from,
+    DateTime? toExclusive,
+  }) async {
+    final fromIndex = page * pageSize;
+    final toIndex = fromIndex + pageSize - 1;
+
+    var query = _applyVerificationFilters(
+      _supabase.client.from('user_verifications').select(),
+      status: status,
+      search: null,
+      from: from,
+      toExclusive: toExclusive,
+      searchOnUsersJoin: false,
+    );
+
+    final trimmedSearch = search?.trim();
+    if (trimmedSearch != null && trimmedSearch.isNotEmpty) {
+      final term = _escapeIlikePattern(trimmedSearch);
+      final userIds = await _matchingUserIds(term);
+      if (userIds.isEmpty) {
+        query = query.ilike('shop_name', '%$term%');
+      } else {
+        query = query.or(
+          'shop_name.ilike.%$term%,user_id.in.(${userIds.join(',')})',
+        );
+      }
+    }
+
+    final response = await query
+        .order('submitted_at', ascending: false)
+        .order('verification_id', ascending: false)
+        .range(fromIndex, toIndex)
+        .count(CountOption.exact);
+
+    final data = response.data as List? ?? const [];
+    var applications = data
+        .map(
+          (row) =>
+              SellerApplication.fromJson(Map<String, dynamic>.from(row as Map)),
+        )
+        .toList();
+
+    if (applications.isEmpty) {
+      return (items: applications, total: response.count);
+    }
+
+    final userIds = applications.map((app) => app.userId).toSet().toList();
     try {
       final profiles = await _supabase.client
-          .from('user_public_profiles')
-          .select('user_id, full_name')
-          .inFilter('user_id', ids);
-      final names = <String, String>{
-        for (final row in profiles as List)
-          (row as Map)['user_id'] as String:
-              (row['full_name'] as String?) ?? '',
-      };
-      return applications
-          .map((app) => app.withApplicantName(names[app.userId]))
-          .toList();
-    } catch (_) {
-      return applications;
+          .from('users')
+          .select('user_id, full_name, email, username')
+          .inFilter('user_id', userIds);
+
+      final profileMap =
+          <String, ({String name, String email, String username})>{
+            for (final row in profiles as List)
+              (row as Map)['user_id'] as String: (
+                name: (row['full_name'] as String?) ?? '',
+                email: (row['email'] as String?) ?? '',
+                username: (row['username'] as String?) ?? '',
+              ),
+          };
+
+      applications = applications.map((app) {
+        final p = profileMap[app.userId];
+        if (p != null) {
+          return app.withApplicantProfile(
+            name: p.name,
+            email: p.email,
+            username: p.username,
+          );
+        }
+        return app;
+      }).toList();
+    } catch (_) {}
+
+    return (items: applications, total: response.count);
+  }
+
+  PostgrestFilterBuilder<PostgrestList> _applyVerificationFilters(
+    PostgrestFilterBuilder<PostgrestList> query, {
+    required String status,
+    required String? search,
+    required DateTime? from,
+    required DateTime? toExclusive,
+    required bool searchOnUsersJoin,
+  }) {
+    if (status != 'all' && status.isNotEmpty) {
+      query = query.eq('verification_status', status);
+    }
+    if (from != null) {
+      query = query.gte('submitted_at', from.toUtc().toIso8601String());
+    }
+    if (toExclusive != null) {
+      query = query.lt('submitted_at', toExclusive.toUtc().toIso8601String());
+    }
+
+    if (searchOnUsersJoin) {
+      final trimmedSearch = search?.trim();
+      if (trimmedSearch != null && trimmedSearch.isNotEmpty) {
+        final term = _escapeIlikePattern(trimmedSearch);
+        query = query.or(
+          'shop_name.ilike.%$term%,'
+          'users.full_name.ilike.%$term%,'
+          'users.email.ilike.%$term%,'
+          'users.username.ilike.%$term%',
+        );
+      }
+    }
+    return query;
+  }
+
+  Future<List<String>> _matchingUserIds(String term) async {
+    try {
+      final rows = await _supabase.client
+          .from('users')
+          .select('user_id')
+          .or(
+            'full_name.ilike.%$term%,email.ilike.%$term%,username.ilike.%$term%',
+          )
+          .limit(100);
+      return [
+        for (final row in rows as List)
+          if (row is Map && row['user_id'] is String) row['user_id'] as String,
+      ];
+    } catch (e) {
+      debugPrint('AdminVerificationService user search fallback: $e');
+      return const [];
     }
   }
 
+  static String _escapeIlikePattern(String raw) {
+    return raw
+        .replaceAll(r'\', r'\\')
+        .replaceAll('%', r'\%')
+        .replaceAll('_', r'\_');
+  }
+
   /// Returns the count of verifications grouped by status.
-  Future<({int pending, int approved, int rejected})> countAll() async {
+  Future<({int pending, int approved, int rejected, int total})>
+  countAll() async {
     final rows = await _supabase.client
         .from('user_verifications')
         .select('verification_status');
@@ -172,7 +394,12 @@ class AdminVerificationService {
           rejected++;
       }
     }
-    return (pending: pending, approved: approved, rejected: rejected);
+    return (
+      pending: pending,
+      approved: approved,
+      rejected: rejected,
+      total: rows.length,
+    );
   }
 
   Future<String?> signedUrl(String? path) async {

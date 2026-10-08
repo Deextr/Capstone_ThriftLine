@@ -21,7 +21,9 @@ class AdminWebSettingsPage extends StatelessWidget {
         children: [
           Text(
             'Administrator profile',
-            style: AppTypography.subheading.copyWith(fontWeight: FontWeight.w600),
+            style: AppTypography.subheading.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 8),
           Text(user?.email ?? '', style: AppTypography.body),

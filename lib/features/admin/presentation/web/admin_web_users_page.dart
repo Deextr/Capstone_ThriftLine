@@ -5,9 +5,8 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
-import '../../../../core/utils/formatters.dart';
 import '../../controllers/admin_users_controller.dart';
-import 'admin_web_table.dart';
+import '../widgets/admin_ui_components.dart';
 
 class AdminWebUsersPage extends StatefulWidget {
   const AdminWebUsersPage({super.key});
@@ -28,44 +27,78 @@ class _AdminWebUsersPageState extends State<AdminWebUsersPage> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AdminUsersController>();
+
     return ColoredBox(
       color: AppColors.background,
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              SizedBox(
-                width: 280,
-                child: TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    labelText: 'Search users',
-                    border: OutlineInputBorder(),
-                    isDense: true,
+          // Header
+          AdminPageHeader(
+            title: 'User Management',
+            subtitle:
+                'View user accounts, roles, trust scores, and activity across the marketplace.',
+            actions: [
+              OutlinedButton.icon(
+                onPressed: () => context.push(RouteNames.adminDisabledAccounts),
+                icon: const Icon(Icons.block, size: 16),
+                label: const Text('Disabled Accounts'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  side: const BorderSide(color: AppColors.border),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
                   ),
-                  onSubmitted: controller.setSearch,
                 ),
               ),
-              DropdownButton<String?>(
+              OutlinedButton.icon(
+                onPressed: controller.isLoading
+                    ? null
+                    : () => controller.load(),
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Refresh'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  side: const BorderSide(color: AppColors.border),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Filters Bar
+          AdminFilterBar(
+            hasActiveFilters: controller.hasActiveFilters,
+            onReset: () {
+              _searchController.clear();
+              controller.resetFilters();
+            },
+            children: [
+              AdminSearchField(
+                controller: _searchController,
+                hintText: 'Search by name, email, @username...',
+                width: 290,
+                onSubmitted: controller.setSearch,
+                onClear: () => controller.setSearch(''),
+              ),
+              AdminFilterDropdown<String?>(
                 value: controller.roleFilter,
-                hint: const Text('Role'),
                 items: const [
-                  DropdownMenuItem(value: null, child: Text('All roles')),
+                  DropdownMenuItem(value: null, child: Text('All Roles')),
                   DropdownMenuItem(value: 'buyer', child: Text('Buyer')),
                   DropdownMenuItem(value: 'seller', child: Text('Seller')),
                   DropdownMenuItem(value: 'admin', child: Text('Admin')),
                 ],
                 onChanged: controller.setRoleFilter,
               ),
-              DropdownButton<String?>(
+              AdminFilterDropdown<String?>(
                 value: controller.statusFilter,
-                hint: const Text('Status'),
                 items: const [
-                  DropdownMenuItem(value: null, child: Text('All statuses')),
+                  DropdownMenuItem(value: null, child: Text('All Statuses')),
                   DropdownMenuItem(value: 'active', child: Text('Active')),
                   DropdownMenuItem(
                     value: 'suspended',
@@ -75,27 +108,58 @@ class _AdminWebUsersPageState extends State<AdminWebUsersPage> {
                 ],
                 onChanged: controller.setStatusFilter,
               ),
-              TextButton(
-                onPressed: () => controller.setSearch(_searchController.text),
-                child: const Text('Search'),
-              ),
-              TextButton(
-                onPressed: () => context.push(RouteNames.adminDisabledAccounts),
-                child: const Text('Disabled accounts'),
-              ),
             ],
           ),
+
           if (controller.errorMessage != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              controller.errorMessage!,
-              style: AppTypography.caption.copyWith(color: AppColors.error),
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.error.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 20,
+                    color: AppColors.error,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      controller.errorMessage!,
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: controller.load,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
             ),
           ],
-          const SizedBox(height: 16),
-          AdminWebTable(
+
+          // Data Table
+          AdminDataTable(
             isLoading: controller.isLoading,
-            emptyMessage: 'No users found for this filter.',
+            emptyTitle: 'No users found',
+            emptyMessage: controller.hasActiveFilters
+                ? 'No users match your active filters. Try adjusting your search.'
+                : 'Users will appear here once registered.',
+            onResetFilters: controller.hasActiveFilters
+                ? () {
+                    _searchController.clear();
+                    controller.resetFilters();
+                  }
+                : null,
             columns: const [
               'User',
               'Email',
@@ -104,68 +168,72 @@ class _AdminWebUsersPageState extends State<AdminWebUsersPage> {
               'Trust',
               'Rating',
               'Joined',
-              'Last active',
+              'Last Active',
             ],
+            columnFlex: const [3, 3, 1, 1, 1, 1, 2, 2],
             rows: [
               for (final user in controller.rows)
                 [
-                  Text(user.fullName.isNotEmpty ? user.fullName : user.username),
-                  Text(user.email),
-                  Text(user.role.name),
-                  Text(user.accountStatus),
-                  Text(user.trustScore.toStringAsFixed(0)),
-                  Text(user.rating.toStringAsFixed(1)),
-                  Text(formatFullDate(user.createdAt)),
-                  Text(
-                    user.lastActiveAt != null
-                        ? formatFullDate(user.lastActiveAt!)
-                        : '—',
+                  AdminTableApplicantCell(
+                    displayName: user.fullName.isNotEmpty
+                        ? user.fullName
+                        : user.username,
+                    secondaryLine: user.username.isNotEmpty
+                        ? '@${user.username}'
+                        : null,
+                    avatarName: user.fullName.isNotEmpty
+                        ? user.fullName
+                        : user.username,
                   ),
+                  AdminTableCellText(
+                    primary: user.email,
+                    primaryStyle: AppTypography.tableBody,
+                  ),
+                  AdminTableCellText(
+                    primary: user.role.name.toUpperCase(),
+                    primaryStyle: AppTypography.caption.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: user.role.name == 'admin'
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                  AdminStatusBadge(status: user.accountStatus),
+                  Text(
+                    user.trustScore.toStringAsFixed(0),
+                    style: AppTypography.tableBodyMedium,
+                  ),
+                  Text(
+                    user.rating.toStringAsFixed(1),
+                    style: AppTypography.tableBody,
+                  ),
+                  AdminTableDateCell(dateTime: user.createdAt),
+                  user.lastActiveAt != null
+                      ? AdminTableDateCell(dateTime: user.lastActiveAt!)
+                      : Text(
+                          '—',
+                          style: AppTypography.tableBody.copyWith(
+                            color: AppColors.textHint,
+                          ),
+                        ),
                 ],
             ],
           ),
+
           const SizedBox(height: 16),
-          _Pager(
-            page: controller.page,
-            total: controller.total,
-            pageSize: AdminUsersController.pageSize,
-            onPage: controller.setPage,
+
+          // Standardized Pagination
+          AdminPagination(
+            currentPage: controller.page,
+            totalItems: controller.total,
+            pageSize: controller.pageSize,
+            pageSizeOptions: const [10, 25, 50],
+            isLoading: controller.isLoading,
+            onPageChanged: controller.setPage,
+            onPageSizeChanged: controller.setPageSize,
           ),
         ],
       ),
-    );
-  }
-}
-
-class _Pager extends StatelessWidget {
-  const _Pager({
-    required this.page,
-    required this.total,
-    required this.pageSize,
-    required this.onPage,
-  });
-
-  final int page;
-  final int total;
-  final int pageSize;
-  final ValueChanged<int> onPage;
-
-  @override
-  Widget build(BuildContext context) {
-    final pages = (total / pageSize).ceil().clamp(1, 9999);
-    return Row(
-      children: [
-        Text('Page ${page + 1} of $pages ($total total)'),
-        const Spacer(),
-        IconButton(
-          onPressed: page > 0 ? () => onPage(page - 1) : null,
-          icon: const Icon(Icons.chevron_left),
-        ),
-        IconButton(
-          onPressed: page + 1 < pages ? () => onPage(page + 1) : null,
-          icon: const Icon(Icons.chevron_right),
-        ),
-      ],
     );
   }
 }

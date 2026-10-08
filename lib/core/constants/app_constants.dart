@@ -16,6 +16,13 @@ abstract final class AppConstants {
   /// Survives process death while the user has not finished reset-password.
   static const String keyPasswordRecoveryPending = 'password_recovery_pending';
 
+  /// Open PayMongo hosted checkout — cleared after paid or terminal failure.
+  static const String keyPaymongoPendingOrderId = 'paymongo_pending_order_id';
+  static const String keyPaymongoPendingCheckoutGroupId =
+      'paymongo_pending_checkout_group_id';
+  static const String keyPaymongoPendingStartedAtMs =
+      'paymongo_pending_started_at_ms';
+
   /// Non-secret marker that pairs with the secure-storage install token.
   /// Logout must keep it. It is not a credential and must not be the token.
   static const String keyDeviceTrustInstall = 'device_trust_install';

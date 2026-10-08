@@ -27,66 +27,78 @@ class AdminDashboardTab extends StatelessWidget {
         MediaQuery.sizeOf(context).width >= AppConstants.breakpointDesktop;
 
     final body = SafeArea(
-        child: RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () => context.read<AdminDashboardController>().load(),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: AppConstants.maxContentWidth,
-                  ),
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.fromLTRB(
-                      20,
-                      20,
-                      20,
-                      wideNav ? 32 : 112,
-                    ),
-                    children: [
-                      if (controller.errorMessage != null &&
-                          controller.hasData) ...[
-                        AdminDashboardBanner(message: controller.errorMessage!),
-                        const SizedBox(height: 16),
-                      ],
-                      if (controller.errorMessage != null &&
-                          !controller.hasData)
-                        AdminErrorState(
-                          message: controller.errorMessage!,
-                          onRetry: () =>
-                              context.read<AdminDashboardController>().load(),
-                        )
-                      else if (controller.isLoading)
-                        AdminDashboardSkeleton(
-                          wide: constraints.maxWidth >= 720,
-                        )
-                      else ...[
-                        const _DateFilters(),
-                        const SizedBox(height: 20),
-                        _OverviewCards(maxWidth: constraints.maxWidth),
-                        const SizedBox(height: 28),
-                        const _MarketplacePerformance(),
-                        const SizedBox(height: 28),
-                        _SalesChart(maxWidth: constraints.maxWidth),
-                        const SizedBox(height: 28),
-                        const _OrderOverview(),
-                        const SizedBox(height: 28),
-                        const _NeedsAttention(),
-                      ],
-                    ],
-                  ),
+      child: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => context.read<AdminDashboardController>().load(),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: AppConstants.maxContentWidth,
                 ),
-              );
-            },
-          ),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, wideNav ? 32 : 112),
+                  children: [
+                    if (controller.errorMessage != null &&
+                        controller.hasData) ...[
+                      AdminDashboardBanner(message: controller.errorMessage!),
+                      const SizedBox(height: 16),
+                    ],
+                    if (controller.errorMessage != null && !controller.hasData)
+                      AdminErrorState(
+                        message: controller.errorMessage!,
+                        onRetry: () =>
+                            context.read<AdminDashboardController>().load(),
+                      )
+                    else if (controller.isLoading)
+                      AdminDashboardSkeleton(wide: constraints.maxWidth >= 720)
+                    else ...[
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: _DateFilters(),
+                      ),
+                      const SizedBox(height: 24),
+                      _OverviewCards(
+                        maxWidth: constraints.maxWidth,
+                        webEmbedded: webEmbedded,
+                      ),
+                      const SizedBox(height: 32),
+                      const _MarketplacePerformance(),
+                      const SizedBox(height: 32),
+                      _SalesChart(maxWidth: constraints.maxWidth),
+                      const SizedBox(height: 32),
+                      const _OrderOverview(),
+                      const SizedBox(height: 32),
+                      _NeedsAttention(webEmbedded: webEmbedded),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
         ),
+      ),
     );
 
     if (webEmbedded) {
-      return ColoredBox(color: AppColors.background, child: body);
+      return ColoredBox(
+        color: AppColors.background,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (controller.isRefreshing)
+              const LinearProgressIndicator(
+                minHeight: 2,
+                color: AppColors.primary,
+                backgroundColor: AppColors.border,
+              ),
+            Expanded(child: body),
+          ],
+        ),
+      );
     }
 
     return Scaffold(
@@ -109,26 +121,12 @@ class AdminDashboardTab extends StatelessWidget {
 }
 
 class _DateFilters extends StatelessWidget {
-  const _DateFilters();
-
   @override
   Widget build(BuildContext context) {
     final window = context.watch<AdminDashboardController>().window;
-    return Wrap(
-      spacing: 4,
-      runSpacing: 4,
-      children: [
-        for (final preset in AdminDatePreset.values)
-          AdminUnderlineFilter(
-            label:
-                preset == AdminDatePreset.custom &&
-                    window.preset == AdminDatePreset.custom
-                ? window.chipLabel
-                : adminDatePresetLabel(preset),
-            selected: window.preset == preset,
-            onTap: () => _select(context, preset),
-          ),
-      ],
+    return AdminDashboardDateRangeBar(
+      window: window,
+      onPresetSelected: (preset) => _select(context, preset),
     );
   }
 
@@ -148,6 +146,7 @@ class _DateFilters extends StatelessWidget {
       AdminDatePreset.today => AdminDateWindow.today(),
       AdminDatePreset.last7Days => AdminDateWindow.last7Days(),
       AdminDatePreset.last30Days => AdminDateWindow.last30Days(),
+      AdminDatePreset.thisMonth => AdminDateWindow.thisMonth(),
       AdminDatePreset.lastYear => AdminDateWindow.lastYear(),
       AdminDatePreset.custom => controller.window,
     };
@@ -156,9 +155,10 @@ class _DateFilters extends StatelessWidget {
 }
 
 class _OverviewCards extends StatelessWidget {
-  const _OverviewCards({required this.maxWidth});
+  const _OverviewCards({required this.maxWidth, this.webEmbedded = false});
 
   final double maxWidth;
+  final bool webEmbedded;
 
   @override
   Widget build(BuildContext context) {
@@ -189,14 +189,20 @@ class _OverviewCards extends StatelessWidget {
         onTap: () => AdminTabScope.open(context, AdminTabScope.verifications),
       ),
       AdminOverviewCard(
-        label: 'Open reports',
-        value: counts.openReports,
-        detail: counts.openReports == 0
-            ? 'None currently under review'
-            : 'Currently under review',
-        icon: Icons.flag_outlined,
-        attention: counts.openReports > 0,
-        onTap: () => AdminTabScope.open(context, AdminTabScope.reports),
+        label: 'Open cases',
+        value: counts.openReports + counts.openDisputes,
+        detail: counts.openReports + counts.openDisputes == 0
+            ? 'No reports or delivery problems waiting'
+            : 'Reports and delivery problems under review',
+        icon: Icons.gavel_outlined,
+        attention: counts.openReports + counts.openDisputes > 0,
+        onTap: () {
+          if (webEmbedded) {
+            context.go(RouteNames.adminReportsAll);
+          } else {
+            AdminTabScope.open(context, AdminTabScope.reports);
+          }
+        },
       ),
     ];
 
@@ -264,7 +270,8 @@ class _MarketplacePerformance extends StatelessWidget {
               child: AdminOverviewCard(
                 label: 'Gross marketplace sales',
                 value: counts.grossMarketplaceSales.round(),
-                detail: formatCurrency(counts.grossMarketplaceSales),
+                displayValue: formatCurrency(counts.grossMarketplaceSales),
+                detail: 'Paid sales in the selected period',
                 icon: Icons.storefront_outlined,
               ),
             ),
@@ -273,7 +280,8 @@ class _MarketplacePerformance extends StatelessWidget {
               child: AdminOverviewCard(
                 label: 'Platform revenue',
                 value: counts.platformRevenue.round(),
-                detail: formatCurrency(counts.platformRevenue),
+                displayValue: formatCurrency(counts.platformRevenue),
+                detail: 'Fees collected in the selected period',
                 icon: Icons.account_balance_outlined,
               ),
             ),
@@ -326,7 +334,9 @@ class _OrderOverview extends StatelessWidget {
 }
 
 class _NeedsAttention extends StatelessWidget {
-  const _NeedsAttention();
+  const _NeedsAttention({this.webEmbedded = false});
+
+  final bool webEmbedded;
 
   @override
   Widget build(BuildContext context) {
@@ -367,7 +377,13 @@ class _NeedsAttention extends StatelessWidget {
         AdminDashboardSectionHeader(
           title: 'Open reports',
           actionLabel: 'View all',
-          onAction: () => AdminTabScope.open(context, AdminTabScope.reports),
+          onAction: () {
+            if (webEmbedded) {
+              context.go(RouteNames.adminReportsAll);
+            } else {
+              AdminTabScope.open(context, AdminTabScope.reports);
+            }
+          },
         ),
         const SizedBox(height: 8),
         if (reports.isEmpty)

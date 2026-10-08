@@ -7,7 +7,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../controllers/admin_orders_list_controller.dart';
-import 'admin_web_table.dart';
+import '../widgets/admin_ui_components.dart';
 
 class AdminWebOrdersPage extends StatelessWidget {
   const AdminWebOrdersPage({super.key});
@@ -15,82 +15,171 @@ class AdminWebOrdersPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AdminOrdersListController>();
+
     return ColoredBox(
       color: AppColors.background,
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          DropdownButton<String?>(
-            value: controller.statusFilter,
-            hint: const Text('Order status'),
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All statuses')),
-              DropdownMenuItem(value: 'payment_pending', child: Text('Awaiting payment')),
-              DropdownMenuItem(value: 'paid', child: Text('Paid / To ship')),
-              DropdownMenuItem(value: 'shipped', child: Text('Shipped')),
-              DropdownMenuItem(value: 'completed', child: Text('Completed')),
-              DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
+          // Header
+          AdminPageHeader(
+            title: 'Orders',
+            subtitle:
+                'Track customer orders, fulfillment statuses, and payment states.',
+            actions: [
+              OutlinedButton.icon(
+                onPressed: controller.isLoading
+                    ? null
+                    : () => controller.load(),
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Refresh'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  side: const BorderSide(color: AppColors.border),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                ),
+              ),
             ],
-            onChanged: controller.setStatusFilter,
           ),
+
+          // Filters Bar
+          AdminFilterBar(
+            hasActiveFilters: controller.hasActiveFilters,
+            onReset: () => controller.resetFilters(),
+            children: [
+              AdminFilterDropdown<String?>(
+                value: controller.statusFilter,
+                items: const [
+                  DropdownMenuItem(
+                    value: null,
+                    child: Text('All Order Statuses'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'payment_pending',
+                    child: Text('Awaiting Payment'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'paid',
+                    child: Text('Paid / To Ship'),
+                  ),
+                  DropdownMenuItem(value: 'shipped', child: Text('Shipped')),
+                  DropdownMenuItem(
+                    value: 'completed',
+                    child: Text('Completed'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'cancelled',
+                    child: Text('Cancelled'),
+                  ),
+                ],
+                onChanged: controller.setStatusFilter,
+              ),
+            ],
+          ),
+
           if (controller.errorMessage != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              controller.errorMessage!,
-              style: AppTypography.caption.copyWith(color: AppColors.error),
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.error.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 20,
+                    color: AppColors.error,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      controller.errorMessage!,
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: controller.load,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
             ),
           ],
-          const SizedBox(height: 16),
-          AdminWebTable(
+
+          // Data Table
+          AdminDataTable(
             isLoading: controller.isLoading,
-            emptyMessage: 'No orders found for this filter.',
+            emptyTitle: 'No orders found',
+            emptyMessage: controller.hasActiveFilters
+                ? 'No orders match this status filter. Try selecting another status.'
+                : 'Orders will appear here once placed by buyers.',
+            onResetFilters: controller.hasActiveFilters
+                ? () => controller.resetFilters()
+                : null,
             columns: const [
-              'Order',
+              'Order #',
               'Buyer',
               'Seller',
               'Amount',
               'Payment',
-              'Status',
+              'Fulfillment Status',
               'Created',
-              '',
+              'Actions',
             ],
             rows: [
               for (final order in controller.rows)
                 [
-                  Text(order.orderNumber),
-                  Text(order.buyerName),
-                  Text(order.sellerName),
-                  Text(formatCurrency(order.totalAmount)),
-                  Text(order.paymentStatus),
-                  Text(order.statusLabel),
-                  Text(formatFullDate(order.createdAt)),
-                  TextButton(
-                    onPressed: () =>
-                        context.push(RouteNames.adminOrderDetailFor(order.orderId)),
-                    child: const Text('View order'),
+                  Text(
+                    order.orderNumber,
+                    style: AppTypography.tableBodyMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(order.buyerName, style: AppTypography.tableBody),
+                  Text(order.sellerName, style: AppTypography.tableBody),
+                  Text(
+                    formatCurrency(order.totalAmount),
+                    style: AppTypography.tableBodyMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  AdminStatusBadge(status: order.paymentStatus),
+                  AdminStatusBadge(
+                    status: order.orderStatus,
+                    label: order.statusLabel,
+                  ),
+                  AdminTableDateCell(dateTime: order.createdAt),
+                  AdminTableLinkAction(
+                    label: 'View',
+                    onPressed: () => context.push(
+                      RouteNames.adminOrderDetailFor(order.orderId),
+                    ),
                   ),
                 ],
             ],
           ),
+
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Text(
-                '${controller.total} orders',
-                style: AppTypography.caption,
-              ),
-              const Spacer(),
-              IconButton(
-                onPressed: controller.page > 0
-                    ? () => controller.setPage(controller.page - 1)
-                    : null,
-                icon: const Icon(Icons.chevron_left),
-              ),
-              IconButton(
-                onPressed: () => controller.setPage(controller.page + 1),
-                icon: const Icon(Icons.chevron_right),
-              ),
-            ],
+
+          // Standardized Pagination
+          AdminPagination(
+            currentPage: controller.page,
+            totalItems: controller.total,
+            pageSize: controller.pageSize,
+            pageSizeOptions: const [10, 25, 50],
+            isLoading: controller.isLoading,
+            onPageChanged: controller.setPage,
+            onPageSizeChanged: controller.setPageSize,
           ),
         ],
       ),

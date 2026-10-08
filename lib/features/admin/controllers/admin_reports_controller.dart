@@ -6,28 +6,34 @@ import '../../../models/order_model.dart';
 import '../../buyer/data/order_query.dart';
 import '../../trust_safety/data/report_reasons.dart';
 import '../data/admin_dashboard_models.dart';
+import '../data/admin_delivery_dispute.dart';
 import '../data/admin_review_rules.dart';
 import '../data/admin_review_service.dart';
+import '../data/delivery_payment_hold.dart';
+import '../data/delivery_payment_resolve.dart';
 import '../data/looking_for_moderation.dart';
 
 class AdminReportKindSummary {
   const AdminReportKindSummary({
     required this.total,
     required this.underReview,
+    required this.needsMoreEvidence,
     required this.resolved,
-    required this.closed,
+    required this.dismissed,
   });
 
   final int total;
   final int underReview;
+  final int needsMoreEvidence;
   final int resolved;
-  final int closed;
+  final int dismissed;
 
   int countFor(AdminReportListFilter filter) => switch (filter) {
     AdminReportListFilter.all => total,
     AdminReportListFilter.underReview => underReview,
+    AdminReportListFilter.needsMoreEvidence => needsMoreEvidence,
     AdminReportListFilter.resolved => resolved,
-    AdminReportListFilter.closed => closed,
+    AdminReportListFilter.dismissed => dismissed,
   };
 }
 
@@ -52,6 +58,7 @@ class AdminReportsController extends ChangeNotifier {
   List<LookingForAdminReport> _lookingForReports = const [];
   CommunityReportModel? _report;
   OrderModel? _relatedOrder;
+  AdminDeliveryDispute? _relatedDispute;
   bool _isLoading = true;
   bool _isSaving = false;
   String? _errorMessage;
@@ -67,18 +74,43 @@ class AdminReportsController extends ChangeNotifier {
   List<LookingForAdminReport> get lookingForReports => _lookingForReports;
   CommunityReportModel? get report => _report;
   OrderModel? get relatedOrder => _relatedOrder;
+  AdminDeliveryDispute? get relatedDispute => _relatedDispute;
+  DeliveryPaymentHold? get paymentHold => _relatedDispute?.paymentHold;
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
   String? get errorMessage => _errorMessage;
   String? get decision => _decision;
   String get searchQuery => searchController.text;
   String get response => responseController.text;
+  bool get isOrderReport =>
+      _report != null &&
+      isAdminOrderReport(
+        category: _report!.category,
+        orderId: _report!.orderId,
+      );
+
   bool get canSubmitDecision =>
       _report != null &&
       canDecideReport(_report!.status) &&
+      !isOrderReport &&
       _decision != null &&
-      adminResponseError(response) == null &&
+      adminResponseError(response, decision: _decision) == null &&
       !_isSaving;
+
+  String? get orderResolutionNotesError {
+    if (response.trim().isEmpty) return null;
+    return adminResponseError(response, decision: 'resolved');
+  }
+
+  bool get canSubmitOrderFinancialResolution {
+    return isOrderReport &&
+        canDecideReport(_report!.status) &&
+        relatedDispute != null &&
+        paymentHold != null &&
+        orderResolutionNotesError == null &&
+        response.trim().length >= kAdminResponseMinLength &&
+        !_isSaving;
+  }
 
   bool get hasActiveListFilters =>
       _filter != AdminReportListFilter.all ||
@@ -90,7 +122,8 @@ class AdminReportsController extends ChangeNotifier {
   int get totalCount => activeKindSummary.total;
   int get underReviewCount => activeKindSummary.underReview;
   int get resolvedCount => activeKindSummary.resolved;
-  int get closedCount => activeKindSummary.closed;
+  int get needsMoreEvidenceCount => activeKindSummary.needsMoreEvidence;
+  int get dismissedCount => activeKindSummary.dismissed;
 
   AdminReportKindSummary kindSummary(AdminReportKind kind) {
     if (kind == AdminReportKind.lookingFor) {
@@ -104,8 +137,13 @@ class AdminReportsController extends ChangeNotifier {
         total: community.total + orders.total + lookingFor.total,
         underReview:
             community.underReview + orders.underReview + lookingFor.underReview,
+        needsMoreEvidence:
+            community.needsMoreEvidence +
+            orders.needsMoreEvidence +
+            lookingFor.needsMoreEvidence,
         resolved: community.resolved + orders.resolved + lookingFor.resolved,
-        closed: community.closed + orders.closed + lookingFor.closed,
+        dismissed:
+            community.dismissed + orders.dismissed + lookingFor.dismissed,
       );
     }
     return _summaryForCommunity(
@@ -122,13 +160,11 @@ class AdminReportsController extends ChangeNotifier {
       underReview: list
           .where((item) => item.status == kAdminReportOpenStatus)
           .length,
-      resolved: list.where((item) => item.status == 'resolved').length,
-      closed: list
-          .where(
-            (item) =>
-                item.status == 'action_taken' || item.status == 'dismissed',
-          )
+      needsMoreEvidence: list
+          .where((item) => item.status == kAdminReportNeedsEvidenceStatus)
           .length,
+      resolved: list.where((item) => item.status == 'resolved').length,
+      dismissed: list.where((item) => item.status == 'dismissed').length,
     );
   }
 
@@ -141,13 +177,11 @@ class AdminReportsController extends ChangeNotifier {
       underReview: list
           .where((item) => item.status == kAdminReportOpenStatus)
           .length,
-      resolved: list.where((item) => item.status == 'resolved').length,
-      closed: list
-          .where(
-            (item) =>
-                item.status == 'action_taken' || item.status == 'dismissed',
-          )
+      needsMoreEvidence: list
+          .where((item) => item.status == kAdminReportNeedsEvidenceStatus)
           .length,
+      resolved: list.where((item) => item.status == 'resolved').length,
+      dismissed: list.where((item) => item.status == 'dismissed').length,
     );
   }
 
@@ -305,10 +339,15 @@ class AdminReportsController extends ChangeNotifier {
       if (reportId != null) {
         _report = await _service.getReport(reportId!);
         _relatedOrder = null;
+        _relatedDispute = null;
         if (_report == null) {
           _errorMessage = 'Report not found.';
         } else if (_report!.orderId != null && _report!.orderId!.isNotEmpty) {
           _relatedOrder = await fetchOrderById(_supabase, _report!.orderId!);
+          _relatedDispute = await _service.getDisputeForOrderReport(
+            disputeId: _report!.disputeId,
+            orderId: _report!.orderId,
+          );
         }
         if (!canDecideReport(_report?.status ?? '')) {
           _decision = null;
@@ -337,11 +376,128 @@ class AdminReportsController extends ChangeNotifier {
       _reports = const [];
       _report = null;
       _relatedOrder = null;
+      _relatedDispute = null;
       _errorMessage = reportId == null
           ? 'Unable to load reports.'
           : 'Unable to load this report.';
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<String?> submitOrderEvidenceRequest({
+    required String party,
+    required String instruction,
+  }) async {
+    final current = _report;
+    if (current == null) return 'Report not found.';
+    if (!canDecideReport(current.status)) {
+      return 'This report is already closed.';
+    }
+    if (_isSaving) return null;
+    _isSaving = true;
+    notifyListeners();
+    try {
+      return await _service
+          .requestOrderReportEvidence(
+            reportId: current.id,
+            party: party,
+            instruction: instruction,
+          )
+          .then((error) async {
+            if (error == null) await load();
+            return error;
+          });
+    } finally {
+      _isSaving = false;
+      notifyListeners();
+    }
+  }
+
+  Future<DeliveryPaymentResult> confirmOrderFinancialResolution({
+    required bool refundBuyer,
+    required bool? returnRequired,
+  }) async {
+    if (_relatedDispute == null) {
+      return const DeliveryPaymentResult(
+        success: false,
+        error: 'No delivery dispute is linked to this order report.',
+      );
+    }
+    final notesError = adminResponseError(response, decision: 'resolved');
+    if (notesError != null) {
+      return DeliveryPaymentResult(success: false, error: notesError);
+    }
+    if (_isSaving) {
+      return const DeliveryPaymentResult(success: false, error: 'Please wait…');
+    }
+
+    _isSaving = true;
+    notifyListeners();
+    try {
+      DeliveryPaymentResult result;
+      if (refundBuyer) {
+        if (returnRequired == null) {
+          return const DeliveryPaymentResult(
+            success: false,
+            error: 'Choose whether the item must be returned.',
+          );
+        }
+        final hold = paymentHold;
+        if (hold != null && hold.isRefunded) {
+          result = await _service.refundDeliveryPayment(
+            disputeId: _relatedDispute!.id,
+            adminNote: response.trim(),
+            returnRequired: returnRequired,
+          );
+          if (!result.success) return result;
+        } else {
+          result = await _service.refundDeliveryPayment(
+            disputeId: _relatedDispute!.id,
+            adminNote: response.trim(),
+            returnRequired: returnRequired,
+          );
+          if (!result.success) return result;
+        }
+        final closeError = await _service.completeOrderReportResolution(
+          reportId: _report!.id,
+          financial: 'refund_buyer',
+          adminResponse: response,
+          returnRequired: returnRequired,
+        );
+        if (closeError != null) {
+          return DeliveryPaymentResult(success: false, error: closeError);
+        }
+      } else {
+        final hold = paymentHold;
+        if (hold != null && hold.isReleased) {
+          result = DeliveryPaymentResult(
+            success: true,
+            alreadyDecided: true,
+            decision: 'release',
+            status: 'released',
+          );
+        } else {
+          result = await _service.releaseDeliveryPayment(
+            disputeId: _relatedDispute!.id,
+            adminNote: response.trim(),
+          );
+        }
+        if (!result.success) return result;
+        final closeError = await _service.completeOrderReportResolution(
+          reportId: _report!.id,
+          financial: 'release_seller',
+          adminResponse: response,
+        );
+        if (closeError != null) {
+          return DeliveryPaymentResult(success: false, error: closeError);
+        }
+      }
+      await load();
+      return result;
+    } finally {
+      _isSaving = false;
       notifyListeners();
     }
   }
@@ -356,7 +512,10 @@ class AdminReportsController extends ChangeNotifier {
     if (selected == null || !isAllowedReportDecision(selected)) {
       return 'Choose a decision.';
     }
-    final responseError = adminResponseError(response);
+    if (isOrderReport && selected != 'needs_more_evidence') {
+      return 'Use the financial resolution controls for this order report.';
+    }
+    final responseError = adminResponseError(response, decision: _decision);
     if (responseError != null) return responseError;
     if (_isSaving) return null;
 

@@ -135,9 +135,55 @@ async function findCheckoutPayment(
     .in("order_id", orderIds)
     .not("checkout_session_id", "is", null)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return asRecord(grouped.data) ?? payment;
+    .limit(1);
+  if (grouped.error) {
+    console.error("findCheckoutPayment group", grouped.error.message);
+    return payment;
+  }
+  const rows = Array.isArray(grouped.data) ? grouped.data : [];
+  return asRecord(rows[0]) ?? payment;
+}
+
+async function groupAlreadyPaid(
+  supabase: SupabaseClient,
+  orderId: string,
+  checkoutGroupId: string,
+): Promise<boolean> {
+  if (checkoutGroupId && isUuid(checkoutGroupId)) {
+    const paidOrders = await supabase
+      .from("orders")
+      .select("order_id")
+      .eq("checkout_group_id", checkoutGroupId)
+      .eq("order_status", "paid")
+      .limit(1);
+    if ((paidOrders.data ?? []).length > 0) return true;
+
+    const groupOrders = await supabase
+      .from("orders")
+      .select("order_id")
+      .eq("checkout_group_id", checkoutGroupId);
+    const orderIds = (groupOrders.data ?? [])
+      .map((row) => readString(asRecord(row)?.order_id))
+      .filter((id) => isUuid(id));
+    if (orderIds.length > 0) {
+      const paidPayments = await supabase
+        .from("payments")
+        .select("payment_id")
+        .in("order_id", orderIds)
+        .eq("payment_status", "paid")
+        .limit(1);
+      if ((paidPayments.data ?? []).length > 0) return true;
+    }
+    return false;
+  }
+
+  const paidPayment = await supabase
+    .from("payments")
+    .select("payment_id")
+    .eq("order_id", orderId)
+    .eq("payment_status", "paid")
+    .limit(1);
+  return (paidPayment.data ?? []).length > 0;
 }
 
 async function expectedAmountCentavos(
@@ -283,6 +329,15 @@ Deno.serve(async (req) => {
   }
 
   const checkoutGroupId = readString(order.checkout_group_id);
+  if (await groupAlreadyPaid(supabase, orderId, checkoutGroupId)) {
+    console.log(JSON.stringify({
+      msg: "paymongo reconcile already paid",
+      order_id: orderId,
+      checkout_group_id: checkoutGroupId || null,
+    }));
+    return json(200, { success: true, outcome: "paid" });
+  }
+
   const payment = await findCheckoutPayment(
     supabase,
     orderId,
@@ -352,6 +407,8 @@ Deno.serve(async (req) => {
 
   console.log(JSON.stringify({
     msg: "paymongo reconcile",
+    order_id: orderId,
+    checkout_group_id: checkoutGroupId || null,
     outcome: parsed.outcome,
     session_status: parsed.sessionStatus,
     session_id: parsed.sessionId ?? sessionId,
@@ -391,7 +448,19 @@ Deno.serve(async (req) => {
     }
     if (applied.success === false) {
       console.error("apply_paymongo_event reconcile rejected", applied.error);
+    } else {
+      console.log(JSON.stringify({
+        msg: "paymongo reconcile applied",
+        order_id: orderId,
+        checkout_group_id: checkoutGroupId || null,
+        outcome: parsed.outcome,
+        applied,
+      }));
     }
+  }
+
+  if (await groupAlreadyPaid(supabase, orderId, checkoutGroupId)) {
+    return json(200, { success: true, outcome: "paid" });
   }
 
   const latestOrder = await supabase

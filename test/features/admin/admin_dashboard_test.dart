@@ -182,8 +182,11 @@ void main() {
       expect(adminReportListFilterStatuses(AdminReportListFilter.resolved), [
         'resolved',
       ]);
-      expect(adminReportListFilterStatuses(AdminReportListFilter.closed), [
-        'action_taken',
+      expect(
+        adminReportListFilterStatuses(AdminReportListFilter.needsMoreEvidence),
+        ['needs_more_evidence'],
+      );
+      expect(adminReportListFilterStatuses(AdminReportListFilter.dismissed), [
         'dismissed',
       ]);
     });

@@ -145,12 +145,17 @@ void main() {
       expect(kReportReasons.map((r) => r.slug), contains('scam_or_fraud'));
       expect(kReportReasons.map((r) => r.slug), contains('harassment'));
       expect(kReportReasons.map((r) => r.slug), contains('other'));
-      expect(reportReasonLabel('fake_product'), 'Fake or Misrepresented Item');
+      expect(reportReasonLabel('fake_item'), 'Counterfeit or Fake Items');
+      expect(reportReasonLabel('fake_product'), 'Counterfeit or Fake Items');
+      expect(reportReasonLabel('abusive_behavior'), 'Harassment or Abusive Behavior');
+      expect(communityReportDetailsError('', 'scam_or_fraud'), isNull);
+      expect(communityReportDetailsError('', 'other'), isNotNull);
     });
 
     test('maps studio statuses to readable labels', () {
       expect(reportStatusLabel('under_review'), 'Under Review');
-      expect(reportStatusLabel('action_taken'), 'Action Taken');
+      expect(reportStatusLabel('action_taken'), 'Resolved');
+      expect(reportStatusLabel('needs_more_evidence'), 'Needs More Evidence');
       expect(reportStatusLabel('resolved'), 'Resolved');
       expect(reportStatusLabel('dismissed'), 'Dismissed');
       expect(reportStatusFromDb('Dismissed'), 'dismissed');

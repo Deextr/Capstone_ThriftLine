@@ -7,7 +7,9 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../models/order_model.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../data/checkout_totals.dart';
 import '../../data/paymongo_checkout.dart';
+import 'order_cost_breakdown_section.dart';
 import 'pay_now_button.dart';
 import 'payment_deadline_text.dart';
 
@@ -51,13 +53,14 @@ class PaymentCheckoutBody extends StatelessWidget {
     return [order];
   }
 
-  double get _subtotal =>
-      _orders.fold<double>(0, (sum, item) => sum + item.amount);
-  double get _shipping =>
-      _orders.fold<double>(0, (sum, item) => sum + item.shippingFee);
-  double get _platform =>
-      _orders.fold<double>(0, (sum, item) => sum + item.platformFee);
-  double get _total => _orders.fold<double>(0, (sum, item) => sum + item.total);
+  double get _subtotal => checkoutRoundCurrency(
+      _orders.fold<double>(0, (sum, item) => sum + item.amount));
+  double get _shipping => checkoutRoundCurrency(
+      _orders.fold<double>(0, (sum, item) => sum + item.shippingFee));
+  double get _platform => checkoutRoundCurrency(
+      _orders.fold<double>(0, (sum, item) => sum + item.platformFee));
+  double get _total =>
+      checkoutRoundCurrency(_orders.fold<double>(0, (sum, item) => sum + item.total));
 
   @override
   Widget build(BuildContext context) {
@@ -80,13 +83,17 @@ class PaymentCheckoutBody extends StatelessWidget {
                 _SectionLabel(
                   title: shops > 1 ? 'Your orders' : 'Your order',
                   subtitle: shops > 1
-                      ? '$shops shops · one payment'
-                      : order.sellerName,
+                      ? '$shops orders from $shops shops · Pay once through PayMongo'
+                      : '1 order from ${order.sellerName}',
                 ),
                 const SizedBox(height: 10),
                 for (var i = 0; i < _orders.length; i++) ...[
-                  if (i > 0) const SizedBox(height: 10),
-                  _OrderItemsCard(order: _orders[i], showShopHeader: shops > 1),
+                  if (i > 0) const SizedBox(height: 12),
+                  _OrderItemsCard(
+                    order: _orders[i],
+                    orderIndex: i,
+                    totalOrders: shops,
+                  ),
                 ],
                 const SizedBox(height: 16),
                 _PaymentAddressSection(
@@ -95,14 +102,20 @@ class PaymentCheckoutBody extends StatelessWidget {
                   onChangeAddress: onChangeAddress,
                 ),
                 const SizedBox(height: 16),
-                _SectionLabel(title: 'Payment summary'),
-                const SizedBox(height: 10),
-                _PaymentTotalsCard(
+                CombinedPaymentSummaryCard(
                   subtotal: _subtotal,
                   shippingFee: _shipping,
                   platformFee: _platform,
                   total: _total,
                   shopCount: shops,
+                  itemCount: _orders.fold<int>(
+                    0,
+                    (sum, o) =>
+                        sum +
+                        (o.items.isNotEmpty
+                            ? o.items.fold(0, (s, it) => s + it.quantity)
+                            : o.quantity),
+                  ),
                 ),
                 if (!confirming) ...[
                   const SizedBox(height: 20),
@@ -221,10 +234,15 @@ class _ConfirmingBanner extends StatelessWidget {
 }
 
 class _OrderItemsCard extends StatelessWidget {
-  const _OrderItemsCard({required this.order, this.showShopHeader = false});
+  const _OrderItemsCard({
+    required this.order,
+    this.orderIndex,
+    this.totalOrders,
+  });
 
   final OrderModel order;
-  final bool showShopHeader;
+  final int? orderIndex;
+  final int? totalOrders;
 
   @override
   Widget build(BuildContext context) {
@@ -243,25 +261,89 @@ class _OrderItemsCard extends StatelessWidget {
             ),
           ];
 
+    final totalItemCount = lines.fold<int>(0, (sum, i) => sum + i.quantity);
+
     return ThriftCard(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (showShopHeader) ...[
-            Text(
-              order.sellerName,
-              style: AppTypography.caption.copyWith(
-                fontWeight: FontWeight.w700,
-                color: AppColors.primaryDark,
-              ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.storefront_outlined,
+                  size: 20,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    order.sellerName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.subheading.copyWith(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (order.orderNumber.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    '#${order.orderNumber}',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                if (totalOrders != null && totalOrders! > 1 && orderIndex != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Order ${orderIndex! + 1} of $totalOrders',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.primaryDark,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
-            const SizedBox(height: 10),
-          ],
-          for (var i = 0; i < lines.length; i++) ...[
-            if (i > 0) const SizedBox(height: 12),
-            _OrderLineRow(item: lines[i]),
-          ],
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                for (var i = 0; i < lines.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 12),
+                  _OrderLineRow(item: lines[i]),
+                ],
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          OrderCostBreakdown(
+            subtotal: order.amount,
+            shippingFee: order.shippingFee,
+            platformFee: order.platformFee,
+            total: order.total,
+            itemCount: totalItemCount,
+          ),
         ],
       ),
     );
@@ -447,94 +529,6 @@ class _PaymentAddressSection extends StatelessWidget {
           ],
         ],
       ),
-    );
-  }
-}
-
-class _PaymentTotalsCard extends StatelessWidget {
-  const _PaymentTotalsCard({
-    required this.subtotal,
-    required this.shippingFee,
-    required this.platformFee,
-    required this.total,
-    this.shopCount = 1,
-  });
-
-  final double subtotal;
-  final double shippingFee;
-  final double platformFee;
-  final double total;
-  final int shopCount;
-
-  @override
-  Widget build(BuildContext context) {
-    return ThriftCard(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        children: [
-          _SummaryLine(label: 'Subtotal', value: formatCurrency(subtotal)),
-          const SizedBox(height: 8),
-          _SummaryLine(
-            label: shopCount > 1
-                ? 'Delivery fee ($shopCount shops)'
-                : 'Delivery fee',
-            value: formatCurrency(shippingFee),
-          ),
-          if (platformFee > 0) ...[
-            const SizedBox(height: 8),
-            _SummaryLine(
-              label: 'Platform fee (2%)',
-              value: formatCurrency(platformFee),
-            ),
-          ],
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Divider(height: 1),
-          ),
-          Row(
-            children: [
-              Text(
-                'Total payment',
-                style: AppTypography.subheading.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                formatCurrency(total),
-                style: AppTypography.heading.copyWith(
-                  color: AppColors.primaryDark,
-                  fontSize: 20,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryLine extends StatelessWidget {
-  const _SummaryLine({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: AppTypography.caption.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ),
-        Text(value, style: AppTypography.body),
-      ],
     );
   }
 }
