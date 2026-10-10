@@ -12,6 +12,7 @@ import '../../../../core/routes/route_names.dart';
 import '../../../../features/auth/domain/auth_user.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/theme_provider.dart';
+import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/admin_dashboard_controller.dart';
 import '../widgets/admin_profile_modal.dart';
 
@@ -447,12 +448,16 @@ class _AdminHeaderActions extends StatelessWidget {
         ? user!.name.trim()
         : 'Admin';
 
+    final avatarUrl = user?.avatarUrl ?? '';
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        ThriftAvatar(imageUrl: avatarUrl, name: name, size: 32),
         if (showName) ...[
+          const SizedBox(width: 8),
           ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 160),
+            constraints: const BoxConstraints(maxWidth: 160),
             child: Text(
               name,
               style: AppTypography.caption.copyWith(
@@ -463,8 +468,8 @@ class _AdminHeaderActions extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          const SizedBox(width: 8),
         ],
+        const SizedBox(width: 8),
         const _ThemeToggleButton(),
         const SizedBox(width: 8),
         const _SignOutButton(),
