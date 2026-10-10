@@ -13,13 +13,17 @@ class AdminAccessDeniedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final reason = GoRouterState.of(context).uri.queryParameters['reason'];
+    final deactivated =
+        reason == 'deactivated' ||
+        context.watch<AuthProvider>().isDeactivatedAdministrator;
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
+            constraints: BoxConstraints(maxWidth: 440),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -30,14 +34,16 @@ class AdminAccessDeniedScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'Access denied',
+                  deactivated ? 'Account deactivated' : 'Access denied',
                   style: AppTypography.heading.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Text(
-                  'This portal is for ThriftLine administrators only. Buyer and seller accounts cannot access the admin workspace.',
+                  deactivated
+                      ? 'This administrator account is deactivated. Ask a Super Admin to restore access.'
+                      : 'This portal is for ThriftLine administrators only. Buyer and seller accounts cannot access the admin workspace.',
                   style: AppTypography.body.copyWith(
                     color: AppColors.textSecondary,
                     height: 1.45,

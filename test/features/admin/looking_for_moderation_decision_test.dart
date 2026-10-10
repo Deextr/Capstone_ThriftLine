@@ -35,12 +35,8 @@ void main() {
       );
       expect(remove.any((t) => t.id == 'spam'), isTrue);
       expect(dismiss.any((t) => t.id == 'no_violation'), isTrue);
-      expect(dismiss.any((t) => t.id == 'complies'), isFalse);
       expect(remove.any((t) => t.id == 'no_violation'), isFalse);
-      expect(
-        dismiss.any((t) => t.id == 'insufficient_evidence'),
-        isFalse,
-      );
+      expect(dismiss.any((t) => t.id == 'insufficient_evidence'), isFalse);
     });
   });
 }

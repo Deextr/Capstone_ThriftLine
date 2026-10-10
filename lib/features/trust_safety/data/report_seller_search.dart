@@ -30,10 +30,9 @@ class ReportSellerCandidate {
 
   factory ReportSellerCandidate.fromSupabase(Map<String, dynamic> row) {
     final username = (row['username'] as String? ?? '').trim();
-    final displayName =
-        (row['full_name'] as String? ?? '').trim().isNotEmpty
-            ? (row['full_name'] as String).trim()
-            : username;
+    final displayName = (row['full_name'] as String? ?? '').trim().isNotEmpty
+        ? (row['full_name'] as String).trim()
+        : username;
     final shopRaw = (row['shop_name'] as String? ?? '').trim();
     final shopName = shopRaw.isNotEmpty ? shopRaw : displayName;
     final avatar = (row['avatar'] as String? ?? '').trim();
@@ -82,7 +81,9 @@ Future<List<ReportSellerCandidate>> searchReportableSellers(
   if (items is! List) return const [];
   return items
       .whereType<Map>()
-      .map((e) => ReportSellerCandidate.fromSupabase(Map<String, dynamic>.from(e)))
+      .map(
+        (e) => ReportSellerCandidate.fromSupabase(Map<String, dynamic>.from(e)),
+      )
       .where((c) => c.sellerId.isNotEmpty)
       .toList();
 }

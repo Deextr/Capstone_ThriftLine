@@ -49,7 +49,7 @@ class AdminDisabledAccountsScreen extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
                   itemCount: controller.accounts.length,
                   separatorBuilder: (_, _) =>
-                      const Divider(height: 1, color: AppColors.border),
+                      Divider(height: 1, color: AppColors.border),
                   itemBuilder: (context, index) {
                     final account = controller.accounts[index];
                     final open = controller.openUserId == account.userId;
@@ -88,7 +88,7 @@ class AdminDisabledAccountsScreen extends StatelessWidget {
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 4),
+                              SizedBox(height: 4),
                               Text(
                                 '${accountRoleLabel(account.role)} · ${account.strikeCount} confirmed violations',
                                 style: AppTypography.caption,

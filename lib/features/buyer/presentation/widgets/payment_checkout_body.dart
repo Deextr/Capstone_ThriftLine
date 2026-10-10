@@ -417,7 +417,7 @@ class _ProductThumbnail extends StatelessWidget {
               width: 64,
               height: 64,
               color: AppColors.surfaceVariant,
-              child: const Icon(
+              child: Icon(
                 Icons.image_outlined,
                 size: 24,
                 color: AppColors.textHint,
@@ -437,7 +437,7 @@ class _ProductThumbnail extends StatelessWidget {
                 width: 64,
                 height: 64,
                 color: AppColors.surfaceVariant,
-                child: const Icon(
+                child: Icon(
                   Icons.image_outlined,
                   size: 24,
                   color: AppColors.textHint,

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
-import '../../../../core/routes/route_names.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../controllers/admin_users_controller.dart';
+import '../../data/admin_users_service.dart';
+import '../widgets/admin_marketplace_user_dialogs.dart';
 import '../widgets/admin_ui_components.dart';
 
 class AdminWebUsersPage extends StatefulWidget {
@@ -19,7 +20,19 @@ class _AdminWebUsersPageState extends State<AdminWebUsersPage> {
   final _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    if (!mounted) return;
+    context.read<AdminUsersController>().scheduleSearch(_searchController.text);
+  }
+
+  @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -27,50 +40,25 @@ class _AdminWebUsersPageState extends State<AdminWebUsersPage> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AdminUsersController>();
+    final compact = MediaQuery.sizeOf(context).width < 960;
 
     return ColoredBox(
       color: AppColors.background,
       child: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(compact ? 16 : 24),
         children: [
-          // Header
-          AdminPageHeader(
-            title: 'User Management',
-            subtitle:
-                'View user accounts, roles, trust scores, and activity across the marketplace.',
-            actions: [
-              OutlinedButton.icon(
-                onPressed: () => context.push(RouteNames.adminDisabledAccounts),
-                icon: const Icon(Icons.block, size: 16),
-                label: const Text('Disabled Accounts'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textPrimary,
-                  side: const BorderSide(color: AppColors.border),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: controller.isLoading
-                    ? null
-                    : () => controller.load(),
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Refresh'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textPrimary,
-                  side: const BorderSide(color: AppColors.border),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          // Filters Bar
+          if (controller.noticeMessage != null)
+            _Banner(
+              message: controller.noticeMessage!,
+              error: false,
+              onDismiss: controller.clearNotice,
+            ),
+          if (controller.errorMessage != null)
+            _Banner(
+              message: controller.errorMessage!,
+              error: true,
+              onRetry: controller.load,
+            ),
           AdminFilterBar(
             hasActiveFilters: controller.hasActiveFilters,
             onReset: () {
@@ -80,149 +68,95 @@ class _AdminWebUsersPageState extends State<AdminWebUsersPage> {
             children: [
               AdminSearchField(
                 controller: _searchController,
-                hintText: 'Search by name, email, @username...',
-                width: 290,
+                hintText: 'Search name, email, or username',
+                width: 280,
                 onSubmitted: controller.setSearch,
                 onClear: () => controller.setSearch(''),
               ),
               AdminFilterDropdown<String?>(
-                value: controller.roleFilter,
+                value: controller.accountType,
                 items: const [
-                  DropdownMenuItem(value: null, child: Text('All Roles')),
-                  DropdownMenuItem(value: 'buyer', child: Text('Buyer')),
-                  DropdownMenuItem(value: 'seller', child: Text('Seller')),
-                  DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                  DropdownMenuItem(value: null, child: Text('All users')),
+                  DropdownMenuItem(value: 'buyer', child: Text('Buyers')),
+                  DropdownMenuItem(value: 'both', child: Text('Both')),
                 ],
-                onChanged: controller.setRoleFilter,
+                onChanged: controller.setAccountType,
               ),
               AdminFilterDropdown<String?>(
                 value: controller.statusFilter,
                 items: const [
-                  DropdownMenuItem(value: null, child: Text('All Statuses')),
+                  DropdownMenuItem(value: null, child: Text('All statuses')),
                   DropdownMenuItem(value: 'active', child: Text('Active')),
-                  DropdownMenuItem(
-                    value: 'suspended',
-                    child: Text('Suspended'),
-                  ),
+                  DropdownMenuItem(value: 'suspended', child: Text('Disabled')),
                   DropdownMenuItem(value: 'banned', child: Text('Banned')),
                 ],
                 onChanged: controller.setStatusFilter,
               ),
             ],
           ),
-
-          if (controller.errorMessage != null) ...[
-            Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: AppColors.error.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    size: 20,
-                    color: AppColors.error,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      controller.errorMessage!,
-                      style: AppTypography.body.copyWith(
-                        color: AppColors.error,
+          if (compact)
+            _UserCards(
+              controller: controller,
+              onView: _view,
+              onDisable: _disable,
+            )
+          else
+            AdminDataTable(
+              isLoading: controller.isLoading,
+              minWidth: 920,
+              emptyTitle: 'No users found',
+              emptyMessage: controller.hasActiveFilters
+                  ? 'No marketplace accounts match these filters.'
+                  : 'Registered buyers and sellers will appear here.',
+              onResetFilters: controller.hasActiveFilters
+                  ? () {
+                      _searchController.clear();
+                      controller.resetFilters();
+                    }
+                  : null,
+              columns: const [
+                'User',
+                'Email',
+                'Account type',
+                'Account status',
+                'Date joined',
+                'Actions',
+              ],
+              columnFlex: const [3, 3, 2, 2, 2, 2],
+              onRowTap: [for (final user in controller.rows) () => _view(user)],
+              rows: [
+                for (final user in controller.rows)
+                  [
+                    AdminTableApplicantCell(
+                      displayName: user.displayName,
+                      secondaryLine: user.username.isNotEmpty
+                          ? '@${user.username}'
+                          : null,
+                      avatarName: user.displayName,
+                    ),
+                    Text(
+                      user.email.isEmpty ? '—' : user.email,
+                      style: AppTypography.tableBody,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(user.accountTypeLabel, style: AppTypography.tableBody),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: MarketplaceStatusBadge(
+                        status: user.effectiveAccountStatus,
                       ),
                     ),
-                  ),
-                  TextButton(
-                    onPressed: controller.load,
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          // Data Table
-          AdminDataTable(
-            isLoading: controller.isLoading,
-            emptyTitle: 'No users found',
-            emptyMessage: controller.hasActiveFilters
-                ? 'No users match your active filters. Try adjusting your search.'
-                : 'Users will appear here once registered.',
-            onResetFilters: controller.hasActiveFilters
-                ? () {
-                    _searchController.clear();
-                    controller.resetFilters();
-                  }
-                : null,
-            columns: const [
-              'User',
-              'Email',
-              'Role',
-              'Status',
-              'Trust',
-              'Rating',
-              'Joined',
-              'Last Active',
-            ],
-            columnFlex: const [3, 3, 1, 1, 1, 1, 2, 2],
-            rows: [
-              for (final user in controller.rows)
-                [
-                  AdminTableApplicantCell(
-                    displayName: user.fullName.isNotEmpty
-                        ? user.fullName
-                        : user.username,
-                    secondaryLine: user.username.isNotEmpty
-                        ? '@${user.username}'
-                        : null,
-                    avatarName: user.fullName.isNotEmpty
-                        ? user.fullName
-                        : user.username,
-                  ),
-                  AdminTableCellText(
-                    primary: user.email,
-                    primaryStyle: AppTypography.tableBody,
-                  ),
-                  AdminTableCellText(
-                    primary: user.role.name.toUpperCase(),
-                    primaryStyle: AppTypography.caption.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: user.role.name == 'admin'
-                          ? AppColors.primary
-                          : AppColors.textSecondary,
+                    Text(
+                      formatAdminTableDate(user.createdAt),
+                      style: AppTypography.tableBody,
                     ),
-                  ),
-                  AdminStatusBadge(status: user.accountStatus),
-                  Text(
-                    user.trustScore.toStringAsFixed(0),
-                    style: AppTypography.tableBodyMedium,
-                  ),
-                  Text(
-                    user.rating.toStringAsFixed(1),
-                    style: AppTypography.tableBody,
-                  ),
-                  AdminTableDateCell(dateTime: user.createdAt),
-                  user.lastActiveAt != null
-                      ? AdminTableDateCell(dateTime: user.lastActiveAt!)
-                      : Text(
-                          '—',
-                          style: AppTypography.tableBody.copyWith(
-                            color: AppColors.textHint,
-                          ),
-                        ),
-                ],
-            ],
-          ),
-
+                    AdminTableActionCell(
+                      child: _DisableAction(user: user, onDisable: _disable),
+                    ),
+                  ],
+              ],
+            ),
           const SizedBox(height: 16),
-
-          // Standardized Pagination
           AdminPagination(
             currentPage: controller.page,
             totalItems: controller.total,
@@ -232,6 +166,227 @@ class _AdminWebUsersPageState extends State<AdminWebUsersPage> {
             onPageChanged: controller.setPage,
             onPageSizeChanged: controller.setPageSize,
           ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _view(MarketplaceUserRow user) {
+    final controller = context.read<AdminUsersController>();
+    return showMarketplaceUserDetailDialog(
+      context: context,
+      user: user,
+      loadDetail: () => controller.loadDetail(user.userId),
+    );
+  }
+
+  Future<void> _disable(MarketplaceUserRow user) {
+    if (!user.mayDisable) return Future.value();
+    final controller = context.read<AdminUsersController>();
+    return showDisableMarketplaceAccountDialog(
+      context: context,
+      user: user,
+      onConfirm: (reason, notes) => controller.disableAccount(
+        userId: user.userId,
+        reason: reason,
+        notes: notes,
+      ),
+    );
+  }
+}
+
+class _DisableAction extends StatelessWidget {
+  const _DisableAction({required this.user, required this.onDisable});
+
+  final MarketplaceUserRow user;
+  final ValueChanged<MarketplaceUserRow> onDisable;
+
+  @override
+  Widget build(BuildContext context) {
+    final blocked = user.disableBlockedMessage;
+    if (user.mayDisable) {
+      return TextButton(
+        onPressed: () => onDisable(user),
+        style: TextButton.styleFrom(
+          foregroundColor: Color(0xFF9F1239),
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+        ),
+        child: const Text('Disable account'),
+      );
+    }
+    return Tooltip(
+      message: blocked ?? 'This account cannot be disabled.',
+      child: Text(
+        'Disable unavailable',
+        style: TextStyle(
+          color: AppColors.textHint,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _UserCards extends StatelessWidget {
+  const _UserCards({
+    required this.controller,
+    required this.onView,
+    required this.onDisable,
+  });
+
+  final AdminUsersController controller;
+  final ValueChanged<MarketplaceUserRow> onView;
+  final ValueChanged<MarketplaceUserRow> onDisable;
+
+  @override
+  Widget build(BuildContext context) {
+    if (controller.isLoading && controller.rows.isEmpty) {
+      return AdminTableSkeleton(
+        columns: ['User', 'Email', 'Status'],
+        rowCount: 4,
+      );
+    }
+    if (controller.rows.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Text(
+          controller.hasActiveFilters
+              ? 'No marketplace accounts match these filters.'
+              : 'Registered buyers and sellers will appear here.',
+          style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+        ),
+      );
+    }
+    return Column(
+      children: [
+        for (final user in controller.rows)
+          _UserCard(
+            user: user,
+            onView: () => onView(user),
+            onDisable: () => onDisable(user),
+          ),
+      ],
+    );
+  }
+}
+
+class _UserCard extends StatefulWidget {
+  const _UserCard({
+    required this.user,
+    required this.onView,
+    required this.onDisable,
+  });
+
+  final MarketplaceUserRow user;
+  final VoidCallback onView;
+  final VoidCallback onDisable;
+
+  @override
+  State<_UserCard> createState() => _UserCardState();
+}
+
+class _UserCardState extends State<_UserCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final user = widget.user;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onView,
+        child: Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: _hovered
+                ? AppColors.primary.withValues(alpha: 0.03)
+                : AppColors.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      user.displayName,
+                      style: AppTypography.tableBodyMedium,
+                    ),
+                  ),
+                  MarketplaceStatusBadge(status: user.effectiveAccountStatus),
+                ],
+              ),
+              SizedBox(height: 4),
+              Text(
+                user.email.isEmpty ? '—' : user.email,
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${user.accountTypeLabel} · Joined ${formatAdminTableDate(user.createdAt)}',
+                style: AppTypography.caption,
+              ),
+              const SizedBox(height: 8),
+              AdminTableActionCell(
+                child: _DisableAction(
+                  user: user,
+                  onDisable: (_) => widget.onDisable(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Banner extends StatelessWidget {
+  const _Banner({
+    required this.message,
+    required this.error,
+    this.onRetry,
+    this.onDismiss,
+  });
+
+  final String message;
+  final bool error;
+  final VoidCallback? onRetry;
+  final VoidCallback? onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = error ? AppColors.error : AppColors.primaryDark;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              message,
+              style: AppTypography.body.copyWith(color: color),
+            ),
+          ),
+          if (onRetry != null)
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
+          if (onDismiss != null)
+            TextButton(onPressed: onDismiss, child: const Text('Dismiss')),
         ],
       ),
     );

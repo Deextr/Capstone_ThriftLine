@@ -109,7 +109,7 @@ class _BuyerSearchFilterSheetState extends State<BuyerSearchFilterSheet> {
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(context).height * 0.88,
         ),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         ),

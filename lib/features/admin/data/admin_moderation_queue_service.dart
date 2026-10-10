@@ -6,6 +6,7 @@ import '../../../models/community_report_model.dart';
 import 'admin_delivery_dispute.dart';
 import 'admin_review_rules.dart';
 import 'admin_review_service.dart';
+import '../domain/looking_for_report_moderation.dart';
 import 'looking_for_moderation.dart';
 
 class AdminModerationCaseRow {
@@ -20,6 +21,11 @@ class AdminModerationCaseRow {
     required this.subjectName,
     this.orderNumber,
     required this.createdAt,
+    this.lfPostTitle,
+    this.lfExpiresAt,
+    this.lfOpenReports,
+    this.lfPriorityScore,
+    this.lfDecisionOutcome,
   });
 
   final String source;
@@ -32,6 +38,14 @@ class AdminModerationCaseRow {
   final String subjectName;
   final String? orderNumber;
   final DateTime createdAt;
+  final String? lfPostTitle;
+  final DateTime? lfExpiresAt;
+  final int? lfOpenReports;
+  final int? lfPriorityScore;
+  final String? lfDecisionOutcome;
+
+  bool get isLookingForReport =>
+      caseKind == 'looking_for_report' || source == 'looking_for';
 
   factory AdminModerationCaseRow.fromJson(Map<String, dynamic> json) {
     DateTime? parseTime(Object? value) {
@@ -52,6 +66,11 @@ class AdminModerationCaseRow {
       subjectName: (json['subject_name'] as String?)?.trim() ?? 'Member',
       orderNumber: (json['order_number'] as String?)?.trim(),
       createdAt: parseTime(json['created_at']) ?? DateTime.now(),
+      lfPostTitle: (json['lf_post_title'] as String?)?.trim(),
+      lfExpiresAt: parseTime(json['lf_expires_at']),
+      lfOpenReports: (json['lf_open_reports'] as num?)?.toInt(),
+      lfPriorityScore: (json['lf_priority_score'] as num?)?.toInt(),
+      lfDecisionOutcome: (json['lf_decision_outcome'] as String?)?.trim(),
     );
   }
 
@@ -95,7 +114,11 @@ class AdminModerationCaseRow {
     );
   }
 
-  static AdminModerationCaseRow fromLookingFor(LookingForAdminReport report) {
+  static AdminModerationCaseRow fromLookingFor(
+    LookingForAdminReport report, {
+    DateTime? serverNow,
+  }) {
+    final now = serverNow ?? DateTime.now().toUtc();
     return AdminModerationCaseRow(
       source: 'looking_for',
       caseId: report.id,
@@ -107,6 +130,19 @@ class AdminModerationCaseRow {
       subjectName: report.reportedName,
       orderNumber: null,
       createdAt: report.createdAt,
+      lfPostTitle: report.displayPostTitle,
+      lfExpiresAt: report.expiresAt,
+      lfOpenReports: report.openReportsOnPost,
+      lfPriorityScore: lookingForReportPriorityScore(
+        reason: report.reason,
+        status: report.status,
+        expiresAt: report.expiresAt,
+        reportCreatedAt: report.createdAt,
+        openReportsOnPost: report.openReportsOnPost,
+        confirmedViolations: report.confirmedViolations,
+        serverNow: now,
+      ),
+      lfDecisionOutcome: report.decisionOutcome,
     );
   }
 }
@@ -130,6 +166,8 @@ class AdminModerationQueueService {
   Future<AdminModerationQueuePage> list({
     required AdminModerationCategory category,
     required AdminReportListFilter statusFilter,
+    AdminLookingForLifecycleFilter lfLifecycleFilter =
+        AdminLookingForLifecycleFilter.all,
     required int page,
     required int pageSize,
     String? search,
@@ -140,6 +178,7 @@ class AdminModerationQueueService {
       return await _listViaRpc(
         category: category,
         statusFilter: statusFilter,
+        lfLifecycleFilter: lfLifecycleFilter,
         page: page,
         pageSize: pageSize,
         search: search,
@@ -151,6 +190,7 @@ class AdminModerationQueueService {
       return _listViaFallback(
         category: category,
         statusFilter: statusFilter,
+        lfLifecycleFilter: lfLifecycleFilter,
         page: page,
         pageSize: pageSize,
         search: search,
@@ -163,6 +203,7 @@ class AdminModerationQueueService {
   Future<AdminModerationQueuePage> _listViaRpc({
     required AdminModerationCategory category,
     required AdminReportListFilter statusFilter,
+    required AdminLookingForLifecycleFilter lfLifecycleFilter,
     required int page,
     required int pageSize,
     String? search,
@@ -180,6 +221,9 @@ class AdminModerationQueueService {
         'p_to': toExclusive?.toUtc().toIso8601String(),
         'p_limit': pageSize,
         'p_offset': offset,
+        'p_lf_lifecycle': adminLookingForLifecycleFilterParam(
+          lfLifecycleFilter,
+        ),
       },
     );
     final map = supabaseRpcMap(raw);
@@ -206,6 +250,7 @@ class AdminModerationQueueService {
   Future<AdminModerationQueuePage> _listViaFallback({
     required AdminModerationCategory category,
     required AdminReportListFilter statusFilter,
+    required AdminLookingForLifecycleFilter lfLifecycleFilter,
     required int page,
     required int pageSize,
     String? search,
@@ -238,13 +283,23 @@ class AdminModerationQueueService {
     if (category == AdminModerationCategory.all ||
         category == AdminModerationCategory.lookingFor) {
       try {
+        final serverNow = await _lookingFor.serverNow();
         final lfReports = await _lookingFor.listReports();
         for (final report in lfReports) {
           if (from != null && report.createdAt.isBefore(from)) continue;
           if (toExclusive != null && !report.createdAt.isBefore(toExclusive)) {
             continue;
           }
-          rows.add(AdminModerationCaseRow.fromLookingFor(report));
+          if (!_matchesLfLifecycleFilter(
+            report,
+            lfLifecycleFilter,
+            serverNow,
+          )) {
+            continue;
+          }
+          rows.add(
+            AdminModerationCaseRow.fromLookingFor(report, serverNow: serverNow),
+          );
         }
       } catch (e) {
         debugPrint('AdminModerationQueueService looking-for fallback: $e');
@@ -260,10 +315,33 @@ class AdminModerationQueueService {
       }
     }
 
-    final filtered = uniqueRows.where((row) {
-      if (!_matchesStatusFilter(row, statusFilter)) return false;
-      return _matchesSearch(row, search);
-    }).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final serverNow = DateTime.now().toUtc();
+    final filtered =
+        uniqueRows.where((row) {
+          if (!_matchesStatusFilter(row, statusFilter)) return false;
+          return _matchesSearch(row, search);
+        }).toList()..sort((a, b) {
+          if (category == AdminModerationCategory.lookingFor &&
+              a.isLookingForReport &&
+              b.isLookingForReport) {
+            return compareLookingForReportPriority(
+              reasonA: a.category,
+              statusA: a.statusRaw,
+              expiresA: a.lfExpiresAt,
+              createdA: a.createdAt,
+              openA: a.lfOpenReports ?? 1,
+              violationsA: 0,
+              reasonB: b.category,
+              statusB: b.statusRaw,
+              expiresB: b.lfExpiresAt,
+              createdB: b.createdAt,
+              openB: b.lfOpenReports ?? 1,
+              violationsB: 0,
+              serverNow: serverNow,
+            );
+          }
+          return b.createdAt.compareTo(a.createdAt);
+        });
 
     final offset = page * pageSize;
     final slice = offset >= filtered.length
@@ -274,6 +352,35 @@ class AdminModerationQueueService {
           );
 
     return AdminModerationQueuePage(items: slice, total: filtered.length);
+  }
+
+  static bool _matchesLfLifecycleFilter(
+    LookingForAdminReport report,
+    AdminLookingForLifecycleFilter filter,
+    DateTime serverNow,
+  ) {
+    return switch (filter) {
+      AdminLookingForLifecycleFilter.all => true,
+      AdminLookingForLifecycleFilter.resolvedClosed =>
+        report.status == 'resolved' || report.status == 'dismissed',
+      AdminLookingForLifecycleFilter.activePost =>
+        lookingForReportIsOpen(report.status) &&
+            report.expiresAt != null &&
+            report.expiresAt!.isAfter(serverNow),
+      AdminLookingForLifecycleFilter.expiringSoon =>
+        lookingForReportIsOpen(report.status) &&
+            report.expiresAt != null &&
+            report.expiresAt!.isAfter(serverNow) &&
+            !report.expiresAt!.isAfter(
+              serverNow.add(lookingForExpiringSoonWindow),
+            ),
+      AdminLookingForLifecycleFilter.expiredReviewRequired =>
+        lookingForReportExpiredReviewRequired(
+          status: report.status,
+          expiresAt: report.expiresAt,
+          serverNow: serverNow,
+        ),
+    };
   }
 
   static bool _matchesStatusFilter(

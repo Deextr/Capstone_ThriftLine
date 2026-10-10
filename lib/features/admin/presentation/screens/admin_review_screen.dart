@@ -223,7 +223,7 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.all(24),
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 800, maxHeight: 680),
+          constraints: BoxConstraints(maxWidth: 800, maxHeight: 680),
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(AppConstants.radiusLg),
@@ -395,7 +395,7 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.arrow_back, size: 16, color: AppColors.primary),
-              const SizedBox(width: 6),
+              SizedBox(width: 6),
               Text(
                 'Seller Verifications',
                 style: AppTypography.label.copyWith(
@@ -407,8 +407,8 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        const Text('/', style: TextStyle(color: AppColors.textHint)),
-        const SizedBox(width: 8),
+        Text('/', style: TextStyle(color: AppColors.textHint)),
+        SizedBox(width: 8),
         Expanded(
           child: Text(
             app.shopName,
@@ -457,7 +457,7 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
                     AdminStatusBadge(status: app.status),
                   ],
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   'Submitted by ${app.applicantName ?? 'Applicant'} on ${formatFullDate(app.submittedAt)} at ${formatTimeOfDay(app.submittedAt)}',
                   style: AppTypography.body.copyWith(
@@ -651,7 +651,7 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
                     size: 14,
                     color: passed ? AppColors.success : AppColors.error,
                   ),
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6),
                   Text(
                     entry.key,
                     style: AppTypography.caption.copyWith(
@@ -700,7 +700,7 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
                 size: 20,
                 color: isPending ? AppColors.primary : AppColors.textSecondary,
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text('Verification Decision', style: AppTypography.sectionTitle),
             ],
           ),
@@ -783,7 +783,7 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
                   ),
                   if (app.status == 'rejected' &&
                       (app.rejectionReason?.trim().isNotEmpty ?? false)) ...[
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Text(
                       'Rejection Reason:',
                       style: AppTypography.caption.copyWith(
@@ -889,7 +889,7 @@ class _InfoGrid extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  SizedBox(height: 3),
                   Row(
                     children: [
                       Flexible(
@@ -982,10 +982,10 @@ class _DocumentPreviewCard extends StatelessWidget {
                         CachedNetworkImage(
                           imageUrl: url!,
                           fit: BoxFit.cover,
-                          placeholder: (_, _) => const Center(
+                          placeholder: (_, _) => Center(
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
-                          errorWidget: (_, _, _) => const Icon(
+                          errorWidget: (_, _, _) => Icon(
                             Icons.broken_image,
                             size: 32,
                             color: AppColors.textHint,
@@ -1009,7 +1009,7 @@ class _DocumentPreviewCard extends StatelessWidget {
                         ),
                       ],
                     )
-                  : const Center(
+                  : Center(
                       child: Icon(
                         Icons.image_not_supported,
                         size: 32,

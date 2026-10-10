@@ -195,7 +195,7 @@ class _CreateLookingForSheetState extends State<CreateLookingForSheet> {
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Container(
         height: MediaQuery.sizeOf(context).height * 0.9,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
@@ -253,7 +253,7 @@ class _CreateLookingForSheetState extends State<CreateLookingForSheet> {
                             ? Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.add_photo_alternate_outlined,
                                     size: 40,
                                     color: AppColors.textSecondary,

@@ -212,7 +212,7 @@ class _ReportStatusCard extends StatelessWidget {
           ),
           if (normalized == 'under_review') ...[
             const SizedBox(height: 14),
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.border),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -256,7 +256,7 @@ class _Section extends StatelessWidget {
         children: [
           Text(title, style: AppTypography.subheading),
           const SizedBox(height: 4),
-          const Divider(height: 20, color: AppColors.border),
+          Divider(height: 20, color: AppColors.border),
           ...children,
         ],
       ),
@@ -356,7 +356,7 @@ class _EvidenceThumb extends StatelessWidget {
               ? Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.image_not_supported_outlined,
                       color: AppColors.textHint,
                     ),
@@ -481,7 +481,7 @@ class _RelatedOrderSection extends StatelessWidget {
                             width: 64,
                             height: 64,
                             color: AppColors.surfaceVariant,
-                            child: const Icon(
+                            child: Icon(
                               Icons.shopping_bag_outlined,
                               color: AppColors.textHint,
                             ),

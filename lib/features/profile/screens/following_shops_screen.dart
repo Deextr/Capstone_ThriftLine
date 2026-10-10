@@ -73,7 +73,7 @@ class _FollowingShopsScreenState extends State<FollowingShopsScreen> {
       elevation: 0,
       scrolledUnderElevation: 0.5,
       leading: IconButton(
-        icon: const Icon(
+        icon: Icon(
           Icons.arrow_back_rounded,
           color: AppColors.textPrimary,
         ),
@@ -379,7 +379,7 @@ class _FollowingShopsScreenState extends State<FollowingShopsScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
@@ -429,7 +429,7 @@ class _FollowingShopsScreenState extends State<FollowingShopsScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          side: const BorderSide(color: AppColors.border),
+                          side: BorderSide(color: AppColors.border),
                         ),
                         child: Text(
                           'Cancel',

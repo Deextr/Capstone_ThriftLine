@@ -2,8 +2,6 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/supabase_rpc.dart';
-import 'admin_audit_log_models.dart';
-import 'admin_audit_service.dart';
 import '../../buyer/domain/looking_for_lifecycle.dart';
 
 class LookingForAdminReport {
@@ -34,6 +32,13 @@ class LookingForAdminReport {
     this.resolvedAt,
     this.moderationRemovedAt,
     this.ownerDeletedAt,
+    this.snapshotTitle,
+    this.snapshotDescription,
+    this.snapshotImagePath,
+    this.snapshotCapturedAt,
+    this.decisionOutcome,
+    this.openReportsOnPost = 1,
+    this.openReportReasonCounts = const {},
   });
 
   final String id;
@@ -62,6 +67,22 @@ class LookingForAdminReport {
   final String reportedAccountStatus;
   final int confirmedViolations;
   final int evidenceAttemptCount;
+  final String? snapshotTitle;
+  final String? snapshotDescription;
+  final String? snapshotImagePath;
+  final DateTime? snapshotCapturedAt;
+  final String? decisionOutcome;
+  final int openReportsOnPost;
+  final Map<String, int> openReportReasonCounts;
+
+  String get displayPostTitle =>
+      (snapshotTitle?.trim().isNotEmpty == true ? snapshotTitle! : postTitle)
+          .trim();
+
+  String get displayPostDescription =>
+      snapshotDescription?.trim().isNotEmpty == true
+      ? snapshotDescription!.trim()
+      : postDescription.trim();
 
   bool get canDecide =>
       status == 'under_review' || status == 'needs_more_evidence';
@@ -110,8 +131,40 @@ class LookingForAdminReport {
       confirmedViolations: (row['confirmed_violations'] as num?)?.toInt() ?? 0,
       evidenceAttemptCount:
           (row['evidence_attempt_count'] as num?)?.toInt() ?? 1,
+      snapshotTitle: row['snapshot_title'] as String?,
+      snapshotDescription: row['snapshot_description'] as String?,
+      snapshotImagePath: row['snapshot_image_path'] as String?,
+      snapshotCapturedAt: _time(row['snapshot_captured_at']),
+      decisionOutcome: row['decision_outcome'] as String?,
+      openReportsOnPost: (row['open_reports_on_post'] as num?)?.toInt() ?? 1,
+      openReportReasonCounts: _parseReasonCounts(
+        row['open_report_reason_counts'],
+      ),
     );
   }
+
+  static Map<String, int> _parseReasonCounts(Object? raw) {
+    if (raw is! Map) return const {};
+    final out = <String, int>{};
+    raw.forEach((key, value) {
+      if (key is String && value is num) {
+        out[key] = value.toInt();
+      }
+    });
+    return out;
+  }
+}
+
+const _lookingForBucket = 'looking-for';
+
+String? lookingForPublicUrlFromStoragePath(
+  SupabaseService supabase,
+  String? storagePath,
+) {
+  if (storagePath == null || storagePath.trim().isEmpty) return null;
+  return supabase.client.storage
+      .from(_lookingForBucket)
+      .getPublicUrl(storagePath.trim());
 }
 
 class DisabledAccountRecord {
@@ -216,6 +269,21 @@ class LookingForModerationService {
     }
   }
 
+  Future<List<LookingForAdminReport>> listOpenReportsForPost(
+    String postId,
+  ) async {
+    final rows = await _supabase.client
+        .from('admin_looking_for_report_queue')
+        .select()
+        .eq('post_id', postId)
+        .inFilter('status', ['under_review', 'needs_more_evidence'])
+        .order('created_at', ascending: true);
+    return [
+      for (final row in rows as List)
+        if (row is Map<String, dynamic>) LookingForAdminReport.fromRow(row),
+    ];
+  }
+
   Future<List<LookingForAdminReport>> listReports() async {
     final rows = await _supabase.client
         .from('admin_looking_for_report_queue')
@@ -255,15 +323,6 @@ class LookingForModerationService {
         },
       );
       if (supabaseRpcSuccess(raw)) {
-        await AdminAuditService(_supabase).record(
-          category: AdminAuditCategory.reportsDisputes,
-          eventType: 'looking_for_report_decided',
-          status: 'success',
-          summary: 'Looking-for report decision saved',
-          targetType: 'looking_for_report',
-          targetId: reportId,
-          details: {'decision': decision},
-        );
         return null;
       }
       return supabaseRpcError(

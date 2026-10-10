@@ -10,6 +10,23 @@ String formatCurrency(double amount) => _currencyFormat.format(amount);
 
 String formatCentavos(int centavos) => formatCurrency(centavos / 100);
 
+final _adminReportMoneyFormat = NumberFormat.currency(
+  locale: 'en_PH',
+  symbol: '₱',
+  decimalDigits: 2,
+);
+
+/// Orders/payments report detail cells (always real ₱, not mojibake from legacy SQL).
+String formatAdminReportPesoAmount(String raw) {
+  var s = raw.trim();
+  if (s.isEmpty || s == '—') return raw;
+  s = s.replaceAll('\u20B1', '').replaceAll('â‚±', '').replaceAll('₱', '').trim();
+  s = s.replaceAll(',', '');
+  final amount = double.tryParse(s);
+  if (amount == null) return raw;
+  return _adminReportMoneyFormat.format(amount);
+}
+
 /// First name plus last initial for list views. Full names stay on details.
 String shortPersonName(String? name, {String fallback = 'Buyer'}) {
   final parts = (name ?? '')
@@ -46,6 +63,23 @@ String formatAdminTableDateTime(DateTime dateTime) {
   return '${DateFormat('MMM d, yyyy').format(local)} · '
       '${DateFormat('h:mm a').format(local)}';
 }
+
+/// Marketplace admin reports (Manila): OCT 3, 2026 6:35 AM
+String formatAdminReportDateTime(DateTime dateTime) {
+  final pht = toPhilippinesTime(dateTime);
+  final month = DateFormat('MMM').format(pht).toUpperCase();
+  return '$month ${DateFormat('d, yyyy h:mm a').format(pht)}';
+}
+
+/// Philippine Time (UTC+8) for admin order tables (Davao / national scope).
+DateTime toPhilippinesTime(DateTime dateTime) =>
+    dateTime.toUtc().add(const Duration(hours: 8));
+
+String formatAdminPhilippinesDate(DateTime dateTime) =>
+    DateFormat('MMM d, yyyy').format(toPhilippinesTime(dateTime));
+
+String formatAdminPhilippinesTime(DateTime dateTime) =>
+    DateFormat('h:mm a').format(toPhilippinesTime(dateTime));
 
 String formatTimeOfDay(DateTime dateTime) =>
     DateFormat('h:mm a').format(dateTime.toLocal());

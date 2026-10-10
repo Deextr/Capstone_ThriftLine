@@ -70,7 +70,7 @@ class BidCard extends StatelessWidget {
                           color: AppColors.primaryLight,
                           width: 72,
                           height: 72,
-                          child: const Icon(
+                          child: Icon(
                             Icons.image_outlined,
                             color: AppColors.textHint,
                           ),
@@ -150,7 +150,7 @@ class BidCard extends StatelessWidget {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.timer,
                                     size: 12,
                                     color: AppColors.textSecondary,

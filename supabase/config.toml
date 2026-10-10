@@ -43,3 +43,6 @@ verify_jwt = false
 
 [functions.password-recovery-return]
 verify_jwt = false
+
+[functions.invite-admin]
+verify_jwt = true

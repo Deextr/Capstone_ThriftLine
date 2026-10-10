@@ -35,7 +35,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
           backgroundColor: AppColors.surface,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
             onPressed: () => context.pop(),
           ),
           title: Text(
@@ -60,7 +60,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
           backgroundColor: AppColors.surface,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
             onPressed: () => context.pop(),
           ),
           title: const Text('Seller Profile'),
@@ -72,7 +72,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
+                Icon(
                   Icons.person_off_outlined,
                   size: 64,
                   color: AppColors.textHint,
@@ -195,7 +195,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
       elevation: 0,
       scrolledUnderElevation: 0.5,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+        icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
         onPressed: () => context.pop(),
       ),
       title: Text(
@@ -205,7 +205,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
       centerTitle: true,
       actions: [
         IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.share_outlined,
             color: AppColors.textPrimary,
             size: 22,
@@ -218,7 +218,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
           },
         ),
         IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.more_vert,
             color: AppColors.textPrimary,
             size: 22,
@@ -238,7 +238,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
@@ -437,9 +437,9 @@ class SellerPublicProfileScreen extends StatelessWidget {
               ),
               if (seller.location.isNotEmpty) ...[
                 const SizedBox(width: 8),
-                const Text('•', style: TextStyle(color: AppColors.textHint)),
+                Text('•', style: TextStyle(color: AppColors.textHint)),
                 const SizedBox(width: 8),
-                const Icon(
+                Icon(
                   Icons.location_on_outlined,
                   size: 13,
                   color: AppColors.textSecondary,
@@ -537,7 +537,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.textPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 13),
-                  side: const BorderSide(color: AppColors.border, width: 1.5),
+                  side: BorderSide(color: AppColors.border, width: 1.5),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -579,7 +579,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.textPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 13),
-                      side: const BorderSide(
+                      side: BorderSide(
                         color: AppColors.border,
                         width: 1.5,
                       ),
@@ -648,7 +648,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
                   color: AppColors.surfaceVariant,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.grid_off_rounded,
                   size: 40,
                   color: AppColors.textSecondary,
@@ -713,7 +713,7 @@ class SellerPublicProfileScreen extends StatelessWidget {
                   color: AppColors.surfaceVariant,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.rate_review_outlined,
                   size: 40,
                   color: AppColors.textSecondary,
@@ -931,7 +931,7 @@ class _ShopGridItem extends StatelessWidget {
               placeholder: (_, _) => Container(color: AppColors.surfaceVariant),
               errorWidget: (_, _, _) => Container(
                 color: AppColors.surfaceVariant,
-                child: const Center(
+                child: Center(
                   child: Icon(
                     Icons.image_outlined,
                     color: AppColors.textHint,

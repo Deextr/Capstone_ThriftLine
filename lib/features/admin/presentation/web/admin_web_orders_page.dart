@@ -7,6 +7,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../controllers/admin_orders_list_controller.dart';
+import '../../domain/admin_order_management.dart';
 import '../widgets/admin_ui_components.dart';
 
 class AdminWebOrdersPage extends StatelessWidget {
@@ -31,11 +32,11 @@ class AdminWebOrdersPage extends StatelessWidget {
                 onPressed: controller.isLoading
                     ? null
                     : () => controller.load(),
-                icon: const Icon(Icons.refresh, size: 16),
+                icon: Icon(Icons.refresh, size: 16),
                 label: const Text('Refresh'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.textPrimary,
-                  side: const BorderSide(color: AppColors.border),
+                  side: BorderSide(color: AppColors.border),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 10,
@@ -50,32 +51,15 @@ class AdminWebOrdersPage extends StatelessWidget {
             hasActiveFilters: controller.hasActiveFilters,
             onReset: () => controller.resetFilters(),
             children: [
-              AdminFilterDropdown<String?>(
-                value: controller.statusFilter,
-                items: const [
-                  DropdownMenuItem(
-                    value: null,
-                    child: Text('All Order Statuses'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'payment_pending',
-                    child: Text('Awaiting Payment'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'paid',
-                    child: Text('Paid / To Ship'),
-                  ),
-                  DropdownMenuItem(value: 'shipped', child: Text('Shipped')),
-                  DropdownMenuItem(
-                    value: 'completed',
-                    child: Text('Completed'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'cancelled',
-                    child: Text('Cancelled'),
-                  ),
+              AdminFilterDropdown<AdminUnifiedStatusFilter>(
+                value: controller.unifiedStatus,
+                items: [
+                  for (final option in AdminUnifiedStatusFilter.values)
+                    DropdownMenuItem(value: option, child: Text(option.label)),
                 ],
-                onChanged: controller.setStatusFilter,
+                onChanged: (value) {
+                  if (value != null) controller.setUnifiedStatusFilter(value);
+                },
               ),
             ],
           ),
@@ -153,10 +137,9 @@ class AdminWebOrdersPage extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  AdminStatusBadge(status: order.paymentStatus),
                   AdminStatusBadge(
-                    status: order.orderStatus,
-                    label: order.statusLabel,
+                    status: order.unifiedStatus.badgeKey,
+                    label: order.unifiedStatus.label,
                   ),
                   AdminTableDateCell(dateTime: order.createdAt),
                   AdminTableLinkAction(

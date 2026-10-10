@@ -109,13 +109,13 @@ class SettingsScreen extends StatelessWidget {
               title: 'Support',
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.help_outline_rounded,
                     color: AppColors.textPrimary,
                     size: 22,
                   ),
                   title: Text('Help & FAQ', style: AppTypography.body),
-                  trailing: const Icon(
+                  trailing: Icon(
                     Icons.chevron_right,
                     size: 20,
                     color: AppColors.textHint,
@@ -125,7 +125,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.description_outlined,
                     color: AppColors.textPrimary,
                     size: 22,
@@ -134,7 +134,7 @@ class SettingsScreen extends StatelessWidget {
                     'Terms and Conditions',
                     style: AppTypography.body,
                   ),
-                  trailing: const Icon(
+                  trailing: Icon(
                     Icons.chevron_right,
                     size: 20,
                     color: AppColors.textHint,
@@ -144,13 +144,13 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.privacy_tip_outlined,
                     color: AppColors.textPrimary,
                     size: 22,
                   ),
                   title: Text('Privacy Policy', style: AppTypography.body),
-                  trailing: const Icon(
+                  trailing: Icon(
                     Icons.chevron_right,
                     size: 20,
                     color: AppColors.textHint,
@@ -166,13 +166,13 @@ class SettingsScreen extends StatelessWidget {
               title: 'About',
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.info_outline_rounded,
                     color: AppColors.textPrimary,
                     size: 22,
                   ),
                   title: Text('About ThriftLine', style: AppTypography.body),
-                  trailing: const Icon(
+                  trailing: Icon(
                     Icons.chevron_right,
                     size: 20,
                     color: AppColors.textHint,

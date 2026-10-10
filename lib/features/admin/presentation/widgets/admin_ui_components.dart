@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/theme/app_gradients.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../widgets/skeleton_widgets.dart';
 import '../../../../widgets/thrift_widgets.dart';
@@ -47,7 +48,7 @@ class AdminPageHeader extends StatelessWidget {
                   children: [
                     Text(title, style: AppTypography.pageTitle),
                     if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 4),
+                      SizedBox(height: 4),
                       Text(
                         subtitle!,
                         style: AppTypography.body.copyWith(
@@ -123,7 +124,7 @@ class _AdminStatCardState extends State<AdminStatCard> {
         child: GestureDetector(
           onTap: widget.onTap,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: Duration(milliseconds: 180),
             curve: Curves.easeInOut,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             decoration: BoxDecoration(
@@ -161,7 +162,7 @@ class _AdminStatCardState extends State<AdminStatCard> {
                   ),
                   child: Icon(widget.icon, size: 20, color: color),
                 ),
-                const SizedBox(width: 14),
+                SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,7 +176,7 @@ class _AdminStatCardState extends State<AdminStatCard> {
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: 2),
                       Text(
                         widget.label,
                         style: AppTypography.label.copyWith(
@@ -190,7 +191,7 @@ class _AdminStatCardState extends State<AdminStatCard> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       if (widget.subtitle != null) ...[
-                        const SizedBox(height: 2),
+                        SizedBox(height: 2),
                         Text(
                           widget.subtitle!,
                           style: AppTypography.caption.copyWith(
@@ -275,7 +276,7 @@ class AdminPagination extends StatelessWidget {
             fontWeight: FontWeight.w500,
           ),
         ),
-        const Spacer(),
+        Spacer(),
         // Rows per page dropdown
         if (onPageSizeChanged != null && pageSizeOptions.isNotEmpty) ...[
           Text(
@@ -284,7 +285,7 @@ class AdminPagination extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Container(
             height: 32,
             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -299,7 +300,8 @@ class AdminPagination extends StatelessWidget {
                     ? pageSize
                     : pageSizeOptions.first,
                 isDense: true,
-                icon: const Icon(
+                dropdownColor: AppColors.surface,
+                icon: Icon(
                   Icons.keyboard_arrow_down,
                   size: 16,
                   color: AppColors.textSecondary,
@@ -353,7 +355,7 @@ class AdminPagination extends StatelessWidget {
                       color: AppColors.textSecondary,
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6),
                   Container(
                     height: 28,
                     padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -368,7 +370,8 @@ class AdminPagination extends StatelessWidget {
                             ? pageSize
                             : pageSizeOptions.first,
                         isDense: true,
-                        icon: const Icon(
+                        dropdownColor: AppColors.surface,
+                        icon: Icon(
                           Icons.keyboard_arrow_down,
                           size: 14,
                           color: AppColors.textSecondary,
@@ -434,7 +437,7 @@ class AdminPagination extends StatelessWidget {
           isEnabled: currentPage > 0 && !isLoading,
           onTap: () => onPageChanged(currentPage - 1),
         ),
-        const SizedBox(width: 4),
+        SizedBox(width: 4),
         for (final item in pages) ...[
           if (item == -1)
             Padding(
@@ -549,15 +552,10 @@ class _PageNumberButtonState extends State<_PageNumberButton> {
   @override
   Widget build(BuildContext context) {
     final selected = widget.isSelected;
-    final bg = selected
-        ? AppColors.primary
-        : _hovered
-        ? AppColors.surfaceVariant
-        : AppColors.surface;
     final fg = selected
         ? Colors.white
         : _hovered
-        ? AppColors.primary
+        ? AppColors.primaryDark
         : AppColors.textPrimary;
 
     return MouseRegion(
@@ -566,15 +564,20 @@ class _PageNumberButtonState extends State<_PageNumberButton> {
       child: GestureDetector(
         onTap: widget.isLoading || selected ? null : widget.onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
+          duration: Duration(milliseconds: 140),
           width: 32,
           height: 32,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: bg,
+            gradient: selected ? AppGradients.buttonGradient : null,
+            color: selected
+                ? null
+                : _hovered
+                ? AppColors.surfaceVariant
+                : AppColors.surface,
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
+              color: selected ? AppColors.primaryDark : AppColors.border,
             ),
           ),
           child: Text(
@@ -647,14 +650,14 @@ class _AdminSearchFieldState extends State<AdminSearchField> {
             color: AppColors.textHint,
             fontSize: 13,
           ),
-          prefixIcon: const Icon(
+          prefixIcon: Icon(
             Icons.search,
             size: 18,
             color: AppColors.textSecondary,
           ),
           suffixIcon: hasText
               ? IconButton(
-                  icon: const Icon(Icons.clear, size: 16),
+                  icon: Icon(Icons.clear, size: 16),
                   tooltip: 'Clear search',
                   onPressed: () {
                     widget.controller.clear();
@@ -671,11 +674,11 @@ class _AdminSearchFieldState extends State<AdminSearchField> {
           ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppConstants.radiusSm),
-            borderSide: const BorderSide(color: AppColors.border),
+            borderSide: BorderSide(color: AppColors.border),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppConstants.radiusSm),
-            borderSide: const BorderSide(color: AppColors.border),
+            borderSide: BorderSide(color: AppColors.border),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppConstants.radiusSm),
@@ -722,7 +725,8 @@ class AdminFilterDropdown<T> extends StatelessWidget {
         child: DropdownButton<T>(
           value: value,
           isDense: true,
-          icon: const Icon(
+          dropdownColor: AppColors.surface,
+          icon: Icon(
             Icons.keyboard_arrow_down,
             size: 18,
             color: AppColors.textSecondary,
@@ -772,10 +776,10 @@ class AdminDateFilter extends StatelessWidget {
 
     return PopupMenuButton<AdminDatePreset?>(
       tooltip: 'Filter by date',
-      offset: const Offset(0, 42),
+      offset: Offset(0, 42),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-        side: const BorderSide(color: AppColors.border),
+        side: BorderSide(color: AppColors.border),
       ),
       onSelected: (preset) async {
         if (preset == null) {
@@ -847,7 +851,7 @@ class AdminDateFilter extends StatelessWidget {
               size: 15,
               color: isActive ? AppColors.primary : AppColors.textSecondary,
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             Text(
               _label(),
               style: AppTypography.body.copyWith(
@@ -856,7 +860,7 @@ class AdminDateFilter extends StatelessWidget {
                 color: isActive ? AppColors.primary : AppColors.textPrimary,
               ),
             ),
-            const SizedBox(width: 6),
+            SizedBox(width: 6),
             Icon(
               Icons.keyboard_arrow_down,
               size: 16,
@@ -904,7 +908,7 @@ class AdminFilterBar extends StatelessWidget {
                 if (hasActiveFilters && onReset != null)
                   TextButton.icon(
                     onPressed: onReset,
-                    icon: const Icon(Icons.refresh, size: 16),
+                    icon: Icon(Icons.refresh, size: 16),
                     label: const Text('Clear filters'),
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.textSecondary,
@@ -947,7 +951,7 @@ class AdminStatusBadge extends StatelessWidget {
       'awaiting_review' ||
       'under_review' ||
       'open' ||
-      'payment_pending' => (const Color(0xFF92400E), const Color(0xFFFFFBEB)),
+      'payment_pending' => (AppColors.warningForeground, AppColors.warningSoft),
       'approved' ||
       'active' ||
       'success' ||
@@ -965,9 +969,9 @@ class AdminStatusBadge extends StatelessWidget {
       'dismissed' ||
       'closed' ||
       'suspended' ||
-      'blocked' => (const Color(0xFF9F1239), const Color(0xFFFFF1F2)),
+      'blocked' => (AppColors.errorForeground, AppColors.errorSoft),
       'action_taken' ||
-      'processing' => (const Color(0xFF475569), const Color(0xFFF1F5F9)),
+      'processing' => (AppColors.textSecondary, AppColors.neutralSoft),
       _ => (AppColors.textSecondary, AppColors.surfaceVariant),
     };
 
@@ -1015,6 +1019,9 @@ class AdminDataTable extends StatelessWidget {
     this.onResetFilters,
     this.minWidth = 720,
     this.columnFlex,
+    this.columnAlignments,
+    this.columnSpacing = 0,
+    this.columnGapsAfter,
     this.onRowTap,
   });
 
@@ -1026,10 +1033,21 @@ class AdminDataTable extends StatelessWidget {
   final VoidCallback? onResetFilters;
   final double minWidth;
   final List<int>? columnFlex;
+  final List<AlignmentGeometry>? columnAlignments;
+  final double columnSpacing;
+  /// Fixed width between column [i] and [i + 1]. Length must be [columns.length - 1].
+  final List<double>? columnGapsAfter;
   final List<VoidCallback?>? onRowTap;
 
   List<int> get _flex =>
       columnFlex ?? List<int>.filled(columns.length, 1, growable: false);
+
+  List<AlignmentGeometry> get _alignments {
+    if (columnAlignments != null && columnAlignments!.length == columns.length) {
+      return columnAlignments!;
+    }
+    return List<AlignmentGeometry>.filled(columns.length, Alignment.centerLeft);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1067,7 +1085,13 @@ class AdminDataTable extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _AdminTableHeaderRow(columns: columns, flex: _flex),
+                      _AdminTableHeaderRow(
+                        columns: columns,
+                        flex: _flex,
+                        alignments: _alignments,
+                        columnSpacing: columnSpacing,
+                        columnGapsAfter: columnGapsAfter,
+                      ),
                       if (!isLoading && rows.isEmpty)
                         _AdminTableEmptyBody(
                           title: emptyTitle,
@@ -1079,6 +1103,9 @@ class AdminDataTable extends StatelessWidget {
                           _AdminTableDataRow(
                             cells: rows[i],
                             flex: _flex,
+                            alignments: _alignments,
+                            columnSpacing: columnSpacing,
+                            columnGapsAfter: columnGapsAfter,
                             onTap: onRowTap != null && i < onRowTap!.length
                                 ? onRowTap![i]
                                 : null,
@@ -1097,50 +1124,119 @@ class AdminDataTable extends StatelessWidget {
 }
 
 class _AdminTableHeaderRow extends StatelessWidget {
-  const _AdminTableHeaderRow({required this.columns, required this.flex});
+  const _AdminTableHeaderRow({
+    required this.columns,
+    required this.flex,
+    required this.alignments,
+    this.columnSpacing = 0,
+    this.columnGapsAfter,
+  });
 
   final List<String> columns;
   final List<int> flex;
+  final List<AlignmentGeometry> alignments;
+  final double columnSpacing;
+  final List<double>? columnGapsAfter;
+
+  static TextAlign _textAlignFor(AlignmentGeometry alignment) {
+    if (alignment == Alignment.centerRight) return TextAlign.right;
+    if (alignment == Alignment.center) return TextAlign.center;
+    return TextAlign.left;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       height: 40,
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: const BoxDecoration(
-        color: Color(0xFFFAFAFA),
+      decoration: BoxDecoration(
+        color: AppColors.background,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(
-        children: [
-          for (var i = 0; i < columns.length; i++)
-            Expanded(
-              flex: i < flex.length ? flex[i] : 1,
-              child: Text(
-                columns[i].toUpperCase(),
-                style: AppTypography.tableHeader.copyWith(
-                  fontSize: 11,
-                  letterSpacing: 0.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+        children: _adminTableRowSegments(
+          columnCount: columns.length,
+          flex: flex,
+          alignments: alignments,
+          columnSpacing: columnSpacing,
+          columnGapsAfter: columnGapsAfter,
+          cellBuilder: (i) => Text(
+            columns[i].toUpperCase(),
+            textAlign: _textAlignFor(
+              i < alignments.length ? alignments[i] : Alignment.centerLeft,
             ),
-        ],
+            style: AppTypography.tableHeader.copyWith(
+              fontSize: 11,
+              letterSpacing: 0.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
       ),
     );
   }
+}
+
+List<Widget> _adminTableRowSegments({
+  required int columnCount,
+  required List<int> flex,
+  required List<AlignmentGeometry> alignments,
+  required double columnSpacing,
+  required List<double>? columnGapsAfter,
+  required Widget Function(int index) cellBuilder,
+  bool dataRow = false,
+}) {
+  final useExplicitGaps =
+      columnGapsAfter != null && columnGapsAfter.length == columnCount - 1;
+
+  final children = <Widget>[];
+  for (var i = 0; i < columnCount; i++) {
+    final alignment =
+        i < alignments.length ? alignments[i] : Alignment.centerLeft;
+    final horizontalPad = useExplicitGaps
+        ? 0.0
+        : (columnSpacing > 0 ? columnSpacing / 2 : 0.0);
+
+    children.add(
+      Expanded(
+        flex: i < flex.length ? flex[i] : 1,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPad),
+          child: Align(
+            alignment: alignment,
+            widthFactor: dataRow ? 1 : null,
+            child: cellBuilder(i),
+          ),
+        ),
+      ),
+    );
+
+    if (i < columnCount - 1) {
+      final gap = useExplicitGaps ? columnGapsAfter[i] : 0.0;
+      if (gap > 0) {
+        children.add(SizedBox(width: gap));
+      }
+    }
+  }
+  return children;
 }
 
 class _AdminTableDataRow extends StatefulWidget {
   const _AdminTableDataRow({
     required this.cells,
     required this.flex,
+    required this.alignments,
+    this.columnSpacing = 0,
+    this.columnGapsAfter,
     this.onTap,
     this.showDivider = true,
   });
 
   final List<Widget> cells;
   final List<int> flex;
+  final List<AlignmentGeometry> alignments;
+  final double columnSpacing;
+  final List<double>? columnGapsAfter;
   final VoidCallback? onTap;
   final bool showDivider;
 
@@ -1156,28 +1252,27 @@ class _AdminTableDataRowState extends State<_AdminTableDataRow> {
     final interactive = widget.onTap != null;
 
     Widget row = Container(
-      constraints: const BoxConstraints(minHeight: 52),
+      constraints: BoxConstraints(minHeight: 52),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: _hovered && interactive
-            ? AppColors.primary.withValues(alpha: 0.03)
+            ? AppColors.primary.withValues(alpha: 0.04)
             : AppColors.surface,
         border: widget.showDivider
-            ? const Border(bottom: BorderSide(color: AppColors.border))
+            ? Border(bottom: BorderSide(color: AppColors.border))
             : null,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          for (var i = 0; i < widget.cells.length; i++)
-            Expanded(
-              flex: i < widget.flex.length ? widget.flex[i] : 1,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: widget.cells[i],
-              ),
-            ),
-        ],
+        children: _adminTableRowSegments(
+          columnCount: widget.cells.length,
+          flex: widget.flex,
+          alignments: widget.alignments,
+          columnSpacing: widget.columnSpacing,
+          columnGapsAfter: widget.columnGapsAfter,
+          dataRow: true,
+          cellBuilder: (i) => widget.cells[i],
+        ),
       ),
     );
 
@@ -1188,12 +1283,107 @@ class _AdminTableDataRowState extends State<_AdminTableDataRow> {
         cursor: SystemMouseCursors.click,
         child: Material(
           color: Colors.transparent,
-          child: InkWell(onTap: widget.onTap, child: row),
+          child: InkWell(
+            onTap: widget.onTap,
+            focusColor: AppColors.primary.withValues(alpha: 0.08),
+            hoverColor: Colors.transparent,
+            child: row,
+          ),
+        ),
+      );
+      row = FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.click,
+        actions: {
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) {
+              widget.onTap?.call();
+              return null;
+            },
+          ),
+        },
+        child: Semantics(
+          button: true,
+          label: 'View record details',
+          child: row,
         ),
       );
     }
 
     return row;
+  }
+}
+
+/// Wraps secondary row actions so taps do not activate the row [InkWell].
+class AdminTableActionCell extends StatelessWidget {
+  const AdminTableActionCell({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.deferToChild,
+      child: child,
+    );
+  }
+}
+
+/// Primary admin action button with shared teal gradient styling.
+class AdminGradientButton extends StatelessWidget {
+  const AdminGradientButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.icon,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    return DecoratedBox(
+      decoration: AppGradients.fill(
+        gradient: enabled
+            ? AppGradients.buttonGradient
+            : LinearGradient(
+                colors: [
+                  AppColors.border,
+                  AppColors.border.withValues(alpha: 0.8),
+                ],
+              ),
+        borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+        boxShadow: enabled ? AppGradients.emphasisShadow : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 18, color: Colors.white),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                  label,
+                  style: AppTypography.label.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -1220,7 +1410,7 @@ class _AdminTableEmptyBody extends StatelessWidget {
             style: AppTypography.cardTitle.copyWith(fontSize: 15),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             message,
             style: AppTypography.body.copyWith(
@@ -1272,7 +1462,7 @@ class AdminTableCellText extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         if (secondary != null && secondary!.trim().isNotEmpty) ...[
-          const SizedBox(height: 2),
+          SizedBox(height: 2),
           Text(
             secondary!,
             style: AppTypography.caption.copyWith(
@@ -1340,6 +1530,66 @@ class AdminTableDateCell extends StatelessWidget {
   }
 }
 
+/// Compact date + time for admin order tables (Philippine Time, UTC+8).
+class AdminTablePhilippinesDateTimeCell extends StatelessWidget {
+  const AdminTablePhilippinesDateTimeCell({super.key, required this.dateTime});
+
+  final DateTime dateTime;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Philippine Time (UTC+8)',
+      waitDuration: Duration(milliseconds: 400),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            formatAdminPhilippinesDate(dateTime),
+            style: AppTypography.tableBody,
+          ),
+          Text(
+            formatAdminPhilippinesTime(dateTime),
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AdminOrderTypeBadge extends StatelessWidget {
+  const AdminOrderTypeBadge({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final isAuction = label.toLowerCase().contains('auction');
+    final fg = isAuction ? AppColors.textSecondary : AppColors.primaryDark;
+    final bg = isAuction ? AppColors.neutralSoft : AppColors.primaryLight;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: fg.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.badge.copyWith(
+          color: fg,
+          fontWeight: FontWeight.w600,
+          fontSize: 11,
+        ),
+      ),
+    );
+  }
+}
+
 class AdminTableLinkAction extends StatelessWidget {
   const AdminTableLinkAction({
     super.key,
@@ -1403,7 +1653,14 @@ class AdminTableSkeleton extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppConstants.radiusMd),
         child: Column(
           children: [
-            _AdminTableHeaderRow(columns: columns, flex: flex),
+            _AdminTableHeaderRow(
+              columns: columns,
+              flex: flex,
+              alignments: List<AlignmentGeometry>.filled(
+                columns.length,
+                Alignment.centerLeft,
+              ),
+            ),
             for (int i = 0; i < rowCount; i++)
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -1412,7 +1669,7 @@ class AdminTableSkeleton extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   border: i < rowCount - 1
-                      ? const Border(
+                      ? Border(
                           bottom: BorderSide(color: AppColors.border),
                         )
                       : null,

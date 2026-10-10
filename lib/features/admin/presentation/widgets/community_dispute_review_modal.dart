@@ -247,7 +247,7 @@ class _CommunityDisputeReviewModalState
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.border),
+        side: BorderSide(color: AppColors.border),
       ),
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       clipBehavior: Clip.antiAlias,
@@ -262,9 +262,9 @@ class _CommunityDisputeReviewModalState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildHeader(context),
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.border),
             Expanded(child: _buildBody(context)),
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.border),
             _buildFooter(context),
           ],
         ),
@@ -292,7 +292,7 @@ class _CommunityDisputeReviewModalState
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    SizedBox(width: 10),
                     if (_report != null) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -313,7 +313,7 @@ class _CommunityDisputeReviewModalState
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       AdminStatusChip(status: _report!.status),
                     ],
                   ],
@@ -332,7 +332,7 @@ class _CommunityDisputeReviewModalState
           ),
           IconButton(
             tooltip: 'Close (Esc)',
-            icon: const Icon(
+            icon: Icon(
               Icons.close,
               size: 20,
               color: AppColors.textSecondary,
@@ -459,7 +459,7 @@ class _CommunityDisputeReviewModalState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(child: leftCard),
-            const SizedBox(width: 14),
+            SizedBox(width: 14),
             Expanded(child: rightCard),
           ],
         );
@@ -492,7 +492,7 @@ class _CommunityDisputeReviewModalState
                   color: AppColors.primary,
                 ),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -516,8 +516,8 @@ class _CommunityDisputeReviewModalState
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          const Divider(height: 1, color: AppColors.border),
+          SizedBox(height: 14),
+          Divider(height: 1, color: AppColors.border),
           const SizedBox(height: 12),
           Text(
             'Reporter Statement',
@@ -526,7 +526,7 @@ class _CommunityDisputeReviewModalState
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -535,9 +535,9 @@ class _CommunityDisputeReviewModalState
               borderRadius: BorderRadius.circular(8),
               border: Border(
                 left: const BorderSide(color: AppColors.primary, width: 3),
-                top: const BorderSide(color: AppColors.border),
-                right: const BorderSide(color: AppColors.border),
-                bottom: const BorderSide(color: AppColors.border),
+                top: BorderSide(color: AppColors.border),
+                right: BorderSide(color: AppColors.border),
+                bottom: BorderSide(color: AppColors.border),
               ),
             ),
             child: Text(
@@ -576,12 +576,12 @@ class _CommunityDisputeReviewModalState
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.photo_library_outlined,
                 size: 16,
                 color: AppColors.textSecondary,
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text(
                 'Supporting Evidence',
                 style: AppTypography.body.copyWith(
@@ -606,18 +606,18 @@ class _CommunityDisputeReviewModalState
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           if (validUrls.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.image_not_supported_outlined,
                     size: 18,
                     color: AppColors.textSecondary,
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   Text(
                     'No photo evidence was attached to this dispute.',
                     style: AppTypography.caption.copyWith(
@@ -679,7 +679,7 @@ class _CommunityDisputeReviewModalState
                   fontSize: 14,
                 ),
               ),
-              const Spacer(),
+              Spacer(),
               AdminStatusChip(status: report.status),
             ],
           ),
@@ -692,8 +692,8 @@ class _CommunityDisputeReviewModalState
               ),
             ),
           ],
-          const SizedBox(height: 12),
-          const Divider(height: 1, color: AppColors.border),
+          SizedBox(height: 12),
+          Divider(height: 1, color: AppColors.border),
           const SizedBox(height: 10),
           Text(
             'Admin Response',
@@ -702,7 +702,7 @@ class _CommunityDisputeReviewModalState
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             report.adminResponse?.trim().isNotEmpty == true
                 ? report.adminResponse!.trim()
@@ -749,7 +749,7 @@ class _CommunityDisputeReviewModalState
               fontSize: 15,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             'Choose one outcome. The reporter is notified when you submit.',
             style: AppTypography.caption.copyWith(
@@ -781,7 +781,7 @@ class _CommunityDisputeReviewModalState
             ],
           ),
           if (!canRequestEvidence && evidenceRequestDisabledReason != null) ...[
-            const SizedBox(height: 10),
+            SizedBox(height: 10),
             Text(
               evidenceRequestDisabledReason,
               style: AppTypography.caption.copyWith(
@@ -792,7 +792,7 @@ class _CommunityDisputeReviewModalState
           ],
           if (selected != null)
             AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
+              duration: Duration(milliseconds: 180),
               switchInCurve: Curves.easeOut,
               switchOutCurve: Curves.easeIn,
               child: KeyedSubtree(
@@ -801,8 +801,8 @@ class _CommunityDisputeReviewModalState
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 18),
-                    const Divider(height: 1, color: AppColors.border),
-                    const SizedBox(height: 16),
+                    Divider(height: 1, color: AppColors.border),
+                    SizedBox(height: 16),
                     Text(
                       communityDisputeDecisionFormTitle(selected),
                       style: AppTypography.caption.copyWith(
@@ -818,7 +818,7 @@ class _CommunityDisputeReviewModalState
                         height: 1.35,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     Row(
                       children: [
                         Text(
@@ -828,7 +828,7 @@ class _CommunityDisputeReviewModalState
                             color: AppColors.textPrimary,
                           ),
                         ),
-                        const Spacer(),
+                        Spacer(),
                         Text(
                           'Min ${selected == 'needs_more_evidence' ? kAdminNeedsMoreEvidenceMinLength : kAdminResponseMinLength} chars',
                           style: AppTypography.caption.copyWith(
@@ -847,7 +847,7 @@ class _CommunityDisputeReviewModalState
                       enabled: !_isSubmitting,
                       onSelected: _onApplyTemplate,
                     ),
-                    const SizedBox(height: 10),
+                    SizedBox(height: 10),
                     TextField(
                       controller: _responseController,
                       enabled: !_isSubmitting,
@@ -866,11 +866,11 @@ class _CommunityDisputeReviewModalState
                         errorText: responseError,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: AppColors.border),
+                          borderSide: BorderSide(color: AppColors.border),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: AppColors.border),
+                          borderSide: BorderSide(color: AppColors.border),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -936,7 +936,7 @@ class _CommunityDisputeReviewModalState
                 : () => Navigator.of(context).pop(false),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.textPrimary,
-              side: const BorderSide(color: AppColors.border),
+              side: BorderSide(color: AppColors.border),
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -1009,7 +1009,7 @@ class _PartyCard extends StatelessWidget {
                   letterSpacing: 0.5,
                 ),
               ),
-              const Spacer(),
+              Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
@@ -1026,7 +1026,7 @@ class _PartyCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             displayName,
             style: AppTypography.body.copyWith(
@@ -1037,7 +1037,7 @@ class _PartyCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: 2),
           Text(
             '@$username',
             style: AppTypography.caption.copyWith(
@@ -1090,14 +1090,14 @@ class _EvidenceThumbnail extends StatelessWidget {
             CachedNetworkImage(
               imageUrl: url,
               fit: BoxFit.cover,
-              placeholder: (_, _) => const Center(
+              placeholder: (_, _) => Center(
                 child: SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
-              errorWidget: (_, _, _) => const Center(
+              errorWidget: (_, _, _) => Center(
                 child: Icon(
                   Icons.broken_image_outlined,
                   size: 24,

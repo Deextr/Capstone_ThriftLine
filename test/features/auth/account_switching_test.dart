@@ -195,7 +195,7 @@ void main() {
           location: RouteNames.adminHome,
           homeRoute: RouteNames.adminHome,
         ),
-        isNull,
+        RouteNames.adminPortalRequired,
       );
     });
   });

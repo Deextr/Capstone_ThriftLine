@@ -21,7 +21,7 @@ class AdminWebTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isLoading && rows.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator());
     }
     if (!isLoading && rows.isEmpty) {
       return EmptyState(

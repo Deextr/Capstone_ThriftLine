@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
-import '../../../buyer/domain/looking_for_lifecycle.dart';
 import '../../data/looking_for_moderation.dart';
 import 'admin_dispute_review_modal_shell.dart';
 
@@ -22,7 +21,7 @@ class LookingForDisputeOverviewSection extends StatelessWidget {
     final explanation = report.details.trim();
 
     return AdminDisputeModalSection(
-      title: 'Reported issue',
+      title: 'Report information',
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: AppColors.background,
@@ -50,7 +49,7 @@ class LookingForDisputeOverviewSection extends StatelessWidget {
                             color: AppColors.textPrimary,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        SizedBox(height: 6),
                         Text(
                           'Reporter allegation — not a confirmed violation',
                           style: AppTypography.caption.copyWith(
@@ -61,7 +60,7 @@ class LookingForDisputeOverviewSection extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -83,7 +82,7 @@ class LookingForDisputeOverviewSection extends StatelessWidget {
                 ],
               ),
               if (explanation.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Text(
                   explanation,
                   style: AppTypography.body.copyWith(
@@ -92,8 +91,8 @@ class LookingForDisputeOverviewSection extends StatelessWidget {
                   ),
                 ),
               ],
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Divider(height: 1, color: AppColors.border),
               ),
               AdminDisputeKeyValueGrid(

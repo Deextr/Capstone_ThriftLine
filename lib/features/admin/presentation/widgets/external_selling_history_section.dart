@@ -46,7 +46,7 @@ class ExternalSellingHistorySection extends StatelessWidget {
         AdminKeyValueRow(label: 'Verified', value: '$verified'),
         AdminKeyValueRow(label: 'Insufficient', value: '$insufficient'),
         AdminKeyValueRow(label: 'Rejected', value: '$rejected'),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         Text(
           'Only verified transactions count, and at most 10. A claimed range does not set the score. These photos are outside ThriftLine.',
           style: AppTypography.caption.copyWith(color: AppColors.textSecondary),

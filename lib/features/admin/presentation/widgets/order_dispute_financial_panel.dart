@@ -145,7 +145,7 @@ class _OrderDisputeFinancialPanelState
           ],
         ),
         if (!canRequestEvidence && evidenceDisabledReason != null) ...[
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Text(
             evidenceDisabledReason,
             style: AppTypography.caption.copyWith(

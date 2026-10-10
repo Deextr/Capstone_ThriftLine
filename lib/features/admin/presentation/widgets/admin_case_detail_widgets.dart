@@ -36,7 +36,7 @@ class AdminCaseDetailPage extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: TextButton.icon(
                     onPressed: onBack,
-                    icon: const Icon(Icons.arrow_back, size: 18),
+                    icon: Icon(Icons.arrow_back, size: 18),
                     label: Text(backLabel),
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.textSecondary,
@@ -89,7 +89,7 @@ class AdminCaseDetailHeader extends StatelessWidget {
             AdminStatusBadge(status: status, label: statusLabel),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         Text(title, style: AppTypography.pageTitle.copyWith(fontSize: 22)),
         const SizedBox(height: 6),
         Text(
@@ -149,8 +149,8 @@ class AdminCaseDetailSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!first) const Divider(height: 1, color: AppColors.border),
-          if (!first) const SizedBox(height: 24),
+          if (!first) Divider(height: 1, color: AppColors.border),
+          if (!first) SizedBox(height: 24),
           Text(
             title.toUpperCase(),
             style: AppTypography.caption.copyWith(
@@ -259,7 +259,7 @@ class AdminCasePartiesRow extends StatelessWidget {
         if (stacked) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [left, const SizedBox(height: 20), right],
+            children: [left, SizedBox(height: 20), right],
           );
         }
         return IntrinsicHeight(
@@ -302,7 +302,7 @@ class _PartyColumn extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         Text(name, style: AppTypography.subheading.copyWith(fontSize: 15)),
         for (final line in lines)
           if (line.trim().isNotEmpty) ...[
@@ -428,7 +428,7 @@ class _TimelineRow extends StatelessWidget {
                   ),
                   if (event.subtitle != null &&
                       event.subtitle!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2),
                     Text(
                       event.subtitle!.trim(),
                       style: AppTypography.caption.copyWith(
@@ -440,7 +440,7 @@ class _TimelineRow extends StatelessWidget {
                     ),
                   ],
                   if (event.at != null) ...[
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2),
                     Text(
                       formatAdminTableDateTime(event.at!),
                       style: AppTypography.caption.copyWith(
@@ -484,7 +484,7 @@ class AdminCaseDecisionPanel extends StatelessWidget {
               height: 1.45,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
         ],
         DecoratedBox(
           decoration: BoxDecoration(

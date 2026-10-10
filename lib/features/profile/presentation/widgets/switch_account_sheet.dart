@@ -183,7 +183,7 @@ class _AccountTile extends StatelessWidget {
               if (selected)
                 const Icon(Icons.check_circle_rounded, color: AppColors.primary)
               else
-                const Icon(
+                Icon(
                   Icons.radio_button_unchecked,
                   color: AppColors.textHint,
                 ),

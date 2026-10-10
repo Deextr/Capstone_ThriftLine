@@ -44,7 +44,7 @@
 DO $$
 DECLARE
   v_seed CONSTANT jsonb := '[
-    {"email": "dexter041711@gmail.com", "role": "admin", "full_name": "Admin"}
+    {"email": "dexter041711@gmail.com", "role": "super_admin", "full_name": "Admin"}
   ]'::jsonb;
 
   v_entry    jsonb;
@@ -108,5 +108,5 @@ SELECT * FROM seed_results ORDER BY email;
 SELECT u.username, u.full_name, u.role, u.account_status, u.trust_score
 FROM public.users u
 WHERE lower(u.email) = 'dexter041711@gmail.com'
-   OR u.role = 'admin'::user_role_enum
+   OR u.role IN ('admin'::user_role_enum, 'super_admin'::user_role_enum)
 ORDER BY u.role, u.username;

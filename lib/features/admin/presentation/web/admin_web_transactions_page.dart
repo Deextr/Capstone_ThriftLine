@@ -29,11 +29,11 @@ class AdminWebTransactionsPage extends StatelessWidget {
                 onPressed: controller.isLoading
                     ? null
                     : () => controller.load(),
-                icon: const Icon(Icons.refresh, size: 16),
+                icon: Icon(Icons.refresh, size: 16),
                 label: const Text('Refresh'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.textPrimary,
-                  side: const BorderSide(color: AppColors.border),
+                  side: BorderSide(color: AppColors.border),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 10,

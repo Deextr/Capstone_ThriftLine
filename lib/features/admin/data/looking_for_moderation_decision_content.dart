@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'admin_report_decision_content.dart';
 
-/// UI decision slugs for Looking For content moderation (mapped to RPC in controller).
 const String kLookingForDecisionRemovePost = 'remove_post';
 const String kLookingForDecisionDismissReport = 'dismiss_report';
+
 /// Legacy RPC slug; not offered in the Looking For dispute review modal.
 const String kLookingForDecisionRequestEvidence = 'needs_more_evidence';
 
-/// Final moderation choices shown in the Looking For dispute review modal.
 const List<CommunityDisputeDecisionOptionData>
 kLookingForDisputeDecisionOptions = [
   CommunityDisputeDecisionOptionData(
@@ -21,12 +20,12 @@ kLookingForDisputeDecisionOptions = [
   CommunityDisputeDecisionOptionData(
     value: kLookingForDecisionDismissReport,
     title: 'Dismiss Report',
-    description: 'No violation is established; keep the post available.',
+    description:
+        'No violation is established; keep the post available if it still complies.',
     icon: Icons.check_circle_outline_rounded,
   ),
 ];
 
-/// Maps modal decision slug to `review_looking_for_report` decision parameter.
 String? lookingForDecisionToRpc(String? uiDecision) => switch (uiDecision) {
   kLookingForDecisionRemovePost => 'resolved',
   kLookingForDecisionDismissReport => 'dismissed',
@@ -56,13 +55,14 @@ String lookingForDisputeConfirmDetail(
   String? uiDecision,
 ) => switch (uiDecision) {
   kLookingForDecisionRemovePost =>
-    'The Looking For post will be removed from public view. '
-        'Strike and sanction rules may apply to the post author.',
+    'The Looking For post will be marked removed by moderation and cannot be '
+        'reposted. Strike rules may apply once per post. Other open reports on '
+        'this post will close with the same enforcement without duplicate strikes.',
   kLookingForDecisionDismissReport =>
-    'The report will be closed. The post remains visible if it already complies with guidelines.',
+    'The report will be closed. No strike or removal is applied. Other open '
+        'reports on this post stay open unless you decide them separately.',
   kLookingForDecisionRequestEvidence =>
-    'The reporter will be asked to submit additional evidence. '
-        'The report stays open until you resolve or dismiss it.',
+    'The reporter will be asked to submit additional evidence.',
   _ => '',
 };
 
@@ -113,13 +113,7 @@ List<AdminResponseTemplate> lookingForDecisionReasonTemplates(
         id: 'no_violation',
         label: 'No violation found',
         message:
-            'We reviewed this report and did not find a Looking For policy violation. The post may remain public.',
-      ),
-      const AdminResponseTemplate(
-        id: 'insufficient_proof',
-        label: 'Insufficient evidence of a violation',
-        message:
-            'We could not confirm a violation based on the information provided. The post remains available.',
+            'We reviewed this report and did not find sufficient grounds for moderation.',
       ),
       const AdminResponseTemplate(
         id: 'duplicate_report',

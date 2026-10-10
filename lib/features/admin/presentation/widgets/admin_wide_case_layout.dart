@@ -49,7 +49,7 @@ class AdminWideCaseDetailPage extends StatelessWidget {
                               alignment: Alignment.centerLeft,
                               child: TextButton.icon(
                                 onPressed: onBack,
-                                icon: const Icon(Icons.arrow_back, size: 18),
+                                icon: Icon(Icons.arrow_back, size: 18),
                                 label: Text(backLabel),
                                 style: TextButton.styleFrom(
                                   foregroundColor: AppColors.textSecondary,

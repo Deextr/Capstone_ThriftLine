@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/services/supabase_service.dart';
@@ -9,15 +11,19 @@ class AdminDisputesHubController extends ChangeNotifier {
   AdminDisputesHubController({
     required SupabaseService supabase,
     AdminModerationCategory initialCategory = AdminModerationCategory.all,
+    AdminReportListFilter initialStatus = AdminReportListFilter.all,
   }) : _service = AdminModerationQueueService(supabase),
-       _category = initialCategory {
+       _category = initialCategory,
+       _statusFilter = initialStatus {
     load();
   }
 
   final AdminModerationQueueService _service;
 
   AdminModerationCategory _category;
-  AdminReportListFilter _statusFilter = AdminReportListFilter.all;
+  AdminReportListFilter _statusFilter;
+  AdminLookingForLifecycleFilter _lfLifecycleFilter =
+      AdminLookingForLifecycleFilter.all;
   AdminDateWindow? _dateWindow;
   final TextEditingController searchController = TextEditingController();
 
@@ -27,9 +33,14 @@ class AdminDisputesHubController extends ChangeNotifier {
   int _pageSize = 10;
   bool _isLoading = true;
   String? _errorMessage;
+  Timer? _searchDebounce;
+  static const Duration _searchDebounceDuration = Duration(milliseconds: 350);
 
   AdminModerationCategory get category => _category;
   AdminReportListFilter get statusFilter => _statusFilter;
+  AdminLookingForLifecycleFilter get lfLifecycleFilter => _lfLifecycleFilter;
+  bool get isLookingForCategory =>
+      _category == AdminModerationCategory.lookingFor;
   AdminDateWindow? get dateWindow => _dateWindow;
   List<AdminModerationCaseRow> get items => _items;
   int get total => _total;
@@ -40,12 +51,20 @@ class AdminDisputesHubController extends ChangeNotifier {
 
   bool get hasActiveFilters =>
       _statusFilter != AdminReportListFilter.all ||
+      _lfLifecycleFilter != AdminLookingForLifecycleFilter.all ||
       _dateWindow != null ||
-      searchController.text.trim().isNotEmpty ||
-      false;
+      searchController.text.trim().isNotEmpty;
+
+  void scheduleSearch(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(_searchDebounceDuration, () {
+      setSearch(value);
+    });
+  }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     searchController.dispose();
     super.dispose();
   }
@@ -60,6 +79,13 @@ class AdminDisputesHubController extends ChangeNotifier {
   void setStatusFilter(AdminReportListFilter value) {
     if (_statusFilter == value) return;
     _statusFilter = value;
+    _page = 0;
+    load();
+  }
+
+  void setLfLifecycleFilter(AdminLookingForLifecycleFilter value) {
+    if (_lfLifecycleFilter == value) return;
+    _lfLifecycleFilter = value;
     _page = 0;
     load();
   }
@@ -92,6 +118,7 @@ class AdminDisputesHubController extends ChangeNotifier {
   void resetFilters() {
     _category = AdminModerationCategory.all;
     _statusFilter = AdminReportListFilter.all;
+    _lfLifecycleFilter = AdminLookingForLifecycleFilter.all;
     _dateWindow = null;
     searchController.clear();
     _page = 0;
@@ -115,6 +142,7 @@ class AdminDisputesHubController extends ChangeNotifier {
       final page = await _service.list(
         category: _category,
         statusFilter: _statusFilter,
+        lfLifecycleFilter: _lfLifecycleFilter,
         page: _page,
         pageSize: _pageSize,
         search: searchController.text,

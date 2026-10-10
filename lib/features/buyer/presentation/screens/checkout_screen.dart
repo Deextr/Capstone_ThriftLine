@@ -46,7 +46,7 @@ class CheckoutScreen extends StatelessWidget {
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(
+            icon: Icon(
               Icons.arrow_back_rounded,
               color: AppColors.textPrimary,
             ),

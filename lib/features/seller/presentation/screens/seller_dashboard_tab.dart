@@ -339,7 +339,7 @@ class _OrdersGlance extends StatelessWidget {
                     ordersBucket: SellerOrderBucket.toShip,
                   ),
                 ),
-                const Divider(height: 1, color: AppColors.border),
+                Divider(height: 1, color: AppColors.border),
                 _OrderActionLine(
                   icon: Icons.outbox_outlined,
                   label: 'Shipped',
@@ -438,7 +438,7 @@ class _OrderActionLine extends StatelessWidget {
                       ),
                     ),
                   ),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
                   size: 18,
                   color: AppColors.textHint,
@@ -504,7 +504,7 @@ class _YourShopSection extends StatelessWidget {
                   onTap: () =>
                       SellerTabScope.open(context, SellerTabScope.listings),
                 ),
-                const Divider(height: 1, color: AppColors.border),
+                Divider(height: 1, color: AppColors.border),
                 _ShopInfoLine(
                   icon: Icons.star_rounded,
                   iconColor: AppColors.warning,
@@ -561,7 +561,7 @@ class _ShopInfoLine extends StatelessWidget {
             ),
             if (onTap != null) ...[
               const SizedBox(width: 4),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 size: 18,
                 color: AppColors.textHint,
@@ -624,7 +624,7 @@ class _OrderTile extends StatelessWidget {
       color: AppColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppConstants.radiusLg),
-        side: const BorderSide(color: AppColors.border),
+        side: BorderSide(color: AppColors.border),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppConstants.radiusLg),
@@ -704,7 +704,7 @@ class _LookingForTile extends StatelessWidget {
       color: AppColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppConstants.radiusLg),
-        side: const BorderSide(color: AppColors.border),
+        side: BorderSide(color: AppColors.border),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppConstants.radiusLg),

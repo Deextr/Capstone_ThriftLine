@@ -91,7 +91,8 @@ EdgeFunctionErrorPayload parseEdgeFunctionError(Object? body) {
     } else if (codeRaw is num) {
       code = codeRaw.toString();
     }
-    final message = _nonEmptyString(body['error']) ??
+    final message =
+        _nonEmptyString(body['error']) ??
         _nonEmptyString(body['message']) ??
         _nonEmptyString(body['msg']) ??
         _nonEmptyString(body['error_description']);
@@ -187,7 +188,8 @@ bool isEmailLoginTransportFailure({
       code == 'turnstile_failed' ||
       code == 'turnstile_required' ||
       code == 'rate_limited' ||
-      code == 'admin_access_denied') {
+      code == 'admin_access_denied' ||
+      code == 'admin_deactivated') {
     return false;
   }
 
@@ -276,6 +278,8 @@ String emailLoginUiMessage({
       return 'Too many failed login attempts. Please try again in 5 minutes.';
     case 'admin_access_denied':
       return 'This account does not have admin access.';
+    case 'admin_deactivated':
+      return 'This administrator account is deactivated.';
     case 'invalid_credentials':
     case '401':
       final remaining = attemptsRemainingFromErrorBody(errorBody);
@@ -373,10 +377,7 @@ String _safeInvalidRequestCopy(String serverText) {
 /// Maps GoTrue [AuthException] errors after direct auth calls (e.g. setSession).
 String mapGoTrueEmailLoginFailure({String? code, required String message}) {
   final parsed = parseGoTrueError(code: code, message: message);
-  return emailLoginUiMessage(
-    code: parsed.code,
-    serverError: parsed.message,
-  );
+  return emailLoginUiMessage(code: parsed.code, serverError: parsed.message);
 }
 
 bool isExistingAccountAuthError(GoTrueErrorInfo info) {

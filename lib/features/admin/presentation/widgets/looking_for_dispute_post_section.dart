@@ -62,7 +62,7 @@ class LookingForDisputePostSection extends StatelessWidget {
                 ],
               ),
               if (description.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Text(
                   description,
                   style: AppTypography.body.copyWith(

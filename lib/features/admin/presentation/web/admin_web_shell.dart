@@ -3,13 +3,17 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_palette.dart';
+import '../../../../core/theme/app_palette_lerp_sync.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../features/auth/domain/auth_user.dart';
 import '../../../../providers/auth_provider.dart';
-import '../../../../widgets/thrift_widgets.dart';
+import '../../../../providers/theme_provider.dart';
 import '../../controllers/admin_dashboard_controller.dart';
+import '../widgets/admin_profile_modal.dart';
 
 const double _kSidebarIconSlotSize = 24;
 
@@ -22,8 +26,10 @@ class AdminWebShell extends StatefulWidget {
   State<AdminWebShell> createState() => _AdminWebShellState();
 }
 
-class _AdminWebShellState extends State<AdminWebShell> {
+class _AdminWebShellState extends State<AdminWebShell>
+    with WidgetsBindingObserver {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _profileModalOpen = false;
 
   static const double _sidebarExpandedWidth = 240;
   static const double _sidebarRailWidth = 72;
@@ -39,21 +45,27 @@ class _AdminWebShellState extends State<AdminWebShell> {
         location.startsWith('/admin/review/')) {
       return 'Seller verifications';
     }
-    if (location == RouteNames.adminReports) return 'Analytics';
+    if (location.startsWith(RouteNames.adminMarketplaceReports)) {
+      return 'Reports';
+    }
     if (location.startsWith('/admin/reports/') ||
         location.startsWith(RouteNames.adminDisputes) ||
         location.startsWith('/admin/looking-for-reports')) {
       return 'Disputes';
     }
-    if (location.startsWith(RouteNames.adminLogs)) return 'Logs';
+    if (location.startsWith(RouteNames.adminLogs)) return 'Activity logs';
+    if (location.startsWith(RouteNames.adminAdministrators)) {
+      return 'Admin accounts';
+    }
     if (location.startsWith(RouteNames.adminUsers)) return 'Users';
     if (location.startsWith(RouteNames.adminOrdersTransactions) ||
         location.startsWith(RouteNames.adminOrders) ||
         location.startsWith(RouteNames.adminTransactions)) {
       return 'Orders & transactions';
     }
-    if (location.startsWith(RouteNames.adminSettings)) return 'Settings';
-    if (location.startsWith(RouteNames.adminProfile)) return 'Profile';
+    if (location.startsWith(RouteNames.adminBiddingViolations)) {
+      return 'Bidding violations';
+    }
     return 'ThriftLine Admin';
   }
 
@@ -67,6 +79,9 @@ class _AdminWebShellState extends State<AdminWebShell> {
           location.startsWith('${RouteNames.adminOrders}/') ||
           location == RouteNames.adminOrders ||
           location.startsWith(RouteNames.adminTransactions);
+    }
+    if (target == RouteNames.adminBiddingViolations) {
+      return location.startsWith(RouteNames.adminBiddingViolations);
     }
     if (target == RouteNames.adminReportsAll ||
         target == RouteNames.adminReportsCommunity) {
@@ -106,10 +121,10 @@ class _AdminWebShellState extends State<AdminWebShell> {
         route: RouteNames.adminOrdersTransactions,
       ),
       _NavItem(
-        label: 'Logs',
-        icon: Icons.history_outlined,
-        selectedIcon: Icons.history_rounded,
-        route: RouteNames.adminLogs,
+        label: 'Bidding violations',
+        icon: Icons.payments_outlined,
+        selectedIcon: Icons.payments_rounded,
+        route: RouteNames.adminBiddingViolations,
       ),
       _NavItem(
         label: 'Disputes',
@@ -118,7 +133,36 @@ class _AdminWebShellState extends State<AdminWebShell> {
         route: RouteNames.adminReportsAll,
         badge: openCases,
       ),
+      _NavItem(
+        label: 'Reports',
+        icon: Icons.assessment_outlined,
+        selectedIcon: Icons.assessment_rounded,
+        route: RouteNames.adminMarketplaceReports,
+      ),
     ];
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<AuthProvider>().reloadUser();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      context.read<AuthProvider>().reloadUser();
+    }
   }
 
   static const _settingsNav = _NavItem(
@@ -133,29 +177,55 @@ class _AdminWebShellState extends State<AdminWebShell> {
     context.go(route);
   }
 
+  Future<void> _openProfileSettings({required bool compact}) async {
+    if (compact) _scaffoldKey.currentState?.closeDrawer();
+    if (_profileModalOpen) return;
+    setState(() => _profileModalOpen = true);
+    try {
+      await showAdminProfileModal(context);
+    } finally {
+      if (mounted) setState(() => _profileModalOpen = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
+    AppPalette.current =
+        Theme.of(context).extension<AppPalette>() ?? AppPalette.light;
     final location = GoRouterState.of(context).uri.path;
     final wide =
         MediaQuery.sizeOf(context).width >= AppConstants.breakpointDesktop;
     final compact =
         MediaQuery.sizeOf(context).width < AppConstants.breakpointTablet;
-    final pending =
-        context
-            .watch<AdminDashboardController>()
-            .counts
-            ?.pendingVerifications ??
-        0;
-    final counts = context.watch<AdminDashboardController>().counts;
-    final openCases = (counts?.openReports ?? 0) + (counts?.openDisputes ?? 0);
-    final user = context.watch<AuthProvider>().user;
+    final dashboard = context.watch<AdminDashboardController>();
+    final pending = dashboard.pendingVerificationCount;
+    final openCases = dashboard.openDisputeCount;
+    final auth = context.watch<AuthProvider>();
+    final user = auth.user;
     final primaryNav = _primaryNavItems(pending, openCases);
+    final administrationNav = auth.isSuperAdmin
+        ? const [
+            _NavItem(
+              label: 'Admin accounts',
+              icon: Icons.admin_panel_settings_outlined,
+              selectedIcon: Icons.admin_panel_settings_rounded,
+              route: RouteNames.adminAdministrators,
+            ),
+            _NavItem(
+              label: 'Activity logs',
+              icon: Icons.history_outlined,
+              selectedIcon: Icons.history_rounded,
+              route: RouteNames.adminLogs,
+            ),
+          ]
+        : const <_NavItem>[];
 
     Widget sidebar({required bool extended}) {
       return Container(
         width: extended ? _sidebarExpandedWidth : _sidebarRailWidth,
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
+        decoration: BoxDecoration(
+          color: AppColors.sidebarSurface,
           border: Border(right: BorderSide(color: AppColors.border)),
         ),
         child: Column(
@@ -170,7 +240,7 @@ class _AdminWebShellState extends State<AdminWebShell> {
                 child: _SidebarBrand(extended: extended),
               ),
             ),
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.border),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(
@@ -190,10 +260,35 @@ class _AdminWebShellState extends State<AdminWebShell> {
                         onTap: () => _navigate(item.route, compact: compact),
                       ),
                     ),
+                  if (administrationNav.isNotEmpty) ...[
+                    if (extended)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 12, 8, 6),
+                        child: Text(
+                          'Administration',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
+                    else
+                      Divider(height: 16, color: AppColors.border),
+                    for (final item in administrationNav)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: _SidebarTile(
+                          item: item,
+                          extended: extended,
+                          selected: _isSelected(location, item.route),
+                          onTap: () => _navigate(item.route, compact: compact),
+                        ),
+                      ),
+                  ],
                 ],
               ),
             ),
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.border),
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 _navHorizontalInset,
@@ -204,8 +299,8 @@ class _AdminWebShellState extends State<AdminWebShell> {
               child: _SidebarTile(
                 item: _settingsNav,
                 extended: extended,
-                selected: _isSelected(location, _settingsNav.route),
-                onTap: () => _navigate(_settingsNav.route, compact: compact),
+                selected: _profileModalOpen,
+                onTap: () => _openProfileSettings(compact: compact),
               ),
             ),
           ],
@@ -213,7 +308,7 @@ class _AdminWebShellState extends State<AdminWebShell> {
       );
     }
 
-    return Scaffold(
+    final shell = Scaffold(
       key: _scaffoldKey,
       backgroundColor: AppColors.background,
       drawer: compact
@@ -230,7 +325,7 @@ class _AdminWebShellState extends State<AdminWebShell> {
                   color: AppColors.surface,
                   elevation: 0,
                   child: DecoratedBox(
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       border: Border(
                         bottom: BorderSide(color: AppColors.border),
                       ),
@@ -258,7 +353,10 @@ class _AdminWebShellState extends State<AdminWebShell> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              _AdminProfileMenu(user: user, showName: wide),
+                              _AdminHeaderActions(
+                                user: user,
+                                showName: !compact,
+                              ),
                             ],
                           ),
                         ),
@@ -266,13 +364,15 @@ class _AdminWebShellState extends State<AdminWebShell> {
                     ),
                   ),
                 ),
-                Expanded(child: widget.child),
+                Expanded(child: AppPaletteLerpChild(child: widget.child)),
               ],
             ),
           ),
         ],
       ),
     );
+
+    return shell;
   }
 }
 
@@ -318,7 +418,7 @@ class _SidebarBrand extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: 10),
         Expanded(
           child: Text(
             'ThriftLine Admin',
@@ -335,8 +435,8 @@ class _SidebarBrand extends StatelessWidget {
   }
 }
 
-class _AdminProfileMenu extends StatelessWidget {
-  const _AdminProfileMenu({required this.user, required this.showName});
+class _AdminHeaderActions extends StatelessWidget {
+  const _AdminHeaderActions({required this.user, required this.showName});
 
   final AuthUser? user;
   final bool showName;
@@ -346,85 +446,142 @@ class _AdminProfileMenu extends StatelessWidget {
     final name = user?.name.trim().isNotEmpty == true
         ? user!.name.trim()
         : 'Admin';
-    final email = user?.email.trim() ?? '';
-    final avatarUrl = user?.avatarUrl.trim() ?? '';
 
-    return PopupMenuButton<String>(
-      tooltip: 'Admin profile',
-      offset: const Offset(0, 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showName) ...[
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: 160),
+            child: Text(
+              name,
+              style: AppTypography.caption.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+        const _ThemeToggleButton(),
+        const SizedBox(width: 8),
+        const _SignOutButton(),
+      ],
+    );
+  }
+}
+
+class _ThemeToggleButton extends StatelessWidget {
+  const _ThemeToggleButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>();
+    final isDark = theme.isDarkMode;
+    final label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: Material(
+          color: AppColors.surfaceVariant.withValues(alpha: 0.65),
+          shape: CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: theme.toggleTheme,
+            child: SizedBox(
+              width: 36,
+              height: 36,
+              child: Icon(
+                isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                size: 18,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ),
       ),
-      onSelected: (value) async {
-        if (value == 'profile') {
-          context.go(RouteNames.adminProfile);
-        } else if (value == 'logout') {
-          await context.read<AuthProvider>().logout();
-          if (context.mounted) {
-            context.go(RouteNames.adminLogin);
-          }
-        }
-      },
-      itemBuilder: (context) => [
-        PopupMenuItem<String>(
-          enabled: false,
-          height: 72,
-          child: Row(
-            children: [
-              ThriftAvatar(imageUrl: avatarUrl, name: name, size: 40),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+    );
+  }
+}
+
+class _SignOutButton extends StatefulWidget {
+  const _SignOutButton();
+
+  @override
+  State<_SignOutButton> createState() => _SignOutButtonState();
+}
+
+class _SignOutButtonState extends State<_SignOutButton> {
+  bool _hovered = false;
+  bool _busy = false;
+
+  Future<void> _signOut() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    await context.read<AuthProvider>().logout();
+    if (!mounted) return;
+    context.go(RouteNames.adminLogin);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final compact = MediaQuery.sizeOf(context).width < 520;
+    final background = _hovered
+        ? palette.signOutHover
+        : palette.signOutBackground;
+
+    return Tooltip(
+      message: 'Sign out',
+      child: Semantics(
+        button: true,
+        label: 'Sign out',
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: Material(
+            color: background,
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              onTap: _busy ? null : _signOut,
+              borderRadius: BorderRadius.circular(8),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                padding: EdgeInsets.symmetric(
+                  horizontal: compact ? 8 : 10,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: palette.signOutBorder),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      name,
-                      style: AppTypography.body.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Icon(
+                      Icons.logout_rounded,
+                      size: 16,
+                      color: palette.signOutForeground,
                     ),
-                    if (email.isNotEmpty)
+                    if (!compact) ...[
+                      const SizedBox(width: 6),
                       Text(
-                        email,
-                        style: AppTypography.caption,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        'Sign out',
+                        style: AppTypography.caption.copyWith(
+                          color: palette.signOutForeground,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
+                    ],
                   ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
-        const PopupMenuDivider(),
-        const PopupMenuItem<String>(value: 'profile', child: Text('Profile')),
-        const PopupMenuItem<String>(value: 'logout', child: Text('Sign out')),
-      ],
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ThriftAvatar(imageUrl: avatarUrl, name: name, size: 32),
-            if (showName) ...[
-              const SizedBox(width: 8),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 160),
-                child: Text(
-                  name,
-                  style: AppTypography.caption.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const Icon(Icons.expand_more, size: 18),
-            ],
-          ],
         ),
       ),
     );
@@ -470,12 +627,8 @@ class _SidebarTileState extends State<_SidebarTile> {
   @override
   Widget build(BuildContext context) {
     final selected = widget.selected;
-    final color = selected ? AppColors.primary : AppColors.textSecondary;
-    final background = selected
-        ? AppColors.primary.withValues(alpha: 0.1)
-        : _hovered
-        ? AppColors.surfaceVariant
-        : Colors.transparent;
+    final inactive = AppColors.textSecondary;
+    final color = selected ? AppColors.primary : inactive;
 
     Widget iconSlot() {
       return SizedBox(
@@ -523,40 +676,55 @@ class _SidebarTileState extends State<_SidebarTile> {
       );
     }
 
-    final tile = Material(
-      color: background,
-      borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: widget.onTap,
-        onHover: (hover) => setState(() => _hovered = hover),
+    final tile = DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: selected ? AppGradients.primaryGradientLight : null,
+        color: selected
+            ? null
+            : _hovered
+            ? AppColors.surfaceVariant.withValues(alpha: 0.85)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: widget.extended ? 10 : 0,
-            vertical: 10,
-          ),
-          child: widget.extended
-              ? Row(
-                  children: [
-                    iconSlot(),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        widget.item.label,
-                        style: AppTypography.body.copyWith(
-                          color: color,
-                          fontWeight: selected
-                              ? FontWeight.w600
-                              : FontWeight.w500,
+        border: selected
+            ? Border.all(color: AppColors.primary.withValues(alpha: 0.35))
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: widget.onTap,
+          onHover: (hover) => setState(() => _hovered = hover),
+          borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.extended ? 10 : 0,
+              vertical: 10,
+            ),
+            child: widget.extended
+                ? Row(
+                    children: [
+                      iconSlot(),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          widget.item.label,
+                          style: AppTypography.body.copyWith(
+                            color: color,
+                            fontWeight: selected
+                                ? FontWeight.w600
+                                : FontWeight.w500,
+                            letterSpacing: selected ? 0 : null,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
-                )
-              : Center(child: iconSlot()),
+                    ],
+                  )
+                : Center(child: iconSlot()),
+          ),
         ),
       ),
     );

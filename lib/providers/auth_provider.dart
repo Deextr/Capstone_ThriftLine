@@ -117,6 +117,10 @@ class AuthProvider extends ChangeNotifier {
   bool get isBuyer => !isAdmin && _activeAccount == AccountMode.buyer;
   bool get isSeller => !isAdmin && _activeAccount == AccountMode.seller;
   bool get isAdmin => _user?.isAdmin ?? false;
+  bool get isSuperAdmin => _user?.isSuperAdmin ?? false;
+  bool get canUseAdminPortal => _user?.canUseAdminPortal ?? false;
+  bool get isDeactivatedAdministrator =>
+      _user?.isDeactivatedAdministrator ?? false;
   UserRole? get role => _user?.role;
 
   String? get username => _user?.username;
@@ -192,12 +196,11 @@ class AuthProvider extends ChangeNotifier {
 
       // Supabase SDK automatically restores the session from secure storage.
       final currentUser = await _authService.getCurrentUser();
-      if (currentUser != null && !currentUser.isPermanentlyDisabled) {
+      if (currentUser != null && currentUser.sessionBlockMessage == null) {
         _user = currentUser;
         // TEMP: debug OTP bypass clears pending for non-admins only.
         final bypassOtpForUser = _bypassOtp && !currentUser.isAdmin;
-        _emailOtpPending =
-            bypassOtpForUser ? false : _prefs.isEmailOtpPending;
+        _emailOtpPending = bypassOtpForUser ? false : _prefs.isEmailOtpPending;
         if (bypassOtpForUser) await _prefs.setEmailOtpPending(false);
         _syncActiveAccount(currentUser, restoreFromPrefs: true);
         await _saveSession(currentUser);
@@ -237,7 +240,7 @@ class AuthProvider extends ChangeNotifier {
       if (_authService.currentSession == null) return;
       final currentUser = await _authService.getCurrentUser();
       if (currentUser == null || _authService.currentSession == null) return;
-      if (currentUser.isPermanentlyDisabled) {
+      if (currentUser.sessionBlockMessage != null) {
         await _authService.signOut();
         return;
       }
@@ -264,7 +267,7 @@ class AuthProvider extends ChangeNotifier {
       final currentUser = await _authService.getCurrentUser();
       if (currentUser == null || _authService.currentSession == null) return;
 
-      if (currentUser.isPermanentlyDisabled) {
+      if (currentUser.sessionBlockMessage != null) {
         await _authService.signOut();
         _user = null;
         await _clearSession();
@@ -335,12 +338,11 @@ class AuthProvider extends ChangeNotifier {
         );
       }
 
-      if (result.user!.isPermanentlyDisabled) {
+      final blocked = result.user!.sessionBlockMessage;
+      if (blocked != null) {
         await _authService.signOut();
         await _setEmailOtpPending(false);
-        return EmailLoginResult.failure(
-          'This account has been permanently disabled.',
-        );
+        return EmailLoginResult.failure(blocked);
       }
 
       _user = result.user;
@@ -478,11 +480,12 @@ class AuthProvider extends ChangeNotifier {
       return result.errorMessage;
     }
 
-    if (result.user?.isPermanentlyDisabled == true) {
+    final blocked = result.user?.sessionBlockMessage;
+    if (blocked != null) {
       await _authService.signOut();
       _isLoading = false;
       notifyListeners();
-      return 'This account has been permanently disabled.';
+      return blocked;
     }
 
     _user = result.user;
@@ -679,12 +682,20 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> reloadUser() async {
     final currentUser = await _authService.getCurrentUser();
-    if (currentUser != null) {
-      _user = currentUser;
-      _syncActiveAccount(currentUser, restoreFromPrefs: false);
-      await _saveSession(currentUser);
+    if (currentUser == null) return;
+
+    if (currentUser.sessionBlockMessage != null) {
+      await _authService.signOut();
+      _user = null;
+      await _clearSession();
       notifyListeners();
+      return;
     }
+
+    _user = currentUser;
+    _syncActiveAccount(currentUser, restoreFromPrefs: false);
+    await _saveSession(currentUser);
+    notifyListeners();
   }
 
   /// Sends a login/signup email OTP through the Gmail SMTP Edge Function.
@@ -770,18 +781,22 @@ class AuthProvider extends ChangeNotifier {
   // ─────────────────────────────────────────────────────────────────────────
 
   void _syncActiveAccount(AuthUser user, {required bool restoreFromPrefs}) {
+    final sellerBlocked =
+        user.accountStatus != 'active' ||
+        (user.isSeller && user.trustLevel?.trim() == 'Banned');
     _activeAccount = resolveAccountMode(
       hasSellerAccess: user.hasSellerAccess,
       isAdmin: user.isAdmin,
       savedMode: _prefs.activeAccountFor(user.id),
       currentMode: _activeAccount,
       restoreFromPrefs: restoreFromPrefs,
+      sellerWorkspaceBlocked: sellerBlocked,
     );
   }
 
   Future<void> _saveSession(AuthUser user) async {
     await _prefs.setLoggedIn(true);
-    await _prefs.setUserRole(user.role.name);
+    await _prefs.setUserRole(user.role.dbValue);
     await _prefs.setUsername(user.username);
     await _prefs.setUserId(user.id);
     await _prefs.setDisplayName(displayName ?? user.displayName);

@@ -35,6 +35,15 @@ void main() {
     expect(canEditListing(listing), isFalse);
   });
 
+  test('stale active past ends_at is inactive but relistable', () {
+    final listing = auction(
+      auctionStatus: 'active',
+      endsAt: now.subtract(const Duration(hours: 2)),
+    );
+    expect(listingBucketFor(listing), ListingBucket.inactive);
+    expect(canRelistAuction(listing), isTrue);
+  });
+
   test('active fixed-price listing can be edited', () {
     final listing = ListingSnapshot(
       productStatus: 'active',

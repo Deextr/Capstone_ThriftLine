@@ -130,7 +130,7 @@ class _AdminVerifyEmailOtpScreenState extends State<AdminVerifyEmailOtpScreen> {
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       Text(
                         'We sent a 6-digit code to $email. '
                         'Enter it to finish signing in to the admin portal.',
@@ -140,7 +140,7 @@ class _AdminVerifyEmailOtpScreenState extends State<AdminVerifyEmailOtpScreen> {
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 28),
+                      SizedBox(height: 28),
                       TextField(
                         controller: _codeCtrl,
                         enabled: !_verifying && !_sending,
@@ -153,13 +153,13 @@ class _AdminVerifyEmailOtpScreenState extends State<AdminVerifyEmailOtpScreen> {
                           fillColor: AppColors.background,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(
+                            borderSide: BorderSide(
                               color: AppColors.border,
                             ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(
+                            borderSide: BorderSide(
                               color: AppColors.border,
                             ),
                           ),

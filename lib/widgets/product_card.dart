@@ -533,7 +533,7 @@ class _CartPopularityBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.shopping_bag_outlined,
               size: 12,
               color: AppColors.textPrimary,

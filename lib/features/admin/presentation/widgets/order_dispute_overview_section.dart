@@ -49,13 +49,13 @@ class OrderDisputeOverviewSection extends StatelessWidget {
                 issue: issue,
                 submittedAt: report.createdAt,
               ),
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: 14),
                 child: Divider(height: 1, color: AppColors.border),
               ),
               _PartiesBlock(parties: parties),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Divider(height: 1, color: AppColors.border),
               ),
               _OrderContextBlock(
@@ -107,7 +107,7 @@ class _SummaryBlock extends StatelessWidget {
                 letterSpacing: 0.2,
               ),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text(
               reason,
               style: AppTypography.body.copyWith(
@@ -118,7 +118,7 @@ class _SummaryBlock extends StatelessWidget {
               ),
             ),
             if (issue.isNotEmpty) ...[
-              const SizedBox(height: 10),
+              SizedBox(height: 10),
               Text(
                 'Reported issue',
                 style: AppTypography.caption.copyWith(
@@ -126,7 +126,7 @@ class _SummaryBlock extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               Text(
                 issue,
                 maxLines: 3,
@@ -153,7 +153,7 @@ class _SummaryBlock extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 2),
+            SizedBox(height: 2),
             Text(
               formatAdminTableDateTime(submittedAt),
               style: AppTypography.caption.copyWith(
@@ -280,7 +280,7 @@ class _PartyTile extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: 2),
           Text(
             handle,
             style: AppTypography.caption.copyWith(

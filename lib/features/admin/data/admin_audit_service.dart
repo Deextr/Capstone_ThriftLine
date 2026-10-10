@@ -28,6 +28,7 @@ class AdminAuditService {
     String? search,
     String category = AdminAuditCategory.all,
     String status = AdminAuditStatusFilter.all,
+    String actorKind = AdminAuditActorFilter.all,
     String? actorUserId,
     DateTime? from,
     DateTime? toExclusive,
@@ -40,6 +41,9 @@ class AdminAuditService {
         'p_search': search?.trim().isEmpty ?? true ? null : search!.trim(),
         'p_category': category == AdminAuditCategory.all ? null : category,
         'p_status': status == AdminAuditStatusFilter.all ? null : status,
+        'p_actor_kind': actorKind == AdminAuditActorFilter.all
+            ? null
+            : actorKind,
         'p_actor_user_id': actorUserId,
         'p_from': from?.toUtc().toIso8601String(),
         'p_to': toExclusive?.toUtc().toIso8601String(),

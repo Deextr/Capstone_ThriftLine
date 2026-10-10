@@ -303,7 +303,7 @@ class _TopHeader extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.search_rounded,
                       color: AppColors.textHint,
                       size: 22,

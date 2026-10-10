@@ -89,7 +89,7 @@ class AdminReportsHubScreen extends StatelessWidget {
                   ],
                 )
               : ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
+                  physics: AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.fromLTRB(16, 12, 16, bottomPad),
                   children: [
                     Text(

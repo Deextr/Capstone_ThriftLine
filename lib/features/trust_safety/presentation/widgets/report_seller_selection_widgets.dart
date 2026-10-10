@@ -85,7 +85,7 @@ class ReportSellerSelectedCard extends StatelessWidget {
             name: candidate.primaryLabel,
             size: 48,
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,10 +106,7 @@ class ReportSellerSelectedCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 if (candidate.secondaryLabel != null)
-                  Text(
-                    candidate.secondaryLabel!,
-                    style: AppTypography.caption,
-                  ),
+                  Text(candidate.secondaryLabel!, style: AppTypography.caption),
               ],
             ),
           ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/app_colors.dart';
+import 'app_palette.dart';
 
 /// Shared teal gradients derived from ThriftLine primary `#0D9488`.
 ///
@@ -18,11 +19,23 @@ abstract final class AppGradients {
     stops: [0.0, 0.52, 1.0],
   );
 
-  static const LinearGradient primaryGradientLight = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [AppColors.primaryLight, mist],
-  );
+  static LinearGradient get primaryGradientLight {
+    if (AppPalette.current.isDark) {
+      return LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          AppColors.primary.withValues(alpha: 0.28),
+          AppColors.primaryDark.withValues(alpha: 0.18),
+        ],
+      );
+    }
+    return const LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFFCCFBF1), mist],
+    );
+  }
 
   static const LinearGradient primaryGradientDark = LinearGradient(
     begin: Alignment.topLeft,

@@ -159,6 +159,21 @@ function adminInvalidCredentialsResponse(
   });
 }
 
+async function revokeAuthUserSessions(userId: string) {
+  const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/$/, "");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!base || !serviceKey || !userId) return;
+  await fetch(`${base}/auth/v1/admin/users/${userId}/logout`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ scope: "global" }),
+  });
+}
+
 async function logAdminAuthAudit(
   // deno-lint-ignore no-explicit-any
   service: any,
@@ -562,31 +577,46 @@ Deno.serve(async (req) => {
 
       const { data: profile, error: profileError } = await service
         .from("users")
-        .select("role")
+        .select("role, account_status")
         .eq("user_id", userId)
         .maybeSingle();
 
       if (profileError) {
         console.error("sign-in-with-email admin role lookup failed", profileError);
+        await revokeAuthUserSessions(userId);
         return json(req, 503, {
           error: "Sign-in is temporarily unavailable. Please try again.",
           code: "unavailable",
         });
       }
 
-      if (profile?.role !== "admin") {
+      const portalRole = profile?.role;
+      const portalActive = profile?.account_status === "active";
+      const portalAdmin = portalRole === "admin" || portalRole === "super_admin";
+      if (!portalAdmin || !portalActive) {
+        if (portalAdmin && userId) {
+          await revokeAuthUserSessions(userId);
+        }
+        const deactivated = portalAdmin && !portalActive;
         await logAdminAuthAudit(service, {
           eventType: "admin_login_denied",
           status: "failed",
-          summary: "Sign-in rejected: account is not an administrator",
+          summary: deactivated
+            ? "Sign-in rejected: administrator account is deactivated"
+            : "Sign-in rejected: account is not an administrator",
           actorEmail: email,
           actorUserId: userId,
           ipHash: ipHash,
-          details: { login_portal: "admin", reason: "admin_access_denied" },
+          details: {
+            login_portal: "admin",
+            reason: deactivated ? "admin_deactivated" : "admin_access_denied",
+          },
         });
         return json(req, 403, {
-          error: "This account does not have admin access.",
-          code: "admin_access_denied",
+          error: deactivated
+            ? "This administrator account is deactivated."
+            : "This account does not have admin access.",
+          code: deactivated ? "admin_deactivated" : "admin_access_denied",
         });
       }
 
@@ -600,6 +630,38 @@ Deno.serve(async (req) => {
         ipHash: ipHash,
         details: { login_portal: "admin" },
       });
+    } else if (userId) {
+      const { data: profile, error: profileError } = await service
+        .from("users")
+        .select("role, account_status")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (profileError) {
+        console.error(
+          "sign-in-with-email account status lookup failed",
+          profileError,
+        );
+        await revokeAuthUserSessions(userId);
+        return json(req, 503, {
+          error: "Sign-in is temporarily unavailable. Please try again.",
+          code: "unavailable",
+        });
+      }
+      const role = profile?.role;
+      const status = profile?.account_status ?? "active";
+      const administrator = role === "admin" || role === "super_admin";
+      if (!administrator && status !== "active") {
+        await revokeAuthUserSessions(userId);
+        const banned = status === "banned";
+        return json(req, 403, {
+          error: banned
+            ? "This account has been permanently disabled."
+            : status === "suspended"
+            ? "This account has been disabled."
+            : "This account has been deactivated.",
+          code: banned ? "account_banned" : "account_disabled",
+        });
+      }
     }
 
     return json(req, 200, {

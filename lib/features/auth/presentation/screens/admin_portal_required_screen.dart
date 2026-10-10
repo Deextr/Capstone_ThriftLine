@@ -21,9 +21,12 @@ class AdminPortalRequiredScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(flex: 2),
-              Icon(Icons.admin_panel_settings_outlined,
-                  size: 56, color: AppColors.primary),
-              const SizedBox(height: 24),
+              Icon(
+                Icons.admin_panel_settings_outlined,
+                size: 56,
+                color: AppColors.primary,
+              ),
+              SizedBox(height: 24),
               Text(
                 'ThriftLine Admin',
                 style: AppTypography.heading.copyWith(
@@ -40,7 +43,7 @@ class AdminPortalRequiredScreen extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(
                 'Use a buyer or seller account in this app, or open the admin portal in your browser.',
                 style: AppTypography.caption.copyWith(

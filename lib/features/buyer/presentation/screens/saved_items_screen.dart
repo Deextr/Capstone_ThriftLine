@@ -24,7 +24,7 @@ class SavedItemsScreen extends StatelessWidget {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_rounded,
             color: AppColors.textPrimary,
           ),

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:thriftline/core/constants/app_colors.dart';
 import 'package:thriftline/core/theme/app_theme.dart';
 import 'package:thriftline/features/admin/data/admin_dashboard_models.dart';
+import 'package:thriftline/features/admin/data/admin_marketplace_dashboard.dart';
 import 'package:thriftline/features/admin/data/admin_review_rules.dart';
+import 'package:thriftline/features/admin/domain/admin_dashboard_comparison.dart';
+import 'package:thriftline/features/admin/domain/admin_dashboard_period.dart';
 import 'package:thriftline/features/admin/presentation/widgets/admin_dashboard_widgets.dart';
 import 'package:thriftline/features/admin/presentation/widgets/admin_review_widgets.dart';
 
@@ -423,6 +427,238 @@ void main() {
       expect(find.textContaining('Alex Cruz'), findsOneWidget);
       expect(find.text('Sep 28, 2026'), findsOneWidget);
     });
+  });
+
+  group('Admin dashboard periods', () {
+    final now = DateTime.utc(2026, 10, 10, 7, 30);
+
+    test('today is the default window and compares the same elapsed time', () {
+      final today = AdminDashboardPeriod.today(now);
+      expect(today.range, AdminDashboardRange.today);
+      expect(today.bucket, AdminDashboardBucket.hour);
+      expect(today.comparisonLabel, 'vs yesterday');
+      expect(today.from, DateTime.utc(2026, 10, 9, 16));
+      expect(today.toExclusive, now);
+      expect(today.compareFrom, DateTime.utc(2026, 10, 8, 16));
+      expect(today.compareTo, DateTime.utc(2026, 10, 9, 7, 30));
+    });
+
+    test(
+      'weekly starts on Monday and yearly stays inside the previous year',
+      () {
+        final week = AdminDashboardPeriod.weekly(now);
+        final monday = manilaWallClock(week.from!);
+        expect(
+          DateTime.utc(monday.year, monday.month, monday.day).weekday,
+          DateTime.monday,
+        );
+        expect(week.comparisonLabel, 'vs previous week');
+        expect(week.bucket, AdminDashboardBucket.day);
+
+        final year = AdminDashboardPeriod.yearly(now);
+        expect(year.from, DateTime.utc(2025, 12, 31, 16));
+        expect(year.compareFrom, DateTime.utc(2024, 12, 31, 16));
+        expect(year.compareTo!.isBefore(year.from!), isTrue);
+        expect(year.bucket, AdminDashboardBucket.month);
+      },
+    );
+
+    test('all time and custom ranges do not invent a comparison', () {
+      final all = AdminDashboardPeriod.allTime(now);
+      expect(all.from, isNull);
+      expect(all.requestsComparison, isFalse);
+      expect(all.bucket, AdminDashboardBucket.auto);
+
+      final custom = AdminDashboardPeriod.custom(
+        start: DateTime(2026, 10, 1),
+        end: DateTime(2026, 10, 3),
+        utcNow: now,
+      );
+      expect(custom.requestsComparison, isFalse);
+      expect(custom.bucket, AdminDashboardBucket.day);
+      expect(custom.toExclusive, DateTime.utc(2026, 10, 3, 16));
+    });
+
+    test('monthly comparison is clamped to the previous month', () {
+      final lateMarch = DateTime.utc(2026, 3, 31, 10);
+      final month = AdminDashboardPeriod.monthly(lateMarch);
+      expect(month.compareTo, month.from);
+    });
+  });
+
+  group('Admin period comparisons', () {
+    test('shows absolute and percent change against yesterday', () {
+      final delta = formatAdminPeriodDelta(
+        current: 23,
+        previous: 15,
+        comparisonAvailable: true,
+        comparisonLabel: 'vs yesterday',
+        higherIsBetter: true,
+        unit: 'user',
+      );
+      expect(delta?.text, '+8 users (+53.3%) vs yesterday');
+      expect(delta?.tone, AdminDeltaTone.positive);
+    });
+
+    test('hides a percentage when the previous value is zero', () {
+      final delta = formatAdminPeriodDelta(
+        current: 5,
+        previous: 0,
+        comparisonAvailable: true,
+        comparisonLabel: 'vs yesterday',
+        higherIsBetter: true,
+        unit: 'user',
+      );
+      expect(delta?.text, '+5 users vs yesterday');
+      expect(delta!.text.contains('%'), isFalse);
+    });
+
+    test('hides the comparison when history is unavailable', () {
+      expect(
+        formatAdminPeriodDelta(
+          current: 5,
+          previous: null,
+          comparisonAvailable: false,
+          comparisonLabel: 'vs yesterday',
+          higherIsBetter: true,
+          unit: 'user',
+        ),
+        isNull,
+      );
+      expect(
+        formatAdminPeriodDelta(
+          current: 5,
+          previous: 0,
+          comparisonAvailable: false,
+          comparisonLabel: 'vs yesterday',
+          higherIsBetter: true,
+        ),
+        isNull,
+      );
+    });
+
+    test('treats an increase in backlog as negative', () {
+      final delta = formatAdminPeriodDelta(
+        current: 4,
+        previous: 1,
+        comparisonAvailable: true,
+        comparisonLabel: 'vs yesterday',
+        higherIsBetter: false,
+        unit: 'dispute',
+      );
+      expect(delta?.tone, AdminDeltaTone.negative);
+    });
+  });
+
+  group('Admin marketplace snapshot', () {
+    test('keeps a missing comparison null and a real zero as zero', () {
+      final snapshot = AdminMarketplaceSnapshot.fromJson({
+        'generated_at': '2026-10-10T07:30:00Z',
+        'bucket': 'hour',
+        'comparison_available': true,
+        'kpis': {
+          'new_users': 5,
+          'new_users_previous': null,
+          'completed_orders': 2,
+          'completed_orders_previous': 0,
+          'platform_revenue': 50.5,
+          'platform_revenue_previous': 0,
+          'paid_orders': 3,
+          'paid_orders_previous': 1,
+        },
+        'activity': {
+          'new_listings': 4,
+          'seller_applications': 1,
+          'paid_auction_orders': 1,
+          'orders_awaiting_fulfillment': 6,
+        },
+        'attention': {
+          'pending_verifications': 2,
+          'open_community_disputes': 1,
+          'open_order_disputes': 3,
+          'open_looking_for_disputes': 0,
+          'active_bidding_restrictions': 1,
+          'payment_reviews': 1,
+        },
+        'revenue_series': [
+          {'at': '2026-10-10T00:00:00Z', 'current': 50.5, 'previous': 0},
+        ],
+        'recent_activity': [
+          {
+            'kind': 'verification_submitted',
+            'occurred_at': '2026-10-10T01:00:00Z',
+            'title': 'Seller verification submitted',
+            'detail': 'Second Street',
+            'actor': 'member',
+            'target_type': 'verification',
+            'target_id': 'ver-1',
+          },
+        ],
+      });
+
+      expect(snapshot.comparisonAvailable, isTrue);
+      expect(snapshot.kpis.newUsersPrevious, isNull);
+      expect(snapshot.kpis.completedOrdersPrevious, 0);
+      expect(snapshot.kpis.platformRevenue, 50.5);
+      expect(snapshot.attention.openDisputes, 4);
+      expect(snapshot.recentActivity.single.detail, 'Second Street');
+      expect(snapshot.hasRevenue, isTrue);
+    });
+
+    test('rejects a payload that omits metrics', () {
+      expect(
+        () => AdminMarketplaceSnapshot.fromJson({'success': true}),
+        throwsFormatException,
+      );
+    });
+  });
+
+  testWidgets('dashboard filter defaults and empty revenue state', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: Column(
+            children: [
+              AdminDashboardPeriodBar(
+                period: AdminDashboardPeriod.today(
+                  DateTime.utc(2026, 10, 10, 7, 30),
+                ),
+                onSelected: (_) async {},
+              ),
+              const AdminKpiTile(
+                label: 'New users',
+                value: '23',
+                caption: 'Registered in this period',
+                delta: AdminPeriodDelta(
+                  text: '+8 users (+53.3%) vs yesterday',
+                  tone: AdminDeltaTone.positive,
+                ),
+              ),
+              const AdminRevenueChart(
+                points: [],
+                bucket: AdminDashboardBucket.hour,
+                showComparison: false,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('All Time'), findsOneWidget);
+    expect(find.text('Weekly'), findsOneWidget);
+    expect(find.text('+8 users (+53.3%) vs yesterday'), findsOneWidget);
+    expect(find.text('No platform revenue in this period.'), findsOneWidget);
+
+    final delta = tester.widget<Text>(
+      find.text('+8 users (+53.3%) vs yesterday'),
+    );
+    expect(delta.style?.color, AppColors.success);
   });
 }
 

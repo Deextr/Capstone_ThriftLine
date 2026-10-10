@@ -4,6 +4,8 @@ import '../../../core/services/shared_preferences_service.dart';
 import '../../../core/services/supabase_service.dart';
 import '../data/admin_dashboard_models.dart';
 import '../data/admin_dashboard_service.dart';
+import '../data/admin_marketplace_dashboard.dart';
+import '../domain/admin_dashboard_period.dart';
 
 class AdminDashboardController extends ChangeNotifier {
   AdminDashboardController({
@@ -15,48 +17,35 @@ class AdminDashboardController extends ChangeNotifier {
 
   final AdminDashboardService _service;
 
-  AdminDashboardSnapshot? _snapshot;
-  List<AdminDashboardVerification> _verifications = const [];
-  AdminDateWindow _window = AdminDateWindow.last7Days();
-  AdminDashboardReportFilter _reportFilter = AdminDashboardReportFilter.all;
-  AdminDashboardVerificationFilter _verificationFilter =
-      AdminDashboardVerificationFilter.pending;
+  AdminMarketplaceSnapshot? _snapshot;
+  AdminDashboardPeriod _period = AdminDashboardPeriod.today();
   bool _isLoading = true;
   bool _isRefreshing = false;
-  bool _verificationsLoading = false;
   bool _isOffline = false;
   bool _showingCachedData = false;
   String? _errorMessage;
   int _loadEpoch = 0;
 
-  AdminDashboardSnapshot? get snapshot => _snapshot;
-  AdminDashboardCounts? get counts => _snapshot?.counts;
-  AdminDateWindow get window => _window;
-  AdminDashboardReportFilter get reportFilter => _reportFilter;
-  AdminDashboardVerificationFilter get verificationFilter =>
-      _verificationFilter;
+  AdminMarketplaceSnapshot? get snapshot => _snapshot;
+  AdminDashboardPeriod get period => _period;
   bool get isLoading => _isLoading && _snapshot == null;
   bool get isRefreshing => _isRefreshing;
-  bool get verificationsLoading => _verificationsLoading;
   bool get isOffline => _isOffline;
   bool get showingCachedData => _showingCachedData;
   String? get errorMessage => _errorMessage;
   bool get hasData => _snapshot != null;
 
-  List<AdminDashboardVerification> get verifications => _verifications;
+  int get pendingVerificationCount =>
+      _snapshot?.attention.pendingVerifications ?? 0;
 
-  List<AdminDashboardReport> get visibleReports => filterDashboardReports(
-    _snapshot?.recentReports ?? const [],
-    _reportFilter,
-  );
+  int get openDisputeCount => _snapshot?.attention.openDisputes ?? 0;
 
   Future<void> load() async {
     final epoch = ++_loadEpoch;
     if (_snapshot == null) {
-      final cached = _service.readCachedSnapshot();
+      final cached = _service.readCachedMarketplace();
       if (cached != null) {
         _snapshot = cached;
-        _verifications = cached.pendingVerifications;
         _showingCachedData = true;
       }
       _isLoading = true;
@@ -68,18 +57,13 @@ class AdminDashboardController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final window = _window;
-      final snapshot = await _service.loadSnapshot(window: window);
+      final period = _period;
+      final snapshot = await _service.loadMarketplace(period: period);
       if (epoch != _loadEpoch) return;
       _snapshot = snapshot;
       _showingCachedData = false;
       _isOffline = false;
       _errorMessage = null;
-      if (_verificationFilter == AdminDashboardVerificationFilter.pending) {
-        _verifications = snapshot.pendingVerifications;
-      } else {
-        await _reloadVerifications();
-      }
     } catch (e) {
       if (epoch != _loadEpoch) return;
       debugPrint('AdminDashboardController.load error: $e');
@@ -103,45 +87,9 @@ class AdminDashboardController extends ChangeNotifier {
     }
   }
 
-  Future<void> setWindow(AdminDateWindow window) async {
-    _window = window;
+  Future<void> setPeriod(AdminDashboardPeriod period) async {
+    _period = period;
     notifyListeners();
     await load();
-  }
-
-  void setReportFilter(AdminDashboardReportFilter filter) {
-    if (_reportFilter == filter) return;
-    _reportFilter = filter;
-    notifyListeners();
-  }
-
-  Future<void> setVerificationFilter(
-    AdminDashboardVerificationFilter filter,
-  ) async {
-    if (_verificationFilter == filter) return;
-    _verificationFilter = filter;
-    if (filter == AdminDashboardVerificationFilter.pending &&
-        _snapshot != null) {
-      _verifications = _snapshot!.pendingVerifications;
-      notifyListeners();
-      return;
-    }
-    await _reloadVerifications();
-  }
-
-  Future<void> _reloadVerifications() async {
-    _verificationsLoading = true;
-    notifyListeners();
-    try {
-      _verifications = await _service.listVerifications(
-        filter: _verificationFilter,
-      );
-    } catch (e) {
-      debugPrint('AdminDashboardController verifications error: $e');
-      _verifications = const [];
-    } finally {
-      _verificationsLoading = false;
-      notifyListeners();
-    }
   }
 }

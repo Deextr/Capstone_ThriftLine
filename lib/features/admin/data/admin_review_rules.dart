@@ -1,5 +1,6 @@
 import '../../trust_safety/data/report_reasons.dart';
 import '../../../widgets/thrift_widgets.dart';
+import 'admin_portal_session.dart';
 
 const String kAdminReportOpenStatus = 'under_review';
 const String kAdminReportNeedsEvidenceStatus = 'needs_more_evidence';
@@ -29,6 +30,37 @@ enum AdminReportListFilter {
   resolved,
   dismissed,
 }
+
+/// Looking For disputes queue filters (post lifecycle vs report status).
+enum AdminLookingForLifecycleFilter {
+  all,
+  activePost,
+  expiringSoon,
+  expiredReviewRequired,
+  resolvedClosed,
+}
+
+String adminLookingForLifecycleFilterParam(
+  AdminLookingForLifecycleFilter filter,
+) => switch (filter) {
+  AdminLookingForLifecycleFilter.all => 'all',
+  AdminLookingForLifecycleFilter.activePost => 'active_post',
+  AdminLookingForLifecycleFilter.expiringSoon => 'expiring_soon',
+  AdminLookingForLifecycleFilter.expiredReviewRequired =>
+    'expired_review_required',
+  AdminLookingForLifecycleFilter.resolvedClosed => 'resolved_closed',
+};
+
+String adminLookingForLifecycleFilterLabel(
+  AdminLookingForLifecycleFilter filter,
+) => switch (filter) {
+  AdminLookingForLifecycleFilter.all => 'All reports',
+  AdminLookingForLifecycleFilter.activePost => 'Active posts',
+  AdminLookingForLifecycleFilter.expiringSoon => 'Expiring soon',
+  AdminLookingForLifecycleFilter.expiredReviewRequired =>
+    'Expired — review required',
+  AdminLookingForLifecycleFilter.resolvedClosed => 'Resolved',
+};
 
 enum AdminReportKind { all, community, order, lookingFor }
 
@@ -193,6 +225,15 @@ String adminQueueFilterLabel(AdminQueueFilter filter) => switch (filter) {
   AdminQueueFilter.closed => 'Reviewed',
 };
 
+AdminReportListFilter adminReportListFilterFromQuery(String? raw) =>
+    switch (raw?.trim()) {
+      'under_review' => AdminReportListFilter.underReview,
+      'needs_more_evidence' => AdminReportListFilter.needsMoreEvidence,
+      'resolved' => AdminReportListFilter.resolved,
+      'dismissed' => AdminReportListFilter.dismissed,
+      _ => AdminReportListFilter.all,
+    };
+
 String adminReportListFilterLabel(AdminReportListFilter filter) =>
     switch (filter) {
       AdminReportListFilter.all => 'All',
@@ -294,9 +335,24 @@ String verificationStatusLabel(String status) => switch (status) {
 String accountRoleLabel(String? role) => switch (role) {
   'seller' => 'Seller',
   'admin' => 'Admin',
+  'super_admin' => 'Super Admin',
   'buyer' => 'Buyer',
   _ => 'Member',
 };
+
+const kAdminStaleDecisionMessage =
+    'This case has already been reviewed by another administrator. Refresh to view the latest decision.';
+
+String mapAdminDecisionError(String message) {
+  final text = message.toLowerCase();
+  if (text.contains('already been reviewed') ||
+      text.contains('already_decided') ||
+      text.contains('pending verification') ||
+      text.contains('already been closed')) {
+    return kAdminStaleDecisionMessage;
+  }
+  return message;
+}
 
 String adminHandle(String username, String displayName) {
   if (username.trim().isNotEmpty) return '@${username.trim()}';
@@ -349,12 +405,16 @@ String adminEvidenceCountLabel(int count) {
 }
 
 String adminFriendlyError(Object error, String fallback) {
+  AdminPortalSession.note(error);
   final text = error.toString();
   if (text.contains('Only an admin')) {
     return 'Only an admin can take this action.';
   }
-  if (text.contains('already been reviewed')) {
-    return 'This report has already been reviewed.';
+  if (text.contains('already been reviewed') ||
+      text.contains('already_decided') ||
+      text.contains('pending verification') ||
+      text.contains('already been closed')) {
+    return kAdminStaleDecisionMessage;
   }
   return fallback;
 }

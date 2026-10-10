@@ -136,7 +136,7 @@ void main() {
       );
     });
 
-    test('allows admins to access admin routes', () {
+    test('sends admins to the portal notice instead of the marketplace', () {
       expect(
         authenticatedWorkspaceRedirect(
           isAdmin: true,
@@ -145,7 +145,7 @@ void main() {
           location: RouteNames.adminHome,
           homeRoute: RouteNames.adminHome,
         ),
-        isNull,
+        RouteNames.adminPortalRequired,
       );
     });
 

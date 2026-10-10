@@ -46,7 +46,7 @@ class AdminDisputeReviewModalShell extends StatelessWidget {
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.border),
+        side: BorderSide(color: AppColors.border),
       ),
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       clipBehavior: Clip.antiAlias,
@@ -105,22 +105,22 @@ class AdminDisputeReviewModalShell extends StatelessWidget {
                   IconButton(
                     tooltip: 'Close',
                     onPressed: onClose,
-                    icon: const Icon(Icons.close, size: 22),
+                    icon: Icon(Icons.close, size: 22),
                     color: AppColors.textSecondary,
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.border),
             Expanded(
               child: isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? Center(child: CircularProgressIndicator())
                   : errorMessage != null
                   ? _ErrorState(message: errorMessage!, onRetry: onRetry)
                   : body,
             ),
             if (footer != null) ...[
-              const Divider(height: 1, color: AppColors.border),
+              Divider(height: 1, color: AppColors.border),
               footer!,
             ],
           ],
@@ -155,7 +155,7 @@ class AdminDisputeModalSection extends StatelessWidget {
           ),
         ),
         if (subtitle != null) ...[
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             subtitle!,
             style: AppTypography.caption.copyWith(
@@ -218,7 +218,7 @@ class AdminDisputeKeyValueGrid extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 2),
+        SizedBox(height: 2),
         Text(
           value,
           style: AppTypography.body.copyWith(
