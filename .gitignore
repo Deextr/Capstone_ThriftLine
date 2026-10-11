@@ -1,5 +1,9 @@
 # Environment variables (credentials)
 .env
+web/admin_config.json
+assets/config/admin_config.json
+thriftline_app.env
+deploy_manifest.b64
 
 
 # Miscellaneous

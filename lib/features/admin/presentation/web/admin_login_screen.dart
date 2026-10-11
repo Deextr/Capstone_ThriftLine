@@ -9,6 +9,9 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
+import '../../../../core/theme/admin_theme_sync.dart';
+import '../../../../core/theme/app_palette_lerp_sync.dart';
+import '../../../../core/services/shared_preferences_service.dart';
 import '../../../../core/utils/validators.dart' show Validators;
 import '../../../auth/config/turnstile_config.dart';
 import '../../../auth/domain/auth_error.dart';
@@ -17,6 +20,8 @@ import '../../../auth/domain/login_portal.dart';
 import '../../../auth/presentation/widgets/turnstile_challenge.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../controllers/admin_portal_session_controller.dart';
+import '../widgets/admin_theme_toggle_button.dart';
 
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
@@ -44,6 +49,21 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   static const _turnstileAction = 'login';
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadLoginNotice());
+  }
+
+  Future<void> _loadLoginNotice() async {
+    final prefs = context.read<SharedPreferencesService>();
+    final notice = prefs.adminPortalLoginNotice;
+    if (notice == null || notice.isEmpty || !mounted) return;
+    await prefs.clearAdminPortalLoginNotice();
+    if (!mounted) return;
+    setState(() => _error = notice);
+  }
+
+  @override
   void dispose() {
     _lockoutTimer?.cancel();
     _emailController.dispose();
@@ -53,12 +73,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     super.dispose();
   }
 
-  bool get _turnstileReady =>
-      !TurnstileConfig.isConfigured ||
-      (_turnstileToken != null && _turnstileToken!.isNotEmpty);
-
-  bool get _canSubmit =>
-      !_busy && _turnstileReady && (_lockoutSecondsRemaining ?? 0) <= 0;
+  bool get _canSubmit => !_busy && (_lockoutSecondsRemaining ?? 0) <= 0;
 
   void _startLockoutCountdown(int seconds) {
     _lockoutTimer?.cancel();
@@ -121,6 +136,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
 
     final auth = context.read<AuthProvider>();
     try {
+      if (auth.isAuthenticated && !auth.canUseAdminPortal) {
+        await auth.logout();
+        if (!mounted) return;
+      }
+
       final loginResult = await auth.loginWithEmail(
         email: _emailController.text.trim(),
         password: _passwordController.text,
@@ -144,6 +164,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       }
       _lockoutTimer?.cancel();
       setState(() => _lockoutSecondsRemaining = null);
+      await context
+          .read<AdminPortalSessionController>()
+          .clearStaleLoginNotice();
+      if (!mounted) return;
       if (!auth.canUseAdminPortal) {
         final deactivated = auth.isDeactivatedAdministrator;
         await auth.logout();
@@ -156,8 +180,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         }
         return;
       }
+      if (!mounted) return;
       if (auth.isEmailOtpPending) {
-        if (mounted) context.go(RouteNames.adminVerifyEmailOtp);
+        context.go(RouteNames.adminVerifyEmailOtp);
         return;
       }
       final redirect = GoRouterState.of(
@@ -175,7 +200,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         });
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -184,135 +211,163 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < AppConstants.breakpointTablet;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Center(
-          child: ScrollConfiguration(
-            behavior: const _AdminLoginScrollBehavior(),
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: compact ? 20 : 32,
-                vertical: 32,
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: compact ? 440 : 420),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.textPrimary.withValues(alpha: 0.04),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
+    return AdminThemeSync(
+      child: AppPaletteLerpChild(
+        child: Scaffold(
+          backgroundColor: AppColors.background,
+          body: SafeArea(
+            child: Stack(
+              children: [
+                Center(
+                  child: ScrollConfiguration(
+                    behavior: const _AdminLoginScrollBehavior(),
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: compact ? 20 : 32,
+                        vertical: 32,
                       ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      compact ? 24 : 32,
-                      32,
-                      compact ? 24 : 32,
-                      28,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _Header(compact: compact),
-                        const SizedBox(height: 28),
-                        if (_error != null) ...[
-                          _ErrorBanner(message: _error!),
-                          const SizedBox(height: 20),
-                        ],
-                        Form(
-                          key: _formKey,
-                          autovalidateMode: _submitted
-                              ? AutovalidateMode.onUserInteraction
-                              : AutovalidateMode.disabled,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              TextFormField(
-                                controller: _emailController,
-                                focusNode: _emailFocus,
-                                enabled: !_busy,
-                                keyboardType: TextInputType.emailAddress,
-                                textInputAction: TextInputAction.next,
-                                autofillHints: const [AutofillHints.username],
-                                decoration: _fieldDecoration(
-                                  label: 'Email',
-                                  hint: 'admin@example.com',
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: compact ? 440 : 420,
+                        ),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.border),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.textPrimary.withValues(
+                                  alpha: 0.04,
                                 ),
-                                validator: Validators.email,
-                                onFieldSubmitted: (_) =>
-                                    _passwordFocus.requestFocus(),
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _passwordController,
-                                focusNode: _passwordFocus,
-                                enabled: !_busy,
-                                obscureText: _obscure,
-                                textInputAction: TextInputAction.done,
-                                autofillHints: const [AutofillHints.password],
-                                decoration: _fieldDecoration(
-                                  label: 'Password',
-                                  suffix: IconButton(
-                                    tooltip: _obscure
-                                        ? 'Show password'
-                                        : 'Hide password',
-                                    icon: Icon(
-                                      _obscure
-                                          ? Icons.visibility_outlined
-                                          : Icons.visibility_off_outlined,
-                                      size: 20,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                    onPressed: _busy
-                                        ? null
-                                        : () => setState(
-                                            () => _obscure = !_obscure,
-                                          ),
-                                  ),
-                                ),
-                                validator: (v) => (v == null || v.isEmpty)
-                                    ? 'Enter your password'
-                                    : null,
-                                onFieldSubmitted: (_) {
-                                  if (_canSubmit) _submit();
-                                },
+                                blurRadius: 24,
+                                offset: const Offset(0, 8),
                               ),
                             ],
                           ),
-                        ),
-                        if (TurnstileConfig.isConfigured) ...[
-                          const SizedBox(height: 24),
-                          TurnstileChallenge(
-                            key: _turnstileKey,
-                            action: _turnstileAction,
-                            appearance: Theme.of(context).brightness ==
-                                    Brightness.dark
-                                ? TurnstileChallengeAppearance.darkOverlay
-                                : TurnstileChallengeAppearance.lightSurface,
-                            showSuccessMessage: false,
-                            showLoadingMessage: false,
-                            onToken: _onTurnstileToken,
-                            onError: (_) => _onTurnstileError(),
-                            onExpired: _onTurnstileError,
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              compact ? 24 : 32,
+                              32,
+                              compact ? 24 : 32,
+                              28,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _Header(compact: compact),
+                                const SizedBox(height: 28),
+                                if (_error != null) ...[
+                                  _ErrorBanner(message: _error!),
+                                  const SizedBox(height: 20),
+                                ],
+                                Form(
+                                  key: _formKey,
+                                  autovalidateMode: _submitted
+                                      ? AutovalidateMode.onUserInteraction
+                                      : AutovalidateMode.disabled,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      TextFormField(
+                                        controller: _emailController,
+                                        focusNode: _emailFocus,
+                                        enabled: !_busy,
+                                        keyboardType:
+                                            TextInputType.emailAddress,
+                                        textInputAction: TextInputAction.next,
+                                        autofillHints: const [
+                                          AutofillHints.username,
+                                        ],
+                                        decoration: _fieldDecoration(
+                                          label: 'Email',
+                                          hint: 'admin@example.com',
+                                        ),
+                                        validator: Validators.email,
+                                        onFieldSubmitted: (_) =>
+                                            _passwordFocus.requestFocus(),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      TextFormField(
+                                        controller: _passwordController,
+                                        focusNode: _passwordFocus,
+                                        enabled: !_busy,
+                                        obscureText: _obscure,
+                                        textInputAction: TextInputAction.done,
+                                        autofillHints: const [
+                                          AutofillHints.password,
+                                        ],
+                                        decoration: _fieldDecoration(
+                                          label: 'Password',
+                                          suffix: IconButton(
+                                            tooltip: _obscure
+                                                ? 'Show password'
+                                                : 'Hide password',
+                                            icon: Icon(
+                                              _obscure
+                                                  ? Icons.visibility_outlined
+                                                  : Icons
+                                                        .visibility_off_outlined,
+                                              size: 20,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                            onPressed: _busy
+                                                ? null
+                                                : () => setState(
+                                                    () => _obscure = !_obscure,
+                                                  ),
+                                          ),
+                                        ),
+                                        validator: (v) =>
+                                            (v == null || v.isEmpty)
+                                            ? 'Enter your password'
+                                            : null,
+                                        onFieldSubmitted: (_) {
+                                          if (_canSubmit) _submit();
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (TurnstileConfig.isConfigured) ...[
+                                  const SizedBox(height: 24),
+                                  TurnstileChallenge(
+                                    key: _turnstileKey,
+                                    action: _turnstileAction,
+                                    appearance:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? TurnstileChallengeAppearance
+                                              .darkOverlay
+                                        : TurnstileChallengeAppearance
+                                              .lightSurface,
+                                    showSuccessMessage: false,
+                                    showLoadingMessage: false,
+                                    onToken: _onTurnstileToken,
+                                    onError: (_) => _onTurnstileError(),
+                                    onExpired: _onTurnstileError,
+                                  ),
+                                ],
+                                const SizedBox(height: 28),
+                                ThriftButton(
+                                  label: _busy ? 'Signing in…' : 'Sign in',
+                                  onPressed: _canSubmit ? _submit : null,
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
-                        const SizedBox(height: 28),
-                        ThriftButton(
-                          label: _busy ? 'Signing in…' : 'Sign in',
-                          onPressed: _canSubmit ? _submit : null,
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-              ),
+                Positioned(
+                  top: 8,
+                  right: compact ? 12 : 16,
+                  child: const AdminThemeToggleButton(),
+                ),
+              ],
             ),
           ),
         ),
@@ -356,55 +411,39 @@ class _Header extends StatelessWidget {
 
   final bool compact;
 
+  static const _logoPath = 'assets/images/thriftline-logo.png';
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Image.asset(
-            'assets/images/thriftline_revised_app_logo.jpg',
-            width: 72,
-            height: 72,
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => Container(
-              width: 72,
-              height: 72,
-              alignment: Alignment.center,
-              color: AppColors.primary.withValues(alpha: 0.1),
-              child: const Icon(
-                Icons.storefront_rounded,
-                color: AppColors.primary,
-                size: 36,
-              ),
-            ),
+        Image.asset(
+          _logoPath,
+          width: compact ? 88 : 96,
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) => Icon(
+            Icons.storefront_rounded,
+            color: AppColors.primary,
+            size: compact ? 56 : 64,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         Text(
-          'ThriftLine',
+          'Sign in',
           style: AppTypography.heading.copyWith(
             fontWeight: FontWeight.w700,
             letterSpacing: -0.3,
+            color: AppColors.textPrimary,
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Text(
           'Administration Portal',
-          style: AppTypography.subheading.copyWith(
+          style: AppTypography.caption.copyWith(
             color: AppColors.primary,
             fontWeight: FontWeight.w600,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        SizedBox(height: 10),
-        Text(
-          'Sign in with your administrator account. '
-          'Buyer and seller accounts cannot access this workspace.',
-          style: AppTypography.caption.copyWith(
-            color: AppColors.textSecondary,
-            height: 1.45,
+            letterSpacing: 0.2,
           ),
           textAlign: TextAlign.center,
         ),
@@ -444,7 +483,7 @@ class _ErrorBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha: 0.06),
+        color: AppColors.errorSoft,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
       ),
@@ -453,13 +492,13 @@ class _ErrorBanner extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.error_outline, size: 18, color: AppColors.error),
+            Icon(Icons.error_outline, size: 18, color: AppColors.error),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 message,
                 style: AppTypography.caption.copyWith(
-                  color: AppColors.error,
+                  color: AppColors.errorForeground,
                   fontWeight: FontWeight.w600,
                   height: 1.35,
                 ),

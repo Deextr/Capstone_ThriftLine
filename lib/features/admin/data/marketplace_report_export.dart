@@ -33,10 +33,7 @@ class MarketplaceReportExporter {
   }
 
   static Future<void> _preloadPdfAssets() async {
-    await Future.wait([
-      _ensurePdfFonts(),
-      _ensureLogoBytes(),
-    ]);
+    await Future.wait([_ensurePdfFonts(), _ensureLogoBytes()]);
   }
 
   static Future<void> _ensurePdfFonts() async {
@@ -95,7 +92,8 @@ class MarketplaceReportExporter {
     final logoBytes = await _ensureLogoBytes();
     await _pumpUi();
 
-    final heading = title ??
+    final heading =
+        title ??
         (complete ? 'All Reports' : marketplaceReportCategoryLabel(category));
 
     _reportProgress(onProgress, 0.14, 'Assembling report…');
@@ -107,8 +105,7 @@ class MarketplaceReportExporter {
         bold: _cachedBoldFont!,
       ),
     );
-    final logo =
-        logoBytes != null ? pw.MemoryImage(logoBytes) : null;
+    final logo = logoBytes != null ? pw.MemoryImage(logoBytes) : null;
 
     doc.addPage(
       pw.MultiPage(
@@ -147,11 +144,7 @@ class MarketplaceReportExporter {
     final bytes = await _savePdfDocument(
       doc,
       onProgress: (fraction) {
-        _reportProgress(
-          onProgress,
-          0.42 + fraction * 0.52,
-          'Rendering PDF…',
-        );
+        _reportProgress(onProgress, 0.42 + fraction * 0.52, 'Rendering PDF…');
       },
     );
     if (bytes.isEmpty) {
@@ -207,20 +200,29 @@ class MarketplaceReportExporter {
   ) {
     if (complete && payload.completeBundle != null) {
       final widgets = <pw.Widget>[];
-      widgets.addAll(_pdfBlock('Overview', payload.summary, payload.comparison, payload.breakdowns));
+      widgets.addAll(
+        _pdfBlock(
+          'Overview',
+          payload.summary,
+          payload.comparison,
+          payload.breakdowns,
+        ),
+      );
       for (final entry in payload.completeBundle!.entries) {
         final cat = MarketplaceReportCategory.values.firstWhere(
           (c) => marketplaceReportCategoryRpcValue(c) == entry.key,
           orElse: () => MarketplaceReportCategory.overview,
         );
         widgets.add(pw.NewPage());
-        widgets.addAll(_pdfBlock(
-          marketplaceReportCategoryLabel(cat),
-          entry.value.summary,
-          entry.value.comparison,
-          entry.value.breakdowns,
-          entry.key == 'payments' ? null : entry.value.details,
-        ));
+        widgets.addAll(
+          _pdfBlock(
+            marketplaceReportCategoryLabel(cat),
+            entry.value.summary,
+            entry.value.comparison,
+            entry.value.breakdowns,
+            entry.key == 'payments' ? null : entry.value.details,
+          ),
+        );
       }
       return widgets;
     }
@@ -251,27 +253,31 @@ class MarketplaceReportExporter {
     ];
     if (summary.isNotEmpty) {
       widgets.add(_pdfSubsectionTitle('Summary'));
-      widgets.add(_pdfTable(
-        ['Metric', 'Value'],
-        summary.map((m) => [m.label, _pdfMetricDisplay(m)]).toList(),
-      ));
+      widgets.add(
+        _pdfTable([
+          'Metric',
+          'Value',
+        ], summary.map((m) => [m.label, _pdfMetricDisplay(m)]).toList()),
+      );
       widgets.add(pw.SizedBox(height: 12));
     }
     if (comparison.isNotEmpty) {
       widgets.add(_pdfSubsectionTitle('Comparison'));
-      widgets.add(_pdfTable(
-        ['Metric', 'Current', 'Previous', 'Change'],
-        comparison
-            .map(
-              (r) => [
-                r.label,
-                r.current.toString(),
-                r.previous.toString(),
-                formatMarketplaceReportChange(r.changePct),
-              ],
-            )
-            .toList(),
-      ));
+      widgets.add(
+        _pdfTable(
+          ['Metric', 'Current', 'Previous', 'Change'],
+          comparison
+              .map(
+                (r) => [
+                  r.label,
+                  r.current.toString(),
+                  r.previous.toString(),
+                  formatMarketplaceReportChange(r.changePct),
+                ],
+              )
+              .toList(),
+        ),
+      );
       widgets.add(pw.SizedBox(height: 12));
     }
     for (final b in breakdowns) {
@@ -279,11 +285,7 @@ class MarketplaceReportExporter {
       widgets.add(
         _pdfTable(
           b.columns.map(_pdfFixPesoInText).toList(),
-          b.rows
-              .map(
-                (row) => _pdfFormatDetailRow(b.columns, row),
-              )
-              .toList(),
+          b.rows.map((row) => _pdfFormatDetailRow(b.columns, row)).toList(),
         ),
       );
       widgets.add(pw.SizedBox(height: 12));
@@ -293,7 +295,9 @@ class MarketplaceReportExporter {
       widgets.add(
         _pdfTable(
           details.columns.map(_pdfFixPesoInText).toList(),
-          details.rows.map((row) => _pdfFormatDetailRow(details.columns, row)).toList(),
+          details.rows
+              .map((row) => _pdfFormatDetailRow(details.columns, row))
+              .toList(),
         ),
       );
     }
@@ -362,7 +366,10 @@ class MarketplaceReportExporter {
               child: pw.Text(
                 'Filters: ${filters.entries.map((e) => '${e.key}=${e.value}').join(', ')}',
                 textAlign: pw.TextAlign.center,
-                style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                style: const pw.TextStyle(
+                  fontSize: 10,
+                  color: PdfColors.grey700,
+                ),
               ),
             ),
         ],
@@ -443,9 +450,7 @@ class MarketplaceReportExporter {
   }
 
   static String _pdfFixPesoInText(String text) {
-    if (text.contains('â‚±') ||
-        text.contains('₱') ||
-        text.contains('\u20B1')) {
+    if (text.contains('â‚±') || text.contains('₱') || text.contains('\u20B1')) {
       final normalized = formatAdminReportPesoAmount(text);
       if (normalized != text || text.contains('â‚±')) {
         return normalized;
@@ -470,9 +475,7 @@ class MarketplaceReportExporter {
       headerDecoration: pw.BoxDecoration(color: PdfColor.fromHex('E6FFFA')),
       cellAlignment: pw.Alignment.centerLeft,
       headerAlignments: headerAlignments,
-      cellAlignments: {
-        0: pw.Alignment.centerLeft,
-      },
+      cellAlignments: {0: pw.Alignment.centerLeft},
       border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
     );
   }
@@ -589,9 +592,7 @@ class MarketplaceReportExporter {
         final encoded = excel.encode();
         onProgress(1.0);
         if (encoded == null || encoded.isEmpty) {
-          completer.completeError(
-            StateError('Excel export produced no data.'),
-          );
+          completer.completeError(StateError('Excel export produced no data.'));
         } else {
           completer.complete(Uint8List.fromList(encoded));
         }
@@ -631,26 +632,47 @@ class MarketplaceReportExporter {
   }) {
     final sheet = excel[sheetName];
     var row = 0;
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row++)).value =
-        TextCellValue('ThriftLine Marketplace Report');
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row++)).value =
-        TextCellValue(
-          title ??
-              (complete ? 'All Reports' : marketplaceReportCategoryLabel(category)),
-        );
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row++)).value =
-        TextCellValue('Period: ${window.chipLabel}');
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row++)).value =
-        TextCellValue('Generated: ${_dateFmt.format(DateTime.now())}');
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row++))
+        .value = TextCellValue(
+      'ThriftLine Marketplace Report',
+    );
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row++))
+        .value = TextCellValue(
+      title ??
+          (complete ? 'All Reports' : marketplaceReportCategoryLabel(category)),
+    );
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row++))
+        .value = TextCellValue(
+      'Period: ${window.chipLabel}',
+    );
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row++))
+        .value = TextCellValue(
+      'Generated: ${_dateFmt.format(DateTime.now())}',
+    );
     row++;
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row++)).value =
-        TextCellValue('Metric');
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row - 1)).value =
-        TextCellValue('Value');
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row++))
+        .value = TextCellValue(
+      'Metric',
+    );
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row - 1))
+        .value = TextCellValue(
+      'Value',
+    );
     for (final m in payload.summary) {
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value =
-          TextCellValue(sanitizeSpreadsheetCell(m.label));
-      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row));
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
+          .value = TextCellValue(
+        sanitizeSpreadsheetCell(m.label),
+      );
+      final cell = sheet.cell(
+        CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row),
+      );
       if (m.kind == 'money') {
         cell.value = DoubleCellValue(m.value.toDouble());
       } else if (m.kind == 'count' || m.kind == 'percent') {
@@ -662,22 +684,33 @@ class MarketplaceReportExporter {
     }
   }
 
-  static void _writeDetailSheet(Excel excel, String sheetName, MarketplaceReportDetails details) {
+  static void _writeDetailSheet(
+    Excel excel,
+    String sheetName,
+    MarketplaceReportDetails details,
+  ) {
     if (excel.sheets.keys.contains(sheetName)) return;
     final sheet = excel[sheetName];
     for (var c = 0; c < details.columns.length; c++) {
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: 0)).value =
-          TextCellValue(sanitizeSpreadsheetCell(details.columns[c]));
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: 0))
+          .value = TextCellValue(
+        sanitizeSpreadsheetCell(details.columns[c]),
+      );
     }
     for (var r = 0; r < details.rows.length; r++) {
       final row = details.rows[r];
       for (var c = 0; c < row.length; c++) {
         final value = row[c];
-        final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1));
+        final cell = sheet.cell(
+          CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1),
+        );
         if (value is num) {
           cell.value = DoubleCellValue(value.toDouble());
         } else {
-          cell.value = TextCellValue(sanitizeSpreadsheetCell(value?.toString() ?? ''));
+          cell.value = TextCellValue(
+            sanitizeSpreadsheetCell(value?.toString() ?? ''),
+          );
         }
       }
     }
@@ -696,21 +729,30 @@ class MarketplaceReportExporter {
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value =
         TextCellValue('Metric definitions and notes');
     var r = 2;
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: r++)).value =
-        TextCellValue(
-          'Platform revenue is ThriftLine platform fees on paid, non-refunded orders — not total buyer payments.',
-        );
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: r++)).value =
-        TextCellValue(
-          'Gross payment volume sums payment row amounts (multi-shop checkout = one row per seller).',
-        );
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: r++))
+        .value = TextCellValue(
+      'Platform revenue is ThriftLine platform fees on paid, non-refunded orders — not total buyer payments.',
+    );
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: r++))
+        .value = TextCellValue(
+      'Gross payment volume sums payment row amounts (multi-shop checkout = one row per seller).',
+    );
     for (final note in limitations) {
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: r++)).value =
-          TextCellValue(sanitizeSpreadsheetCell(note));
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: r++))
+          .value = TextCellValue(
+        sanitizeSpreadsheetCell(note),
+      );
     }
   }
 
-  static Future<void> _download(Uint8List bytes, String name, String mime) async {
+  static Future<void> _download(
+    Uint8List bytes,
+    String name,
+    String mime,
+  ) async {
     downloadReportBytes(bytes: bytes, fileName: name, mimeType: mime);
   }
 }

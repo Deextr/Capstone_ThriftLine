@@ -15,7 +15,9 @@ class AdminMarketplaceReportService {
     int offset = 0,
     bool complete = false,
   }) async {
-    final rpcCategory = complete ? 'all' : marketplaceReportCategoryRpcValue(category);
+    final rpcCategory = complete
+        ? 'all'
+        : marketplaceReportCategoryRpcValue(category);
     final raw = await _supabase.client.rpc(
       'admin_marketplace_report',
       params: {

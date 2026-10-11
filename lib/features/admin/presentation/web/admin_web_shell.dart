@@ -11,10 +11,11 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../features/auth/domain/auth_user.dart';
 import '../../../../providers/auth_provider.dart';
-import '../../../../providers/theme_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/admin_dashboard_controller.dart';
 import '../widgets/admin_profile_modal.dart';
+import '../widgets/admin_sign_out_dialog.dart';
+import '../widgets/admin_theme_toggle_button.dart';
 
 const double _kSidebarIconSlotSize = 24;
 
@@ -470,45 +471,10 @@ class _AdminHeaderActions extends StatelessWidget {
           ),
         ],
         const SizedBox(width: 8),
-        const _ThemeToggleButton(),
+        const AdminThemeToggleButton(),
         const SizedBox(width: 8),
         const _SignOutButton(),
       ],
-    );
-  }
-}
-
-class _ThemeToggleButton extends StatelessWidget {
-  const _ThemeToggleButton();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.watch<ThemeProvider>();
-    final isDark = theme.isDarkMode;
-    final label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
-    return Tooltip(
-      message: label,
-      child: Semantics(
-        button: true,
-        label: label,
-        child: Material(
-          color: AppColors.surfaceVariant.withValues(alpha: 0.65),
-          shape: CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: theme.toggleTheme,
-            child: SizedBox(
-              width: 36,
-              height: 36,
-              child: Icon(
-                isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-                size: 18,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -527,9 +493,11 @@ class _SignOutButtonState extends State<_SignOutButton> {
   Future<void> _signOut() async {
     if (_busy) return;
     setState(() => _busy = true);
-    await context.read<AuthProvider>().logout();
-    if (!mounted) return;
-    context.go(RouteNames.adminLogin);
+    try {
+      await confirmAdminSignOut(context);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override

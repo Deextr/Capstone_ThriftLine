@@ -32,6 +32,16 @@ abstract final class AppConstants {
   static const String keyBuyerHomeCache = 'buyer_home_feed_cache';
   static const String keyAdminDashboardCache = 'admin_dashboard_snapshot';
 
+  /// Last meaningful admin-portal interaction (epoch ms), shared across tabs.
+  static const String keyAdminPortalLastActivityMs =
+      'admin_portal_last_activity_ms';
+
+  /// Incremented when any admin tab signs out (manual or inactivity).
+  static const String keyAdminPortalLogoutNonce = 'admin_portal_logout_nonce';
+
+  /// One-time banner on the admin login screen after forced sign-out.
+  static const String keyAdminPortalLoginNotice = 'admin_portal_login_notice';
+
   // Breakpoints (mobile-first)
   static const double breakpointTablet = 600;
   static const double breakpointDesktop = 1024;

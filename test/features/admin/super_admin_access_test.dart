@@ -109,6 +109,19 @@ void main() {
       );
     }
 
+    test('site root redirects to admin login', () {
+      expect(
+        redirect(
+          canUseAdminPortal: false,
+          isSuperAdmin: false,
+          location: '/',
+          isAuthenticated: false,
+          isFullyAuthenticated: false,
+        ),
+        RouteNames.adminLogin,
+      );
+    });
+
     test('buyer and seller cannot open the dashboard', () {
       expect(
         redirect(
@@ -188,6 +201,30 @@ void main() {
           location: RouteNames.adminDashboard,
         ),
         '${RouteNames.adminLogin}?redirect=${Uri.encodeComponent(RouteNames.adminDashboard)}',
+      );
+    });
+
+    test('logged-out visitors leave the access denied screen for login', () {
+      expect(
+        redirect(
+          canUseAdminPortal: false,
+          isSuperAdmin: false,
+          isAuthenticated: false,
+          isFullyAuthenticated: false,
+          location: RouteNames.adminAccessDenied,
+        ),
+        RouteNames.adminLogin,
+      );
+    });
+
+    test('marketplace sessions can use the admin login form', () {
+      expect(
+        redirect(
+          canUseAdminPortal: false,
+          isSuperAdmin: false,
+          location: RouteNames.adminLogin,
+        ),
+        isNull,
       );
     });
   });

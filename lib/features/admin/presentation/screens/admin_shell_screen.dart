@@ -157,9 +157,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                     onDestinationSelected: _onTabChanged,
                     labelType: NavigationRailLabelType.all,
                     backgroundColor: AppColors.surface,
-                    selectedIconTheme: IconThemeData(
-                      color: AppColors.primary,
-                    ),
+                    selectedIconTheme: IconThemeData(color: AppColors.primary),
                     selectedLabelTextStyle: const TextStyle(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w600,

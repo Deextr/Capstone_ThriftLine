@@ -6,6 +6,8 @@ import '../core/services/shared_preferences_service.dart';
 import '../core/services/supabase_service.dart';
 import '../core/theme/app_palette_lerp_sync.dart';
 import '../core/theme/app_theme.dart';
+import '../features/admin/controllers/admin_portal_session_controller.dart';
+import '../features/admin/presentation/widgets/admin_portal_activity_listener.dart';
 import '../features/auth/data/auth_service.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
@@ -35,6 +37,11 @@ class ThriftlineAdminApp extends StatelessWidget {
         Provider<AuthService>(create: (_) => AuthService(supabaseService)),
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
         ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
+        ChangeNotifierProvider(
+          create: (context) =>
+              AdminPortalSessionController(prefs: prefs, auth: authProvider)
+                ..init(),
+        ),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, theme, _) {
@@ -48,8 +55,13 @@ class ThriftlineAdminApp extends StatelessWidget {
             themeAnimationCurve: Curves.easeInOutCubic,
             routerConfig: router,
             builder: (context, child) {
+              final session = context.watch<AdminPortalSessionController>();
               return AppPaletteLerpSync(
-                child: child ?? const SizedBox.shrink(),
+                child: AdminPortalActivityListener(
+                  controller: session,
+                  enabled: session.isMonitoring,
+                  child: child ?? const SizedBox.shrink(),
+                ),
               );
             },
           );

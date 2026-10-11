@@ -153,15 +153,11 @@ class _AdminVerifyEmailOtpScreenState extends State<AdminVerifyEmailOtpScreen> {
                           fillColor: AppColors.background,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(
-                              color: AppColors.border,
-                            ),
+                            borderSide: BorderSide(color: AppColors.border),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(
-                              color: AppColors.border,
-                            ),
+                            borderSide: BorderSide(color: AppColors.border),
                           ),
                         ),
                         inputFormatters: [

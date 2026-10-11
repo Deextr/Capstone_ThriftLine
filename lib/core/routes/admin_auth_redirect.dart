@@ -35,6 +35,10 @@ String? adminAppRedirect({
   required bool isEmailOtpPending,
   required String location,
 }) {
+  if (location == '/' || location.isEmpty) {
+    return RouteNames.adminLogin;
+  }
+
   final isLogin = location == RouteNames.adminLogin;
   final isVerifyEmailOtp = location == RouteNames.adminVerifyEmailOtp;
   final isDenied = location == RouteNames.adminAccessDenied;
@@ -54,6 +58,10 @@ String? adminAppRedirect({
     return null;
   }
 
+  if (!isAuthenticated && isDenied) {
+    return RouteNames.adminLogin;
+  }
+
   if (!isAuthenticated && isAdminProtectedRoute(location)) {
     final redirect = Uri.encodeComponent(location);
     return '${RouteNames.adminLogin}?redirect=$redirect';
@@ -61,6 +69,8 @@ String? adminAppRedirect({
 
   if (isFullyAuthenticated && (isLogin || isVerifyEmailOtp)) {
     if (canUseAdminPortal) return RouteNames.adminDashboard;
+    // Stay on login so a marketplace session can be replaced with admin credentials.
+    if (isLogin) return null;
     return RouteNames.adminAccessDenied;
   }
 

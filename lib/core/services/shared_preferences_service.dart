@@ -118,6 +118,30 @@ class SharedPreferencesService {
   Future<void> setAdminDashboardCacheJson(String json) =>
       _prefs.setString(AppConstants.keyAdminDashboardCache, json);
 
+  int get adminPortalLastActivityMs =>
+      _prefs.getInt(AppConstants.keyAdminPortalLastActivityMs) ?? 0;
+
+  Future<bool> setAdminPortalLastActivityMs(int value) =>
+      _prefs.setInt(AppConstants.keyAdminPortalLastActivityMs, value);
+
+  int get adminPortalLogoutNonce =>
+      _prefs.getInt(AppConstants.keyAdminPortalLogoutNonce) ?? 0;
+
+  Future<int> bumpAdminPortalLogoutNonce() async {
+    final next = adminPortalLogoutNonce + 1;
+    await _prefs.setInt(AppConstants.keyAdminPortalLogoutNonce, next);
+    return next;
+  }
+
+  String? get adminPortalLoginNotice =>
+      _prefs.getString(AppConstants.keyAdminPortalLoginNotice);
+
+  Future<bool> setAdminPortalLoginNotice(String value) =>
+      _prefs.setString(AppConstants.keyAdminPortalLoginNotice, value);
+
+  Future<void> clearAdminPortalLoginNotice() =>
+      remove(AppConstants.keyAdminPortalLoginNotice);
+
   Future<void> clearAuthSession() async {
     await setLoggedIn(false);
     await remove(AppConstants.keyUserRole);

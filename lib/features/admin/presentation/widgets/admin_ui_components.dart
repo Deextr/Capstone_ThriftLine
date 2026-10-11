@@ -1035,6 +1035,7 @@ class AdminDataTable extends StatelessWidget {
   final List<int>? columnFlex;
   final List<AlignmentGeometry>? columnAlignments;
   final double columnSpacing;
+
   /// Fixed width between column [i] and [i + 1]. Length must be [columns.length - 1].
   final List<double>? columnGapsAfter;
   final List<VoidCallback?>? onRowTap;
@@ -1043,7 +1044,8 @@ class AdminDataTable extends StatelessWidget {
       columnFlex ?? List<int>.filled(columns.length, 1, growable: false);
 
   List<AlignmentGeometry> get _alignments {
-    if (columnAlignments != null && columnAlignments!.length == columns.length) {
+    if (columnAlignments != null &&
+        columnAlignments!.length == columns.length) {
       return columnAlignments!;
     }
     return List<AlignmentGeometry>.filled(columns.length, Alignment.centerLeft);
@@ -1191,8 +1193,9 @@ List<Widget> _adminTableRowSegments({
 
   final children = <Widget>[];
   for (var i = 0; i < columnCount; i++) {
-    final alignment =
-        i < alignments.length ? alignments[i] : Alignment.centerLeft;
+    final alignment = i < alignments.length
+        ? alignments[i]
+        : Alignment.centerLeft;
     final horizontalPad = useExplicitGaps
         ? 0.0
         : (columnSpacing > 0 ? columnSpacing / 2 : 0.0);
@@ -1669,9 +1672,7 @@ class AdminTableSkeleton extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   border: i < rowCount - 1
-                      ? Border(
-                          bottom: BorderSide(color: AppColors.border),
-                        )
+                      ? Border(bottom: BorderSide(color: AppColors.border))
                       : null,
                 ),
                 child: Row(

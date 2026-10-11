@@ -1,0 +1,7 @@
+{
+  "SUPABASE_URL": "https://your-project-ref.supabase.co",
+  "SUPABASE_ANON_KEY": "your_supabase_anon_key_here",
+  "GOOGLE_WEB_CLIENT_ID": "your_google_web_client_id_here",
+  "TURNSTILE_SITE_KEY": "your_turnstile_site_key_here",
+  "TURNSTILE_BASE_URL": "https://your-project-ref.supabase.co/"
+}

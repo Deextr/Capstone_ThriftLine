@@ -182,14 +182,18 @@ class TurnstileChallengeState extends State<TurnstileChallenge> {
               width: TurnstileSize.normal.width,
               height: TurnstileSize.normal.height,
               child: CloudflareTurnstile(
-                key: ValueKey('turnstile_$_mountGeneration'),
+                key: ValueKey(
+                  'turnstile_${widget.appearance.name}_$_mountGeneration',
+                ),
                 siteKey: TurnstileConfig.siteKey,
                 baseUrl: TurnstileConfig.baseUrl,
                 action: widget.action,
                 controller: _controller,
                 options: TurnstileOptions(
                   size: TurnstileSize.normal,
-                  theme: TurnstileTheme.light,
+                  theme: isLight
+                      ? TurnstileTheme.light
+                      : TurnstileTheme.dark,
                   retryAutomatically: true,
                 ),
                 onTokenReceived: _handleToken,

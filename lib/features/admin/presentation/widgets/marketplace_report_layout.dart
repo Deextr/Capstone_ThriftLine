@@ -20,7 +20,10 @@ List<ReportMetricGroup> marketplaceReportSummaryGroups({
 }) {
   if (metrics.isEmpty) return const [];
 
-  final type = reportType ?? _adminTypeForSection(sectionCategory) ?? AdminReportType.all;
+  final type =
+      reportType ??
+      _adminTypeForSection(sectionCategory) ??
+      AdminReportType.all;
 
   List<ReportMetricGroup> byKeys(List<(String, List<String>)> specs) {
     final used = <String>{};
@@ -49,10 +52,7 @@ List<ReportMetricGroup> marketplaceReportSummaryGroups({
         'Verification summary',
         ['submitted', 'pending', 'approved', 'rejected', 'processed'],
       ),
-      (
-        'Processing performance',
-        ['approval_rate', 'avg_processing_days'],
-      ),
+      ('Processing performance', ['approval_rate', 'avg_processing_days']),
     ]),
     AdminReportType.users => byKeys([
       (
@@ -121,16 +121,10 @@ List<ReportMetricGroup> marketplaceReportSummaryGroups({
           'relisted',
         ],
       ),
-      (
-        'Bidding activity',
-        ['bids', 'violations'],
-      ),
+      ('Bidding activity', ['bids', 'violations']),
     ]),
     AdminReportType.disputes => byKeys([
-      (
-        'Dispute overview',
-        ['submitted', 'pending_snapshot', 'needs_evidence'],
-      ),
+      ('Dispute overview', ['submitted', 'pending_snapshot', 'needs_evidence']),
       (
         'Outcomes & resolution',
         [
@@ -152,10 +146,7 @@ List<ReportMetricGroup> marketplaceReportSummaryGroups({
           'bidding_restricted',
         ],
       ),
-      (
-        'Administrative activity',
-        ['audit_events', 'audit_failed'],
-      ),
+      ('Administrative activity', ['audit_events', 'audit_failed']),
     ]),
     AdminReportType.all => _splitBalanced('Marketplace overview', metrics),
   };
@@ -168,7 +159,7 @@ List<MarketplaceReportBreakdown> _reportBreakdownsForDisplay({
 }) {
   final isUsersReport =
       reportType == AdminReportType.users ||
-          sectionCategory == MarketplaceReportCategory.users;
+      sectionCategory == MarketplaceReportCategory.users;
   if (!isUsersReport) return breakdowns;
   return breakdowns
       .where(
@@ -190,17 +181,17 @@ AdminReportType? _adminTypeForSection(MarketplaceReportCategory? category) =>
       null => null,
     };
 
-List<ReportMetricGroup> _splitBalanced(String title, List<MarketplaceReportMetric> metrics) {
+List<ReportMetricGroup> _splitBalanced(
+  String title,
+  List<MarketplaceReportMetric> metrics,
+) {
   if (metrics.length <= 4) {
     return [ReportMetricGroup(title: title, metrics: metrics)];
   }
   final mid = (metrics.length / 2).ceil();
   return [
     ReportMetricGroup(title: title, metrics: metrics.sublist(0, mid)),
-    ReportMetricGroup(
-      title: 'Continued',
-      metrics: metrics.sublist(mid),
-    ),
+    ReportMetricGroup(title: 'Continued', metrics: metrics.sublist(mid)),
   ];
 }
 
@@ -222,9 +213,8 @@ class MarketplaceReportSummaryLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     final useOrdersSideBySide =
         reportType == AdminReportType.ordersTransactions ||
-            sectionCategory == MarketplaceReportCategory.orders;
-    if (useOrdersSideBySide &&
-        (metrics.isNotEmpty || breakdowns.isNotEmpty)) {
+        sectionCategory == MarketplaceReportCategory.orders;
+    if (useOrdersSideBySide && (metrics.isNotEmpty || breakdowns.isNotEmpty)) {
       return MarketplaceReportOrdersSideBySide(
         orderMetrics: metrics,
         breakdowns: breakdowns,
@@ -233,7 +223,7 @@ class MarketplaceReportSummaryLayout extends StatelessWidget {
 
     final useBiddingLayout =
         reportType == AdminReportType.bidding ||
-            sectionCategory == MarketplaceReportCategory.auctions;
+        sectionCategory == MarketplaceReportCategory.auctions;
     if (useBiddingLayout && (metrics.isNotEmpty || breakdowns.isNotEmpty)) {
       return MarketplaceReportBiddingLayout(
         metrics: metrics,
@@ -243,7 +233,7 @@ class MarketplaceReportSummaryLayout extends StatelessWidget {
 
     final useVerificationsLayout =
         reportType == AdminReportType.verifications ||
-            sectionCategory == MarketplaceReportCategory.verifications;
+        sectionCategory == MarketplaceReportCategory.verifications;
     if (useVerificationsLayout &&
         (metrics.isNotEmpty || breakdowns.isNotEmpty)) {
       return MarketplaceReportVerificationsLayout(
@@ -254,7 +244,7 @@ class MarketplaceReportSummaryLayout extends StatelessWidget {
 
     final useDisputesLayout =
         reportType == AdminReportType.disputes ||
-            sectionCategory == MarketplaceReportCategory.disputes;
+        sectionCategory == MarketplaceReportCategory.disputes;
     if (useDisputesLayout && (metrics.isNotEmpty || breakdowns.isNotEmpty)) {
       return MarketplaceReportDisputesLayout(
         metrics: metrics,
@@ -264,7 +254,7 @@ class MarketplaceReportSummaryLayout extends StatelessWidget {
 
     final useSecurityLayout =
         reportType == AdminReportType.security ||
-            sectionCategory == MarketplaceReportCategory.security;
+        sectionCategory == MarketplaceReportCategory.security;
     if (useSecurityLayout && (metrics.isNotEmpty || breakdowns.isNotEmpty)) {
       return MarketplaceReportSecurityLayout(
         metrics: metrics,
@@ -291,10 +281,7 @@ class MarketplaceReportSummaryLayout extends StatelessWidget {
           _AdaptiveGroupRow(
             children: [
               for (final group in groups)
-                _CompactMetricTable(
-                  title: group.title,
-                  metrics: group.metrics,
-                ),
+                _CompactMetricTable(title: group.title, metrics: group.metrics),
             ],
           ),
         ],
@@ -342,16 +329,15 @@ class MarketplaceReportSecurityLayout extends StatelessWidget {
         break;
       }
     }
-    violationConsequences ??=
-        breakdowns.isNotEmpty ? breakdowns.first : null;
+    violationConsequences ??= breakdowns.isNotEmpty ? breakdowns.first : null;
 
     final restrictionsTable =
         restrictionsMetrics != null && restrictionsMetrics.isNotEmpty
-            ? _CompactMetricTable(
-                title: 'Security & restrictions',
-                metrics: restrictionsMetrics,
-              )
-            : null;
+        ? _CompactMetricTable(
+            title: 'Security & restrictions',
+            metrics: restrictionsMetrics,
+          )
+        : null;
 
     final adminTable = adminMetrics != null && adminMetrics.isNotEmpty
         ? _CompactMetricTable(
@@ -387,7 +373,8 @@ class MarketplaceReportSecurityLayout extends StatelessWidget {
     );
 
     final width = MediaQuery.sizeOf(context).width;
-    final useWideLayout = width >= 880 &&
+    final useWideLayout =
+        width >= 880 &&
         restrictionsTable != null &&
         (adminTable != null || consequencesTable != null);
 
@@ -479,9 +466,7 @@ class MarketplaceReportDisputesLayout extends StatelessWidget {
           )
         : null;
 
-    if (overviewTable == null &&
-        byTypeTable == null &&
-        outcomesTable == null) {
+    if (overviewTable == null && byTypeTable == null && outcomesTable == null) {
       return const SizedBox.shrink();
     }
 
@@ -489,13 +474,15 @@ class MarketplaceReportDisputesLayout extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (overviewTable != null) overviewTable,
-        if (overviewTable != null && byTypeTable != null) const SizedBox(height: 12),
+        if (overviewTable != null && byTypeTable != null)
+          const SizedBox(height: 12),
         if (byTypeTable != null) byTypeTable,
       ],
     );
 
     final width = MediaQuery.sizeOf(context).width;
-    final useWideLayout = width >= 880 &&
+    final useWideLayout =
+        width >= 880 &&
         overviewStack.children.isNotEmpty &&
         outcomesTable != null;
 
@@ -514,9 +501,11 @@ class MarketplaceReportDisputesLayout extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (overviewTable != null) overviewTable,
-        if (overviewTable != null && byTypeTable != null) const SizedBox(height: 12),
+        if (overviewTable != null && byTypeTable != null)
+          const SizedBox(height: 12),
         if (byTypeTable != null) byTypeTable,
-        if ((overviewTable != null || byTypeTable != null) && outcomesTable != null)
+        if ((overviewTable != null || byTypeTable != null) &&
+            outcomesTable != null)
           const SizedBox(height: 12),
         if (outcomesTable != null) outcomesTable,
       ],
@@ -565,11 +554,9 @@ class MarketplaceReportOrdersSideBySide extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (metrics.isNotEmpty)
-          _CompactMetricTable(
-            title: 'Order performance',
-            metrics: metrics,
-          ),
-        if (metrics.isNotEmpty && statusTable != null) const SizedBox(height: 12),
+          _CompactMetricTable(title: 'Order performance', metrics: metrics),
+        if (metrics.isNotEmpty && statusTable != null)
+          const SizedBox(height: 12),
         if (statusTable != null)
           _CompactBreakdownTable(
             breakdown: MarketplaceReportBreakdown(
@@ -623,11 +610,7 @@ class MarketplaceReportOrdersTransactionsGrid extends StatelessWidget {
     if (width < 880) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ordersColumn,
-          const SizedBox(height: 16),
-          paymentsColumn,
-        ],
+        children: [ordersColumn, const SizedBox(height: 16), paymentsColumn],
       );
     }
 
@@ -684,7 +667,8 @@ class _PaymentsSummaryColumn extends StatelessWidget {
             title: 'Transactions & payments',
             metrics: metrics,
           ),
-        if (metrics.isNotEmpty && statusTable != null) const SizedBox(height: 12),
+        if (metrics.isNotEmpty && statusTable != null)
+          const SizedBox(height: 12),
         if (statusTable != null)
           _CompactBreakdownTable(
             breakdown: MarketplaceReportBreakdown(
@@ -744,11 +728,11 @@ class MarketplaceReportVerificationsLayout extends StatelessWidget {
 
     final performanceTable =
         performanceMetrics != null && performanceMetrics.isNotEmpty
-            ? _CompactMetricTable(
-                title: 'Processing performance',
-                metrics: performanceMetrics,
-              )
-            : null;
+        ? _CompactMetricTable(
+            title: 'Processing performance',
+            metrics: performanceMetrics,
+          )
+        : null;
 
     final outcomesBreakdown = outcomesTable != null
         ? _CompactBreakdownTable(
@@ -777,7 +761,8 @@ class MarketplaceReportVerificationsLayout extends StatelessWidget {
     );
 
     final width = MediaQuery.sizeOf(context).width;
-    final useWideLayout = width >= 880 &&
+    final useWideLayout =
+        width >= 880 &&
         summaryTable != null &&
         (performanceTable != null || outcomesBreakdown != null);
 
@@ -886,7 +871,8 @@ class MarketplaceReportBiddingLayout extends StatelessWidget {
     );
 
     final width = MediaQuery.sizeOf(context).width;
-    final useWideLayout = width >= 880 &&
+    final useWideLayout =
+        width >= 880 &&
         performanceTable != null &&
         rightColumn.children.isNotEmpty;
 
@@ -961,10 +947,7 @@ class MarketplaceReportPaymentsSideBySide extends StatelessWidget {
 }
 
 class MarketplaceReportOverviewGrid extends StatelessWidget {
-  const MarketplaceReportOverviewGrid({
-    super.key,
-    required this.metrics,
-  });
+  const MarketplaceReportOverviewGrid({super.key, required this.metrics});
 
   final List<MarketplaceReportMetric> metrics;
 
@@ -1015,10 +998,7 @@ class _AdaptiveGroupRow extends StatelessWidget {
 }
 
 class _CompactMetricTable extends StatelessWidget {
-  const _CompactMetricTable({
-    required this.title,
-    required this.metrics,
-  });
+  const _CompactMetricTable({required this.title, required this.metrics});
 
   final String title;
   final List<MarketplaceReportMetric> metrics;
@@ -1105,7 +1085,10 @@ class _CompactBreakdownTable extends StatelessWidget {
                 ? const [Alignment.centerLeft, Alignment.centerRight]
                 : null,
             rows: breakdown.rows
-                .map((row) => row.map((c) => AdminTableCellText(primary: c)).toList())
+                .map(
+                  (row) =>
+                      row.map((c) => AdminTableCellText(primary: c)).toList(),
+                )
                 .toList(),
             emptyTitle: 'No breakdown',
             emptyMessage: 'No rows for this period.',
