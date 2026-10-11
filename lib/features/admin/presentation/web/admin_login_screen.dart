@@ -144,9 +144,16 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       }
       _lockoutTimer?.cancel();
       setState(() => _lockoutSecondsRemaining = null);
-      if (!auth.isAdmin) {
+      if (!auth.canUseAdminPortal) {
+        final deactivated = auth.isDeactivatedAdministrator;
         await auth.logout();
-        if (mounted) context.go(RouteNames.adminAccessDenied);
+        if (mounted) {
+          context.go(
+            deactivated
+                ? '${RouteNames.adminAccessDenied}?reason=deactivated'
+                : RouteNames.adminAccessDenied,
+          );
+        }
         return;
       }
       if (auth.isEmailOtpPending) {
@@ -285,8 +292,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                           TurnstileChallenge(
                             key: _turnstileKey,
                             action: _turnstileAction,
-                            appearance:
-                                TurnstileChallengeAppearance.lightSurface,
+                            appearance: Theme.of(context).brightness ==
+                                    Brightness.dark
+                                ? TurnstileChallengeAppearance.darkOverlay
+                                : TurnstileChallengeAppearance.lightSurface,
                             showSuccessMessage: false,
                             showLoadingMessage: false,
                             onToken: _onTurnstileToken,
@@ -323,11 +332,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       fillColor: AppColors.background,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: AppColors.border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: AppColors.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
@@ -389,7 +398,7 @@ class _Header extends StatelessWidget {
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         Text(
           'Sign in with your administrator account. '
           'Buyer and seller accounts cannot access this workspace.',

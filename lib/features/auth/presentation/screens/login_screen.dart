@@ -119,11 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!loginResult.isSuccess) {
       _rateLimiter.recordFailure();
       _clearTurnstile();
-      showThriftSnackBar(
-        context,
-        loginResult.errorMessage!,
-        isError: true,
-      );
+      showThriftSnackBar(context, loginResult.errorMessage!, isError: true);
       return;
     }
 
@@ -165,7 +161,8 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Selector<AuthProvider, bool>(
                 selector: (_, auth) => auth.isLoading,
                 builder: (context, isLoading, _) {
-                  final canSubmitEmail = !isLoading &&
+                  final canSubmitEmail =
+                      !isLoading &&
                       !lockedOut &&
                       (_turnstileToken?.isNotEmpty ?? false);
                   return Column(
@@ -215,8 +212,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                         onTurnstileToken: (token) => setState(
                                           () => _turnstileToken = token,
                                         ),
-                                        onTurnstileClear: () =>
-                                            setState(() => _turnstileToken = null),
+                                        onTurnstileClear: () => setState(
+                                          () => _turnstileToken = null,
+                                        ),
                                         onSignIn: _loginWithEmail,
                                         fieldLabelColor: fieldLabelColor,
                                       ),

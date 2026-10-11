@@ -563,7 +563,7 @@ class _ListingCard extends StatelessWidget {
 
             if (_hasMenu)
               PopupMenuButton<String>(
-                icon: const Icon(
+                icon: Icon(
                   Icons.more_vert,
                   color: AppColors.textSecondary,
                 ),
@@ -616,7 +616,7 @@ class _ListingCard extends StatelessWidget {
   Widget _placeholder() {
     return Container(
       color: AppColors.primaryLight,
-      child: const Center(
+      child: Center(
         child: Icon(Icons.image_outlined, color: AppColors.textHint, size: 28),
       ),
     );
@@ -804,7 +804,7 @@ class _ListingCard extends StatelessWidget {
               children: [
                 Text(
                   'The previous winning buyer failed or expired. Pass "${item.name}" to the next highest bidder in line:',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
@@ -849,7 +849,7 @@ class _ListingCard extends StatelessWidget {
                           if (nextTime != null)
                             Text(
                               formatRelativeTime(nextTime),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11,
                                 color: AppColors.textHint,
                               ),
@@ -867,7 +867,7 @@ class _ListingCard extends StatelessWidget {
                               children: [
                                 Text(
                                   '@$nextUsername',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
                                     color: AppColors.textPrimary,
@@ -878,7 +878,7 @@ class _ListingCard extends StatelessWidget {
                                     bidder?['full_name'] != nextUsername)
                                   Text(
                                     bidder!['full_name'] as String,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
                                       color: AppColors.textSecondary,
                                     ),
@@ -939,15 +939,15 @@ class _ListingCard extends StatelessWidget {
                   ),
 
                 const SizedBox(height: 14),
-                const Row(
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.info_outline,
                       size: 16,
                       color: AppColors.primary,
                     ),
-                    SizedBox(width: 6),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         'The 2nd highest bidder will receive an instant notification and a 12-hour payment window to complete checkout at their bid amount.',
@@ -1130,7 +1130,14 @@ class _ListingCard extends StatelessWidget {
       }
 
       try {
-        final result = await context.read<SupabaseService>().client.rpc(
+        final supabase = context.read<SupabaseService>().client;
+        try {
+          await supabase.rpc('close_auctions');
+        } catch (error) {
+          debugPrint('SellerListingsTab.relist close_auctions: $error');
+        }
+
+        final result = await supabase.rpc(
           'relist_unsold_auction',
           params: params,
         );
@@ -1138,11 +1145,10 @@ class _ListingCard extends StatelessWidget {
         if (!supabaseRpcSuccess(result)) {
           showThriftSnackBar(
             context,
-            supabaseRpcError(
-                  result,
-                  fallback: 'Could not relist this auction.',
-                ) ??
-                'Could not relist this auction.',
+            auctionRelistMessageFromRpc(
+              code: supabaseRpcCode(result),
+              error: supabaseRpcError(result),
+            ),
             isError: true,
           );
           return;
@@ -1248,7 +1254,7 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: AppColors.error, size: 40),
+            Icon(Icons.error_outline, color: AppColors.error, size: 40),
             const SizedBox(height: AppConstants.spacingMd),
             Text(
               message,

@@ -18,6 +18,7 @@ class AdminLookingForReportController extends ChangeNotifier {
 
   LookingForAdminReport? _report;
   List<LookingForViolationRecord> _violations = const [];
+  List<LookingForAdminReport> _relatedOpenReports = const [];
   DateTime _serverNow = DateTime.now().toUtc();
   bool _isLoading = true;
   bool _isSaving = false;
@@ -28,6 +29,7 @@ class AdminLookingForReportController extends ChangeNotifier {
 
   LookingForAdminReport? get report => _report;
   List<LookingForViolationRecord> get violations => _violations;
+  List<LookingForAdminReport> get relatedOpenReports => _relatedOpenReports;
   DateTime get serverNow => _serverNow;
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
@@ -38,6 +40,7 @@ class AdminLookingForReportController extends ChangeNotifier {
       lookingForDecisionToRpc(_decision) ??
       (_decision == 'resolved' ||
               _decision == 'dismissed' ||
+              _decision == 'insufficient_evidence' ||
               _decision == 'needs_more_evidence'
           ? _decision
           : null);
@@ -80,8 +83,12 @@ class AdminLookingForReportController extends ChangeNotifier {
       if (_report == null) {
         _errorMessage = 'This report is no longer available.';
         _violations = const [];
+        _relatedOpenReports = const [];
       } else {
         _violations = await _service.violationsFor(_report!.reportedUserId);
+        _relatedOpenReports = await _service.listOpenReportsForPost(
+          _report!.postId,
+        );
       }
     } catch (e) {
       debugPrint('AdminLookingForReportController.load error: $e');
@@ -101,7 +108,7 @@ class AdminLookingForReportController extends ChangeNotifier {
         rpc == null ||
         !current.canDecide ||
         _isSaving) {
-      return 'This report has already been reviewed.';
+      return kAdminStaleDecisionMessage;
     }
     _isSaving = true;
     notifyListeners();
@@ -114,7 +121,7 @@ class AdminLookingForReportController extends ChangeNotifier {
         violationConfirmed:
             rpc == 'resolved' && (removePost || _violationConfirmed),
       );
-      if (error != null) return error;
+      if (error != null) return mapAdminDecisionError(error);
       await load();
       return null;
     } finally {

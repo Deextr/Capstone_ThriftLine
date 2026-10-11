@@ -37,11 +37,11 @@ class AdminWebAnalyticsReportsPage extends StatelessWidget {
                 onPressed: controller.isLoading
                     ? null
                     : () => controller.load(),
-                icon: const Icon(Icons.refresh, size: 16),
+                icon: Icon(Icons.refresh, size: 16),
                 label: const Text('Refresh'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.textPrimary,
-                  side: const BorderSide(color: AppColors.border),
+                  side: BorderSide(color: AppColors.border),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 10,
@@ -277,12 +277,12 @@ class _ReportSection extends StatelessWidget {
           ),
         ),
         if (subtitle != null) ...[
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(subtitle!, style: AppTypography.caption.copyWith(height: 1.4)),
         ],
         const SizedBox(height: 16),
         child,
-        const Divider(height: 48, color: AppColors.border),
+        Divider(height: 48, color: AppColors.border),
       ],
     );
   }

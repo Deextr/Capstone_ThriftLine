@@ -1,12 +1,38 @@
 enum UserRole {
   buyer,
   seller,
-  admin;
+  admin,
+  superAdmin;
 
-  static UserRole fromString(String value) => UserRole.values.firstWhere(
-    (e) => e.name == value,
-    orElse: () => UserRole.buyer,
-  );
+  /// Value stored in `public.users.role`.
+  String get dbValue => this == UserRole.superAdmin ? 'super_admin' : name;
+
+  String get label => switch (this) {
+    UserRole.buyer => 'Buyer',
+    UserRole.seller => 'Seller',
+    UserRole.admin => 'Admin',
+    UserRole.superAdmin => 'Super Admin',
+  };
+
+  bool get isAdministrator =>
+      this == UserRole.admin || this == UserRole.superAdmin;
+
+  static UserRole fromString(String value) {
+    switch (value.trim().toLowerCase()) {
+      case '':
+      case 'buyer':
+        return UserRole.buyer;
+      case 'seller':
+        return UserRole.seller;
+      case 'admin':
+        return UserRole.admin;
+      case 'super_admin':
+      case 'superadmin':
+        return UserRole.superAdmin;
+      default:
+        throw FormatException('Unknown user role: $value');
+    }
+  }
 }
 
 enum ProductCategory {

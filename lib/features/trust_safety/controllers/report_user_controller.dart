@@ -84,7 +84,8 @@ class ReportUserController extends ChangeNotifier {
   List<ReportSellerCandidate> get searchResults =>
       List.unmodifiable(_searchResults);
   bool get isSearching => _isSearching;
-  bool get isSearchActive => _searchQuery.trim().length >= kReportSellerSearchMinChars;
+  bool get isSearchActive =>
+      _searchQuery.trim().length >= kReportSellerSearchMinChars;
 
   bool get hasResolvedTarget =>
       _reportedUserId != null && _reportedUserId!.isNotEmpty;
@@ -297,7 +298,10 @@ class ReportUserController extends ChangeNotifier {
       return 'You cannot report yourself.';
     }
     if (_selectedCategory == null) return 'Select a reason for your report.';
-    final detailsError = communityReportDetailsError(_details, _selectedCategory);
+    final detailsError = communityReportDetailsError(
+      _details,
+      _selectedCategory,
+    );
     if (detailsError != null) return detailsError;
     if (_evidence.length < kReportEvidenceMinCount) {
       _evidenceError = 'Add at least one photo as evidence.';

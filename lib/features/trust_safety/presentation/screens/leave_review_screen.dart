@@ -70,7 +70,7 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.error_outline_rounded,
                           size: 48,
                           color: AppColors.textSecondary,
@@ -211,7 +211,7 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
                                 borderRadius: BorderRadius.circular(
                                   AppConstants.radiusMd,
                                 ),
-                                borderSide: const BorderSide(
+                                borderSide: BorderSide(
                                   color: AppColors.border,
                                 ),
                               ),
@@ -219,7 +219,7 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
                                 borderRadius: BorderRadius.circular(
                                   AppConstants.radiusMd,
                                 ),
-                                borderSide: const BorderSide(
+                                borderSide: BorderSide(
                                   color: AppColors.border,
                                 ),
                               ),
@@ -352,7 +352,7 @@ class _OrderContextCard extends StatelessWidget {
                     width: 64,
                     height: 64,
                     color: AppColors.surfaceVariant,
-                    child: const Icon(
+                    child: Icon(
                       Icons.checkroom_outlined,
                       color: AppColors.textHint,
                     ),
@@ -371,7 +371,7 @@ class _OrderContextCard extends StatelessWidget {
                       width: 64,
                       height: 64,
                       color: AppColors.surfaceVariant,
-                      child: const Icon(
+                      child: Icon(
                         Icons.image_not_supported_outlined,
                         color: AppColors.textHint,
                       ),

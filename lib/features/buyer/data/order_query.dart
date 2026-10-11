@@ -32,6 +32,14 @@ const String kOrderSelect =
     'shipment:shipments($kShipmentSelect), '
     'item_return:return_shipments($kReturnShipmentSelect)';
 
+const String kAdminOrderDetailSelect =
+    '*, items:order_items(*), payments(*)';
+
+const String kAdminOrderDetailSelectWithShipment =
+    '*, items:order_items(*), payments(*), '
+    'shipment:shipments($kShipmentSelect), '
+    'item_return:return_shipments($kReturnShipmentSelect)';
+
 /// Runs an orders select with shipment embed; retries without shipments when
 /// shipment privileges block the nested read (checkout must still load).
 Future<T> runOrderSelect<T>(Future<T> Function(String select) run) async {
@@ -43,6 +51,21 @@ Future<T> runOrderSelect<T>(Future<T> Function(String select) run) async {
       'order select with shipments failed ($e); retrying without shipment embed',
     );
     return await run(kOrderSelectWithoutShipment);
+  }
+}
+
+/// Admin order detail — full payments; retries without shipment embed on RLS errors.
+Future<T> runAdminOrderDetailSelect<T>(
+  Future<T> Function(String select) run,
+) async {
+  try {
+    return await run(kAdminOrderDetailSelectWithShipment);
+  } on PostgrestException catch (e) {
+    if (!orderSelectMightNeedShipmentFallback(e)) rethrow;
+    debugPrint(
+      'admin order detail with shipments failed ($e); retrying without shipment embed',
+    );
+    return await run(kAdminOrderDetailSelect);
   }
 }
 

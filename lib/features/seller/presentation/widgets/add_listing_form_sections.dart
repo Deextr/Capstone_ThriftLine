@@ -105,7 +105,7 @@ class ListingAuctionQuantityNote extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.inventory_2_outlined,
             size: 20,
             color: AppColors.textSecondary,

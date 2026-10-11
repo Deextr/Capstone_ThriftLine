@@ -226,7 +226,7 @@ class _AccountPhoneVerificationSectionState
                       },
                       decoration: InputDecoration(
                         hintText: '09XXXXXXXXX',
-                        prefixIcon: const Icon(
+                        prefixIcon: Icon(
                           Icons.phone_outlined,
                           color: AppColors.textHint,
                           size: 20,
@@ -239,7 +239,7 @@ class _AccountPhoneVerificationSectionState
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppColors.border),
+                          borderSide: BorderSide(color: AppColors.border),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),

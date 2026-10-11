@@ -46,7 +46,7 @@ class MyPurchaseOrderCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.storefront_outlined,
                   size: 16,
                   color: AppColors.textSecondary,
@@ -163,7 +163,7 @@ class MyPurchaseOrderCard extends StatelessWidget {
         : category;
 
     if (bucket == BuyerPurchaseCategory.cancelled) {
-      return const _StatusCopy(
+      return _StatusCopy(
         title: 'Cancelled',
         message: 'Payment deadline expired.',
         color: AppColors.textSecondary,

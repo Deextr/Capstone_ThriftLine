@@ -73,4 +73,3 @@ List<BuyerRatedPurchase> buyerReviewHistory(
   entries.sort((a, b) => b.review.createdAt.compareTo(a.review.createdAt));
   return entries;
 }
-

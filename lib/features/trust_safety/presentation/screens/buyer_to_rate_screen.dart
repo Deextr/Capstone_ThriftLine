@@ -72,7 +72,7 @@ class _BuyerToRateScreenState extends State<BuyerToRateScreen>
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
           child: Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(bottom: BorderSide(color: AppColors.border)),
             ),
             child: TabBar(
@@ -249,7 +249,7 @@ class _ReviewHistoryList extends StatelessWidget {
                 color: AppColors.surfaceVariant,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.rate_review_outlined,
                 size: 38,
                 color: AppColors.textSecondary,
@@ -319,7 +319,7 @@ class _PendingOrderCard extends StatelessWidget {
                         width: 64,
                         height: 64,
                         color: AppColors.surfaceVariant,
-                        child: const Icon(
+                        child: Icon(
                           Icons.checkroom_outlined,
                           color: AppColors.textHint,
                         ),
@@ -338,7 +338,7 @@ class _PendingOrderCard extends StatelessWidget {
                           width: 64,
                           height: 64,
                           color: AppColors.surfaceVariant,
-                          child: const Icon(
+                          child: Icon(
                             Icons.image_not_supported_outlined,
                             color: AppColors.textHint,
                           ),
@@ -361,7 +361,7 @@ class _PendingOrderCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.storefront_outlined,
                           size: 14,
                           color: AppColors.textSecondary,
@@ -394,7 +394,7 @@ class _PendingOrderCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: AppColors.border),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -456,7 +456,7 @@ class _SubmittedReviewCard extends StatelessWidget {
                         width: 44,
                         height: 44,
                         color: AppColors.surfaceVariant,
-                        child: const Icon(
+                        child: Icon(
                           Icons.checkroom_outlined,
                           size: 20,
                           color: AppColors.textHint,
@@ -476,7 +476,7 @@ class _SubmittedReviewCard extends StatelessWidget {
                           width: 44,
                           height: 44,
                           color: AppColors.surfaceVariant,
-                          child: const Icon(
+                          child: Icon(
                             Icons.image_not_supported_outlined,
                             size: 20,
                             color: AppColors.textHint,
@@ -501,7 +501,7 @@ class _SubmittedReviewCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.storefront_outlined,
                           size: 13,
                           color: AppColors.textSecondary,
@@ -545,7 +545,7 @@ class _SubmittedReviewCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: AppColors.border),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

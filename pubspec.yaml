@@ -34,6 +34,9 @@ dependencies:
   app_links: ^6.4.0
   cloudflare_turnstile: ^3.8.1
   fetch_client: ^1.2.1
+  pdf: ^3.11.3
+  excel: ^4.0.6
+  printing: ^5.14.3
 
 dev_dependencies:
   flutter_test:

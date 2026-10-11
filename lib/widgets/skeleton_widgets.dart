@@ -7,8 +7,8 @@ import 'product_card.dart';
 import 'thrift_widgets.dart';
 
 /// Shared shimmer colors for ThriftLine skeleton placeholders.
-const _shimmerBase = AppColors.border;
-const _shimmerHighlight = AppColors.surface;
+Color get _shimmerBase => AppColors.border;
+Color get _shimmerHighlight => AppColors.surface;
 
 /// Wraps [child] with a single shimmer animation (prefer for lists/grids).
 class ThriftShimmer extends StatelessWidget {
@@ -662,7 +662,7 @@ class ProductDetailSkeleton extends StatelessWidget {
     final imageHeight = width / ProductCard.imageAspectRatio;
     return ThriftShimmer(
       child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: AlwaysScrollableScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -736,7 +736,7 @@ class SellerPublicProfileSkeleton extends StatelessWidget {
                 children: [
                   const SkeletonCircle(size: 88),
                   const SizedBox(height: 12),
-                  const SkeletonBox(width: 160, height: 20),
+                  SkeletonBox(width: 160, height: 20),
                   const SizedBox(height: 8),
                   const SkeletonBox(width: 100, height: 14),
                   const SizedBox(height: 20),
@@ -1180,7 +1180,7 @@ class VerifiedSellerGridSkeleton extends StatelessWidget {
     return ThriftShimmer(
       child: GridView.builder(
         shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
+        physics: NeverScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         itemCount: 4,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(

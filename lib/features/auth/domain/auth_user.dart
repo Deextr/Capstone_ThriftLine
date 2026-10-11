@@ -81,6 +81,33 @@ class AuthUser {
 
   bool get isPermanentlyDisabled => accountStatus == 'banned';
 
+  /// Marketplace sessions must end when the account is not active.
+  ///
+  /// `suspended` is an administrative disable. `banned` is permanent.
+  /// Deactivated administrators keep the existing portal rules and are not
+  /// signed out of a marketplace session by this check.
+  String? get sessionBlockMessage {
+    if (isAdministrator) {
+      if (isPermanentlyDisabled) {
+        return 'This account has been permanently disabled.';
+      }
+      return null;
+    }
+    if (accountStatus == 'active' &&
+        isSeller &&
+        trustLevel?.trim() == 'Banned') {
+      return 'Your seller account has been restricted and cannot access marketplace features.';
+    }
+    return switch (accountStatus) {
+      'active' => null,
+      'banned' => 'This account has been permanently disabled.',
+      'suspended' =>
+        'Your account has been restricted. Marketplace seller activities are unavailable.',
+      'deactivated' => 'This account has been deactivated.',
+      _ => 'This account cannot be used right now.',
+    };
+  }
+
   /// `users.is_phone_verified` with a valid stored `09` mobile number.
   bool get hasVerifiedAccountPhone {
     if (!isPhoneVerified) return false;
@@ -91,7 +118,20 @@ class AuthUser {
   String get displayName => role == UserRole.seller ? (shopName ?? name) : name;
   bool get isBuyer => role == UserRole.buyer;
   bool get isSeller => role == UserRole.seller;
-  bool get isAdmin => role == UserRole.admin;
+
+  /// Marketplace lockout for both administrator roles, including deactivated
+  /// accounts. Portal access is [canUseAdminPortal].
+  bool get isAdministrator => role.isAdministrator;
+
+  bool get isSuperAdmin =>
+      role == UserRole.superAdmin && accountStatus == 'active';
+
+  bool get canUseAdminPortal => isAdministrator && accountStatus == 'active';
+
+  bool get isDeactivatedAdministrator =>
+      isAdministrator && !canUseAdminPortal && !isPermanentlyDisabled;
+
+  bool get isAdmin => isAdministrator;
 
   /// Approved to use the seller workspace. The database role stays `seller`
   /// after admin approval; switching accounts never writes a second user row.

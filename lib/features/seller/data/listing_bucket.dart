@@ -1,31 +1,11 @@
+import 'listing_snapshot.dart';
+
+export 'auction_relist_feedback.dart'
+    show auctionRelistHint, auctionRelistMessageFromRpc, canRelistAuction;
+export 'listing_snapshot.dart';
+
 /// Display buckets for My Listings. These do not add a product status.
 enum ListingBucket { active, awaitingPayment, sold, inactive }
-
-class ListingSnapshot {
-  const ListingSnapshot({
-    required this.productStatus,
-    required this.listingType,
-    this.auctionStatus,
-    this.endsAt,
-    this.winnerId,
-    this.orderStatus,
-    this.paymentStatus,
-    this.paymentDueAt,
-    this.bidCount = 0,
-    required this.now,
-  });
-
-  final String productStatus;
-  final String listingType;
-  final String? auctionStatus;
-  final DateTime? endsAt;
-  final String? winnerId;
-  final String? orderStatus;
-  final String? paymentStatus;
-  final DateTime? paymentDueAt;
-  final int bidCount;
-  final DateTime now;
-}
 
 ListingBucket listingBucketFor(ListingSnapshot listing) {
   if (listing.productStatus == 'sold' || listing.paymentStatus == 'paid') {
@@ -64,11 +44,6 @@ bool canEndAuctionEarly(ListingSnapshot listing) {
     return false;
   }
   return listing.bidCount >= 1;
-}
-
-bool canRelistAuction(ListingSnapshot listing) {
-  return listing.listingType == 'auction' &&
-      listingBucketFor(listing) == ListingBucket.inactive;
 }
 
 /// Fallback to the second-highest bidder is automatic after the primary

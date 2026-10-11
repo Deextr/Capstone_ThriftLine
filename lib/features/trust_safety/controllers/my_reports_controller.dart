@@ -10,9 +10,12 @@ import '../../../models/order_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../buyer/data/order_query.dart';
 import '../controllers/report_user_controller.dart';
+import '../data/buyer_my_reports_query.dart';
+import '../data/buyer_report_filters.dart';
 import '../data/report_evidence_upload.dart';
 import '../data/report_evidence_attempt_rules.dart';
 import '../data/report_reasons.dart';
+import '../domain/buyer_report_list_item.dart';
 
 class MyReportsController extends ChangeNotifier {
   MyReportsController({
@@ -36,6 +39,10 @@ class MyReportsController extends ChangeNotifier {
   bool _disposed = false;
 
   List<CommunityReportModel> _reports = [];
+  List<BuyerReportListItem> _allItems = const [];
+  BuyerReportTypeFilter _typeFilter = BuyerReportTypeFilter.all;
+  BuyerReportStatusFilter _statusFilter = BuyerReportStatusFilter.all;
+  int _pageIndex = 0;
   CommunityReportModel? _report;
   OrderModel? _linkedOrder;
   bool _isLoading = true;
@@ -45,6 +52,45 @@ class MyReportsController extends ChangeNotifier {
   final ImagePicker _picker = ImagePicker();
 
   List<CommunityReportModel> get reports => _reports;
+  List<BuyerReportListItem> get allItems => _allItems;
+  BuyerReportTypeFilter get typeFilter => _typeFilter;
+  BuyerReportStatusFilter get statusFilter => _statusFilter;
+  bool get hasAnyReports => _allItems.isNotEmpty;
+  bool get isFilterActive =>
+      _typeFilter != BuyerReportTypeFilter.all ||
+      _statusFilter != BuyerReportStatusFilter.all;
+  int get activeFilterCount => buyerReportActiveFilterCount(
+    typeFilter: _typeFilter,
+    statusFilter: _statusFilter,
+  );
+  String get activeFilterSummary => buyerReportActiveFilterSummary(
+    typeFilter: _typeFilter,
+    statusFilter: _statusFilter,
+  );
+  List<BuyerReportListItem> get visibleItems => filterBuyerReportItems(
+    items: _allItems,
+    typeFilter: _typeFilter,
+    statusFilter: _statusFilter,
+  );
+  int get pageIndex => _pageIndex;
+  int get pageSize => kBuyerMyReportsPageSize;
+  int get totalPages =>
+      buyerMyReportsTotalPages(visibleItems.length, pageSize: pageSize);
+  int get currentPageNumber =>
+      totalPages == 0 ? 0 : (_pageIndex + 1).clamp(1, totalPages);
+  bool get canGoToPreviousPage => _pageIndex > 0;
+  bool get canGoToNextPage => totalPages > 0 && _pageIndex < totalPages - 1;
+  bool get showPagination => visibleItems.length > pageSize;
+  List<BuyerReportListItem> get paginatedVisibleItems =>
+      paginateList(visibleItems, pageIndex: _pageIndex, pageSize: pageSize);
+  String get paginationRangeLabel {
+    final count = visibleItems.length;
+    if (count == 0) return '';
+    final start = _pageIndex * pageSize + 1;
+    final end = start + paginatedVisibleItems.length - 1;
+    return '$start–$end of $count';
+  }
+
   CommunityReportModel? get report => _report;
   OrderModel? get linkedOrder => _linkedOrder;
   bool get isLoading => _isLoading;
@@ -66,6 +112,7 @@ class MyReportsController extends ChangeNotifier {
     final myId = _auth.user?.id;
     if (myId == null) {
       _reports = [];
+      _allItems = const [];
       _report = null;
       _isLoading = false;
       _errorMessage = 'Please sign in.';
@@ -82,72 +129,16 @@ class MyReportsController extends ChangeNotifier {
     }
 
     try {
-      var query = _supabase.client
-          .from('reports')
-          .select(
-            '*, report_evidence(report_evidence_id, file_path, created_at)',
-          )
-          .eq('reporter_id', myId);
       if (reportId != null) {
-        query = query.eq('report_id', reportId!);
-      }
-      final rows = await query.order('created_at', ascending: false);
-      final raw = (rows as List<dynamic>)
-          .map((row) => row as Map<String, dynamic>)
-          .toList();
-
-      final userIds = raw
-          .map((row) => row['reported_user_id'] as String?)
-          .whereType<String>()
-          .toSet();
-      final orderIds = raw
-          .map((row) => row['order_id'] as String?)
-          .whereType<String>()
-          .toSet();
-
-      final profiles = await loadPublicProfiles(_supabase, userIds);
-      final orderNumbers = await _loadOrderNumbers(orderIds);
-
-      final mapped = <CommunityReportModel>[];
-      for (final row in raw) {
-        final evidenceRows =
-            (row['report_evidence'] as List<dynamic>? ?? const [])
-                .map(
-                  (item) => ReportEvidenceItem.fromSupabase(
-                    item as Map<String, dynamic>,
-                  ),
-                )
-                .toList();
-        final reportedId = row['reported_user_id'] as String?;
-        final orderId = row['order_id'] as String?;
-        mapped.add(
-          CommunityReportModel.fromSupabase(
-            row,
-            reportedUser: reportedId == null ? null : profiles[reportedId],
-            orderNumber: orderId == null ? null : orderNumbers[orderId],
-            evidence: evidenceRows,
-          ),
-        );
-      }
-
-      if (reportId != null) {
-        _report = mapped.isEmpty ? null : mapped.first;
-        _linkedOrder = null;
-        if (_report == null) {
-          _errorMessage = 'Report not found.';
-        } else {
-          _report = await _withSignedUrls(_report!);
-          _linkedOrder = await _loadLinkedOrder(_report!);
-        }
-        _reports = mapped;
+        await _loadCommunityReportDetail(myId);
       } else {
-        _reports = mapped;
-        _linkedOrder = null;
+        await _loadUnifiedList(myId);
       }
     } catch (e) {
       debugPrint('MyReportsController.load error: $e');
       _errorMessage = 'Unable to load your reports.';
       _reports = [];
+      _allItems = const [];
       _report = null;
     } finally {
       if (!_disposed) {
@@ -155,6 +146,115 @@ class MyReportsController extends ChangeNotifier {
         notifyListeners();
       }
     }
+  }
+
+  void applyFilters({
+    required BuyerReportTypeFilter type,
+    required BuyerReportStatusFilter status,
+  }) {
+    final changed = _typeFilter != type || _statusFilter != status;
+    final hadPage = _pageIndex != 0;
+    _typeFilter = type;
+    _statusFilter = status;
+    _pageIndex = 0;
+    if (changed || hadPage) notifyListeners();
+  }
+
+  void resetFilters() {
+    if (!isFilterActive && _pageIndex == 0) return;
+    _typeFilter = BuyerReportTypeFilter.all;
+    _statusFilter = BuyerReportStatusFilter.all;
+    _pageIndex = 0;
+    notifyListeners();
+  }
+
+  void goToPreviousPage() {
+    if (!canGoToPreviousPage) return;
+    _pageIndex--;
+    notifyListeners();
+  }
+
+  void goToNextPage() {
+    if (!canGoToNextPage) return;
+    _pageIndex++;
+    notifyListeners();
+  }
+
+  void _syncPageIndex() {
+    final pages = totalPages;
+    if (pages == 0) {
+      _pageIndex = 0;
+      return;
+    }
+    if (_pageIndex >= pages) _pageIndex = pages - 1;
+  }
+
+  ({BuyerReportTypeFilter type, BuyerReportStatusFilter status})
+  get appliedFilters => (type: _typeFilter, status: _statusFilter);
+
+  Future<void> _loadUnifiedList(String myId) async {
+    final data = await fetchBuyerMyReports(_supabase, myId);
+    _allItems = data.items;
+    _reports = data.communityReports;
+    _report = null;
+    _linkedOrder = null;
+    _syncPageIndex();
+  }
+
+  Future<void> _loadCommunityReportDetail(String myId) async {
+    var query = _supabase.client
+        .from('reports')
+        .select('*, report_evidence(report_evidence_id, file_path, created_at)')
+        .eq('reporter_id', myId)
+        .eq('report_id', reportId!);
+    final rows = await query.order('created_at', ascending: false);
+    final raw = (rows as List<dynamic>)
+        .map((row) => row as Map<String, dynamic>)
+        .toList();
+
+    final userIds = raw
+        .map((row) => row['reported_user_id'] as String?)
+        .whereType<String>()
+        .toSet();
+    final orderIds = raw
+        .map((row) => row['order_id'] as String?)
+        .whereType<String>()
+        .toSet();
+
+    final profiles = await loadPublicProfiles(_supabase, userIds);
+    final orderNumbers = await _loadOrderNumbers(orderIds);
+
+    final mapped = <CommunityReportModel>[];
+    for (final row in raw) {
+      final evidenceRows =
+          (row['report_evidence'] as List<dynamic>? ?? const [])
+              .map(
+                (item) => ReportEvidenceItem.fromSupabase(
+                  item as Map<String, dynamic>,
+                ),
+              )
+              .toList();
+      final reportedId = row['reported_user_id'] as String?;
+      final orderId = row['order_id'] as String?;
+      mapped.add(
+        CommunityReportModel.fromSupabase(
+          row,
+          reportedUser: reportedId == null ? null : profiles[reportedId],
+          orderNumber: orderId == null ? null : orderNumbers[orderId],
+          evidence: evidenceRows,
+        ),
+      );
+    }
+
+    _report = mapped.isEmpty ? null : mapped.first;
+    _linkedOrder = null;
+    if (_report == null) {
+      _errorMessage = 'Report not found.';
+    } else {
+      _report = await _withSignedUrls(_report!);
+      _linkedOrder = await _loadLinkedOrder(_report!);
+    }
+    _reports = mapped;
   }
 
   Future<OrderModel?> _loadLinkedOrder(CommunityReportModel report) async {

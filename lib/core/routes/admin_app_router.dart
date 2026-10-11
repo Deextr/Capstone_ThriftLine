@@ -3,16 +3,22 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../features/admin/controllers/admin_bid_risk_controller.dart';
+import '../../features/admin/controllers/admin_bidding_violations_controller.dart';
+import '../../features/admin/data/admin_bidding_violations_service.dart';
 import '../../features/admin/controllers/admin_dashboard_controller.dart';
 import '../../features/admin/controllers/admin_disabled_accounts_controller.dart';
 import '../../features/admin/controllers/admin_analytics_controller.dart';
+import '../../features/admin/controllers/admin_marketplace_reports_controller.dart';
+import '../../features/admin/domain/marketplace_report_catalog.dart';
+import '../../features/admin/presentation/web/admin_web_marketplace_reports_page.dart';
 import '../../features/admin/controllers/admin_disputes_controller.dart';
 import '../../features/admin/controllers/admin_disputes_hub_controller.dart';
 import '../../features/admin/controllers/admin_looking_for_report_controller.dart';
 import '../../features/admin/controllers/admin_orders_list_controller.dart';
+import '../../features/admin/domain/admin_order_management.dart';
+import '../../features/admin/domain/auction_bidding_violations.dart';
 import '../../features/admin/controllers/admin_reports_controller.dart';
 import '../../features/admin/controllers/admin_seller_applications_controller.dart';
-import '../../features/admin/controllers/admin_transactions_controller.dart';
 import '../../features/admin/controllers/admin_users_controller.dart';
 import '../../features/admin/data/admin_review_rules.dart';
 import '../../features/admin/presentation/screens/admin_bid_risk_events_screen.dart';
@@ -23,20 +29,20 @@ import '../../features/admin/presentation/screens/admin_looking_for_report_detai
 import '../../features/admin/presentation/screens/admin_report_detail_screen.dart';
 import '../../features/admin/presentation/screens/admin_review_screen.dart';
 import '../../features/admin/presentation/screens/admin_seller_applications_screen.dart';
+import '../../features/admin/controllers/admin_accounts_controller.dart';
+import '../../features/admin/data/admin_account_service.dart';
+import '../../features/admin/presentation/web/admin_accept_invite_screen.dart';
 import '../../features/admin/presentation/web/admin_access_denied_screen.dart';
+import '../../features/admin/presentation/web/admin_web_accounts_page.dart';
 import '../../features/admin/presentation/web/admin_login_screen.dart';
 import '../../features/admin/presentation/web/admin_verify_email_otp_screen.dart';
 import '../../features/admin/controllers/admin_audit_logs_controller.dart';
 import '../../features/admin/data/admin_audit_service.dart';
 import '../../features/admin/presentation/web/admin_web_logs_page.dart';
-import '../../features/admin/presentation/web/admin_web_order_detail_page.dart';
 import '../../features/admin/presentation/web/admin_web_analytics_reports_page.dart';
 import '../../features/admin/presentation/web/admin_web_disputes_page.dart';
+import '../../features/admin/presentation/web/admin_web_bidding_violations_page.dart';
 import '../../features/admin/presentation/web/admin_web_orders_transactions_page.dart';
-import '../../features/admin/controllers/admin_profile_controller.dart';
-import '../../features/admin/presentation/web/admin_web_profile_page.dart';
-import '../../features/admin/presentation/web/admin_web_settings_page.dart';
-import '../../features/auth/data/auth_service.dart';
 import '../../features/admin/presentation/web/admin_web_shell.dart';
 import '../../features/admin/presentation/web/admin_web_users_page.dart';
 import '../services/shared_preferences_service.dart';
@@ -59,7 +65,9 @@ GoRouter createAdminAppRouter({required AuthProvider authProvider}) {
       }
       return adminAppRedirect(
         isAuthenticated: authProvider.isAuthenticated,
-        isAdmin: authProvider.isAdmin,
+        canUseAdminPortal: authProvider.canUseAdminPortal,
+        isDeactivatedAdministrator: authProvider.isDeactivatedAdministrator,
+        isSuperAdmin: authProvider.isSuperAdmin,
         isFullyAuthenticated: authProvider.isFullyAuthenticated,
         isEmailOtpPending: authProvider.isEmailOtpPending,
         location: location,
@@ -77,6 +85,10 @@ GoRouter createAdminAppRouter({required AuthProvider authProvider}) {
       GoRoute(
         path: RouteNames.adminAccessDenied,
         builder: (_, _) => const AdminAccessDeniedScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.adminAcceptInvite,
+        builder: (_, _) => const AdminAcceptInviteScreen(),
       ),
       GoRoute(
         path: RouteNames.adminHome,
@@ -140,6 +152,10 @@ GoRouter createAdminAppRouter({required AuthProvider authProvider}) {
           ),
           GoRoute(
             path: RouteNames.adminReports,
+            redirect: (_, _) => RouteNames.adminMarketplaceReports,
+          ),
+          GoRoute(
+            path: RouteNames.adminAnalytics,
             builder: (context, _) => ChangeNotifierProvider(
               create: (context) => AdminAnalyticsController(
                 supabase: context.read<SupabaseService>(),
@@ -148,41 +164,70 @@ GoRouter createAdminAppRouter({required AuthProvider authProvider}) {
             ),
           ),
           GoRoute(
+            path: RouteNames.adminMarketplaceReports,
+            builder: (context, state) {
+              final selection = MarketplaceReportSelection.fromQuery(
+                state.uri.queryParameters['type'] ??
+                    state.uri.queryParameters['category'],
+              );
+              return ChangeNotifierProvider(
+                create: (context) => AdminMarketplaceReportsController(
+                  supabase: context.read<SupabaseService>(),
+                  isSuperAdmin: context.read<AuthProvider>().isSuperAdmin,
+                  initialSelection: selection,
+                ),
+                child: const AdminWebMarketplaceReportsPage(),
+              );
+            },
+          ),
+          GoRoute(
             path: RouteNames.adminReportsAll,
-            builder: (context, _) => ChangeNotifierProvider(
+            builder: (context, state) => ChangeNotifierProvider(
               create: (context) => AdminDisputesHubController(
                 supabase: context.read<SupabaseService>(),
                 initialCategory: AdminModerationCategory.all,
+                initialStatus: adminReportListFilterFromQuery(
+                  state.uri.queryParameters['status'],
+                ),
               ),
               child: const AdminWebDisputesPage(),
             ),
           ),
           GoRoute(
             path: RouteNames.adminReportsCommunity,
-            builder: (context, _) => ChangeNotifierProvider(
+            builder: (context, state) => ChangeNotifierProvider(
               create: (context) => AdminDisputesHubController(
                 supabase: context.read<SupabaseService>(),
                 initialCategory: AdminModerationCategory.community,
+                initialStatus: adminReportListFilterFromQuery(
+                  state.uri.queryParameters['status'],
+                ),
               ),
               child: const AdminWebDisputesPage(),
             ),
           ),
           GoRoute(
             path: RouteNames.adminReportsOrders,
-            builder: (context, _) => ChangeNotifierProvider(
+            builder: (context, state) => ChangeNotifierProvider(
               create: (context) => AdminDisputesHubController(
                 supabase: context.read<SupabaseService>(),
                 initialCategory: AdminModerationCategory.order,
+                initialStatus: adminReportListFilterFromQuery(
+                  state.uri.queryParameters['status'],
+                ),
               ),
               child: const AdminWebDisputesPage(),
             ),
           ),
           GoRoute(
             path: RouteNames.adminReportsLookingFor,
-            builder: (context, _) => ChangeNotifierProvider(
+            builder: (context, state) => ChangeNotifierProvider(
               create: (context) => AdminDisputesHubController(
                 supabase: context.read<SupabaseService>(),
                 initialCategory: AdminModerationCategory.lookingFor,
+                initialStatus: adminReportListFilterFromQuery(
+                  state.uri.queryParameters['status'],
+                ),
               ),
               child: const AdminWebDisputesPage(),
             ),
@@ -230,36 +275,53 @@ GoRouter createAdminAppRouter({required AuthProvider authProvider}) {
             redirect: (_, _) => RouteNames.adminOrdersTransactionsTab(),
           ),
           GoRoute(
+            path: RouteNames.adminBiddingViolations,
+            builder: (context, state) => ChangeNotifierProvider(
+              create: (context) => AdminBiddingViolationsController(
+                service: AdminBiddingViolationsService(
+                  supabase: context.read<SupabaseService>(),
+                ),
+                initialStatus:
+                    state.uri.queryParameters['enforcement'] ==
+                        'needs_attention'
+                    ? BiddingRestrictionStatusFilter.needsAttention
+                    : BiddingRestrictionStatusFilter.all,
+              ),
+              child: const AdminWebBiddingViolationsPage(),
+            ),
+          ),
+          GoRoute(
             path: RouteNames.adminOrdersTransactions,
             builder: (context, state) {
-              final tab = state.uri.queryParameters['tab'];
-              final initialTab = tab == 'transactions' ? 1 : 0;
-              return MultiProvider(
-                providers: [
-                  ChangeNotifierProvider(
-                    create: (context) => AdminOrdersListController(
-                      supabase: context.read<SupabaseService>(),
-                    ),
+              final orderId = state.uri.queryParameters['order'];
+              final category = AdminOrderCategoryX.fromQuery(
+                state.uri.queryParameters['category'],
+              );
+              return ChangeNotifierProvider(
+                create: (context) => AdminOrdersListController(
+                  supabase: context.read<SupabaseService>(),
+                  initialCategory: category,
+                  initialStatus: adminUnifiedStatusFromQuery(
+                    state.uri.queryParameters['status'],
                   ),
-                  ChangeNotifierProvider(
-                    create: (context) => AdminTransactionsController(
-                      supabase: context.read<SupabaseService>(),
-                    ),
-                  ),
-                ],
-                child: AdminWebOrdersTransactionsPage(initialTab: initialTab),
+                ),
+                child: AdminWebOrdersTransactionsPage(initialOrderId: orderId),
               );
             },
           ),
           GoRoute(
             path: RouteNames.adminOrderDetail,
-            builder: (_, state) =>
-                AdminWebOrderDetailPage(orderId: state.pathParameters['id']!),
+            redirect: (_, state) {
+              final id = state.pathParameters['id'];
+              if (id == null || id.isEmpty) {
+                return RouteNames.adminOrdersTransactions;
+              }
+              return RouteNames.adminOrderDetailModalFor(id);
+            },
           ),
           GoRoute(
             path: RouteNames.adminTransactions,
-            redirect: (_, _) =>
-                RouteNames.adminOrdersTransactionsTab(transactions: true),
+            redirect: (_, _) => RouteNames.adminOrdersTransactions,
           ),
           GoRoute(
             path: RouteNames.adminDisputes,
@@ -285,6 +347,15 @@ GoRouter createAdminAppRouter({required AuthProvider authProvider}) {
             ),
           ),
           GoRoute(
+            path: RouteNames.adminAdministrators,
+            builder: (context, _) => ChangeNotifierProvider(
+              create: (context) => AdminAccountsController(
+                service: AdminAccountService(context.read<SupabaseService>()),
+              ),
+              child: const AdminWebAccountsPage(),
+            ),
+          ),
+          GoRoute(
             path: RouteNames.adminLogs,
             builder: (context, _) => ChangeNotifierProvider(
               create: (context) => AdminAuditLogsController(
@@ -295,18 +366,11 @@ GoRouter createAdminAppRouter({required AuthProvider authProvider}) {
           ),
           GoRoute(
             path: RouteNames.adminSettings,
-            builder: (_, _) => const AdminWebSettingsPage(),
+            redirect: (_, _) => RouteNames.adminDashboard,
           ),
           GoRoute(
             path: RouteNames.adminProfile,
-            builder: (context, _) => ChangeNotifierProvider(
-              create: (context) => AdminProfileController(
-                supabase: context.read<SupabaseService>(),
-                auth: context.read<AuthProvider>(),
-                authService: context.read<AuthService>(),
-              ),
-              child: const AdminWebProfilePage(),
-            ),
+            redirect: (_, _) => RouteNames.adminDashboard,
           ),
         ],
       ),

@@ -11,6 +11,7 @@ import '../../data/admin_moderation_queue_service.dart';
 import '../../data/admin_review_rules.dart';
 import '../widgets/admin_ui_components.dart';
 import '../widgets/community_dispute_review_modal.dart';
+import '../widgets/admin_looking_for_queue_cells.dart';
 import '../widgets/looking_for_dispute_review_modal.dart';
 import '../widgets/order_dispute_review_modal.dart';
 
@@ -27,11 +28,20 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(_onSearchChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncRouteCategory());
+  }
+
+  void _onSearchChanged() {
+    if (!mounted) return;
+    context.read<AdminDisputesHubController>().scheduleSearch(
+      _searchController.text,
+    );
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -123,19 +133,6 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
               controller.resetFilters();
               context.go(RouteNames.adminReportsAll);
             },
-            trailing: OutlinedButton.icon(
-              onPressed: controller.isLoading ? null : () => controller.load(),
-              icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('Refresh'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.textPrimary,
-                side: const BorderSide(color: AppColors.border),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-              ),
-            ),
             children: [
               AdminSearchField(
                 controller: _searchController,
@@ -144,34 +141,75 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
                 onSubmitted: controller.setSearch,
                 onClear: () => controller.setSearch(''),
               ),
-              AdminFilterDropdown<AdminReportListFilter>(
-                value: controller.statusFilter,
-                items: const [
-                  DropdownMenuItem(
-                    value: AdminReportListFilter.all,
-                    child: Text('All statuses'),
-                  ),
-                  DropdownMenuItem(
-                    value: AdminReportListFilter.underReview,
-                    child: Text('Under review'),
-                  ),
-                  DropdownMenuItem(
-                    value: AdminReportListFilter.needsMoreEvidence,
-                    child: Text('Needs more evidence'),
-                  ),
-                  DropdownMenuItem(
-                    value: AdminReportListFilter.resolved,
-                    child: Text('Resolved'),
-                  ),
-                  DropdownMenuItem(
-                    value: AdminReportListFilter.dismissed,
-                    child: Text('Dismissed'),
-                  ),
-                ],
-                onChanged: (v) {
-                  if (v != null) controller.setStatusFilter(v);
-                },
-              ),
+              if (controller.isLookingForCategory)
+                AdminFilterDropdown<AdminLookingForLifecycleFilter>(
+                  value: controller.lfLifecycleFilter,
+                  items: AdminLookingForLifecycleFilter.values
+                      .map(
+                        (f) => DropdownMenuItem(
+                          value: f,
+                          child: Text(adminLookingForLifecycleFilterLabel(f)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) controller.setLfLifecycleFilter(v);
+                  },
+                )
+              else
+                AdminFilterDropdown<AdminReportListFilter>(
+                  value: controller.statusFilter,
+                  items: const [
+                    DropdownMenuItem(
+                      value: AdminReportListFilter.all,
+                      child: Text('All statuses'),
+                    ),
+                    DropdownMenuItem(
+                      value: AdminReportListFilter.underReview,
+                      child: Text('Under review'),
+                    ),
+                    DropdownMenuItem(
+                      value: AdminReportListFilter.needsMoreEvidence,
+                      child: Text('Needs more evidence'),
+                    ),
+                    DropdownMenuItem(
+                      value: AdminReportListFilter.resolved,
+                      child: Text('Resolved'),
+                    ),
+                    DropdownMenuItem(
+                      value: AdminReportListFilter.dismissed,
+                      child: Text('Dismissed'),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) controller.setStatusFilter(v);
+                  },
+                ),
+              if (controller.isLookingForCategory)
+                AdminFilterDropdown<AdminReportListFilter>(
+                  value: controller.statusFilter,
+                  items: const [
+                    DropdownMenuItem(
+                      value: AdminReportListFilter.all,
+                      child: Text('All moderation statuses'),
+                    ),
+                    DropdownMenuItem(
+                      value: AdminReportListFilter.underReview,
+                      child: Text('Under review'),
+                    ),
+                    DropdownMenuItem(
+                      value: AdminReportListFilter.resolved,
+                      child: Text('Resolved'),
+                    ),
+                    DropdownMenuItem(
+                      value: AdminReportListFilter.dismissed,
+                      child: Text('Dismissed'),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) controller.setStatusFilter(v);
+                  },
+                ),
               AdminFilterDropdown<AdminDatePreset?>(
                 value: controller.dateWindow?.preset,
                 items: const [
@@ -244,8 +282,10 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
           ],
           AdminDataTable(
             isLoading: controller.isLoading,
-            minWidth: 840,
-            columnFlex: const [2, 2, 3, 2, 2, 1],
+            minWidth: controller.isLookingForCategory ? 1020 : 840,
+            columnFlex: controller.isLookingForCategory
+                ? const [4, 2, 2, 2, 2, 2, 1]
+                : const [2, 2, 3, 2, 2, 1],
             emptyTitle: 'No disputes found',
             emptyMessage:
                 'Try adjusting your search or filters. New disputes and reports appear here when submitted.',
@@ -255,46 +295,74 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
             onRowTap: [
               for (final row in controller.items) () => _openCase(row),
             ],
-            columns: const [
-              'Case',
-              'Dispute Type',
-              'Reporter',
-              'Date Submitted',
-              'Status',
-              'Action',
-            ],
-            rows: [
-              for (final row in controller.items)
-                [
-                  AdminTableCellText(
-                    primary: adminModerationCaseRef(row.caseId),
-                    primaryStyle: AppTypography.tableBody.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  AdminTableCellText(
-                    primary: adminModerationCaseKindShortLabel(row.caseKind),
-                    primaryStyle: AppTypography.tableBody.copyWith(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  AdminTableCellText(primary: row.actorName),
-                  AdminTableDateCell(dateTime: row.createdAt),
-                  AdminStatusBadge(
-                    status: row.statusRaw,
-                    label: adminModerationStatusLabel(
-                      source: row.source,
-                      statusRaw: row.statusRaw,
-                    ),
-                  ),
-                  AdminTableLinkAction(
-                    label: 'Review',
-                    onPressed: () => _openCase(row),
-                  ),
-                ],
-            ],
+            columns: controller.isLookingForCategory
+                ? const [
+                    'Post',
+                    'Reporter',
+                    'Reported member',
+                    'Dispute',
+                    'Post status',
+                    'Reported',
+                    'Review',
+                  ]
+                : const [
+                    'Case',
+                    'Dispute Type',
+                    'Reporter',
+                    'Date Submitted',
+                    'Status',
+                    'Action',
+                  ],
+            rows: controller.isLookingForCategory
+                ? [
+                    for (final row in controller.items)
+                      [
+                        AdminLookingForQueuePostCell(row: row),
+                        AdminTableCellText(primary: row.actorName),
+                        AdminTableCellText(primary: row.subjectName),
+                        AdminLookingForDisputeStatusCell(row: row),
+                        AdminLookingForPostStatusCell(row: row),
+                        AdminTableDateCell(dateTime: row.createdAt),
+                        AdminTableLinkAction(
+                          label: 'Review',
+                          onPressed: () => _openCase(row),
+                        ),
+                      ],
+                  ]
+                : [
+                    for (final row in controller.items)
+                      [
+                        AdminTableCellText(
+                          primary: adminModerationCaseRef(row.caseId),
+                          primaryStyle: AppTypography.tableBody.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        AdminTableCellText(
+                          primary: adminModerationCaseKindShortLabel(
+                            row.caseKind,
+                          ),
+                          primaryStyle: AppTypography.tableBody.copyWith(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        AdminTableCellText(primary: row.actorName),
+                        AdminTableDateCell(dateTime: row.createdAt),
+                        AdminStatusBadge(
+                          status: row.statusRaw,
+                          label: adminModerationStatusLabel(
+                            source: row.source,
+                            statusRaw: row.statusRaw,
+                          ),
+                        ),
+                        AdminTableLinkAction(
+                          label: 'Review',
+                          onPressed: () => _openCase(row),
+                        ),
+                      ],
+                  ],
           ),
           const SizedBox(height: 16),
           AdminPagination(

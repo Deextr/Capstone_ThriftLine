@@ -286,7 +286,7 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                                 Container(color: AppColors.surfaceVariant),
                             errorWidget: (_, _, _) => Container(
                               color: AppColors.surfaceVariant,
-                              child: const Icon(
+                              child: Icon(
                                 Icons.image_outlined,
                                 color: AppColors.textHint,
                               ),
@@ -488,7 +488,7 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                                 Container(color: AppColors.surfaceVariant),
                             errorWidget: (_, _, _) => Container(
                               color: AppColors.surfaceVariant,
-                              child: const Icon(
+                              child: Icon(
                                 Icons.image_outlined,
                                 color: AppColors.textHint,
                               ),
@@ -630,7 +630,7 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                   ],
                 ),
               ),
-              const Divider(height: 1, color: AppColors.border),
+              Divider(height: 1, color: AppColors.border),
               ...history.map<Widget>((b) {
                 final isMe =
                     b.username == myUsername || b.username.contains('You');

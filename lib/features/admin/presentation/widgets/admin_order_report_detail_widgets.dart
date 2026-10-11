@@ -208,7 +208,7 @@ class AdminOrderReportSummaryCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Text(
             '${adminModerationCaseRef(report.id)} · Filed ${formatAdminTableDateTime(report.createdAt)}',
             style: AppTypography.caption.copyWith(
@@ -256,7 +256,7 @@ class AdminOrderReportSummaryCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   reporter,
-                  const SizedBox(height: 14),
+                  SizedBox(height: 14),
                   reported,
                   const SizedBox(height: 14),
                   orderTile,
@@ -266,7 +266,7 @@ class AdminOrderReportSummaryCard extends StatelessWidget {
           ),
           if (closed) ...[
             const SizedBox(height: 16),
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.border),
             const SizedBox(height: 12),
             _ClosedOutcomeLine(report: report),
           ],
@@ -340,7 +340,7 @@ class _SummaryPartyTile extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         Text(
           name,
           style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
@@ -457,9 +457,11 @@ class AdminOrderReportDescriptionSection extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 14),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFFBEB),
+                color: AppColors.warningSoft,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFFDE68A)),
+                border: Border.all(
+                  color: AppColors.warningForeground.withValues(alpha: 0.35),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -610,7 +612,7 @@ class AdminOrderReportOrderCard extends StatelessWidget {
                         height: 1.35,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Text(
                       'Qty ${o.quantity} · ${formatCurrency(o.total)}',
                       style: AppTypography.caption.copyWith(
@@ -760,7 +762,7 @@ class AdminOrderReportEvidenceSection extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           if (items.isEmpty ||
               items.every((e) => (e.signedUrl ?? '').trim().isEmpty))
             Text(
@@ -785,7 +787,7 @@ class AdminOrderReportEvidenceSection extends StatelessWidget {
               ],
             ),
             if (report.evidenceAttemptCount > 1 && items.isNotEmpty) ...[
-              const SizedBox(height: 10),
+              SizedBox(height: 10),
               Text(
                 'Latest upload ${formatAdminTableDateTime(items.last.createdAt)}',
                 style: AppTypography.caption.copyWith(
@@ -828,7 +830,7 @@ class AdminOrderReportResolutionSection extends StatelessWidget {
               style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
             ),
           if (report.resolvedAt != null) ...[
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             Text(
               'Closed ${formatAdminTableDateTime(report.resolvedAt!)}',
               style: AppTypography.caption.copyWith(
@@ -837,7 +839,7 @@ class AdminOrderReportResolutionSection extends StatelessWidget {
             ),
           ],
           if (note != null && note.isNotEmpty) ...[
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             Text(note, style: AppTypography.body.copyWith(height: 1.5)),
           ] else if (financial == null) ...[
             const SizedBox(height: 4),
@@ -928,7 +930,7 @@ class AdminOrderReportMissingEscrowNotice extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(Icons.info_outline, size: 18, color: AppColors.textSecondary),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             Expanded(
               child: Text(
                 'Escrow is not linked yet. Refund and release stay disabled until a delivery dispute holds this order\'s payment.',

@@ -125,12 +125,12 @@ class DavaoBarangayField extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: InputDecorator(
               decoration: InputDecoration(
-                prefixIcon: const Icon(
+                prefixIcon: Icon(
                   Icons.location_city_outlined,
                   color: AppColors.textHint,
                   size: 20,
                 ),
-                suffixIcon: const Icon(
+                suffixIcon: Icon(
                   Icons.keyboard_arrow_down,
                   color: AppColors.textHint,
                 ),
@@ -142,11 +142,11 @@ class DavaoBarangayField extends StatelessWidget {
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.border),
+                  borderSide: BorderSide(color: AppColors.border),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.border),
+                  borderSide: BorderSide(color: AppColors.border),
                 ),
               ),
               child: Text(

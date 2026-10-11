@@ -5,10 +5,14 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/theme/app_palette.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../data/admin_dashboard_models.dart';
+import '../../data/admin_marketplace_dashboard.dart';
+import '../../domain/admin_dashboard_comparison.dart';
+import '../../domain/admin_dashboard_period.dart';
 import 'admin_review_widgets.dart';
 
 final _countFormat = NumberFormat.decimalPattern();
@@ -22,7 +26,7 @@ class AdminDashboardBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFFFEF3C7),
+        color: AppColors.warningSoft,
         borderRadius: BorderRadius.circular(AppConstants.radiusSm),
       ),
       child: Padding(
@@ -30,7 +34,7 @@ class AdminDashboardBanner extends StatelessWidget {
         child: Text(
           message,
           style: AppTypography.caption.copyWith(
-            color: const Color(0xFF92400E),
+            color: AppColors.warningForeground,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -77,7 +81,7 @@ class AdminOverviewCard extends StatelessWidget {
                 size: 18,
                 color: attention ? AppColors.primary : AppColors.textSecondary,
               ),
-              const Spacer(),
+              Spacer(),
               if (onTap != null)
                 Icon(
                   Icons.chevron_right,
@@ -93,7 +97,7 @@ class AdminOverviewCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: AppTypography.heading.copyWith(fontSize: 20),
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: 2),
           Text(
             label,
             maxLines: 1,
@@ -149,7 +153,7 @@ class AdminOverviewCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
+    return SizedBox(
       height: AdminOverviewCard.cardHeight,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -258,7 +262,7 @@ class AdminDashboardDateRangeBar extends StatelessWidget {
           ),
         ),
         if (customCaption != null) ...[
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             customCaption,
             style: AppTypography.caption.copyWith(
@@ -481,7 +485,7 @@ class AdminTrendChart extends StatelessWidget {
                 child: _LineChart(points: points),
               ),
             if (breakdown.isNotEmpty) ...[
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Wrap(
                 spacing: 12,
                 runSpacing: 6,
@@ -532,11 +536,11 @@ class _LineChart extends StatelessWidget {
           drawVerticalLine: false,
           horizontalInterval: _interval(top),
           getDrawingHorizontalLine: (_) =>
-              const FlLine(color: AppColors.border, strokeWidth: 1),
+              FlLine(color: AppColors.border, strokeWidth: 1),
         ),
         borderData: FlBorderData(
           show: true,
-          border: const Border(
+          border: Border(
             left: BorderSide(color: AppColors.border),
             bottom: BorderSide(color: AppColors.border),
           ),
@@ -776,7 +780,7 @@ class AdminPendingVerificationCard extends StatelessWidget {
         color: AppColors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-          side: const BorderSide(color: AppColors.border),
+          side: BorderSide(color: AppColors.border),
         ),
         child: InkWell(
           onTap: onReview,
@@ -810,7 +814,7 @@ class AdminPendingVerificationCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: AppTypography.subheading,
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: 2),
                       Text(
                         applicantName,
                         maxLines: 1,
@@ -844,4 +848,778 @@ class AdminPendingVerificationCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class AdminDashboardPeriodBar extends StatelessWidget {
+  const AdminDashboardPeriodBar({
+    super.key,
+    required this.period,
+    required this.onSelected,
+  });
+
+  final AdminDashboardPeriod period;
+  final Future<void> Function(AdminDashboardRange range) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (
+                    var i = 0;
+                    i < AdminDashboardRange.values.length;
+                    i++
+                  ) ...[
+                    if (i > 0) const SizedBox(width: 4),
+                    _AdminDateSegment(
+                      label: adminDashboardRangeLabel(
+                        AdminDashboardRange.values[i],
+                      ),
+                      selected: period.range == AdminDashboardRange.values[i],
+                      onTap: () => onSelected(AdminDashboardRange.values[i]),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (period.range == AdminDashboardRange.custom) ...[
+          const SizedBox(height: 8),
+          Text(
+            period.chipLabel,
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+Future<AdminDashboardPeriod?> showAdminDashboardRangePicker(
+  BuildContext context, {
+  AdminDashboardPeriod? initial,
+}) {
+  final wall = manilaWallClock(DateTime.now().toUtc());
+  final today = DateTime(wall.year, wall.month, wall.day);
+  var start = initial?.customStart == null
+      ? today
+      : DateTime(
+          initial!.customStart!.year,
+          initial.customStart!.month,
+          initial.customStart!.day,
+        );
+  var end = initial?.customEnd == null
+      ? today
+      : DateTime(
+          initial!.customEnd!.year,
+          initial.customEnd!.month,
+          initial.customEnd!.day,
+        );
+  if (start.isAfter(today)) start = today;
+  if (end.isAfter(today)) end = today;
+
+  return showDialog<AdminDashboardPeriod>(
+    context: context,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          Future<void> pick({required bool isStart}) async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: isStart ? start : end,
+              firstDate: DateTime(2020),
+              lastDate: today,
+            );
+            if (picked == null) return;
+            setState(() {
+              final day = DateTime(picked.year, picked.month, picked.day);
+              if (isStart) {
+                start = day;
+                if (end.isBefore(start)) end = start;
+              } else {
+                end = day;
+                if (end.isBefore(start)) start = end;
+              }
+            });
+          }
+
+          return AlertDialog(
+            title: const Text('Custom range'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Dates use Philippine time.'),
+                const SizedBox(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Start date'),
+                  subtitle: Text(formatFullDate(start)),
+                  trailing: const Icon(Icons.calendar_today_outlined, size: 18),
+                  onTap: () => pick(isStart: true),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('End date'),
+                  subtitle: Text(formatFullDate(end)),
+                  trailing: const Icon(Icons.calendar_today_outlined, size: 18),
+                  onTap: () => pick(isStart: false),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: end.isBefore(start)
+                    ? null
+                    : () {
+                        Navigator.of(dialogContext).pop(
+                          AdminDashboardPeriod.custom(start: start, end: end),
+                        );
+                      },
+                child: const Text('Apply'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
+class AdminKpiTile extends StatelessWidget {
+  const AdminKpiTile({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.caption,
+    this.delta,
+  });
+
+  final String label;
+  final String value;
+  final String caption;
+  final AdminPeriodDelta? delta;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final deltaColor = switch (delta?.tone) {
+      AdminDeltaTone.positive => AppColors.success,
+      AdminDeltaTone.negative => AppColors.error,
+      _ => AppColors.textSecondary,
+    };
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.heading.copyWith(fontSize: 22),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              caption,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.caption,
+            ),
+            if (delta != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                delta!.text,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.caption.copyWith(
+                  color: deltaColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AdminDashboardPanel extends StatelessWidget {
+  const AdminDashboardPanel({
+    super.key,
+    required this.title,
+    required this.child,
+    this.subtitle,
+  });
+
+  final String title;
+  final String? subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: AppTypography.subheading),
+            if (subtitle != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle!,
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AdminStatLine extends StatelessWidget {
+  const AdminStatLine({
+    super.key,
+    required this.label,
+    required this.value,
+    this.note,
+  });
+
+  final String label;
+  final String value;
+  final String? note;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: AppTypography.body.copyWith(color: AppColors.textPrimary),
+            ),
+          ),
+          if (note != null) ...[
+            Text(
+              note!,
+              style: AppTypography.caption.copyWith(color: AppColors.textHint),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Text(
+            value,
+            style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AdminAttentionLine extends StatelessWidget {
+  const AdminAttentionLine({
+    super.key,
+    required this.label,
+    required this.count,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final waiting = count > 0;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: AppTypography.body.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            Text(
+              formatDashboardCount(count),
+              style: AppTypography.body.copyWith(
+                fontWeight: FontWeight.w700,
+                color: waiting
+                    ? AppColors.warningForeground
+                    : AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right, size: 18, color: AppColors.textHint),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AdminActivityRow extends StatelessWidget {
+  const AdminActivityRow({super.key, required this.item, this.onTap});
+
+  final AdminRecentActivity item;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final actor = switch (item.actor) {
+      'admin' => 'Admin',
+      'system' => 'System',
+      _ => 'Member',
+    };
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.title, style: AppTypography.body),
+                  if (item.detail.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      item.detail,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.caption,
+                    ),
+                  ],
+                  const SizedBox(height: 2),
+                  Text(
+                    actor,
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textHint,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Text(
+                formatAdminReportDateTime(item.occurredAt),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            if (onTap != null)
+              Icon(Icons.chevron_right, size: 18, color: AppColors.textHint),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AdminRevenueChart extends StatelessWidget {
+  const AdminRevenueChart({
+    super.key,
+    required this.points,
+    required this.bucket,
+    required this.showComparison,
+  });
+
+  final List<AdminRevenuePoint> points;
+  final AdminDashboardBucket bucket;
+  final bool showComparison;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final palette = context.palette;
+    final hasComparison =
+        showComparison && points.any((point) => point.previous != null);
+    final empty =
+        points.isEmpty ||
+        points.every(
+          (point) =>
+              point.current == 0 &&
+              (point.previous == null || point.previous == 0),
+        );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+        border: Border.all(color: palette.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Platform revenue', style: AppTypography.subheading),
+            const SizedBox(height: 2),
+            Text(
+              'ThriftLine fees on paid orders that have not been refunded.',
+              style: AppTypography.caption.copyWith(
+                color: palette.textSecondary,
+              ),
+            ),
+            if (hasComparison) ...[
+              const SizedBox(height: 10),
+              const _RevenueLegend(),
+            ],
+            const SizedBox(height: 12),
+            if (empty)
+              const AdminDashboardEmptyLine(
+                'No platform revenue in this period.',
+              )
+            else
+              SizedBox(
+                height: 260,
+                width: double.infinity,
+                child: _RevenuePlot(
+                  points: points,
+                  bucket: bucket,
+                  dark: dark,
+                  showComparison: hasComparison,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RevenueLegend extends StatelessWidget {
+  const _RevenueLegend();
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Row(
+      children: [
+        _LegendSwatch(
+          color: dark ? const Color(0xFF5EEAD4) : AppPalette.brandPrimary,
+          dashed: false,
+          label: 'Current period',
+        ),
+        const SizedBox(width: 16),
+        _LegendSwatch(
+          color: dark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+          dashed: true,
+          label: 'Previous period',
+        ),
+      ],
+    );
+  }
+}
+
+class _LegendSwatch extends StatelessWidget {
+  const _LegendSwatch({
+    required this.color,
+    required this.dashed,
+    required this.label,
+  });
+
+  final Color color;
+  final bool dashed;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 18,
+          height: dashed ? 0 : 8,
+          decoration: dashed
+              ? null
+              : BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+          child: dashed
+              ? Align(
+                  alignment: Alignment.center,
+                  child: Container(height: 2, color: color),
+                )
+              : null,
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: AppTypography.caption),
+      ],
+    );
+  }
+}
+
+class _RevenuePlot extends StatelessWidget {
+  const _RevenuePlot({
+    required this.points,
+    required this.bucket,
+    required this.dark,
+    required this.showComparison,
+  });
+
+  final List<AdminRevenuePoint> points;
+  final AdminDashboardBucket bucket;
+  final bool dark;
+  final bool showComparison;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final line = dark ? const Color(0xFF5EEAD4) : AppPalette.brandPrimary;
+    final previousColor = dark
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+    var maxY = 0.0;
+    for (final point in points) {
+      if (point.current > maxY) maxY = point.current;
+      final previous = point.previous;
+      if (previous != null && previous > maxY) maxY = previous;
+    }
+    final top = maxY <= 0 ? 1.0 : maxY * 1.18;
+    final currentSpots = [
+      for (var i = 0; i < points.length; i++)
+        FlSpot(i.toDouble(), points[i].current),
+    ];
+    final previousSpots = [
+      for (var i = 0; i < points.length; i++)
+        FlSpot(i.toDouble(), points[i].previous ?? 0),
+    ];
+    final labelEvery = _labelEvery(points.length);
+    final grid = palette.border.withValues(alpha: dark ? 0.55 : 1);
+
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: (points.length - 1).clamp(1, 100000).toDouble(),
+        minY: 0,
+        maxY: top,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: _interval(top),
+          getDrawingHorizontalLine: (_) => FlLine(color: grid, strokeWidth: 1),
+        ),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 72,
+              interval: _interval(top),
+              getTitlesWidget: (value, _) {
+                if (value < 0 || value > top + 0.001) {
+                  return const SizedBox.shrink();
+                }
+                return Text(
+                  formatDashboardPeso(value),
+                  style: AppTypography.caption.copyWith(fontSize: 10),
+                );
+              },
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 28,
+              interval: 1,
+              getTitlesWidget: (value, _) {
+                final index = value.round();
+                if (index < 0 || index >= points.length) {
+                  return const SizedBox.shrink();
+                }
+                if (index % labelEvery != 0 && index != points.length - 1) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    adminRevenueAxisLabel(points[index].at, bucket),
+                    style: AppTypography.caption.copyWith(fontSize: 10),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        lineTouchData: LineTouchData(
+          handleBuiltInTouches: true,
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipColor: (_) =>
+                dark ? const Color(0xFF0F172A) : const Color(0xFF134E4A),
+            fitInsideHorizontally: true,
+            fitInsideVertically: true,
+            getTooltipItems: (touched) {
+              return [
+                for (final spot in touched)
+                  spot.barIndex == 0 &&
+                          spot.x.round() >= 0 &&
+                          spot.x.round() < points.length
+                      ? LineTooltipItem(
+                          _tooltip(
+                            points[spot.x.round()],
+                            bucket,
+                            showComparison,
+                          ),
+                          AppTypography.caption.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            height: 1.35,
+                          ),
+                        )
+                      : null,
+              ];
+            },
+          ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: currentSpots,
+            isCurved: currentSpots.length > 2,
+            curveSmoothness: 0.22,
+            color: line,
+            barWidth: 2.5,
+            shadow: Shadow(
+              color: line.withValues(alpha: dark ? 0.45 : 0.18),
+              blurRadius: dark ? 8 : 4,
+            ),
+            dotData: FlDotData(show: currentSpots.length <= 14),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  line.withValues(alpha: dark ? 0.28 : 0.22),
+                  line.withValues(alpha: 0),
+                ],
+              ),
+            ),
+          ),
+          if (showComparison)
+            LineChartBarData(
+              spots: previousSpots,
+              isCurved: previousSpots.length > 2,
+              curveSmoothness: 0.22,
+              color: previousColor,
+              barWidth: 1.5,
+              dashArray: const [5, 4],
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(show: false),
+            ),
+        ],
+      ),
+      duration: Duration.zero,
+    );
+  }
+
+  int _labelEvery(int length) {
+    if (length <= 8) return 1;
+    if (length <= 16) return 2;
+    if (length <= 31) return 5;
+    return 4;
+  }
+
+  double _interval(double top) {
+    if (top <= 4) return 1;
+    if (top <= 20) return 5;
+    if (top <= 100) return 25;
+    if (top <= 1000) return 250;
+    return (top / 4).ceilToDouble();
+  }
+}
+
+String adminRevenueAxisLabel(DateTime at, AdminDashboardBucket bucket) {
+  final wall = toPhilippinesTime(at);
+  return switch (bucket) {
+    AdminDashboardBucket.hour => DateFormat('h a').format(wall),
+    AdminDashboardBucket.day => DateFormat('MMM d').format(wall),
+    AdminDashboardBucket.month => DateFormat('MMM yyyy').format(wall),
+    AdminDashboardBucket.year ||
+    AdminDashboardBucket.auto => DateFormat('yyyy').format(wall),
+  };
+}
+
+String _tooltip(
+  AdminRevenuePoint point,
+  AdminDashboardBucket bucket,
+  bool showComparison,
+) {
+  final when = adminRevenueAxisLabel(point.at, bucket);
+  final current = formatDashboardPeso(point.current);
+  if (!showComparison || point.previous == null) {
+    return '$when\n$current';
+  }
+  return '$when\nCurrent $current\nPrevious ${formatDashboardPeso(point.previous!)}';
 }

@@ -74,7 +74,7 @@ class _FeedPostSkeleton extends StatelessWidget {
               aspectRatio: 4 / 3,
               child: SkeletonBox(width: double.infinity, height: 200),
             ),
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.border),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Row(

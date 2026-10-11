@@ -143,14 +143,14 @@ ReportReason? reportReasonBySlug(String slug) {
     if (reason.slug == slug) return reason;
   }
   return switch (slug) {
-    'fake_item' ||
-    'fake_product' =>
-      kCommunityReportReasons.firstWhere((r) => r.slug == 'counterfeit_item'),
-    'abusive_behavior' ||
-    'inappropriate_messages' =>
+    'fake_item' || 'fake_product' => kCommunityReportReasons.firstWhere(
+      (r) => r.slug == 'counterfeit_item',
+    ),
+    'abusive_behavior' || 'inappropriate_messages' =>
       kCommunityReportReasons.firstWhere((r) => r.slug == 'harassment'),
-    'failure_to_ship' =>
-      kCommunityReportReasons.firstWhere((r) => r.slug == 'suspicious_activity'),
+    'failure_to_ship' => kCommunityReportReasons.firstWhere(
+      (r) => r.slug == 'suspicious_activity',
+    ),
     _ => null,
   };
 }
@@ -202,8 +202,7 @@ String reportStatusDescription(String status) {
           'submit additional evidence if you still have attempts left.',
     'action_taken' =>
       "We've completed our review and taken the appropriate action.",
-    'resolved' =>
-      "We've completed our review and closed your report.",
+    'resolved' => "We've completed our review and closed your report.",
     'dismissed' =>
       "We reviewed your report, but there wasn't enough evidence to "
           'support the claim.',

@@ -96,7 +96,7 @@ class _ShareLookingForSheetState extends State<ShareLookingForSheet> {
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Container(
         height: MediaQuery.sizeOf(context).height * 0.7,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),

@@ -144,6 +144,7 @@ abstract final class RouteNames {
 
   static const String reportSeller = '/report-seller';
   static const String myReports = '/my-reports';
+  static const String myLookingForReportDetail = '/my-reports/looking-for/:id';
   static const String reportDetail = '/my-reports/:id';
   static const String accountReview = '/account-review/:reportId';
   static const String leaveReview = '/leave-review/:orderId';
@@ -155,6 +156,9 @@ abstract final class RouteNames {
       reviews ? '$buyerToRate?tab=reviews' : buyerToRate;
 
   static String reportDetailFor(String id) => '/my-reports/$id';
+
+  static String myLookingForReportDetailFor(String id) =>
+      '/my-reports/looking-for/$id';
 
   static String accountReviewFor(String reportId) =>
       '/account-review/$reportId';
@@ -190,7 +194,11 @@ abstract final class RouteNames {
   static const String adminVerificationReview = '/admin/verifications/:id';
   static const String adminReview = '/admin/review/:id';
   static const String adminReports = '/admin/reports';
+  static const String adminMarketplaceReports = '/admin/marketplace-reports';
+  static const String adminAnalytics = '/admin/analytics';
   static const String adminLogs = '/admin/logs';
+  static const String adminAdministrators = '/admin/administrators';
+  static const String adminAcceptInvite = '/admin/accept-invite';
   static const String adminReportsAll = '/admin/reports/all';
   static const String adminReportsCommunity = '/admin/reports/community';
   static const String adminReportsOrders = '/admin/reports/orders';
@@ -202,6 +210,7 @@ abstract final class RouteNames {
   static const String adminLookingForReport = '/admin/looking-for-reports/:id';
   static const String adminDisabledAccounts = '/admin/disabled-accounts';
   static const String adminBidRiskEvents = '/admin/bid-risk-events';
+  static const String adminBiddingViolations = '/admin/bidding-violations';
   static const String adminUsers = '/admin/users';
   static const String adminOrders = '/admin/orders';
   static const String adminOrdersTransactions = '/admin/orders-transactions';
@@ -242,9 +251,36 @@ abstract final class RouteNames {
       };
 
   static String adminOrdersTransactionsTab({bool transactions = false}) =>
-      transactions
-      ? '$adminOrdersTransactions?tab=transactions'
-      : '$adminOrdersTransactions?tab=orders';
+      adminOrdersTransactions;
+
+  static String adminOrderDetailModalFor(String orderId) =>
+      '$adminOrdersTransactions?order=$orderId';
+
+  static String adminOrdersTransactionsQuery({
+    String category = 'all',
+    String? orderId,
+  }) {
+    final params = <String, String>{
+      'category': category,
+      if (orderId != null && orderId.isNotEmpty) 'order': orderId,
+    };
+    return Uri(
+      path: adminOrdersTransactions,
+      queryParameters: params,
+    ).toString();
+  }
+
+  static String adminVerificationsStatus(String status) =>
+      '$adminVerifications?status=$status';
+
+  static String adminReportsOpen(AdminReportKind kind) =>
+      '${adminReportsCategoryFor(kind)}?status=under_review';
+
+  static String adminBiddingNeedsAttention() =>
+      '$adminBiddingViolations?enforcement=needs_attention';
+
+  static String adminOrdersPaymentReview() =>
+      '$adminOrdersTransactions?status=cancelled_paid_review';
   static const String verifyPhone = '/verify-phone';
 
   static String verifyPhoneForBidReturn(String productId) =>

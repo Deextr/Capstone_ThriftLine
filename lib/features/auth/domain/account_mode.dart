@@ -45,8 +45,11 @@ AccountMode resolveAccountMode({
   String? savedMode,
   AccountMode? currentMode,
   required bool restoreFromPrefs,
+  bool sellerWorkspaceBlocked = false,
 }) {
-  if (isAdmin || !hasSellerAccess) return AccountMode.buyer;
+  if (isAdmin || !hasSellerAccess || sellerWorkspaceBlocked) {
+    return AccountMode.buyer;
+  }
   if (restoreFromPrefs) {
     return AccountMode.fromName(savedMode) ?? AccountMode.seller;
   }

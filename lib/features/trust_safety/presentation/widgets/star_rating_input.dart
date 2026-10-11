@@ -53,13 +53,11 @@ class StarRatingInput extends StatelessWidget {
           ),
         ),
         if (showSentiment) ...[
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: child,
-            ),
+            transitionBuilder: (child, animation) =>
+                FadeTransition(opacity: animation, child: child),
             child: Text(
               _sentimentLabel(value),
               key: ValueKey<int>(value),
@@ -144,7 +142,7 @@ class StarRatingReadout extends StatelessWidget {
             color: i <= rounded ? activeColor : inactiveColor,
           ),
         if (showNumber) ...[
-          const SizedBox(width: 6),
+          SizedBox(width: 6),
           Text(
             value.toStringAsFixed(1),
             style: AppTypography.caption.copyWith(

@@ -10,15 +10,12 @@ class EmailLoginResult {
 
   bool get isSuccess => errorMessage == null;
 
-  factory EmailLoginResult.success() => const EmailLoginResult._(
-    errorMessage: null,
-  );
+  factory EmailLoginResult.success() =>
+      const EmailLoginResult._(errorMessage: null);
 
-  factory EmailLoginResult.failure(
-    String message, {
-    int? retryAfterSeconds,
-  }) => EmailLoginResult._(
-    errorMessage: message,
-    retryAfterSeconds: retryAfterSeconds,
-  );
+  factory EmailLoginResult.failure(String message, {int? retryAfterSeconds}) =>
+      EmailLoginResult._(
+        errorMessage: message,
+        retryAfterSeconds: retryAfterSeconds,
+      );
 }

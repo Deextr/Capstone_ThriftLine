@@ -50,7 +50,7 @@ class _SellerApplicationRejectDialogState
     );
 
     return AlertDialog(
-      title: const Text('Reject application'),
+      title: Text('Reject application'),
       content: SizedBox(
         width: media.size.width < 480 ? media.size.width : 420,
         child: ConstrainedBox(

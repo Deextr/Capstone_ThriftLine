@@ -111,7 +111,7 @@ class BuyerProfileTab extends StatelessWidget {
                   horizontal: 16,
                   vertical: 4,
                 ),
-                leading: const Icon(
+                leading: Icon(
                   Icons.notifications_none_outlined,
                   color: AppColors.textPrimary,
                   size: 22,
@@ -144,7 +144,7 @@ class BuyerProfileTab extends StatelessWidget {
                 label: 'Settings',
                 onTap: () => context.push(RouteNames.settings),
               ),
-              const Divider(height: 1, thickness: 1, color: AppColors.border),
+              Divider(height: 1, thickness: 1, color: AppColors.border),
               if (auth.canSwitchAccounts)
                 _MenuItem(
                   icon: Icons.sync_alt_rounded,
@@ -352,7 +352,7 @@ class _MenuItem extends StatelessWidget {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Icon(icon, color: AppColors.textPrimary, size: 22),
       title: Text(label, style: AppTypography.body),
-      trailing: const Icon(
+      trailing: Icon(
         Icons.chevron_right,
         size: 20,
         color: AppColors.textHint,
@@ -396,7 +396,7 @@ class _TrustMenuItem extends StatelessWidget {
         style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
       ),
       subtitle: Text(subtitle, style: AppTypography.caption),
-      trailing: const Icon(
+      trailing: Icon(
         Icons.chevron_right,
         size: 20,
         color: AppColors.textHint,
@@ -420,7 +420,7 @@ class _BecomeSellerTile extends StatelessWidget {
     Color bgColor = AppColors.primaryLight;
     String title = 'Become a Seller';
     String subtitle = 'Start selling your thrift items';
-    Widget? trailing = const Icon(
+    Widget? trailing = Icon(
       Icons.chevron_right,
       size: 20,
       color: AppColors.textHint,

@@ -295,7 +295,7 @@ class _CategoryField extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.category_outlined,
                   color: AppColors.textHint,
                   size: 20,
@@ -320,7 +320,7 @@ class _CategoryField extends StatelessWidget {
                           ),
                         ),
                 ),
-                const Icon(
+                Icon(
                   Icons.arrow_drop_down,
                   color: AppColors.textSecondary,
                 ),

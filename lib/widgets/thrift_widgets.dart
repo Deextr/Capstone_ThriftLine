@@ -319,11 +319,11 @@ class _ThriftTextFieldState extends State<ThriftTextField> {
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.border),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.border),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -387,10 +387,16 @@ class ThriftBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final (bg, fg) = switch (variant) {
       BadgeVariant.primary => (AppColors.primaryLight, AppColors.primaryDark),
-      BadgeVariant.secondary => (const Color(0xFFFFEDD5), AppColors.secondary),
-      BadgeVariant.success => (const Color(0xFFD1FAE5), AppColors.success),
-      BadgeVariant.error => (const Color(0xFFFEE2E2), AppColors.error),
-      BadgeVariant.warning => (const Color(0xFFFEF3C7), AppColors.warning),
+      BadgeVariant.secondary => (
+        AppColors.warningSoft,
+        AppColors.secondary,
+      ),
+      BadgeVariant.success => (
+        AppColors.primaryLight,
+        AppColors.success,
+      ),
+      BadgeVariant.error => (AppColors.errorSoft, AppColors.errorForeground),
+      BadgeVariant.warning => (AppColors.warningSoft, AppColors.warning),
       BadgeVariant.neutral => (
         AppColors.surfaceVariant,
         AppColors.textSecondary,
@@ -562,13 +568,13 @@ class ThriftBottomSheet extends StatelessWidget {
       maxChildSize: 0.92,
       expand: false,
       builder: (context, scrollController) => Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           children: [
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Container(
               width: 40,
               height: 4,
@@ -819,14 +825,14 @@ class SellerTrustBadge extends StatelessWidget {
         maxChildSize: 0.95,
         expand: false,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             children: [
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Container(
                 width: 40,
                 height: 4,
@@ -842,7 +848,7 @@ class SellerTrustBadge extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
               Expanded(
                 child: ListView(
                   controller: scrollController,
@@ -853,7 +859,7 @@ class SellerTrustBadge extends StatelessWidget {
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -888,7 +894,7 @@ class SellerTrustBadge extends StatelessWidget {
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
+                                    SizedBox(height: 4),
                                     if (showNumericScore)
                                       Row(
                                         children: [
@@ -969,7 +975,7 @@ class SellerTrustBadge extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     ...trustClassifications.map((item) {
                       final isCurrent = item.label == current.label;
                       return Container(
@@ -1041,7 +1047,7 @@ class SellerTrustBadge extends StatelessWidget {
                                         ),
                                     ],
                                   ),
-                                  const SizedBox(height: 4),
+                                  SizedBox(height: 4),
                                   Text(
                                     showNumericScore
                                         ? item.description
@@ -1078,7 +1084,7 @@ class SellerTrustBadge extends StatelessWidget {
                         ),
                       );
                     }),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(

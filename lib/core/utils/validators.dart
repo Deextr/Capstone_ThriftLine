@@ -75,10 +75,49 @@ abstract final class Validators {
     return null;
   }
 
+  static const int adminPasswordMinLength = 12;
+
+  static const Set<String> _commonPasswords = {
+    'password',
+    'password123',
+    'password1234',
+    '123456789012',
+    'qwertyuiopas',
+    'admin1234567',
+    'letmein12345',
+    'welcome12345',
+    'changeme1234',
+    'thriftline123',
+  };
+
+  /// Stronger check used by Administrator / Superadmin password changes.
+  static String? adminPassword(String? value) {
+    final trimmed = value ?? '';
+    if (trimmed.isEmpty) return 'Enter a new password.';
+    if (trimmed.length < adminPasswordMinLength) {
+      return 'Use at least $adminPasswordMinLength characters.';
+    }
+    if (_commonPasswords.contains(trimmed.toLowerCase())) {
+      return 'Choose a less common password.';
+    }
+    return null;
+  }
+
   static String? confirmPassword(String? value, String password) {
     final confirm = value ?? '';
     if (confirm.isEmpty) return 'Please confirm your password.';
     if (confirm != password) return 'Passwords do not match.';
+    return null;
+  }
+
+  static const int fullNameMaxLength = 80;
+
+  static String? adminFullName(String? value) {
+    final nameError = name(value);
+    if (nameError != null) return nameError;
+    if (normalizeFullName(value ?? '').length > fullNameMaxLength) {
+      return 'Keep your name under $fullNameMaxLength characters.';
+    }
     return null;
   }
 }

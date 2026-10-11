@@ -161,7 +161,7 @@ class _ProductThumb extends StatelessWidget {
                   width: 64,
                   height: 64,
                   color: AppColors.surfaceVariant,
-                  child: const Icon(
+                  child: Icon(
                     Icons.image_outlined,
                     color: AppColors.textHint,
                   ),
@@ -180,7 +180,7 @@ class _ProductThumb extends StatelessWidget {
                     width: 64,
                     height: 64,
                     color: AppColors.surfaceVariant,
-                    child: const Icon(
+                    child: Icon(
                       Icons.image_outlined,
                       color: AppColors.textHint,
                     ),

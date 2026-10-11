@@ -46,7 +46,7 @@ class AdminEmptyState extends StatelessWidget {
             textAlign: TextAlign.center,
             style: AppTypography.subheading,
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             message,
             textAlign: TextAlign.center,
@@ -79,7 +79,7 @@ class AdminErrorState extends StatelessWidget {
             textAlign: TextAlign.center,
             style: AppTypography.subheading,
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             'Please try again.',
             textAlign: TextAlign.center,
@@ -177,7 +177,7 @@ class AdminQueueNavRow extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 64),
+          constraints: BoxConstraints(minHeight: 64),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
@@ -189,7 +189,7 @@ class AdminQueueNavRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(label, style: AppTypography.subheading),
-                      const SizedBox(height: 2),
+                      SizedBox(height: 2),
                       if (loading)
                         const ShimmerBox(width: 128, height: 12)
                       else
@@ -207,8 +207,8 @@ class AdminQueueNavRow extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                const Icon(Icons.chevron_right, color: AppColors.textHint),
+                SizedBox(width: 8),
+                Icon(Icons.chevron_right, color: AppColors.textHint),
               ],
             ),
           ),
@@ -253,7 +253,7 @@ class AdminQueueItem extends StatelessWidget {
             children: [
               Text(title, style: AppTypography.subheading),
               for (final line in visibleLines) ...[
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   line,
                   style: AppTypography.body.copyWith(
@@ -398,7 +398,7 @@ class AdminPersonBlock extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: AppTypography.caption),
-        const SizedBox(height: 4),
+        SizedBox(height: 4),
         Text(name, style: AppTypography.subheading),
         if (showHandle) ...[
           const SizedBox(height: 2),
@@ -661,7 +661,7 @@ class AdminDecisionSection extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.border)),
         ),
         child: Padding(
@@ -703,7 +703,7 @@ class AdminChoiceRow extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48),
+          constraints: BoxConstraints(minHeight: 48),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
@@ -808,7 +808,7 @@ class AdminReportCard extends StatelessWidget {
       shadowColor: Colors.black.withValues(alpha: 0.04),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-        side: const BorderSide(color: AppColors.border),
+        side: BorderSide(color: AppColors.border),
       ),
       child: InkWell(
         onTap: onView,
@@ -871,7 +871,7 @@ class AdminReportCard extends StatelessWidget {
                         style: AppTypography.subheading,
                       ),
                       if (preview != null && preview!.trim().isNotEmpty) ...[
-                        const SizedBox(height: 6),
+                        SizedBox(height: 6),
                         Text(
                           preview!,
                           maxLines: 2,

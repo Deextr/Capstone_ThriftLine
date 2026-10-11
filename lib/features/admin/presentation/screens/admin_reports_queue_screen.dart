@@ -95,7 +95,7 @@ class _AdminReportsQueueScreenState extends State<AdminReportsQueueScreen> {
           color: AppColors.primary,
           onRefresh: read.load,
           child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
+            physics: AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverToBoxAdapter(
                 child: Padding(

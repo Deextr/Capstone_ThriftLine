@@ -9,6 +9,7 @@ import '../../../models/enums.dart';
 import '../../../models/product_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../chat/data/conversation_service.dart';
+import '../../seller/data/auction_relist_feedback.dart';
 import '../../seller/data/listing_bucket.dart';
 import '../data/catalog_product_query.dart';
 import '../domain/bid_placement_result.dart';
@@ -349,6 +350,7 @@ class ProductDetailController extends ChangeNotifier {
   }) async {
     if (_productId.isEmpty) return 'Product not found.';
     try {
+      await _closeExpiredAuctions();
       final params = <String, dynamic>{
         'p_product_id': _productId,
         'p_duration_days': days,
@@ -362,9 +364,9 @@ class ProductDetailController extends ChangeNotifier {
         params: params,
       );
       if (!supabaseRpcSuccess(result)) {
-        return supabaseRpcError(
-          result,
-          fallback: 'Could not relist this auction.',
+        return auctionRelistMessageFromRpc(
+          code: supabaseRpcCode(result),
+          error: supabaseRpcError(result),
         );
       }
       await _loadProduct();

@@ -65,7 +65,8 @@ void main() {
     test('formats selected evidence types', () {
       final msg = buildEvidenceRequestInstruction(
         selectedTypeLabels: ['Product photos', 'Delivery receipt'],
-        intro: 'Please provide the following evidence to continue the investigation',
+        intro:
+            'Please provide the following evidence to continue the investigation',
       );
       expect(msg, contains('Product photos'));
       expect(msg, contains('Delivery receipt'));

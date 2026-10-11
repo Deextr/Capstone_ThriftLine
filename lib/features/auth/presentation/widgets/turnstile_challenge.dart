@@ -124,7 +124,8 @@ class TurnstileChallengeState extends State<TurnstileChallenge> {
 
     _controller ??= TurnstileController();
 
-    final isLight = widget.appearance == TurnstileChallengeAppearance.lightSurface;
+    final isLight =
+        widget.appearance == TurnstileChallengeAppearance.lightSurface;
     final captionColor = isLight
         ? AppColors.textSecondary
         : Colors.white.withValues(alpha: 0.72);
@@ -158,7 +159,11 @@ class TurnstileChallengeState extends State<TurnstileChallenge> {
             padding: const EdgeInsets.only(bottom: 8),
             child: Row(
               children: [
-                Icon(Icons.check_circle_outline, size: 18, color: AppColors.success),
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 18,
+                  color: AppColors.success,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Verification complete',
@@ -273,7 +278,7 @@ class _MessageBox extends StatelessWidget {
                       ),
                     ),
                     if (detail != null) ...[
-                      const SizedBox(height: 4),
+                      SizedBox(height: 4),
                       Text(
                         detail!,
                         style: AppTypography.caption.copyWith(

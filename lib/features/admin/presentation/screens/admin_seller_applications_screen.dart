@@ -28,11 +28,27 @@ class AdminSellerApplicationsScreen extends StatefulWidget {
 class _AdminSellerApplicationsScreenState
     extends State<AdminSellerApplicationsScreen> {
   final TextEditingController _searchController = TextEditingController();
+  String? _appliedRouteStatus;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final status = GoRouterState.of(context).uri.queryParameters['status'];
+    if (status != 'pending' && status != 'approved' && status != 'rejected') {
+      return;
+    }
+    if (_appliedRouteStatus == status) return;
+    _appliedRouteStatus = status;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<AdminSellerApplicationsController>().setStatus(status!);
+    });
   }
 
   @override
@@ -84,11 +100,11 @@ class _AdminSellerApplicationsScreenState
                     onPressed: controller.isLoading
                         ? null
                         : () => controller.load(),
-                    icon: const Icon(Icons.refresh, size: 16),
+                    icon: Icon(Icons.refresh, size: 16),
                     label: const Text('Refresh'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.textPrimary,
-                      side: const BorderSide(color: AppColors.border),
+                      side: BorderSide(color: AppColors.border),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 10,
@@ -103,23 +119,6 @@ class _AdminSellerApplicationsScreenState
                 _searchController.clear();
                 controller.resetFilters();
               },
-              trailing: widget.webEmbedded
-                  ? OutlinedButton.icon(
-                      onPressed: controller.isLoading
-                          ? null
-                          : () => controller.load(),
-                      icon: const Icon(Icons.refresh, size: 16),
-                      label: const Text('Refresh'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.textPrimary,
-                        side: const BorderSide(color: AppColors.border),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                      ),
-                    )
-                  : null,
               children: [
                 AdminSearchField(
                   controller: _searchController,
@@ -196,7 +195,7 @@ class _AdminSellerApplicationsScreenState
             AdminDataTable(
               isLoading: controller.isLoading,
               minWidth: 720,
-              columnFlex: const [3, 2, 2, 1, 1],
+              columnFlex: const [3, 2, 2, 1],
               emptyTitle: 'No seller applications found',
               emptyMessage: controller.hasActiveFilters
                   ? 'No applications match your active search or filters. Try adjusting them.'
@@ -211,13 +210,7 @@ class _AdminSellerApplicationsScreenState
                 for (final app in controller.applications)
                   () => _openDetail(app),
               ],
-              columns: const [
-                'Applicant',
-                'Store',
-                'Submitted',
-                'Status',
-                'Action',
-              ],
+              columns: const ['Applicant', 'Store', 'Submitted', 'Status'],
               rows: [
                 for (final app in controller.applications)
                   [
@@ -237,10 +230,6 @@ class _AdminSellerApplicationsScreenState
                     AdminTableCellText(primary: app.shopName),
                     AdminTableDateCell(dateTime: app.submittedAt),
                     AdminStatusBadge(status: app.status),
-                    AdminTableLinkAction(
-                      label: app.status == 'pending' ? 'Review' : 'View',
-                      onPressed: () => _openDetail(app),
-                    ),
                   ],
               ],
             ),

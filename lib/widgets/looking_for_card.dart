@@ -175,7 +175,7 @@ class LookingForCard extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 4),
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.border),
             _feedActions(context),
           ],
         ),
@@ -391,7 +391,7 @@ class LookingForCard extends StatelessWidget {
     if (items.isEmpty) return const SizedBox(width: 8);
     return PopupMenuButton<String>(
       tooltip: 'Request actions',
-      icon: const Icon(Icons.more_horiz, color: AppColors.textHint),
+      icon: Icon(Icons.more_horiz, color: AppColors.textHint),
       onSelected: (value) {
         switch (value) {
           case 'share':
@@ -435,7 +435,7 @@ class _FeedImage extends StatelessWidget {
         imageUrl: url,
         fit: BoxFit.cover,
         width: double.infinity,
-        placeholder: (_, _) => const ColoredBox(
+        placeholder: (_, _) => ColoredBox(
           color: AppColors.surfaceVariant,
           child: Center(
             child: SizedBox(
@@ -448,7 +448,7 @@ class _FeedImage extends StatelessWidget {
             ),
           ),
         ),
-        errorWidget: (_, _, _) => const ColoredBox(
+        errorWidget: (_, _, _) => ColoredBox(
           color: AppColors.surfaceVariant,
           child: Center(
             child: Icon(
@@ -487,7 +487,7 @@ class _Thumb extends StatelessWidget {
             fit: BoxFit.cover,
             errorWidget: (_, _, _) => ColoredBox(
               color: AppColors.surfaceVariant,
-              child: const Icon(
+              child: Icon(
                 Icons.image_outlined,
                 color: AppColors.textHint,
               ),

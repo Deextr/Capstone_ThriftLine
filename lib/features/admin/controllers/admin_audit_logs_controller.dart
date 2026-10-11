@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../data/admin_audit_log_models.dart';
 import '../data/admin_audit_service.dart';
 import '../data/admin_dashboard_models.dart';
+import '../data/admin_portal_session.dart';
 
 class AdminAuditLogsController extends ChangeNotifier {
   AdminAuditLogsController({required AdminAuditService service})
@@ -23,7 +26,10 @@ class AdminAuditLogsController extends ChangeNotifier {
   String _search = '';
   String _category = AdminAuditCategory.all;
   String _status = AdminAuditStatusFilter.all;
+  String _actorKind = AdminAuditActorFilter.all;
   AdminDateWindow? _window;
+  Timer? _searchDebounce;
+  static const Duration _searchDebounceDuration = Duration(milliseconds: 350);
 
   List<AdminAuditLogRow> get rows => _rows;
   AdminAuditLogRow? get selected => _selected;
@@ -37,12 +43,14 @@ class AdminAuditLogsController extends ChangeNotifier {
   String get search => _search;
   String get category => _category;
   String get status => _status;
+  String get actorKind => _actorKind;
   AdminDateWindow? get window => _window;
 
   bool get hasActiveFilters =>
       _search.trim().isNotEmpty ||
       _category != AdminAuditCategory.all ||
       _status != AdminAuditStatusFilter.all ||
+      _actorKind != AdminAuditActorFilter.all ||
       _window != null;
 
   Future<void> load() async {
@@ -54,6 +62,7 @@ class AdminAuditLogsController extends ChangeNotifier {
         search: _search,
         category: _category,
         status: _status,
+        actorKind: _actorKind,
         from: _window?.from,
         toExclusive: _window?.toExclusive,
         limit: _pageSize,
@@ -66,6 +75,7 @@ class AdminAuditLogsController extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('AdminAuditLogsController.load error: $e');
+      AdminPortalSession.note(e);
       _rows = const [];
       _total = 0;
       _error = 'Unable to load audit logs. Please try again.';
@@ -80,10 +90,26 @@ class AdminAuditLogsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void scheduleSearch(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(_searchDebounceDuration, () {
+      unawaited(setSearch(value));
+    });
+  }
+
   Future<void> setSearch(String value) async {
-    _search = value.trim();
+    _searchDebounce?.cancel();
+    final trimmed = value.trim();
+    if (_search == trimmed) return;
+    _search = trimmed;
     _page = 0;
     await load();
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
   }
 
   Future<void> setCategory(String value) async {
@@ -98,6 +124,12 @@ class AdminAuditLogsController extends ChangeNotifier {
     await load();
   }
 
+  Future<void> setActorKind(String value) async {
+    _actorKind = value;
+    _page = 0;
+    await load();
+  }
+
   Future<void> setWindow(AdminDateWindow? value) async {
     _window = value;
     _page = 0;
@@ -108,6 +140,7 @@ class AdminAuditLogsController extends ChangeNotifier {
     _search = '';
     _category = AdminAuditCategory.all;
     _status = AdminAuditStatusFilter.all;
+    _actorKind = AdminAuditActorFilter.all;
     _window = null;
     _page = 0;
     await load();

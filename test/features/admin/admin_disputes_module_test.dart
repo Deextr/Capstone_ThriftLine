@@ -18,10 +18,7 @@ void main() {
     });
 
     test('adminModerationCategoryLabel returns the updated names', () {
-      expect(
-        adminModerationCategoryLabel(AdminModerationCategory.all),
-        'All',
-      );
+      expect(adminModerationCategoryLabel(AdminModerationCategory.all), 'All');
       expect(
         adminModerationCategoryLabel(AdminModerationCategory.community),
         'Community Disputes',
@@ -36,21 +33,27 @@ void main() {
       );
     });
 
-    test('adminModerationCategoryParam formats correctly for backend queries', () {
-      expect(adminModerationCategoryParam(AdminModerationCategory.all), 'all');
-      expect(
-        adminModerationCategoryParam(AdminModerationCategory.community),
-        'community',
-      );
-      expect(
-        adminModerationCategoryParam(AdminModerationCategory.order),
-        'order',
-      );
-      expect(
-        adminModerationCategoryParam(AdminModerationCategory.lookingFor),
-        'looking_for',
-      );
-    });
+    test(
+      'adminModerationCategoryParam formats correctly for backend queries',
+      () {
+        expect(
+          adminModerationCategoryParam(AdminModerationCategory.all),
+          'all',
+        );
+        expect(
+          adminModerationCategoryParam(AdminModerationCategory.community),
+          'community',
+        );
+        expect(
+          adminModerationCategoryParam(AdminModerationCategory.order),
+          'order',
+        );
+        expect(
+          adminModerationCategoryParam(AdminModerationCategory.lookingFor),
+          'looking_for',
+        );
+      },
+    );
 
     test('adminModerationCategoryFromParam parses all categories safely', () {
       expect(
@@ -119,18 +122,21 @@ void main() {
       );
     });
 
-    test('adminModerationCaseKindShortLabel formats dispute categories cleanly', () {
-      expect(
-        adminModerationCaseKindShortLabel('community_report'),
-        'Community',
-      );
-      expect(adminModerationCaseKindShortLabel('order_report'), 'Order');
-      expect(
-        adminModerationCaseKindShortLabel('looking_for_report'),
-        'Looking For',
-      );
-      expect(adminModerationCaseKindShortLabel('unknown'), 'Dispute');
-    });
+    test(
+      'adminModerationCaseKindShortLabel formats dispute categories cleanly',
+      () {
+        expect(
+          adminModerationCaseKindShortLabel('community_report'),
+          'Community',
+        );
+        expect(adminModerationCaseKindShortLabel('order_report'), 'Order');
+        expect(
+          adminModerationCaseKindShortLabel('looking_for_report'),
+          'Looking For',
+        );
+        expect(adminModerationCaseKindShortLabel('unknown'), 'Dispute');
+      },
+    );
 
     test('adminModerationCaseKindLabel returns dispute titles', () {
       expect(
@@ -212,13 +218,16 @@ void main() {
   });
 
   group('Admin Report Decision Rules', () {
-    test('canDecideReport returns true for under_review and needs_more_evidence', () {
-      expect(canDecideReport('under_review'), isTrue);
-      expect(canDecideReport('needs_more_evidence'), isTrue);
-      expect(canDecideReport('resolved'), isFalse);
-      expect(canDecideReport('dismissed'), isFalse);
-      expect(canDecideReport('closed'), isFalse);
-    });
+    test(
+      'canDecideReport returns true for under_review and needs_more_evidence',
+      () {
+        expect(canDecideReport('under_review'), isTrue);
+        expect(canDecideReport('needs_more_evidence'), isTrue);
+        expect(canDecideReport('resolved'), isFalse);
+        expect(canDecideReport('dismissed'), isFalse);
+        expect(canDecideReport('closed'), isFalse);
+      },
+    );
 
     test('adminResponseError validates minimum length', () {
       expect(adminResponseError('Short', decision: 'resolved'), isNotNull);
@@ -230,10 +239,7 @@ void main() {
         isNull,
       );
       expect(
-        adminResponseError(
-          'Need more photos',
-          decision: 'needs_more_evidence',
-        ),
+        adminResponseError('Need more photos', decision: 'needs_more_evidence'),
         isNotNull,
       );
       expect(
@@ -247,40 +253,43 @@ void main() {
   });
 
   group('DisputeCategorySegmentedNav Widget Tests', () {
-    testWidgets('renders all 4 dispute categories in order and triggers selection', (tester) async {
-      AdminModerationCategory? selected;
+    testWidgets(
+      'renders all 4 dispute categories in order and triggers selection',
+      (tester) async {
+        AdminModerationCategory? selected;
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: DisputeCategorySegmentedNav(
-              selectedCategory: AdminModerationCategory.all,
-              onCategorySelected: (cat) => selected = cat,
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: DisputeCategorySegmentedNav(
+                selectedCategory: AdminModerationCategory.all,
+                onCategorySelected: (cat) => selected = cat,
+              ),
             ),
           ),
-        ),
-      );
+        );
 
-      // Verify all 4 tabs appear in UI
-      expect(find.text('All'), findsOneWidget);
-      expect(find.text('Community Disputes'), findsOneWidget);
-      expect(find.text('Order Disputes'), findsOneWidget);
-      expect(find.text('Looking For Disputes'), findsOneWidget);
+        // Verify all 4 tabs appear in UI
+        expect(find.text('All'), findsOneWidget);
+        expect(find.text('Community Disputes'), findsOneWidget);
+        expect(find.text('Order Disputes'), findsOneWidget);
+        expect(find.text('Looking For Disputes'), findsOneWidget);
 
-      // Tap on Community Disputes
-      await tester.tap(find.text('Community Disputes'));
-      await tester.pumpAndSettle();
-      expect(selected, AdminModerationCategory.community);
+        // Tap on Community Disputes
+        await tester.tap(find.text('Community Disputes'));
+        await tester.pumpAndSettle();
+        expect(selected, AdminModerationCategory.community);
 
-      // Tap on Order Disputes
-      await tester.tap(find.text('Order Disputes'));
-      await tester.pumpAndSettle();
-      expect(selected, AdminModerationCategory.order);
+        // Tap on Order Disputes
+        await tester.tap(find.text('Order Disputes'));
+        await tester.pumpAndSettle();
+        expect(selected, AdminModerationCategory.order);
 
-      // Tap on Looking For Disputes
-      await tester.tap(find.text('Looking For Disputes'));
-      await tester.pumpAndSettle();
-      expect(selected, AdminModerationCategory.lookingFor);
-    });
+        // Tap on Looking For Disputes
+        await tester.tap(find.text('Looking For Disputes'));
+        await tester.pumpAndSettle();
+        expect(selected, AdminModerationCategory.lookingFor);
+      },
+    );
   });
 }

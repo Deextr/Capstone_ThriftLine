@@ -159,7 +159,7 @@ class FollowedShopCard extends StatelessWidget {
                               ),
                               if (shop.location.isNotEmpty) ...[
                                 const SizedBox(width: 6),
-                                const Text(
+                                Text(
                                   '•',
                                   style: TextStyle(
                                     color: AppColors.textHint,
@@ -167,7 +167,7 @@ class FollowedShopCard extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 6),
-                                const Icon(
+                                Icon(
                                   Icons.location_on_outlined,
                                   size: 13,
                                   color: AppColors.textSecondary,
@@ -453,7 +453,7 @@ class _ProductThumbnail extends StatelessWidget {
                   ),
                   errorWidget: (_, _, _) => Container(
                     color: AppColors.surfaceVariant,
-                    child: const Icon(
+                    child: Icon(
                       Icons.image_not_supported_outlined,
                       size: 20,
                       color: AppColors.textHint,
@@ -463,7 +463,7 @@ class _ProductThumbnail extends StatelessWidget {
               else
                 Container(
                   color: AppColors.surfaceVariant,
-                  child: const Icon(
+                  child: Icon(
                     Icons.shopping_bag_outlined,
                     size: 24,
                     color: AppColors.textHint,

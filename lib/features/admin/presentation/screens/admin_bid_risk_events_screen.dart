@@ -65,7 +65,7 @@ class _AdminBidRiskEventsScreenState extends State<AdminBidRiskEventsScreen> {
     }
     if (controller.events.isEmpty) {
       return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: AlwaysScrollableScrollPhysics(),
         children: [
           Padding(
             padding: const EdgeInsets.all(24),
@@ -100,7 +100,7 @@ class _AdminBidRiskEventsScreenState extends State<AdminBidRiskEventsScreen> {
                     color: AppColors.primaryDark,
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Text(
                   'Amount: ${formatCurrency(event.attemptedAmount)}',
                   style: AppTypography.body,
@@ -114,7 +114,7 @@ class _AdminBidRiskEventsScreenState extends State<AdminBidRiskEventsScreen> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   event.createdAt.toLocal().toString(),
                   style: AppTypography.caption.copyWith(

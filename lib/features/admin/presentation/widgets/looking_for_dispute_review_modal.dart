@@ -15,8 +15,11 @@ import 'admin_case_detail_widgets.dart';
 import 'admin_dispute_review_modal_shell.dart';
 import 'admin_report_decision_widgets.dart';
 import 'community_dispute_decision_cards.dart';
+import 'looking_for_dispute_case_overview_section.dart';
+import 'looking_for_dispute_evidence_section.dart';
+import 'looking_for_dispute_history_section.dart';
 import 'looking_for_dispute_overview_section.dart';
-import 'looking_for_dispute_post_section.dart';
+import 'looking_for_related_reports_section.dart';
 
 Future<bool?> showLookingForDisputeReviewModal({
   required BuildContext context,
@@ -151,14 +154,31 @@ class _LookingForDisputeBody extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          LookingForDisputeCaseOverviewSection(
+            report: report,
+            reasonLabel: reasonLabel,
+            serverNow: controller.serverNow,
+          ),
+          const SizedBox(height: 22),
           LookingForDisputeOverviewSection(
             report: report,
             reasonLabel: reasonLabel,
           ),
           const SizedBox(height: 22),
-          LookingForDisputePostSection(
+          LookingForDisputeEvidenceSection(
             report: report,
-            lifecycleLabel: report.lifecycleLabel(controller.serverNow),
+            serverNow: controller.serverNow,
+          ),
+          const SizedBox(height: 22),
+          LookingForRelatedReportsSection(
+            currentReportId: report.id,
+            reports: controller.relatedOpenReports,
+          ),
+          if (controller.relatedOpenReports.length > 1)
+            const SizedBox(height: 22),
+          LookingForDisputeHistorySection(
+            report: report,
+            violations: controller.violations,
           ),
           const SizedBox(height: 22),
           AdminDisputeModalSection(
@@ -222,14 +242,14 @@ class _LookingForDecisionPanel extends StatelessWidget {
               fontSize: 15,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             'Remove the post or dismiss the report after reviewing the content.',
             style: AppTypography.caption.copyWith(
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           CommunityDisputeDecisionCardGroup(
             selectedValue: selectedDecision,
             onSelected: onSelectDecision,
@@ -237,7 +257,7 @@ class _LookingForDecisionPanel extends StatelessWidget {
           ),
           if (selectedDecision != null) ...[
             const SizedBox(height: 18),
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.border),
             const SizedBox(height: 16),
             Text(
               'Decision reason',
@@ -248,8 +268,9 @@ class _LookingForDecisionPanel extends StatelessWidget {
             const SizedBox(height: 8),
             Builder(
               builder: (context) {
-                final templates =
-                    lookingForDecisionReasonTemplates(selectedDecision!);
+                final templates = lookingForDecisionReasonTemplates(
+                  selectedDecision!,
+                );
                 final ids = templates.map((t) => t.id).toSet();
                 final selectedId = ids.contains(selectedReasonTemplateId)
                     ? selectedReasonTemplateId!
@@ -355,7 +376,7 @@ class _LookingForFooter extends StatelessWidget {
       context: context,
       title: lookingForDisputeConfirmTitle(uiDecision),
       confirmLabel: lookingForDisputeActionLabel(uiDecision),
-      destructive: uiDecision == kLookingForDecisionRemovePost,
+      destructive: lookingForDecisionRequiresViolation(uiDecision),
       rows: [
         ('Action', lookingForDisputeActionLabel(uiDecision)),
         ('Message', controller.response.trim()),

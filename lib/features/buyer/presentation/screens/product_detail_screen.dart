@@ -140,7 +140,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'The previous winning buyer failed or cancelled. You can pass the item to the next-highest bidder:',
                 style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
@@ -184,7 +184,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                         if (nextTime != null)
                           Text(
                             formatRelativeTime(nextTime),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               color: AppColors.textHint,
                             ),
@@ -202,7 +202,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                             children: [
                               Text(
                                 '@$username',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
                                   color: AppColors.textPrimary,
@@ -213,7 +213,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                                   bidder?['full_name'] != username)
                                 Text(
                                   bidder!['full_name'] as String,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
                                     color: AppColors.textSecondary,
                                   ),
@@ -274,7 +274,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 ),
 
               const SizedBox(height: 14),
-              const Row(
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(Icons.info_outline, size: 16, color: AppColors.primary),
@@ -800,7 +800,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                             Container(color: AppColors.surfaceVariant),
                         errorWidget: (_, _, _) => Container(
                           color: AppColors.surfaceVariant,
-                          child: const Center(
+                          child: Center(
                             child: Icon(
                               Icons.image_not_supported_outlined,
                               color: AppColors.textHint,
@@ -1144,7 +1144,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
+              Icon(
                 Icons.location_on_outlined,
                 size: 18,
                 color: AppColors.textSecondary,
@@ -1171,7 +1171,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(
+            Icon(
               Icons.local_shipping_outlined,
               size: 18,
               color: AppColors.textSecondary,
@@ -1294,7 +1294,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                       if (product.publicItemLocation != null)
                         Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.location_on_outlined,
                               color: AppColors.textSecondary,
                               size: 14,
@@ -1559,7 +1559,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 child: OutlinedButton.icon(
                   onPressed: () =>
                       _addFixedPriceToCart(context, cart, product),
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.add_shopping_cart_outlined,
                     color: AppColors.textPrimary,
                     size: 20,
@@ -1574,7 +1574,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                   ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 18),
-                    side: const BorderSide(color: AppColors.border, width: 1.5),
+                    side: BorderSide(color: AppColors.border, width: 1.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -1882,7 +1882,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
         onPressed: null,
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 18),
-          side: const BorderSide(color: AppColors.border, width: 1.5),
+          side: BorderSide(color: AppColors.border, width: 1.5),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

@@ -211,7 +211,7 @@ class CartCheckoutProductLine extends StatelessWidget {
                     width: _imageSize,
                     height: _imageSize,
                     color: AppColors.surfaceVariant,
-                    child: const Icon(
+                    child: Icon(
                       Icons.image_outlined,
                       color: AppColors.textHint,
                     ),

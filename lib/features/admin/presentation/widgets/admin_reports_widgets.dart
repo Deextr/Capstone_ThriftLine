@@ -76,7 +76,7 @@ class AdminReportCategoryCard extends StatelessWidget {
                             adminReportKindLabel(kind),
                             style: AppTypography.subheading,
                           ),
-                          const SizedBox(height: 4),
+                          SizedBox(height: 4),
                           Text(
                             adminReportKindHubSubtitle(kind),
                             style: AppTypography.caption.copyWith(
@@ -301,7 +301,7 @@ class _StatusCard extends StatelessWidget {
                 size: 16,
                 color: selected ? AppColors.primary : AppColors.textSecondary,
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(
                 '${data.value}',
                 style: AppTypography.heading.copyWith(fontSize: 20),

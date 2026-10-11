@@ -215,7 +215,7 @@ class EditListingScreen extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const LinearProgressIndicator(
+                  LinearProgressIndicator(
                     backgroundColor: AppColors.primaryLight,
                     color: AppColors.primary,
                   ),
@@ -420,7 +420,7 @@ class _SlotWidget extends StatelessWidget {
 
   Widget _placeholder() => Container(
     color: AppColors.primaryLight,
-    child: const Center(
+    child: Center(
       child: Icon(Icons.image_outlined, color: AppColors.textHint, size: 22),
     ),
   );
@@ -493,7 +493,7 @@ class _CategoryField extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.category_outlined,
                   color: AppColors.textHint,
                   size: 20,
@@ -518,7 +518,7 @@ class _CategoryField extends StatelessWidget {
                           ),
                         ),
                 ),
-                const Icon(
+                Icon(
                   Icons.arrow_drop_down,
                   color: AppColors.textSecondary,
                 ),

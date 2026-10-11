@@ -10,8 +10,6 @@ import '../../trust_safety/data/report_reasons.dart';
 import 'admin_delivery_dispute.dart';
 import 'admin_review_rules.dart';
 import 'delivery_payment_hold.dart';
-import 'admin_audit_log_models.dart';
-import 'admin_audit_service.dart';
 import 'delivery_payment_resolve.dart';
 
 class AdminReviewCounts {
@@ -296,20 +294,13 @@ class AdminReviewService {
         },
       );
       if (!supabaseRpcSuccess(rpcRes)) {
-        return supabaseRpcError(
-          rpcRes,
-          fallback: 'Could not send the evidence request.',
+        return mapAdminDecisionError(
+          supabaseRpcError(
+            rpcRes,
+            fallback: 'Could not send the evidence request.',
+          )!,
         );
       }
-      await AdminAuditService(_supabase).record(
-        category: AdminAuditCategory.reportsDisputes,
-        eventType: 'order_report_evidence_requested',
-        status: 'success',
-        summary: 'Additional evidence requested for order report',
-        targetType: 'report',
-        targetId: reportId,
-        details: {'party': party},
-      );
       return null;
     } catch (e) {
       debugPrint('admin_request_order_report_evidence error: $e');
@@ -334,23 +325,13 @@ class AdminReviewService {
         },
       );
       if (!supabaseRpcSuccess(rpcRes)) {
-        return supabaseRpcError(
-          rpcRes,
-          fallback: 'Could not close this order report.',
+        return mapAdminDecisionError(
+          supabaseRpcError(
+            rpcRes,
+            fallback: 'Could not close this order report.',
+          )!,
         );
       }
-      await AdminAuditService(_supabase).record(
-        category: AdminAuditCategory.reportsDisputes,
-        eventType: 'order_report_closed',
-        status: 'success',
-        summary: 'Order report closed after escrow decision',
-        targetType: 'report',
-        targetId: reportId,
-        details: {
-          'resolution_financial': financial,
-          if (returnRequired != null) 'return_required': returnRequired,
-        },
-      );
       return null;
     } catch (e) {
       debugPrint('complete_order_report_resolution error: $e');
@@ -388,20 +369,10 @@ class AdminReviewService {
         },
       );
       if (!supabaseRpcSuccess(rpcRes)) {
-        return supabaseRpcError(
-          rpcRes,
-          fallback: 'Could not save that decision.',
+        return mapAdminDecisionError(
+          supabaseRpcError(rpcRes, fallback: 'Could not save that decision.')!,
         );
       }
-      await AdminAuditService(_supabase).record(
-        category: AdminAuditCategory.reportsDisputes,
-        eventType: 'report_decided',
-        status: 'success',
-        summary: 'Community report decision saved',
-        targetType: 'report',
-        targetId: reportId,
-        details: {'decision': decision},
-      );
       return null;
     } catch (e) {
       debugPrint('decide_report error: $e');
@@ -419,19 +390,13 @@ class AdminReviewService {
         params: {'p_dispute_id': disputeId, 'p_admin_note': adminNote?.trim()},
       );
       if (!supabaseRpcSuccess(rpcRes)) {
-        return supabaseRpcError(
-          rpcRes,
-          fallback: 'Could not close this delivery problem.',
+        return mapAdminDecisionError(
+          supabaseRpcError(
+            rpcRes,
+            fallback: 'Could not close this delivery problem.',
+          )!,
         );
       }
-      await AdminAuditService(_supabase).record(
-        category: AdminAuditCategory.reportsDisputes,
-        eventType: 'delivery_dispute_closed',
-        status: 'success',
-        summary: 'Delivery dispute closed',
-        targetType: 'dispute',
-        targetId: disputeId,
-      );
       return null;
     } catch (e) {
       debugPrint('close_delivery_dispute error: $e');
@@ -464,16 +429,6 @@ class AdminReviewService {
       disputeId: disputeId,
       adminNote: adminNote,
     );
-    if (result.success) {
-      await AdminAuditService(_supabase).record(
-        category: AdminAuditCategory.paymentsEscrow,
-        eventType: 'delivery_payment_released',
-        status: 'success',
-        summary: 'Escrow payment released to seller',
-        targetType: 'dispute',
-        targetId: disputeId,
-      );
-    }
     return result;
   }
 
@@ -488,17 +443,6 @@ class AdminReviewService {
       adminNote: adminNote,
       returnRequired: returnRequired,
     );
-    if (result.success) {
-      await AdminAuditService(_supabase).record(
-        category: AdminAuditCategory.paymentsEscrow,
-        eventType: 'delivery_payment_refunded',
-        status: 'success',
-        summary: 'Buyer refund approved for delivery dispute',
-        targetType: 'dispute',
-        targetId: disputeId,
-        details: {'return_required': returnRequired},
-      );
-    }
     return result;
   }
 

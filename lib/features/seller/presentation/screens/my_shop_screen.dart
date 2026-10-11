@@ -104,7 +104,7 @@ class MyShopScreen extends StatelessWidget {
                         ),
                         child: Column(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.storefront_outlined,
                               size: 48,
                               color: AppColors.textHint,

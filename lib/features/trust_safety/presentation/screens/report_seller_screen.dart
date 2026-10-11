@@ -105,7 +105,7 @@ class _ReportSellerScreenState extends State<ReportSellerScreen> {
                               ..setSearchQuery('');
                           },
                         ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: 24),
                       Text(
                         'Why are you reporting this seller?',
                         style: AppTypography.subheading,
@@ -122,8 +122,7 @@ class _ReportSellerScreenState extends State<ReportSellerScreen> {
                       ...kCommunityReportReasons.map(
                         (reason) => _ReasonOption(
                           reason: reason,
-                          selected:
-                              controller.selectedCategory == reason.slug,
+                          selected: controller.selectedCategory == reason.slug,
                           onTap: () => context
                               .read<ReportUserController>()
                               .selectCategory(reason.slug),
@@ -173,7 +172,7 @@ class _ReportSellerScreenState extends State<ReportSellerScreen> {
                             .read<ReportUserController>()
                             .removeEvidence(i),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       Text(
                         'Your report stays private. The seller will not see who reported them. '
                         'Our team reviews community reports in Disputes.',
@@ -316,7 +315,9 @@ class _FollowingShopsSection extends StatelessWidget {
           children: [
             Text(
               'Following Shops',
-              style: AppTypography.label.copyWith(color: AppColors.textSecondary),
+              style: AppTypography.label.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
             if (controller.hasMoreFollowedShops) ...[
               const Spacer(),
@@ -443,9 +444,7 @@ class _ReasonOption extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                selected
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_off,
+                selected ? Icons.radio_button_checked : Icons.radio_button_off,
                 size: 22,
                 color: selected ? AppColors.primary : AppColors.textHint,
               ),

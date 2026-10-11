@@ -236,7 +236,7 @@ class _MenuItem extends StatelessWidget {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Icon(icon, color: AppColors.textPrimary, size: 22),
       title: Text(label, style: AppTypography.body),
-      trailing: const Icon(
+      trailing: Icon(
         Icons.chevron_right,
         size: 20,
         color: AppColors.textHint,
@@ -258,7 +258,7 @@ class _NotificationToggle extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: const Icon(
+      leading: Icon(
         Icons.notifications_none_outlined,
         color: AppColors.textPrimary,
         size: 22,

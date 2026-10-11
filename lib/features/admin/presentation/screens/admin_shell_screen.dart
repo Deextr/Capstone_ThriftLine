@@ -74,9 +74,9 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final counts = context.watch<AdminDashboardController>().counts;
-    final pending = counts?.pendingVerifications ?? 0;
-    final openReports = counts?.openReports ?? 0;
+    final dashboard = context.watch<AdminDashboardController>();
+    final pending = dashboard.pendingVerificationCount;
+    final openReports = dashboard.openDisputeCount;
     final wide =
         MediaQuery.sizeOf(context).width >= AppConstants.breakpointDesktop;
     final page = KeyedSubtree(key: ValueKey<int>(_index), child: _page(_index));
@@ -157,7 +157,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                     onDestinationSelected: _onTabChanged,
                     labelType: NavigationRailLabelType.all,
                     backgroundColor: AppColors.surface,
-                    selectedIconTheme: const IconThemeData(
+                    selectedIconTheme: IconThemeData(
                       color: AppColors.primary,
                     ),
                     selectedLabelTextStyle: const TextStyle(
@@ -165,12 +165,12 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
                     ),
-                    unselectedIconTheme: const IconThemeData(
+                    unselectedIconTheme: IconThemeData(
                       color: AppColors.textSecondary,
                     ),
                     destinations: destinations,
                   ),
-                  const VerticalDivider(width: 1, color: AppColors.border),
+                  VerticalDivider(width: 1, color: AppColors.border),
                   Expanded(
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 250),

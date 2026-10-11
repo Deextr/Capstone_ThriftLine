@@ -37,7 +37,10 @@ void main() {
         isNotNull,
       );
       expect(
-        adminResponseError('Please upload a clear photo of the label on the box.', decision: 'needs_more_evidence'),
+        adminResponseError(
+          'Please upload a clear photo of the label on the box.',
+          decision: 'needs_more_evidence',
+        ),
         isNull,
       );
       expect(adminResponseError('a' * 2001), isNotNull);
@@ -47,7 +50,10 @@ void main() {
       expect(reportStatusLabel('under_review'), 'Under Review');
       expect(reportStatusLabel('needs_more_evidence'), 'Needs More Evidence');
       expect(reportStatusLabel('action_taken'), 'Resolved');
-      expect(reportDecisionLabel('needs_more_evidence'), 'Request More Evidence');
+      expect(
+        reportDecisionLabel('needs_more_evidence'),
+        'Request More Evidence',
+      );
       expect(reportDecisionLabel('resolved'), 'Resolved');
       expect(reportDecisionLabel('dismissed'), 'Dismissed');
     });

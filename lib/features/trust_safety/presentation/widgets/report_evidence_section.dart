@@ -36,14 +36,12 @@ class ReportEvidenceSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Photo Evidence', style: AppTypography.subheading),
-        const SizedBox(height: 4),
+        SizedBox(height: 4),
         Text(
           required
               ? 'Add at least one photo that helps us review your report.'
               : 'Add photos that help us review your report (optional).',
-          style: AppTypography.caption.copyWith(
-            color: AppColors.textSecondary,
-          ),
+          style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
         ),
         if (evidenceError != null) ...[
           const SizedBox(height: 6),
@@ -70,7 +68,7 @@ class ReportEvidenceSection extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         Text(
           '$count of $kReportEvidenceMaxCount photos added',
           style: AppTypography.caption.copyWith(
@@ -94,9 +92,7 @@ class ReportEvidenceSection extends StatelessWidget {
         insetPadding: const EdgeInsets.all(20),
         child: Stack(
           children: [
-            InteractiveViewer(
-              child: Image.memory(bytes, fit: BoxFit.contain),
-            ),
+            InteractiveViewer(child: Image.memory(bytes, fit: BoxFit.contain)),
             Positioned(
               top: 4,
               right: 4,
@@ -173,7 +169,10 @@ class _AddEvidenceButton extends StatelessWidget {
   final Future<String?> Function() onGallery;
   final Future<String?> Function()? onCamera;
 
-  Future<void> _pick(BuildContext context, Future<String?> Function() pick) async {
+  Future<void> _pick(
+    BuildContext context,
+    Future<String?> Function() pick,
+  ) async {
     final err = await pick();
     if (err != null && context.mounted) {
       showThriftSnackBar(context, err, isError: true);
@@ -184,9 +183,7 @@ class _AddEvidenceButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () => _pick(context, onGallery),
-      onLongPress: onCamera == null
-          ? null
-          : () => _pick(context, onCamera!),
+      onLongPress: onCamera == null ? null : () => _pick(context, onCamera!),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         width: 88,

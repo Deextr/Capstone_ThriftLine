@@ -37,12 +37,10 @@ class AuthResult {
     requiresEmailOtp: requiresEmailOtp,
   );
 
-  factory AuthResult.failure(
-    String message, {
-    int? retryAfterSeconds,
-  }) => AuthResult._(
-    success: false,
-    errorMessage: message,
-    retryAfterSeconds: retryAfterSeconds,
-  );
+  factory AuthResult.failure(String message, {int? retryAfterSeconds}) =>
+      AuthResult._(
+        success: false,
+        errorMessage: message,
+        retryAfterSeconds: retryAfterSeconds,
+      );
 }

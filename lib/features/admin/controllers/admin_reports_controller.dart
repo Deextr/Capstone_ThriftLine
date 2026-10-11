@@ -506,7 +506,7 @@ class AdminReportsController extends ChangeNotifier {
     final current = _report;
     if (current == null) return 'Report not found.';
     if (!canDecideReport(current.status)) {
-      return 'This report has already been reviewed.';
+      return kAdminStaleDecisionMessage;
     }
     final selected = _decision;
     if (selected == null || !isAllowedReportDecision(selected)) {
@@ -527,7 +527,7 @@ class AdminReportsController extends ChangeNotifier {
         decision: selected,
         adminResponse: response,
       );
-      if (error != null) return error;
+      if (error != null) return mapAdminDecisionError(error);
       await load();
       return null;
     } finally {
