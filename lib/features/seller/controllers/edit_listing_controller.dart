@@ -97,6 +97,13 @@ class EditListingController extends ChangeNotifier {
   ListingShippingMode shippingMode = ListingShippingMode.fixedFee;
   String? sellerBarangay;
   bool shippingConfigLocked = false;
+  bool coreBiddingLocked = false;
+  bool formatLocked = false;
+  bool isExistingAuction = false;
+  bool isAuctionActive = false;
+  int auctionBidCount = 0;
+  double originalStartingPrice = 0;
+  DateTime? auctionEndsAt;
 
   // â”€â”€ Selection state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   List<CategoryItem> categories = [];
@@ -197,6 +204,8 @@ class EditListingController extends ChangeNotifier {
       final price = (row['price'] as num?)?.toDouble() ?? 0;
       if (selectedFormat == ListingFormat.auction) {
         startBidCtrl.text = price.toString();
+        originalStartingPrice = price;
+        isExistingAuction = true;
       } else {
         priceCtrl.text = price.toString();
       }
@@ -209,20 +218,50 @@ class EditListingController extends ChangeNotifier {
           final auctionRow = await _supabase.client
               .from('auctions')
               .select(
-                'auction_id, minimum_increment, duration_days, starts_at, ends_at',
+                'auction_id, status, minimum_increment, duration_days, starts_at, ends_at, bid_count, starting_price, current_price',
               )
               .eq('product_id', productId)
               .maybeSingle();
           if (auctionRow != null) {
             final auctionId = auctionRow['auction_id'] as String?;
-            if (auctionId != null) {
+            auctionBidCount = (auctionRow['bid_count'] as num?)?.toInt() ?? 0;
+            bool hasBids = auctionBidCount > 0;
+            if (auctionId != null && !hasBids) {
               final bidRows = await _supabase.client
                   .from('bids')
                   .select('bid_id')
                   .eq('auction_id', auctionId)
                   .limit(1);
-              shippingConfigLocked = (bidRows as List).isNotEmpty;
+              hasBids = (bidRows as List).isNotEmpty;
+              if (hasBids) {
+                auctionBidCount = (bidRows as List).length;
+              }
             }
+
+            final status = auctionRow['status'] as String? ?? 'active';
+            final endsAtStr = auctionRow['ends_at'] as String?;
+            auctionEndsAt =
+                endsAtStr != null ? DateTime.tryParse(endsAtStr) : null;
+            final isLive = status == 'active' &&
+                (auctionEndsAt == null ||
+                    auctionEndsAt!.isAfter(DateTime.now()));
+            isAuctionActive = isLive;
+
+            // Listing format is locked for all active auctions
+            formatLocked = isLive;
+
+            // Core bidding parameters and shipping configuration are locked
+            // once at least one bid is placed (during active bidding)
+            shippingConfigLocked = hasBids;
+            coreBiddingLocked = hasBids;
+
+            final startPrice =
+                (auctionRow['starting_price'] as num?)?.toDouble();
+            if (startPrice != null && startPrice > 0) {
+              originalStartingPrice = startPrice;
+              startBidCtrl.text = startPrice.toString();
+            }
+
             bidIncrement =
                 (auctionRow['minimum_increment'] as num?)?.toDouble() ??
                 bidIncrement;
@@ -233,11 +272,8 @@ class EditListingController extends ChangeNotifier {
               final startsAt = DateTime.tryParse(
                 auctionRow['starts_at'] as String? ?? '',
               );
-              final endsAt = DateTime.tryParse(
-                auctionRow['ends_at'] as String? ?? '',
-              );
-              if (startsAt != null && endsAt != null) {
-                final days = endsAt.difference(startsAt).inDays;
+              if (startsAt != null && auctionEndsAt != null) {
+                final days = auctionEndsAt!.difference(startsAt).inDays;
                 if ([1, 3, 5, 7].contains(days)) {
                   auctionDurationDays = days;
                 }
@@ -294,6 +330,7 @@ class EditListingController extends ChangeNotifier {
   }
 
   void onStartBidChanged(String _) {
+    if (coreBiddingLocked) return;
     fieldErrors.remove('price');
     notifyListeners();
   }
@@ -317,6 +354,7 @@ class EditListingController extends ChangeNotifier {
   }
 
   void selectFormat(ListingFormat format) {
+    if (formatLocked && format != selectedFormat) return;
     selectedFormat = format;
     fieldErrors.remove('price');
     fieldErrors.remove('stock');
@@ -359,16 +397,22 @@ class EditListingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  DateTime get previewAuctionEndsAt =>
-      DateTime.now().add(Duration(days: auctionDurationDays));
+  DateTime get previewAuctionEndsAt {
+    if (coreBiddingLocked && auctionEndsAt != null) {
+      return auctionEndsAt!;
+    }
+    return DateTime.now().add(Duration(days: auctionDurationDays));
+  }
 
   void selectAuctionDuration(int days) {
+    if (coreBiddingLocked) return;
     auctionDurationDays = days;
     fieldErrors.remove('duration');
     notifyListeners();
   }
 
   void selectBidIncrement(double increment) {
+    if (coreBiddingLocked) return;
     bidIncrement = increment;
     fieldErrors.remove('increment');
     notifyListeners();
@@ -458,26 +502,28 @@ class EditListingController extends ChangeNotifier {
       fieldErrors['condition'] = 'Please select a condition.';
     }
 
-    final priceText = selectedFormat == ListingFormat.auction
-        ? startBidCtrl.text
-        : priceCtrl.text;
-    final price = double.tryParse(priceText);
-    if (price == null || price <= 0) {
-      fieldErrors['price'] = selectedFormat == ListingFormat.auction
-          ? 'Please enter a valid starting price.'
-          : 'Please enter a valid price.';
+    if (selectedFormat == ListingFormat.auction) {
+      if (!coreBiddingLocked) {
+        final price = double.tryParse(startBidCtrl.text);
+        if (price == null || price <= 0) {
+          fieldErrors['price'] = 'Please enter a valid starting price.';
+        }
+        if (bidIncrement <= 0) {
+          fieldErrors['increment'] = 'Please choose a valid bid increment.';
+        }
+        if (![1, 3, 5, 7].contains(auctionDurationDays)) {
+          fieldErrors['duration'] =
+              'Auction duration must be 1, 3, 5, or 7 days.';
+        }
+      }
+    } else {
+      final price = double.tryParse(priceCtrl.text);
+      if (price == null || price <= 0) {
+        fieldErrors['price'] = 'Please enter a valid price.';
+      }
     }
     if (!listingStockIsValid(selectedFormat, stockCtrl.text, min: 0)) {
       fieldErrors['stock'] = 'Enter how many units you have (0 or more).';
-    }
-    if (selectedFormat == ListingFormat.auction) {
-      if (bidIncrement <= 0) {
-        fieldErrors['increment'] = 'Please choose a valid bid increment.';
-      }
-      if (![1, 3, 5, 7].contains(auctionDurationDays)) {
-        fieldErrors['duration'] =
-            'Auction duration must be 1, 3, 5, or 7 days.';
-      }
     }
 
     if (!shippingConfigLocked) {
@@ -567,9 +613,14 @@ class EditListingController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final formatToSave =
+          formatLocked ? ListingFormat.auction : selectedFormat;
+
       // 1. Update products row
-      final priceValue = selectedFormat == ListingFormat.auction
-          ? double.parse(startBidCtrl.text)
+      final priceValue = formatToSave == ListingFormat.auction
+          ? (coreBiddingLocked
+              ? originalStartingPrice
+              : (double.tryParse(startBidCtrl.text) ?? originalStartingPrice))
           : double.parse(priceCtrl.text);
 
       await _supabase.client
@@ -579,9 +630,9 @@ class EditListingController extends ChangeNotifier {
             'description': descCtrl.text.trim(),
             'price': priceValue,
             'condition': conditionToDbString(selectedCondition!),
-            'listing_type': formatToDbString(selectedFormat),
+            'listing_type': formatToDbString(formatToSave),
             'quantity_available': listingQuantityAvailable(
-              selectedFormat,
+              formatToSave,
               stockCtrl.text,
             ),
             'category_id': selectedCategoryId,
@@ -608,7 +659,8 @@ class EditListingController extends ChangeNotifier {
           .eq('product_id', productId);
 
       // 1b. Auction params go through ensure_product_auction (no client writes).
-      if (selectedFormat == ListingFormat.auction) {
+      // When core bidding is locked (active bidding with bids), skip modifying auction parameters.
+      if (formatToSave == ListingFormat.auction && !coreBiddingLocked) {
         final rpcRes = await _supabase.client.rpc(
           'ensure_product_auction',
           params: {
