@@ -43,12 +43,25 @@ class AdminDashboardActivity {
     required this.sellerApplications,
     required this.paidAuctionOrders,
     required this.ordersAwaitingFulfillment,
+    this.ordersOverdueFulfillment = 0,
   });
 
   final int newListings;
   final int sellerApplications;
   final int paidAuctionOrders;
   final int ordersAwaitingFulfillment;
+  final int ordersOverdueFulfillment;
+
+  AdminDashboardActivity copyWith({int? ordersOverdueFulfillment}) {
+    return AdminDashboardActivity(
+      newListings: newListings,
+      sellerApplications: sellerApplications,
+      paidAuctionOrders: paidAuctionOrders,
+      ordersAwaitingFulfillment: ordersAwaitingFulfillment,
+      ordersOverdueFulfillment:
+          ordersOverdueFulfillment ?? this.ordersOverdueFulfillment,
+    );
+  }
 
   factory AdminDashboardActivity.fromJson(Map<String, dynamic>? json) {
     return AdminDashboardActivity(
@@ -58,6 +71,8 @@ class AdminDashboardActivity {
       ordersAwaitingFulfillment: _requiredInt(
         json?['orders_awaiting_fulfillment'],
       ),
+      ordersOverdueFulfillment:
+          _optionalInt(json?['orders_overdue_fulfillment']) ?? 0,
     );
   }
 }

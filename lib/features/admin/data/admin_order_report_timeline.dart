@@ -1,3 +1,4 @@
+import '../../../core/utils/fulfillment_sla.dart';
 import '../../../models/community_report_model.dart';
 import '../../../models/enums.dart';
 import '../../../models/order_model.dart';
@@ -6,7 +7,7 @@ import '../presentation/widgets/admin_case_detail_widgets.dart';
 import 'admin_review_rules.dart';
 
 /// Stages stuck longer than this may show a warning on the timeline.
-const Duration kAdminOrderStageStallThreshold = Duration(hours: 72);
+const Duration kAdminOrderStageStallThreshold = kFulfillmentAdminDelayed;
 
 List<AdminCaseTimelineEvent> buildAdminOrderReportCaseTimeline({
   required CommunityReportModel report,
@@ -116,7 +117,8 @@ List<AdminCaseTimelineEvent> _orderLifecycleEvents(
       order.status == OrderStatus.paymentConfirmed;
   if (preparingCurrent ||
       _statusIndex(order.status) > _statusIndex(OrderStatus.preparing)) {
-    final at = shipment?.readyForPickupAt ?? order.createdAt;
+    final at =
+        shipment?.readyForPickupAt ?? orderPaidClock(order) ?? order.createdAt;
     final stalled =
         preparingCurrent && now.difference(at) > kAdminOrderStageStallThreshold;
     events.add(

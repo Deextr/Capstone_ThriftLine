@@ -1,5 +1,6 @@
 # Environment variables (credentials)
 .env
+android/app/google-services.json
 web/admin_config.json
 assets/config/admin_config.json
 thriftline_app.env

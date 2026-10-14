@@ -12,6 +12,34 @@ import 'checkout_payment_errors.dart';
 /// Result of verifying a PayMongo app return. The redirect itself is not proof.
 enum PaymongoAppReturnResult { paid, pending, failed }
 
+/// UI after hosted checkout closes and the backend has been asked for status.
+enum PaymongoHostedCheckoutUi {
+  paid,
+  failed,
+  confirming,
+
+  /// Session is still pending or unknown. Stop blocking the buyer; do not void.
+  unverified,
+}
+
+/// Maps a verified PayMongo reconcile result onto checkout-exit UI.
+/// Closing the browser is not treated as payment failure.
+PaymongoHostedCheckoutUi paymongoHostedCheckoutUi({
+  required PaymongoReconcileResult reconciled,
+  required bool stillConfirmingAttempt,
+}) {
+  if (reconciled.isPaid) return PaymongoHostedCheckoutUi.paid;
+  if (reconciled.isUnsuccessful) return PaymongoHostedCheckoutUi.failed;
+  if (stillConfirmingAttempt) return PaymongoHostedCheckoutUi.confirming;
+  return PaymongoHostedCheckoutUi.unverified;
+}
+
+/// Back navigation is blocked only while a start/reconcile request is in flight.
+bool paymentNavigationBlocked({
+  required bool isStartingPayment,
+  required bool isConfirmingPayment,
+}) => isStartingPayment || isConfirmingPayment;
+
 class PaymongoCheckoutResult {
   const PaymongoCheckoutResult({
     required this.success,
@@ -217,10 +245,12 @@ Future<PaymongoCheckoutResult> createPaymongoCheckout(
       }
     }
 
-    final response = await supabase.client.functions.invoke(
-      'create-paymongo-checkout',
-      body: {'order_id': orderId, 'payment_method': parsed},
-    );
+    final response = await supabase.client.functions
+        .invoke(
+          'create-paymongo-checkout',
+          body: {'order_id': orderId, 'payment_method': parsed},
+        )
+        .timeout(const Duration(seconds: 45));
     final map = supabaseRpcMap(response.data);
     if (map == null) {
       debugPrint(
@@ -240,6 +270,11 @@ Future<PaymongoCheckoutResult> createPaymongoCheckout(
     return PaymongoCheckoutResult(
       success: false,
       error: buyerFacingPaymentStartError(e.message),
+    );
+  } on TimeoutException {
+    return const PaymongoCheckoutResult(
+      success: false,
+      error: 'Payment is taking too long to start. Please try again.',
     );
   } on FunctionException catch (e) {
     debugPrint(

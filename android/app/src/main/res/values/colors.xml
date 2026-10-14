@@ -2,4 +2,6 @@
 <resources>
     <color name="splash_background">#166D65</color>
     <color name="ic_launcher_background">#166D65</color>
+    <!-- Teal accent for FCM / status-bar notification icon tint -->
+    <color name="notification_color">#0D9488</color>
 </resources>

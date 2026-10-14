@@ -12,6 +12,8 @@ import '../../../../models/looking_for_model.dart';
 import '../../../../models/order_model.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/notifications_provider.dart';
+import '../../../auth/domain/account_mode.dart';
+import '../../../notifications/presentation/widgets/notification_permission_banner.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../buyer/controllers/looking_for_controller.dart';
 import '../../controllers/seller_earnings_controller.dart';
@@ -61,6 +63,9 @@ class SellerDashboardTab extends StatelessWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverToBoxAdapter(child: _ShopHeader(unread: unread)),
+              const SliverToBoxAdapter(
+                child: NotificationPermissionBanner(mode: AccountMode.seller),
+              ),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),

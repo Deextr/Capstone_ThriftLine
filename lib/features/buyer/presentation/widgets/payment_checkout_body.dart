@@ -20,6 +20,7 @@ class PaymentCheckoutBody extends StatelessWidget {
     required this.order,
     this.groupOrders = const [],
     required this.confirming,
+    this.statusUnverified = false,
     required this.selectedChannel,
     required this.isAbandoning,
     required this.isSavingAddress,
@@ -28,6 +29,7 @@ class PaymentCheckoutBody extends StatelessWidget {
     required this.onSelectChannel,
     required this.onChangeAddress,
     this.onReturnToCart,
+    this.onCheckStatus,
     this.paymentDueAt,
     this.payOrderId,
   });
@@ -36,6 +38,7 @@ class PaymentCheckoutBody extends StatelessWidget {
   final String? payOrderId;
   final List<OrderModel> groupOrders;
   final bool confirming;
+  final bool statusUnverified;
   final String? selectedChannel;
   final bool isAbandoning;
   final bool isSavingAddress;
@@ -44,6 +47,7 @@ class PaymentCheckoutBody extends StatelessWidget {
   final ValueChanged<String> onSelectChannel;
   final VoidCallback onChangeAddress;
   final VoidCallback? onReturnToCart;
+  final VoidCallback? onCheckStatus;
   final DateTime? paymentDueAt;
 
   bool get _hasValidDeliveryAddress => order.hasValidDeliveryAddress;
@@ -54,13 +58,17 @@ class PaymentCheckoutBody extends StatelessWidget {
   }
 
   double get _subtotal => checkoutRoundCurrency(
-      _orders.fold<double>(0, (sum, item) => sum + item.amount));
+    _orders.fold<double>(0, (sum, item) => sum + item.amount),
+  );
   double get _shipping => checkoutRoundCurrency(
-      _orders.fold<double>(0, (sum, item) => sum + item.shippingFee));
+    _orders.fold<double>(0, (sum, item) => sum + item.shippingFee),
+  );
   double get _platform => checkoutRoundCurrency(
-      _orders.fold<double>(0, (sum, item) => sum + item.platformFee));
-  double get _total =>
-      checkoutRoundCurrency(_orders.fold<double>(0, (sum, item) => sum + item.total));
+    _orders.fold<double>(0, (sum, item) => sum + item.platformFee),
+  );
+  double get _total => checkoutRoundCurrency(
+    _orders.fold<double>(0, (sum, item) => sum + item.total),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +86,9 @@ class PaymentCheckoutBody extends StatelessWidget {
               children: [
                 if (confirming) ...[
                   const _ConfirmingBanner(),
+                  const SizedBox(height: 16),
+                ] else if (statusUnverified) ...[
+                  const _UnverifiedStatusBanner(),
                   const SizedBox(height: 16),
                 ],
                 _SectionLabel(
@@ -143,6 +154,7 @@ class PaymentCheckoutBody extends StatelessWidget {
           payOrderId: payOrderId,
           totalLabel: totalLabel,
           confirming: confirming,
+          statusUnverified: statusUnverified,
           selectedChannel: selectedChannel,
           hasAddress: _hasValidDeliveryAddress,
           windowOpen: windowOpen,
@@ -150,6 +162,7 @@ class PaymentCheckoutBody extends StatelessWidget {
           returnLabel: returnLabel,
           onChangeAddress: onChangeAddress,
           onReturnToCart: onReturnToCart,
+          onCheckStatus: onCheckStatus,
         ),
       ],
     );
@@ -212,19 +225,53 @@ class _ConfirmingBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Confirming your payment...',
+                  'Checking payment status',
                   style: AppTypography.body.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  "We're confirming your payment with PayMongo. This can take a few seconds.",
+                  "We're checking your payment status. Please wait while we confirm the result.",
                   style: AppTypography.caption.copyWith(
                     color: AppColors.textSecondary,
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UnverifiedStatusBanner extends StatelessWidget {
+  const _UnverifiedStatusBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Payment not confirmed yet',
+            style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Your payment was not completed. You can check the status again, '
+            'try again, or return to your cart. We have not marked this order as paid.',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -300,7 +347,9 @@ class _OrderItemsCard extends StatelessWidget {
                     ),
                   ),
                 ],
-                if (totalOrders != null && totalOrders! > 1 && orderIndex != null) ...[
+                if (totalOrders != null &&
+                    totalOrders! > 1 &&
+                    orderIndex != null) ...[
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -662,6 +711,7 @@ class _PaymentStickyBar extends StatelessWidget {
     this.payOrderId,
     required this.totalLabel,
     required this.confirming,
+    required this.statusUnverified,
     required this.selectedChannel,
     required this.hasAddress,
     required this.windowOpen,
@@ -669,12 +719,14 @@ class _PaymentStickyBar extends StatelessWidget {
     required this.returnLabel,
     required this.onChangeAddress,
     this.onReturnToCart,
+    this.onCheckStatus,
   });
 
   final OrderModel order;
   final String? payOrderId;
   final String totalLabel;
   final bool confirming;
+  final bool statusUnverified;
   final String? selectedChannel;
   final bool hasAddress;
   final bool windowOpen;
@@ -682,6 +734,7 @@ class _PaymentStickyBar extends StatelessWidget {
   final String returnLabel;
   final VoidCallback onChangeAddress;
   final VoidCallback? onReturnToCart;
+  final VoidCallback? onCheckStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -741,11 +794,19 @@ class _PaymentStickyBar extends StatelessWidget {
             ],
             if (confirming)
               const ThriftButton(
-                label: 'Confirming your payment...',
+                label: 'Checking payment status...',
                 onPressed: null,
                 isLoading: true,
               )
             else ...[
+              if (statusUnverified && onCheckStatus != null) ...[
+                ThriftButton(
+                  label: 'Check payment status',
+                  variant: ThriftButtonVariant.outline,
+                  onPressed: isAbandoning ? null : onCheckStatus,
+                ),
+                const SizedBox(height: 10),
+              ],
               if (!hasAddress)
                 ThriftButton(
                   label: 'Add Delivery Address',

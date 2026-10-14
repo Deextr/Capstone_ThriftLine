@@ -152,6 +152,14 @@ class SharedPreferencesService {
     await remove(AppConstants.keyPasswordRecoveryPending);
   }
 
+  bool pushPermissionPromptDismissed(String accountMode) =>
+      _prefs.getBool('push_prompt_dismissed_$accountMode') ?? false;
+
+  Future<bool> setPushPermissionPromptDismissed(
+    String accountMode,
+    bool value,
+  ) => _prefs.setBool('push_prompt_dismissed_$accountMode', value);
+
   // Generic helpers
   String? getString(String key) => _prefs.getString(key);
 

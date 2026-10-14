@@ -1,3 +1,4 @@
+import '../../../core/utils/fulfillment_sla.dart';
 import '../../../models/enums.dart';
 import '../../../models/order_model.dart';
 import '../../../widgets/thrift_widgets.dart';
@@ -101,6 +102,13 @@ SellerOrderChipView sellerOrderChip(OrderModel order) {
     return const SellerOrderChipView('Pending Payment', BadgeVariant.neutral);
   }
   if (bucket == SellerOrderBucket.toShip) {
+    final sla = fulfillmentSlaForOrder(order);
+    if (sla.delayedForAdmin) {
+      return const SellerOrderChipView('Delayed', BadgeVariant.warning);
+    }
+    if (sla.stuckPreparing) {
+      return const SellerOrderChipView('Needs shipping', BadgeVariant.warning);
+    }
     return const SellerOrderChipView('To Ship', BadgeVariant.primary);
   }
   if (bucket == SellerOrderBucket.completed) {

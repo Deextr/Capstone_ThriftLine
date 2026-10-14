@@ -321,6 +321,7 @@ Escrow/seller_payouts `USING (true)` policies are **`TO postgres` only** (verifi
 | MKT-005 | Medium | Second PayMongo session on double Pay Now | Double charge risk | Single session | Double Pay Now | One cs_ | Confirmed security gap | `create-paymongo-checkout` |
 | MKT-006 | Medium | Non-atomic stock restore | Inflated quantity | Locked increment restore | Parallel fail events | Qty once | Confirmed bug | `restore_product_stock` |
 | MKT-009 | Medium | Listing cap skipped on restore | >10 active listings | Cap-aware reactivate | Fail pay at cap | ≤10 active | Improvement recommendation | `skip_seller_listing_limit` |
+| MKT-010 | High | Won-auction checkout: `ensure_auction_order` is not buyer-callable; `settle_one_auction` swallows order-create failures; client only queried `orders` after `close_auctions` → “pending order not ready”, stock reserved, admin “Awaiting payment”, buyer UI empty; payment screen could spin forever on indeterminate order state | Winner cannot pay; inventory/order divergence | `ensure_my_auction_order` RPC; heal missing `order_items`; bounded PayMongo reconcile; clearer payment UI errors | TC-CHK-SYS-005 / checklist below | Winner retrieves order, pays, consistent admin/buyer rows | **Fixed (code); QA unverified** | `20261013131258_ensure_my_auction_order_buyer_rpc.sql`; `auction_checkout_order.dart`; `buyer_bids_controller.dart`; `payment_proof_screen.dart` |
 | SEL-002 | Medium | Client-only listing validation affects checkout price integrity | Bad prices in orders | DB constraints | API negative price checkout | Blocked | Confirmed security gap | See §4 |
 
 ### Low Risk
@@ -465,6 +466,7 @@ Runtime device tests not executed.
 |---|---|---|---|---|---|---|---|---|---|
 | BUY-T001 | Buyer | Critical | Void vs captured payment | Buyer, seller, PayMongo test | Pay; trigger failure before webhook | Paid or refund; stock not restored wrongly | Not tested | Not tested | MKT-001 |
 | BUY-T002 | Buyer | Critical | Auction pay after window | Winner, 12h window | Webhook after `payment_due_at` | Paid/fulfilled or refund | Not tested | Not tested | MKT-002 |
+| TC-CHK-SYS-005 | Buyer | High | Won auction pay + restart | Auction ended; buyer is winner | Win auction → Pay now from Bids; complete or interrupt payment; kill app; reopen → My Purchases To Pay | Pending order visible; no endless loading; stock/order/admin aligned | Not tested (fix deployed locally) | Not verified | MKT-010 |
 | BUY-T003 | Buyer | High | Reconcile amount mismatch | Pending checkout | Reconcile wrong session amount | Stays pending | Not tested | Not tested | MKT-003 |
 | BUY-T004 | Buyer | Medium | Second Pay Now | Pending order | Double-tap Pay Now | One `cs_` session | Not tested | Not tested | MKT-005 |
 | BUY-T005 | Buyer | Medium | Two-shop partial pay | Two sellers in cart | One shop paid; reconcile | Not full group success | Not tested | Not tested | MKT-004 |

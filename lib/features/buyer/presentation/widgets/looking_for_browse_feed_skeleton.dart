@@ -16,7 +16,7 @@ class LookingForBrowseFeedSkeleton extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 96),
       itemCount: itemCount,
       itemBuilder: (_, index) => const Padding(
-        padding: EdgeInsets.only(bottom: 8),
+        padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
         child: _FeedPostSkeleton(),
       ),
     );
@@ -28,8 +28,13 @@ class _FeedPostSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
+    return Material(
       color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: ThriftShimmer(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -70,18 +75,23 @@ class _FeedPostSkeleton extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            const AspectRatio(
-              aspectRatio: 4 / 3,
-              child: SkeletonBox(width: double.infinity, height: 200),
-            ),
-            Divider(height: 1, color: AppColors.border),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: const AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: SkeletonBox(width: double.infinity, height: 200),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
               child: Row(
                 children: const [
-                  SkeletonBox(width: 88, height: 36, radius: 8),
-                  Spacer(),
-                  SkeletonBox(width: 140, height: 40, radius: 8),
+                  Expanded(child: SkeletonBox(width: double.infinity, height: 40, radius: 8)),
+                  SizedBox(width: 10),
+                  Expanded(child: SkeletonBox(width: double.infinity, height: 40, radius: 8)),
                 ],
               ),
             ),

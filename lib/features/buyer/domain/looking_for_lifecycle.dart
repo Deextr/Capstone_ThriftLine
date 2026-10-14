@@ -126,6 +126,9 @@ bool lookingForCanDelete(LookingForLifecycle lifecycle) =>
 bool lookingForCanEdit(LookingForLifecycle lifecycle) =>
     lifecycle == LookingForLifecycle.active;
 
+bool lookingForCanClose(LookingForLifecycle lifecycle) =>
+    lifecycle == LookingForLifecycle.active;
+
 /// Expiration is a normal lifecycle change. It never counts as a strike.
 bool lookingForExpirationCountsAsStrike() => false;
 
@@ -304,6 +307,7 @@ extension LookingForLifecycleView on LookingForModel {
   bool get canRepost => lookingForCanRepost(lifecycle);
   bool get canDelete => lookingForCanDelete(lifecycle);
   bool get canEdit => lookingForCanEdit(lifecycle);
+  bool get canClose => lookingForCanClose(lifecycle);
 
   String get lifecycleLabel => lookingForLifecycleLabel(
     lifecycle,

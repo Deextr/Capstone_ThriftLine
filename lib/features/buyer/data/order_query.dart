@@ -24,16 +24,15 @@ const String kReturnShipmentSelect =
     'plate_number, return_notes, pickup_scheduled_at, picked_up_at, returned_at';
 
 const String kOrderSelectWithoutShipment =
-    '*, items:order_items(*), payments(payment_status, paymongo_channel), '
+    '*, items:order_items(*), payments(payment_status, paymongo_channel, updated_at), '
     'item_return:return_shipments($kReturnShipmentSelect)';
 
 const String kOrderSelect =
-    '*, items:order_items(*), payments(payment_status, paymongo_channel), '
+    '*, items:order_items(*), payments(payment_status, paymongo_channel, updated_at), '
     'shipment:shipments($kShipmentSelect), '
     'item_return:return_shipments($kReturnShipmentSelect)';
 
-const String kAdminOrderDetailSelect =
-    '*, items:order_items(*), payments(*)';
+const String kAdminOrderDetailSelect = '*, items:order_items(*), payments(*)';
 
 const String kAdminOrderDetailSelectWithShipment =
     '*, items:order_items(*), payments(*), '

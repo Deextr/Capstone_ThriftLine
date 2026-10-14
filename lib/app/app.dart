@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../core/constants/app_constants.dart';
 import '../core/services/presence_service.dart';
+import '../core/services/push_notification_service.dart';
 import '../core/services/shared_preferences_service.dart';
 import '../core/services/supabase_service.dart';
 import '../core/theme/app_theme.dart';
@@ -34,6 +35,7 @@ class ThriftlineApp extends StatelessWidget {
     required this.followingShopsProvider,
     required this.cartProvider,
     required this.supabaseService,
+    required this.pushNotifications,
   });
 
   final SharedPreferencesService prefs;
@@ -47,6 +49,7 @@ class ThriftlineApp extends StatelessWidget {
   final FollowingShopsProvider followingShopsProvider;
   final CartProvider cartProvider;
   final SupabaseService supabaseService;
+  final PushNotificationService pushNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +61,7 @@ class ThriftlineApp extends StatelessWidget {
         Provider<PresenceService>(
           create: (_) => PresenceService(supabaseService),
         ),
+        Provider<PushNotificationService>.value(value: pushNotifications),
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
         ChangeNotifierProvider<AppProvider>.value(value: appProvider),
         ChangeNotifierProvider<DataProvider>.value(value: dataProvider),
@@ -74,6 +78,8 @@ class ThriftlineApp extends StatelessWidget {
         ChangeNotifierProvider<CartProvider>.value(value: cartProvider),
       ],
       child: _SessionBindings(
+        router: router,
+        pushNotifications: pushNotifications,
         child: MaterialApp.router(
           title: AppConstants.appName,
           debugShowCheckedModeBanner: false,
@@ -87,8 +93,14 @@ class ThriftlineApp extends StatelessWidget {
 
 /// Starts notification realtime, settings, saved items, and cart once a user is signed in.
 class _SessionBindings extends StatefulWidget {
-  const _SessionBindings({required this.child});
+  const _SessionBindings({
+    required this.child,
+    required this.router,
+    required this.pushNotifications,
+  });
   final Widget child;
+  final GoRouter router;
+  final PushNotificationService pushNotifications;
 
   @override
   State<_SessionBindings> createState() => _SessionBindingsState();
@@ -107,6 +119,7 @@ class _SessionBindingsState extends State<_SessionBindings>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    widget.pushNotifications.initialize();
   }
 
   @override
@@ -123,15 +136,25 @@ class _SessionBindingsState extends State<_SessionBindings>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _boundUserId != null) {
       context.read<PresenceService>().touch();
+      unawaited(context.read<NotificationsProvider>().refresh());
+      unawaited(
+        widget.pushNotifications.syncRegistrationForUser(_boundUserId),
+      );
     }
   }
 
   void _bindSession(String? userId) {
     context.read<NotificationsProvider>().startForUser(userId);
-    context.read<SettingsProvider>().loadForUser(userId);
     context.read<SavedItemsProvider>().startForUser(userId);
     context.read<FollowingShopsProvider>().startForUser(userId);
     context.read<CartProvider>().startForUser(userId);
+    widget.pushNotifications.bind(
+      router: widget.router,
+      auth: context.read<AuthProvider>(),
+      notifications: context.read<NotificationsProvider>(),
+      settings: context.read<SettingsProvider>(),
+    );
+    unawaited(_finishSessionBinding(userId));
     _presenceTimer?.cancel();
     if (userId == null) return;
     context.read<PresenceService>().touch();
@@ -139,6 +162,19 @@ class _SessionBindingsState extends State<_SessionBindings>
       if (!mounted) return;
       context.read<PresenceService>().touch();
     });
+  }
+
+  Future<void> _finishSessionBinding(String? userId) async {
+    if (!mounted) return;
+    await context.read<SettingsProvider>().loadForUser(userId);
+    if (!mounted) return;
+    if (userId == null) {
+      await widget.pushNotifications.revokeCurrentDeviceToken();
+      return;
+    }
+    await widget.pushNotifications.ensureInitialized();
+    if (!mounted) return;
+    await widget.pushNotifications.syncRegistrationForUser(userId);
   }
 
   void _syncNotificationAudience(AuthProvider auth) {
@@ -153,6 +189,7 @@ class _SessionBindingsState extends State<_SessionBindings>
       mode: mode,
       hasSellerAccess: hasSellerAccess,
     );
+    unawaited(widget.pushNotifications.syncRegistrationForUser(_boundUserId));
   }
 
   void _onAuthChanged() {

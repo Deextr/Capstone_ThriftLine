@@ -9,7 +9,9 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
+import '../../../../core/utils/fulfillment_sla.dart';
 import '../../../../core/utils/rider_privacy.dart';
+import '../../../../models/community_report_model.dart';
 import '../../../../models/order_model.dart';
 import '../../../../widgets/delivery_timeline.dart';
 import '../../../../widgets/empty_state.dart';
@@ -135,6 +137,19 @@ class OrderTrackingScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 ThriftCard(
                   child: _DeliveryPinCard(pin: controller.deliveryPin),
+                ),
+              ],
+              if (_showFulfillmentReport(order, orderReport)) ...[
+                const SizedBox(height: 16),
+                ThriftCard(
+                  child: _FulfillmentDelayCard(
+                    sla: fulfillmentSlaForOrder(order, report: orderReport),
+                    reportId: orderReport?.id,
+                    isBusy: controller.isUpdatingDelivery,
+                    onReport: () => context.push(
+                      RouteNames.orderFulfillmentReportFor(orderId),
+                    ),
+                  ),
                 ),
               ],
               if (order.isInspecting &&
@@ -278,6 +293,14 @@ class OrderTrackingScreen extends StatelessWidget {
 
   void _reportProblem(BuildContext context) {
     context.push(RouteNames.orderDeliveryReportFor(orderId));
+  }
+
+  bool _showFulfillmentReport(
+    OrderModel order,
+    CommunityReportModel? orderReport,
+  ) {
+    return fulfillmentSlaForOrder(order, report: orderReport).cta !=
+        FulfillmentReportCta.hidden;
   }
 }
 
@@ -660,6 +683,59 @@ class _InspectionCardState extends State<_InspectionCard> {
           label: 'Report a problem',
           variant: ThriftButtonVariant.outline,
           onPressed: widget.isBusy ? null : widget.onReport,
+        ),
+      ],
+    );
+  }
+}
+
+class _FulfillmentDelayCard extends StatelessWidget {
+  const _FulfillmentDelayCard({
+    required this.sla,
+    required this.onReport,
+    required this.isBusy,
+    this.reportId,
+  });
+
+  final FulfillmentSlaView sla;
+  final VoidCallback onReport;
+  final bool isBusy;
+  final String? reportId;
+
+  @override
+  Widget build(BuildContext context) {
+    final waiting = sla.cta == FulfillmentReportCta.waiting;
+    final review = sla.cta == FulfillmentReportCta.underReview;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Seller delay', style: AppTypography.subheading),
+        const SizedBox(height: 8),
+        Text(
+          review
+              ? 'You already reported this order. We will keep escrow protected until review finishes.'
+              : waiting
+              ? 'If the seller has not updated this order in ${formatFulfillmentRemaining(sla.reportUnlocksAt)}, you can report a problem. Unprocessed orders are cancelled 72 hours after payment.'
+              : 'The seller has not prepared or shipped this order. You can report it now. Unprocessed orders are cancelled 72 hours after payment.',
+          style: AppTypography.caption,
+        ),
+        const SizedBox(height: 16),
+        ThriftButton(
+          label: review
+              ? 'View report'
+              : waiting
+              ? 'Report available in ${formatFulfillmentRemaining(sla.reportUnlocksAt)}'
+              : 'Report a problem',
+          variant: ThriftButtonVariant.outline,
+          onPressed: isBusy
+              ? null
+              : review
+              ? (reportId == null
+                    ? null
+                    : () => context.push(RouteNames.reportDetailFor(reportId!)))
+              : waiting
+              ? null
+              : onReport,
         ),
       ],
     );

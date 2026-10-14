@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'login_rate_limit_persistence.dart';
+
 /// Incremental login rate limiter that tracks failed attempts and enforces
-/// escalating lockout durations.
+/// escalating lockout durations. State is persisted per normalized email.
 ///
 /// Lockout schedule:
 /// - 5 failed attempts  → 5-minute lockout
@@ -13,37 +15,61 @@ import 'package:flutter/foundation.dart';
 /// The counter resets after a successful login or after the lockout expires
 /// without new failures.
 class LoginRateLimiter extends ChangeNotifier {
-  int _failedAttempts = 0;
-  DateTime? _lockoutUntil;
+  LoginRateLimiter(this._persistence) {
+    _entries = _decodeAllEntries(_persistence.loadEntries());
+    _pruneExpiredLockouts();
+  }
+
+  final LoginRateLimitPersistence _persistence;
+
+  /// Authoritative in-memory copy; disk is updated after each mutation.
+  late Map<String, dynamic> _entries;
+
+  String _displayEmail = '';
   Timer? _lockoutTimer;
+  Future<void>? _persistChain;
 
-  /// Number of consecutive failed login attempts.
-  int get failedAttempts => _failedAttempts;
+  /// Normalizes email for use as a storage key (trim + lowercase).
+  @visibleForTesting
+  static String normalizeEmailKey(String email) => email.trim().toLowerCase();
 
-  /// Whether the user is currently locked out.
-  bool get isLockedOut {
-    if (_lockoutUntil == null) return false;
-    if (DateTime.now().isAfter(_lockoutUntil!)) {
-      // Lockout expired naturally — don't reset the counter so the next
-      // tier still applies if they keep failing.
-      _lockoutUntil = null;
-      _lockoutTimer?.cancel();
-      _lockoutTimer = null;
+  /// Email currently shown on the login form (drives countdown UI).
+  void setDisplayEmail(String email) {
+    _displayEmail = normalizeEmailKey(email);
+    _syncLockoutTimer();
+    notifyListeners();
+  }
+
+  /// Number of consecutive failed login attempts for [email].
+  int failedAttempts(String email) {
+    return _readEntry(email)?.failedAttempts ?? 0;
+  }
+
+  /// Whether [email] is currently locked out.
+  bool isLockedOut(String email) {
+    final entry = _readEntry(email);
+    if (entry == null || entry.lockoutUntil == null) return false;
+    if (DateTime.now().isAfter(entry.lockoutUntil!)) {
+      _clearExpiredLockout(email, entry);
       return false;
     }
     return true;
   }
 
-  /// Remaining lockout duration. Returns [Duration.zero] if not locked out.
-  Duration get remainingLockout {
-    if (_lockoutUntil == null) return Duration.zero;
-    final remaining = _lockoutUntil!.difference(DateTime.now());
+  /// Remaining lockout duration for [email]. Returns [Duration.zero] if not locked out.
+  Duration remainingLockout(String email) {
+    final entry = _readEntry(email);
+    if (entry?.lockoutUntil == null) return Duration.zero;
+    final remaining = entry!.lockoutUntil!.difference(DateTime.now());
     return remaining.isNegative ? Duration.zero : remaining;
   }
 
-  /// Human-readable string for the remaining lockout time.
-  String get lockoutMessage {
-    final rem = remainingLockout;
+  /// Human-readable string for the remaining lockout time on the display email.
+  String get lockoutMessage => lockoutMessageFor(_displayEmail);
+
+  /// Human-readable lockout countdown for [email].
+  String lockoutMessageFor(String email) {
+    final rem = remainingLockout(email);
     if (rem == Duration.zero) return '';
     final mins = rem.inMinutes;
     final secs = rem.inSeconds % 60;
@@ -55,26 +81,41 @@ class LoginRateLimiter extends ChangeNotifier {
   }
 
   /// Records a failed login attempt and starts a lockout if a threshold is hit.
-  void recordFailure() {
-    _failedAttempts++;
-    final lockoutDuration = _lockoutDurationForAttempt(_failedAttempts);
+  Future<void> recordFailure(String email) async {
+    final key = normalizeEmailKey(email);
+    if (key.isEmpty) return;
+
+    final entry = _readEntry(email) ?? _LoginRateLimitEntry(failedAttempts: 0);
+    final attempts = entry.failedAttempts + 1;
+    var lockoutUntil = entry.lockoutUntil;
+    final lockoutDuration = _lockoutDurationForAttempt(attempts);
     if (lockoutDuration != null) {
-      _startLockout(lockoutDuration);
+      lockoutUntil = DateTime.now().add(lockoutDuration);
     }
+
+    _writeEntry(
+      key,
+      _LoginRateLimitEntry(
+        failedAttempts: attempts,
+        lockoutUntil: lockoutUntil,
+      ),
+    );
+    await _flushPersist();
+    _syncLockoutTimer();
     notifyListeners();
   }
 
-  /// Resets all state after a successful login.
-  void recordSuccess() {
-    _failedAttempts = 0;
-    _lockoutUntil = null;
-    _lockoutTimer?.cancel();
-    _lockoutTimer = null;
+  /// Resets all state for [email] after a successful login.
+  Future<void> recordSuccess(String email) async {
+    final key = normalizeEmailKey(email);
+    if (key.isEmpty) return;
+
+    _entries.remove(key);
+    await _flushPersist();
+    _syncLockoutTimer();
     notifyListeners();
   }
 
-  /// Returns the lockout duration when a threshold is exactly hit, or `null`
-  /// if no new lockout should start at this attempt count.
   Duration? _lockoutDurationForAttempt(int attempt) {
     if (attempt == 5) return const Duration(minutes: 5);
     if (attempt == 10) return const Duration(minutes: 10);
@@ -84,12 +125,86 @@ class LoginRateLimiter extends ChangeNotifier {
     return null;
   }
 
-  void _startLockout(Duration duration) {
-    _lockoutUntil = DateTime.now().add(duration);
-    _lockoutTimer?.cancel();
-    // Tick every second so the countdown UI updates.
+  void _pruneExpiredLockouts() {
+    final now = DateTime.now();
+    var changed = false;
+    for (final key in _entries.keys.toList()) {
+      final entry = _entryFromStored(_entries[key]);
+      if (entry == null) {
+        _entries.remove(key);
+        changed = true;
+        continue;
+      }
+      if (entry.lockoutUntil != null && now.isAfter(entry.lockoutUntil!)) {
+        _entries[key] = _LoginRateLimitEntry(
+          failedAttempts: entry.failedAttempts,
+          lockoutUntil: null,
+        ).toJson();
+        changed = true;
+      }
+    }
+    if (changed) {
+      unawaited(_flushPersist());
+    }
+  }
+
+  void _clearExpiredLockout(String email, _LoginRateLimitEntry entry) {
+    final key = normalizeEmailKey(email);
+    _writeEntry(
+      key,
+      _LoginRateLimitEntry(
+        failedAttempts: entry.failedAttempts,
+        lockoutUntil: null,
+      ),
+    );
+    unawaited(_flushPersist());
+  }
+
+  _LoginRateLimitEntry? _readEntry(String email) {
+    final key = normalizeEmailKey(email);
+    if (key.isEmpty) return null;
+    return _entryFromStored(_entries[key]);
+  }
+
+  void _writeEntry(String key, _LoginRateLimitEntry entry) {
+    _entries[key] = entry.toJson();
+  }
+
+  static Map<String, dynamic> _decodeAllEntries(Map<String, dynamic>? loaded) {
+    if (loaded == null || loaded.isEmpty) return {};
+    return Map<String, dynamic>.from(loaded);
+  }
+
+  static _LoginRateLimitEntry? _entryFromStored(Object? raw) {
+    if (raw is! Map) return null;
+    return _LoginRateLimitEntry.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  Future<void> _flushPersist() async {
+    final snapshot = Map<String, dynamic>.from(_entries);
+    final previous = _persistChain ?? Future<void>.value();
+    _persistChain = previous.then((_) async {
+      try {
+        await _persistence.saveEntries(snapshot);
+      } catch (e, st) {
+        debugPrint('LoginRateLimiter: failed to persist rate-limit state: $e');
+        debugPrint('$st');
+      }
+    });
+    await _persistChain;
+  }
+
+  void _syncLockoutTimer() {
+    final shouldRun = _displayEmail.isNotEmpty && isLockedOut(_displayEmail);
+    if (!shouldRun) {
+      _lockoutTimer?.cancel();
+      _lockoutTimer = null;
+      return;
+    }
+    if (_lockoutTimer != null) return;
+
     _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!isLockedOut) {
+      if (_displayEmail.isEmpty || !isLockedOut(_displayEmail)) {
         _lockoutTimer?.cancel();
         _lockoutTimer = null;
       }
@@ -102,4 +217,27 @@ class LoginRateLimiter extends ChangeNotifier {
     _lockoutTimer?.cancel();
     super.dispose();
   }
+}
+
+class _LoginRateLimitEntry {
+  _LoginRateLimitEntry({required this.failedAttempts, this.lockoutUntil});
+
+  final int failedAttempts;
+  final DateTime? lockoutUntil;
+
+  factory _LoginRateLimitEntry.fromJson(Map<String, dynamic> json) {
+    final lockoutMs = json['lockoutUntilMs'];
+    return _LoginRateLimitEntry(
+      failedAttempts: (json['failedAttempts'] as num?)?.toInt() ?? 0,
+      lockoutUntil: lockoutMs is num
+          ? DateTime.fromMillisecondsSinceEpoch(lockoutMs.toInt())
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'failedAttempts': failedAttempts,
+    if (lockoutUntil != null)
+      'lockoutUntilMs': lockoutUntil!.millisecondsSinceEpoch,
+  };
 }

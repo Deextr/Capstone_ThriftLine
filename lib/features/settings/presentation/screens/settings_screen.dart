@@ -13,6 +13,7 @@ import '../../../../widgets/thrift_widgets.dart'
     show ThriftButton, ThriftButtonVariant, showThriftSnackBar;
 import '../../../auth/domain/legal_documents.dart';
 import '../../../auth/presentation/widgets/auth_widgets.dart';
+import '../widgets/push_notification_preferences.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
@@ -54,31 +55,7 @@ class SettingsScreen extends StatelessWidget {
             _buildSection(
               title: 'Preferences',
               children: [
-                SwitchListTile(
-                  title: Text('Push Notifications', style: AppTypography.body),
-                  subtitle: Text(
-                    auth.isSeller
-                        ? 'Seller workspace alerts'
-                        : 'Buyer workspace alerts',
-                    style: AppTypography.caption,
-                  ),
-                  value: settingsProvider.pushFor(mode),
-                  activeThumbColor: AppColors.primary,
-                  onChanged: settingsProvider.isSavingPush
-                      ? null
-                      : (value) async {
-                          final ok = await settingsProvider
-                              .setPushNotifications(value, mode: mode);
-                          if (!context.mounted) return;
-                          if (!ok) {
-                            showThriftSnackBar(
-                              context,
-                              'Could not save push notification preference.',
-                              isError: true,
-                            );
-                          }
-                        },
-                ),
+                PushNotificationPreferences(mode: mode),
                 SwitchListTile(
                   title: Text('Email Notifications', style: AppTypography.body),
                   subtitle: Text(

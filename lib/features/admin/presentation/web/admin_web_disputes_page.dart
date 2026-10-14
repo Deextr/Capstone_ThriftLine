@@ -185,6 +185,21 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
                     if (v != null) controller.setStatusFilter(v);
                   },
                 ),
+              if (controller.isOrderCategory)
+                AdminFilterDropdown<String?>(
+                  value: controller.orderReasonFilter,
+                  items: const [
+                    DropdownMenuItem(
+                      value: null,
+                      child: Text('All order reasons'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'seller_not_processing_order',
+                      child: Text('Seller did not process'),
+                    ),
+                  ],
+                  onChanged: controller.setOrderReasonFilter,
+                ),
               if (controller.isLookingForCategory)
                 AdminFilterDropdown<AdminReportListFilter>(
                   value: controller.statusFilter,

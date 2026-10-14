@@ -13,6 +13,9 @@ abstract final class AppConstants {
   static const String keyDisplayName = 'display_name';
   static const String keyEmailOtpPending = 'email_otp_pending';
 
+  /// Per-email failed login counts and lockout expiry (JSON map).
+  static const String keyLoginRateLimitState = 'login_rate_limit_state_v1';
+
   /// Survives process death while the user has not finished reset-password.
   static const String keyPasswordRecoveryPending = 'password_recovery_pending';
 

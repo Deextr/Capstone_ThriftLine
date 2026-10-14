@@ -8,6 +8,7 @@ import '../../../core/services/supabase_service.dart';
 import '../../../models/chat_model.dart';
 import '../../../models/enums.dart';
 import '../../../models/message_model.dart';
+import '../../../models/product_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../data/conversation_service.dart';
 
@@ -41,6 +42,7 @@ class ChatDetailController extends ChangeNotifier {
   bool _subscribed = false;
   bool _initialSubscribe = true;
   final Map<String, String> _signedUrls = {};
+  final Map<String, MessageModel> _productPreviews = {};
 
   ChatModel? get chat => _chat;
   List<MessageModel> get messages => _messages;
@@ -48,6 +50,7 @@ class ChatDetailController extends ChangeNotifier {
   bool get isSending => _isSending;
   String? get errorMessage => _errorMessage;
   String? get myId => _auth.user?.id;
+  bool get canShareProducts => _auth.isSeller;
 
   Future<void> load({bool quiet = false}) async {
     final id = _auth.user?.id;
@@ -115,6 +118,11 @@ class ChatDetailController extends ChangeNotifier {
     final incoming = MessageModel.fromSupabase(row);
     if (incoming.id.isEmpty) return;
     _messages = upsertMessages(_messages, incoming);
+    if (incoming.type == MessageType.product &&
+        incoming.productId != null &&
+        incoming.productName == null) {
+      unawaited(_hydrateProductPreview(incoming.productId!));
+    }
     notifyListeners();
     final id = _auth.user?.id;
     if (id != null && incoming.senderId != id) {
@@ -184,6 +192,86 @@ class ChatDetailController extends ChangeNotifier {
     } catch (e) {
       debugPrint('ChatDetailController.sendOffer error: $e');
       return 'Could not send that offer.';
+    } finally {
+      _isSending = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<List<ProductModel>> loadShareableProducts() async {
+    final id = _auth.user?.id;
+    if (id == null || !_auth.isSeller) return const [];
+    return _conversations.loadSellerShareableProducts(id);
+  }
+
+  Future<MessageModel?> productPreviewFor(MessageModel message) async {
+    final productId = message.productId;
+    if (productId == null || productId.isEmpty) return null;
+    if (message.productName != null) return message;
+    final cached = _productPreviews[productId];
+    if (cached != null) return cached;
+    final loaded = await _conversations.loadMessageProductPreview(productId);
+    if (loaded != null) _productPreviews[productId] = loaded;
+    return loaded;
+  }
+
+  Future<void> _hydrateProductPreview(String productId) async {
+    final loaded = await _conversations.loadMessageProductPreview(productId);
+    if (loaded == null || _disposed) return;
+    _productPreviews[productId] = loaded;
+    _messages = _messages
+        .map(
+          (m) => m.productId == productId && m.productName == null
+              ? MessageModel(
+                  id: m.id,
+                  chatId: m.chatId,
+                  senderId: m.senderId,
+                  content: m.content,
+                  createdAt: m.createdAt,
+                  type: m.type,
+                  isRead: m.isRead,
+                  offerAmount: m.offerAmount,
+                  lookingForPostId: m.lookingForPostId,
+                  lookingForTitle: m.lookingForTitle,
+                  lookingForImageUrl: m.lookingForImageUrl,
+                  productId: loaded.productId,
+                  productName: loaded.productName,
+                  productPrice: loaded.productPrice,
+                  productImageUrl: loaded.productImageUrl,
+                  productStatus: loaded.productStatus,
+                  attachmentPath: m.attachmentPath,
+                )
+              : m,
+        )
+        .toList();
+    if (!_disposed) notifyListeners();
+  }
+
+  Future<String?> sendProductShare(String productId) async {
+    final id = _auth.user?.id;
+    if (id == null) return 'Please sign in to share a product.';
+    if (!_auth.isSeller) {
+      return 'Switch to your Seller account to share shop items.';
+    }
+    if (productId.trim().isEmpty) return 'Choose a product to share.';
+    _isSending = true;
+    notifyListeners();
+    try {
+      final sent = await _conversations.sendProductShare(
+        conversationId: conversationId,
+        senderId: id,
+        productId: productId,
+      );
+      if (sent.productId != null) _productPreviews[sent.productId!] = sent;
+      _messages = upsertMessages(_messages, sent);
+      return null;
+    } catch (e) {
+      debugPrint('ChatDetailController.sendProductShare error: $e');
+      if (e is PostgrestException &&
+          e.message.toLowerCase().contains('share active items')) {
+        return 'You can only share active items from your shop.';
+      }
+      return 'Could not share that product.';
     } finally {
       _isSending = false;
       if (!_disposed) notifyListeners();

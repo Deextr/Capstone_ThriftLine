@@ -353,6 +353,18 @@ Apply after mandatory payment. Buy Now still calls `checkout_cart` for one produ
 
 Apply after `20260928120000_checkout_selected_cart.sql` if that file already ran. If it never finished, running only this file is enough because it replaces both functions. PayMongo stays one payment per order so escrow stays with the right seller.
 
+## Fulfillment SLA (72-hour auto-cancel)
+
+| File | Purpose |
+| --- | --- |
+| `20261013200000_fulfillment_sla.sql` | Paid clock, stuck-preparing helper, 48h buyer report gate, original 120h refund RPCs |
+| `20261014120000_fulfillment_sla_72h_and_system_reports.sql` | 72h auto-cancel, system Confirmed Report, trust CR includes `resolved`, `list_my_payment_transactions` |
+| `20261014131000_fix_list_my_payment_transactions_types.sql` | Cast varchar columns to text in `list_my_payment_transactions` (fixes PostgREST 42804) |
+
+Apply `20261014160000_notification_push_and_messages.sql` after `20261014150000` for chat message in-app alerts, FCM device tokens, and push dispatch. Deploy `../functions/send-push-notification` and set Edge secrets `FCM_SERVICE_ACCOUNT_JSON` (Firebase service account JSON) and optional `PUSH_DISPATCH_SECRET` (match Vault `push_dispatch_secret` for pg_net). Add Flutter `.env` keys `FIREBASE_API_KEY`, `FIREBASE_APP_ID`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_PROJECT_ID`.
+
+Apply `20261014120000` after `20261013200000`. Apply `20261014131000` if Transaction History fails with “varchar does not match text”. Deploy `../functions/process-fulfillment-sla`. Apply `20261014140000_schedule_process_fulfillment_sla_cron.sql` (or use Dashboard → Integrations → Cron) to POST the function every 10 minutes via `pg_cron` + `pg_net`. Enable **pg_cron** and **pg_net** extensions first if the migration notices they are missing. Optional: store the same value as Edge secret `FULFILLMENT_SLA_JOB_SECRET` in Vault as `fulfillment_sla_job_secret` so cron sends `x-fulfillment-sla-secret`. PayMongo refunds need `PAYMONGO_SECRET_KEY` on the function.
+
 ## Conventions
 
 - Authorization lives in RLS policies and `SECURITY DEFINER` helpers, never in

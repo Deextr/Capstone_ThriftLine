@@ -13,6 +13,7 @@ import '../../../../widgets/delivery_timeline.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../trust_safety/presentation/widgets/order_review_cta.dart';
 import '../../controllers/seller_orders_controller.dart';
+import '../widgets/fulfillment_deadline_banner.dart';
 import '../../../buyer/presentation/widgets/item_return_panel.dart';
 import '../widgets/delivery_pin_entry.dart';
 import '../widgets/record_delivery_problem_sheet.dart';
@@ -75,6 +76,7 @@ class SellerOrderDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
+            FulfillmentDeadlineBanner(order: order),
             ThriftCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -225,7 +227,8 @@ class SellerOrderDetailScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                     ],
-                    if (order.shipment?.isOutForDelivery == true) ...[
+                    if (order.status != OrderStatus.cancelled &&
+                        order.shipment?.isOutForDelivery == true) ...[
                       Text(
                         'Do not instruct your rider to leave the parcel without obtaining the buyer\'s Delivery PIN.',
                         style: AppTypography.caption.copyWith(
@@ -297,6 +300,9 @@ class SellerOrderDetailScreen extends StatelessWidget {
     OrderModel order,
     SellerOrdersController controller,
   ) {
+    if (order.status == OrderStatus.cancelled) {
+      return const [];
+    }
     final status = order.shipment?.deliveryStatus;
     final actions = <(String, String)>[];
     if (status == DeliveryStatus.riderAssigned) {

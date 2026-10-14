@@ -11,6 +11,7 @@ import '../../../../models/enums.dart';
 import '../../../../models/message_model.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/chat_detail_controller.dart';
+import '../widgets/share_product_sheet.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   const ChatDetailScreen({super.key, required this.chatId});
@@ -110,6 +111,26 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       padding: const EdgeInsets.all(8),
                       child: Row(
                         children: [
+                          if (chat.canShareProducts)
+                            IconButton(
+                              tooltip: 'Share product',
+                              icon: const Icon(Icons.storefront_outlined),
+                              onPressed: chat.isSending
+                                  ? null
+                                  : () async {
+                                      final chatController = context
+                                          .read<ChatDetailController>();
+                                      final sent = await ShareProductSheet.show(
+                                        context,
+                                        controller: chatController,
+                                      );
+                                      if (!context.mounted || !sent) return;
+                                      showThriftSnackBar(
+                                        context,
+                                        'Product shared in this chat.',
+                                      );
+                                    },
+                            ),
                           IconButton(
                             icon: const Icon(Icons.image_outlined),
                             onPressed: chat.isSending
@@ -231,11 +252,17 @@ class _MessageBody extends StatelessWidget {
           ),
         if (message.type == MessageType.image)
           _ChatImage(message: message, isSent: isSent),
-        if (message.content.trim().isNotEmpty)
+        if (message.content.trim().isNotEmpty &&
+            message.type != MessageType.product)
           Text(
             message.content,
             style: AppTypography.body.copyWith(color: textColor),
           ),
+        if (message.type == MessageType.product &&
+            message.productId != null) ...[
+          const SizedBox(height: 8),
+          _ChatProductCard(message: message, isSent: isSent),
+        ],
         if (message.type == MessageType.lookingFor &&
             message.lookingForPostId != null) ...[
           const SizedBox(height: 8),
@@ -264,6 +291,113 @@ class _MessageBody extends StatelessWidget {
           style: AppTypography.caption.copyWith(color: hintColor, fontSize: 10),
         ),
       ],
+    );
+  }
+}
+
+class _ChatProductCard extends StatelessWidget {
+  const _ChatProductCard({required this.message, required this.isSent});
+
+  final MessageModel message;
+  final bool isSent;
+
+  @override
+  Widget build(BuildContext context) {
+    final hintColor = isSent ? Colors.white70 : AppColors.textHint;
+    return FutureBuilder<MessageModel?>(
+      future: context.read<ChatDetailController>().productPreviewFor(message),
+      builder: (context, snapshot) {
+        final preview = snapshot.data ?? message;
+        final name = preview.productName;
+        final price = preview.productPrice;
+        final imageUrl = preview.productImageUrl;
+        final productId = preview.productId ?? message.productId;
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            name == null) {
+          return const SizedBox(
+            height: 72,
+            child: Center(
+              child: CircularProgressIndicator(color: Colors.white70),
+            ),
+          );
+        }
+        if (productId == null || productId.isEmpty) {
+          return Text(
+            'Product unavailable',
+            style: AppTypography.caption.copyWith(color: hintColor),
+          );
+        }
+        if (!preview.productShareAvailable) {
+          return Text(
+            name ?? 'This listing is no longer available',
+            style: AppTypography.caption.copyWith(color: hintColor),
+          );
+        }
+        return Material(
+          color: isSent ? Colors.white12 : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => context.push(RouteNames.productFor(productId)),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: SizedBox(
+                      width: 56,
+                      height: 56,
+                      child: imageUrl != null && imageUrl.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              fit: BoxFit.cover,
+                            )
+                          : Container(
+                              color: AppColors.border,
+                              child: Icon(
+                                Icons.image_outlined,
+                                color: hintColor,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name ?? 'Product',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.caption.copyWith(
+                            color: isSent ? Colors.white : AppColors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (price != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            formatCurrency(price),
+                            style: AppTypography.caption.copyWith(
+                              color: isSent
+                                  ? Colors.white
+                                  : AppColors.primaryDark,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, color: hintColor, size: 20),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

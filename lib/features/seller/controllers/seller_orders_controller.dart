@@ -157,6 +157,11 @@ class SellerOrdersController extends ChangeNotifier {
     } catch (e) {
       debugPrint('complete_expired_inspections error: $e');
     }
+    try {
+      await _supabase.client.rpc('process_fulfillment_sla');
+    } catch (e) {
+      debugPrint('process_fulfillment_sla error: $e');
+    }
   }
 
   Future<String?> assignRider({

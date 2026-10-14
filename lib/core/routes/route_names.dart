@@ -89,6 +89,10 @@ abstract final class RouteNames {
   static const String orderDeliveryReport = '/orders/:orderId/report-problem';
   static String orderDeliveryReportFor(String orderId) =>
       '/orders/$orderId/report-problem';
+  static const String orderFulfillmentReport =
+      '/orders/:orderId/report-fulfillment';
+  static String orderFulfillmentReportFor(String orderId) =>
+      '/orders/$orderId/report-fulfillment';
   static const String addListing = '/add-listing';
   static const String editListing = '/edit-listing/:id';
   static const String sellerOrder = '/seller-order/:id';
@@ -107,6 +111,7 @@ abstract final class RouteNames {
   static const String editProfile = '/edit-profile';
   static const String settings = '/settings';
   static const String purchaseHistory = '/purchase-history';
+  static const String transactionHistory = '/transaction-history';
   static const String savedItems = '/saved-items';
   static const String followingShops = '/following-shops';
   static const String becomeSeller = '/become-seller';
@@ -281,6 +286,12 @@ abstract final class RouteNames {
 
   static String adminOrdersPaymentReview() =>
       '$adminOrdersTransactions?status=cancelled_paid_review';
+
+  static String adminOrdersPreparing() =>
+      '$adminOrdersTransactions?status=preparing';
+
+  static String adminOrdersDelayedFulfillment() =>
+      '$adminOrdersTransactions?status=delayed';
   static const String verifyPhone = '/verify-phone';
 
   static String verifyPhoneForBidReturn(String productId) =>

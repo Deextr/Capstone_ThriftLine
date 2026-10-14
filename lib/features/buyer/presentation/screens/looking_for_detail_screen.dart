@@ -58,6 +58,7 @@ class LookingForDetailScreen extends StatelessWidget {
                   onShare: () => _share(context, controller),
                   onRespond: () => _iHaveThis(context, controller),
                   onEdit: () => _edit(context, controller),
+                  onClose: () => _close(context, controller),
                   onDelete: () => _delete(context, controller),
                   onRepost: () => _repost(context, controller),
                   onReport: () => _report(context, controller),
@@ -113,6 +114,42 @@ class LookingForDetailScreen extends StatelessWidget {
     await controller.load();
     if (!context.mounted) return;
     showThriftSnackBar(context, 'Request updated.');
+  }
+
+  Future<void> _close(
+    BuildContext context,
+    LookingForDetailController controller,
+  ) async {
+    final post = controller.post;
+    if (post == null || !post.canClose) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mark as fulfilled?'),
+        content: const Text(
+          'Sellers will no longer see this as an active request. You can still '
+          'find it under Inactive Requests.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Mark fulfilled'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final error = await controller.closeAsFulfilled();
+    if (!context.mounted) return;
+    if (error != null) {
+      showThriftSnackBar(context, error, isError: true);
+      return;
+    }
+    showThriftSnackBar(context, 'Request marked as fulfilled.');
   }
 
   Future<void> _delete(

@@ -3,13 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_typography.dart';
-import '../../../../core/utils/formatters.dart';
-import '../../../../models/enums.dart';
 import '../../../../models/notification_model.dart';
-import '../../../../providers/auth_provider.dart';
 import '../../../../providers/notifications_provider.dart';
-import '../../domain/notification_navigation.dart';
+import '../../domain/notification_catalog.dart';
+import '../widgets/notification_list_content.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -22,10 +19,12 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tab;
 
+  static const _tabs = ['all', 'orders', 'bids', 'messages', 'system'];
+
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 5, vsync: this);
+    _tab = TabController(length: _tabs.length, vsync: this);
   }
 
   @override
@@ -34,11 +33,18 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     super.dispose();
   }
 
+  List<NotificationModel> _itemsForTab(NotificationsProvider provider, String tab) {
+    final visible = provider.items;
+    if (tab == 'all') return visible;
+    return visible.where((n) => notificationMatchesTab(n, tab)).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final notifications = context.watch<NotificationsProvider>();
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Notifications'),
         leading: IconButton(
@@ -46,129 +52,61 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           onPressed: () => context.pop(),
         ),
         actions: [
-          TextButton(
-            onPressed: notifications.markAllRead,
-            child: const Text('Mark all read'),
-          ),
+          if (notifications.unreadCount > 0)
+            TextButton(
+              onPressed: notifications.isLoading ? null : notifications.markAllRead,
+              child: const Text('Mark all read'),
+            ),
         ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            TabBar(
-              controller: _tab,
-              isScrollable: true,
-              labelColor: AppColors.primary,
-              tabs: const [
-                Tab(text: 'All'),
-                Tab(text: 'Orders'),
-                Tab(text: 'Bids'),
-                Tab(text: 'Messages'),
-                Tab(text: 'System'),
-              ],
-            ),
-            Expanded(
-              child: notifications.isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : TabBarView(
-                      controller: _tab,
-                      children: [
-                        _list(notifications.items),
-                        _list(notifications.forTab('orders')),
-                        _list(notifications.forTab('bids')),
-                        _list(notifications.forTab('messages')),
-                        _list(notifications.forTab('system')),
-                      ],
-                    ),
-            ),
+        bottom: TabBar(
+          controller: _tab,
+          isScrollable: true,
+          labelColor: AppColors.primary,
+          unselectedLabelColor: AppColors.textSecondary,
+          indicatorColor: AppColors.primary,
+          tabs: const [
+            Tab(text: 'All'),
+            Tab(text: 'Orders'),
+            Tab(text: 'Bids'),
+            Tab(text: 'Messages'),
+            Tab(text: 'System'),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _list(List<NotificationModel> items) {
-    if (items.isEmpty) {
-      return const Center(child: Text('No notifications'));
-    }
-    return ListView.builder(
-      itemCount: items.length,
-      itemBuilder: (_, i) {
-        final n = items[i];
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: _colorFor(n.type).withValues(alpha: 0.15),
-            child: Text(
-              _emojiFor(n.type),
-              style: const TextStyle(fontSize: 18),
-            ),
-          ),
-          title: Text(
-            n.title,
-            style: AppTypography.body.copyWith(
-              fontWeight: n.isRead ? FontWeight.w400 : FontWeight.w600,
-            ),
-          ),
-          subtitle: Text(n.body, style: AppTypography.caption),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                formatRelativeTime(n.createdAt),
-                style: AppTypography.caption,
+      body: SafeArea(
+        child: notifications.isLoading && notifications.items.isEmpty
+            ? const Center(child: CircularProgressIndicator())
+            : TabBarView(
+                controller: _tab,
+                children: [
+                  for (final tab in _tabs)
+                    NotificationListContent(
+                      items: _itemsForTab(notifications, tab),
+                      emptyTitle: _emptyTitle(tab),
+                      emptySubtitle: _emptySubtitle(tab),
+                    ),
+                ],
               ),
-              if (!n.isRead)
-                Container(
-                  width: 8,
-                  height: 8,
-                  margin: const EdgeInsets.only(top: 4),
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-            ],
-          ),
-          onTap: () {
-            context.read<NotificationsProvider>().markRead(n.id);
-            openNotification(
-              GoRouter.of(context),
-              notification: n,
-              activeAccount: context.read<AuthProvider>().activeAccount,
-            );
-          },
-        );
-      },
+      ),
     );
   }
 
-  String _emojiFor(NotificationType type) => switch (type) {
-    NotificationType.outbid => '🎯',
-    NotificationType.wonBid => '🏆',
-    NotificationType.shipped => '📦',
-    NotificationType.message => '💬',
-    NotificationType.saved => '❤️',
-    NotificationType.orderConfirmed => '✅',
-    NotificationType.verificationSubmitted => '📄',
-    NotificationType.verificationApproved => '✅',
-    NotificationType.verificationRejected => '⚠️',
-    NotificationType.review => '⭐',
-    NotificationType.reportDecision => '🛡️',
-    NotificationType.system => 'ℹ️',
+  String _emptyTitle(String tab) => switch (tab) {
+    'orders' => 'No order updates yet',
+    'bids' => 'No bidding alerts',
+    'messages' => 'No message alerts',
+    'system' => 'No account updates',
+    _ => 'You are all caught up',
   };
 
-  Color _colorFor(NotificationType type) => switch (type) {
-    NotificationType.outbid => AppColors.secondary,
-    NotificationType.wonBid => AppColors.primary,
-    NotificationType.shipped => AppColors.info,
-    NotificationType.message => AppColors.textSecondary,
-    NotificationType.saved => const Color(0xFFEC4899),
-    NotificationType.orderConfirmed => AppColors.success,
-    NotificationType.verificationSubmitted => AppColors.warning,
-    NotificationType.verificationApproved => AppColors.success,
-    NotificationType.verificationRejected => AppColors.error,
-    NotificationType.review => AppColors.warning,
-    NotificationType.reportDecision => AppColors.info,
-    NotificationType.system => AppColors.textHint,
+  String _emptySubtitle(String tab) => switch (tab) {
+    'orders' =>
+      'Payments, shipping, and delivery notices for your workspace will show here.',
+    'bids' => 'Outbid and auction results will appear here when they happen.',
+    'messages' =>
+      'When someone messages you, a alert will show up here and in Chat.',
+    'system' =>
+      'Verification, reports, and marketplace policy updates appear here.',
+    _ => 'New alerts about your buys, sells, and account will land here.',
   };
 }

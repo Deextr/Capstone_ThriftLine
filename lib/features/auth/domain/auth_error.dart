@@ -44,6 +44,24 @@ bool isOauthAccountSignupBlocked(GoTrueErrorInfo info) {
       msg.contains('an account with this email already exists');
 }
 
+/// Title after a password-reset request succeeds (same for all addresses).
+const passwordResetAcknowledgementTitle = 'Request received';
+
+/// Non-enumerating confirmation shown after submit. Does not claim an email was
+/// delivered or that the address is registered.
+String passwordResetAcknowledgementBody(String email) {
+  final trimmed = email.trim();
+  if (trimmed.isEmpty) {
+    return 'If an account exists for this email with a password, you will '
+        'receive instructions to reset your password shortly. '
+        'If you use Continue with Google, sign in that way instead.';
+  }
+  return 'If an account exists for $trimmed with a password, you will receive '
+      'instructions to reset your password shortly. '
+      'If you use Continue with Google for that address, sign in that way '
+      'instead.';
+}
+
 /// Safe copy for the password-reset Edge Function. Unknown server text is
 /// collapsed so logs and gateway errors are not shown to the user.
 String passwordResetUiMessage(String? serverError) {

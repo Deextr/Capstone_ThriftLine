@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/utils/fulfillment_sla.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../models/community_report_model.dart';
 import '../../../../models/order_model.dart';
@@ -95,6 +97,11 @@ class _OrderDisputeReviewBody extends StatelessWidget {
       report: report,
       order: order,
     );
+    final linkedOrder = order;
+    final showFulfillmentStallCallout =
+        report.category == 'seller_not_processing_order' &&
+        linkedOrder != null &&
+        fulfillmentSlaForOrder(linkedOrder).delayedForAdmin;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
@@ -106,6 +113,24 @@ class _OrderDisputeReviewBody extends StatelessWidget {
             order: order,
             parties: parties,
           ),
+          if (showFulfillmentStallCallout) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.warning),
+              ),
+              child: Text(
+                'Paid more than 72 hours ago and still preparing. The scheduled job cancels and refunds this case automatically when no other dispute is open.',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 22),
           AdminDisputeModalSection(
             title: 'Report & evidence',

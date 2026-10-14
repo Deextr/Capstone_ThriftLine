@@ -98,6 +98,78 @@ void main() {
       expect(result.isUnsuccessful, isFalse);
     });
 
+    test('checkout exit stays unverified when PayMongo is still pending', () {
+      final pending = PaymongoReconcileResult.fromMap({'outcome': 'pending'});
+      expect(
+        paymongoHostedCheckoutUi(
+          reconciled: pending,
+          stillConfirmingAttempt: false,
+        ),
+        PaymongoHostedCheckoutUi.unverified,
+      );
+      expect(pending.isUnsuccessful, isFalse);
+      expect(
+        paymentNavigationBlocked(
+          isStartingPayment: false,
+          isConfirmingPayment: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('blocks back only while a payment request is in flight', () {
+      expect(
+        paymentNavigationBlocked(
+          isStartingPayment: true,
+          isConfirmingPayment: false,
+        ),
+        isTrue,
+      );
+      expect(
+        paymentNavigationBlocked(
+          isStartingPayment: false,
+          isConfirmingPayment: true,
+        ),
+        isTrue,
+      );
+      expect(
+        paymongoHostedCheckoutUi(
+          reconciled: PaymongoReconcileResult.fromMap({'outcome': 'pending'}),
+          stillConfirmingAttempt: true,
+        ),
+        PaymongoHostedCheckoutUi.confirming,
+      );
+    });
+
+    test(
+      'maps verified PayMongo failure without treating pending as failed',
+      () {
+        expect(
+          paymongoHostedCheckoutUi(
+            reconciled: PaymongoReconcileResult.fromMap({'outcome': 'failed'}),
+            stillConfirmingAttempt: false,
+          ),
+          PaymongoHostedCheckoutUi.failed,
+        );
+        expect(
+          paymongoHostedCheckoutUi(
+            reconciled: PaymongoReconcileResult.fromMap({
+              'outcome': 'cancelled',
+            }),
+            stillConfirmingAttempt: false,
+          ),
+          PaymongoHostedCheckoutUi.failed,
+        );
+        expect(
+          paymongoHostedCheckoutUi(
+            reconciled: PaymongoReconcileResult.fromMap({'outcome': 'paid'}),
+            stillConfirmingAttempt: true,
+          ),
+          PaymongoHostedCheckoutUi.paid,
+        );
+      },
+    );
+
     test(
       'keeps pending when PayMongo is paid but the order is still recording',
       () {

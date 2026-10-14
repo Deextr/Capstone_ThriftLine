@@ -78,6 +78,7 @@ class OrderModel {
     this.paymentDueAt,
     this.checkoutGroupId,
     this.checkoutSource,
+    this.paidAt,
   });
 
   final String id;
@@ -118,6 +119,9 @@ class OrderModel {
   final DateTime? paymentDueAt;
   final String? checkoutGroupId;
   final String? checkoutSource;
+
+  /// First successful payment time (`payments.updated_at` when paid).
+  final DateTime? paidAt;
 
   bool get isBuyNowCheckout => checkoutSource == 'buy_now';
 
@@ -218,6 +222,7 @@ class OrderModel {
       !isPaymentPending &&
       !isCompleted &&
       !isDisputed &&
+      status != OrderStatus.cancelled &&
       (shipment == null || shipment!.canEditRider);
 
   bool get isSellerVisible =>
@@ -341,6 +346,7 @@ class OrderModel {
           : null,
       checkoutGroupId: row['checkout_group_id'] as String?,
       checkoutSource: row['checkout_source'] as String?,
+      paidAt: paidAtFromPaymentsRow(row),
     );
   }
 
@@ -382,6 +388,7 @@ class OrderModel {
     ReturnShipment? itemReturn,
     DateTime? paymentDueAt,
     String? checkoutGroupId,
+    DateTime? paidAt,
   }) => OrderModel(
     id: id ?? this.id,
     orderNumber: orderNumber ?? this.orderNumber,
@@ -420,7 +427,31 @@ class OrderModel {
     itemReturn: itemReturn ?? this.itemReturn,
     paymentDueAt: paymentDueAt ?? this.paymentDueAt,
     checkoutGroupId: checkoutGroupId ?? this.checkoutGroupId,
+    paidAt: paidAt ?? this.paidAt,
   );
+}
+
+DateTime? paidAtFromPaymentsRow(Map<String, dynamic> row) {
+  DateTime? earliest;
+  void consider(Map<dynamic, dynamic> raw) {
+    final status = raw['payment_status']?.toString().trim().toLowerCase();
+    if (status != 'paid') return;
+    final stamp =
+        DateTime.tryParse(raw['updated_at']?.toString() ?? '') ??
+        DateTime.tryParse(raw['created_at']?.toString() ?? '');
+    if (stamp == null) return;
+    if (earliest == null || stamp.isBefore(earliest!)) earliest = stamp;
+  }
+
+  final nested = row['payments'];
+  if (nested is List) {
+    for (final raw in nested) {
+      if (raw is Map) consider(raw);
+    }
+  } else if (nested is Map) {
+    consider(nested);
+  }
+  return earliest;
 }
 
 String paymentStatusFromOrderRow(Map<String, dynamic> row) {

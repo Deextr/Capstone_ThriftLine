@@ -317,6 +317,7 @@ class _OrderList extends StatelessWidget {
             category: category == BuyerPurchaseCategory.all
                 ? orderCategory
                 : category,
+            orderReport: controller.reportForOrder(order.id),
             reviewActionKind: orderCategory == BuyerPurchaseCategory.completed
                 ? action
                 : null,

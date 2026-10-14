@@ -9,6 +9,7 @@ import 'core/routes/app_router.dart';
 import 'core/routes/deep_link_dispatch.dart';
 import 'core/routes/password_recovery_coordinator.dart';
 import 'core/routes/paymongo_return_coordinator.dart';
+import 'core/services/push_notification_service.dart';
 import 'core/services/shared_preferences_service.dart';
 import 'core/services/supabase_service.dart';
 import 'features/auth/data/auth_service.dart';
@@ -45,6 +46,7 @@ Future<void> main() async {
   final appProvider = AppProvider(prefs);
   final dataProvider = DataProvider();
   final notificationsProvider = NotificationsProvider(supabaseService);
+  final pushNotificationService = PushNotificationService(supabaseService);
   final settingsProvider = SettingsProvider(supabaseService);
   final savedItemsProvider = SavedItemsProvider(supabaseService, authProvider);
   final followingShopsProvider = FollowingShopsProvider(supabaseService);
@@ -94,6 +96,7 @@ Future<void> main() async {
         followingShopsProvider: followingShopsProvider,
         cartProvider: cartProvider,
         supabaseService: supabaseService,
+        pushNotifications: pushNotificationService,
       ),
     ),
   );

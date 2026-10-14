@@ -10,8 +10,10 @@ import '../../../../core/utils/validators.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../domain/legal_documents.dart';
+import '../../data/shared_preferences_login_rate_limit_store.dart';
 import '../../domain/login_rate_limiter.dart';
-import '../widgets/auth_branding.dart' show AuthVideoScrim;
+import '../../../../core/services/shared_preferences_service.dart';
+import '../widgets/auth_branding.dart';
 import '../widgets/auth_lockout_banner.dart';
 import '../widgets/google_sign_in_button.dart';
 import '../widgets/legal_consent_notice.dart';
@@ -36,17 +38,26 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _submitted = false;
   String? _turnstileToken;
 
-  final LoginRateLimiter _rateLimiter = LoginRateLimiter();
+  LoginRateLimiter? _rateLimiter;
+  bool _rateLimiterReady = false;
 
   @override
   void initState() {
     super.initState();
-    _rateLimiter.addListener(_onRateLimiterChanged);
+    _emailController.addListener(_onEmailFieldChanged);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!_rateLimiterReady) {
+      final prefs = context.read<SharedPreferencesService>();
+      _rateLimiter = LoginRateLimiter(
+        SharedPreferencesLoginRateLimitStore(prefs),
+      )..addListener(_onRateLimiterChanged);
+      _rateLimiter!.setDisplayEmail(_emailController.text);
+      _rateLimiterReady = true;
+    }
     final openEmail =
         GoRouterState.of(context).uri.queryParameters['email'] == '1';
     if (openEmail && !_showEmailSignIn) {
@@ -56,10 +67,16 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _onEmailFieldChanged() {
+    _rateLimiter?.setDisplayEmail(_emailController.text);
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
-    _rateLimiter.removeListener(_onRateLimiterChanged);
-    _rateLimiter.dispose();
+    _emailController.removeListener(_onEmailFieldChanged);
+    _rateLimiter?.removeListener(_onRateLimiterChanged);
+    _rateLimiter?.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -93,8 +110,16 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _submitted = true);
     if (!_formKey.currentState!.validate()) return;
 
-    if (_rateLimiter.isLockedOut) {
-      showThriftSnackBar(context, _rateLimiter.lockoutMessage, isError: true);
+    final email = _emailController.text.trim();
+    final rateLimiter = _rateLimiter;
+    if (rateLimiter == null) return;
+
+    if (rateLimiter.isLockedOut(email)) {
+      showThriftSnackBar(
+        context,
+        rateLimiter.lockoutMessageFor(email),
+        isError: true,
+      );
       return;
     }
 
@@ -117,13 +142,13 @@ class _LoginScreenState extends State<LoginScreen> {
     );
     if (!mounted) return;
     if (!loginResult.isSuccess) {
-      _rateLimiter.recordFailure();
+      await rateLimiter.recordFailure(email);
       _clearTurnstile();
       showThriftSnackBar(context, loginResult.errorMessage!, isError: true);
       return;
     }
 
-    _rateLimiter.recordSuccess();
+    await rateLimiter.recordSuccess(email);
     context.go(
       auth.isEmailOtpPending ? RouteNames.verifyEmailOtp : auth.homeRoute,
     );
@@ -145,7 +170,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final screenHeight = MediaQuery.sizeOf(context).height;
     final compact = screenHeight < 700;
     const fieldLabelColor = Colors.white;
-    final lockedOut = _rateLimiter.isLockedOut;
+    final rateLimiter = _rateLimiter;
+    final loginEmail = _emailController.text.trim();
+    final lockedOut =
+        rateLimiter != null && rateLimiter.isLockedOut(loginEmail);
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -179,65 +207,64 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       Expanded(
-                        child: _showEmailSignIn
-                            ? LayoutBuilder(
-                                builder: (context, constraints) {
-                                  return SingleChildScrollView(
-                                    padding: EdgeInsets.fromLTRB(
-                                      AppConstants.spacingLg,
-                                      compact ? 4 : AppConstants.spacingSm,
-                                      AppConstants.spacingLg,
-                                      AppConstants.spacingMd,
+                        child: IndexedStack(
+                          index: _showEmailSignIn ? 1 : 0,
+                          sizing: StackFit.expand,
+                          children: [
+                            _AuthMethodPicker(
+                              isLoading: isLoading,
+                              onGoogle: _loginWithGoogle,
+                              onEmail: _openEmailSignIn,
+                            ),
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                return SingleChildScrollView(
+                                  padding: EdgeInsets.fromLTRB(
+                                    AppConstants.spacingLg,
+                                    compact ? 4 : AppConstants.spacingSm,
+                                    AppConstants.spacingLg,
+                                    AppConstants.spacingMd,
+                                  ),
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      minHeight:
+                                          constraints.maxHeight -
+                                          (compact ? 4 : AppConstants.spacingSm),
                                     ),
-                                    child: ConstrainedBox(
-                                      constraints: BoxConstraints(
-                                        minHeight: constraints.maxHeight,
+                                    child: _EmailSignInBody(
+                                      formKey: _formKey,
+                                      compact: compact,
+                                      lockedOut: lockedOut,
+                                      isLoading: isLoading,
+                                      canSubmitEmail: canSubmitEmail,
+                                      emailController: _emailController,
+                                      passwordController:
+                                          _passwordController,
+                                      obscurePassword: _obscurePassword,
+                                      submitted: _submitted,
+                                      rateLimiter: rateLimiter,
+                                      loginEmail: loginEmail,
+                                      turnstileKey: _turnstileKey,
+                                      onObscureToggle: () => setState(
+                                        () => _obscurePassword =
+                                            !_obscurePassword,
                                       ),
-                                      child: _EmailSignInBody(
-                                        formKey: _formKey,
-                                        compact: compact,
-                                        lockedOut: lockedOut,
-                                        isLoading: isLoading,
-                                        canSubmitEmail: canSubmitEmail,
-                                        emailController: _emailController,
-                                        passwordController: _passwordController,
-                                        obscurePassword: _obscurePassword,
-                                        submitted: _submitted,
-                                        rateLimiter: _rateLimiter,
-                                        turnstileKey: _turnstileKey,
-                                        onObscureToggle: () => setState(
-                                          () => _obscurePassword =
-                                              !_obscurePassword,
-                                        ),
-                                        onTurnstileToken: (token) => setState(
-                                          () => _turnstileToken = token,
-                                        ),
-                                        onTurnstileClear: () => setState(
-                                          () => _turnstileToken = null,
-                                        ),
-                                        onSignIn: _loginWithEmail,
-                                        fieldLabelColor: fieldLabelColor,
+                                      onTurnstileToken: (token) => setState(
+                                        () => _turnstileToken = token,
                                       ),
+                                      onTurnstileClear: () => setState(
+                                        () => _turnstileToken = null,
+                                      ),
+                                      onSignIn: _loginWithEmail,
+                                      fieldLabelColor: fieldLabelColor,
                                     ),
-                                  );
-                                },
-                              )
-                            : _AuthMethodPicker(
-                                isLoading: isLoading,
-                                onGoogle: _loginWithGoogle,
-                                onEmail: _openEmailSignIn,
-                              ),
-                      ),
-                      if (_showEmailSignIn)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppConstants.spacingLg,
-                            AppConstants.spacingSm,
-                            AppConstants.spacingLg,
-                            AppConstants.spacingMd,
-                          ),
-                          child: const LegalConsentNotice(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
+                      ),
                     ],
                   );
                 },
@@ -328,6 +355,7 @@ class _EmailSignInBody extends StatelessWidget {
     required this.obscurePassword,
     required this.submitted,
     required this.rateLimiter,
+    required this.loginEmail,
     required this.turnstileKey,
     required this.onObscureToggle,
     required this.onTurnstileToken,
@@ -345,7 +373,8 @@ class _EmailSignInBody extends StatelessWidget {
   final TextEditingController passwordController;
   final bool obscurePassword;
   final bool submitted;
-  final LoginRateLimiter rateLimiter;
+  final LoginRateLimiter? rateLimiter;
+  final String loginEmail;
   final GlobalKey<TurnstileChallengeState> turnstileKey;
   final VoidCallback onObscureToggle;
   final ValueChanged<String> onTurnstileToken;
@@ -364,6 +393,8 @@ class _EmailSignInBody extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          Center(child: AuthBrandLogo(size: compact ? 64 : 72)),
+          SizedBox(height: compact ? 12 : 16),
           Text(
             'Sign in with Email',
             style: AppTypography.heading.copyWith(
@@ -372,9 +403,19 @@ class _EmailSignInBody extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
+          const SizedBox(height: 8),
+          Text(
+            'Use your ThriftLine email and password to continue.',
+            style: AppTypography.body.copyWith(
+              color: Colors.white.withValues(alpha: 0.82),
+            ),
+            textAlign: TextAlign.center,
+          ),
           SizedBox(height: compact ? 20 : 28),
-          if (lockedOut) ...[
-            AuthLockoutBanner(message: rateLimiter.lockoutMessage),
+          if (lockedOut && rateLimiter != null) ...[
+            AuthLockoutBanner(
+              message: rateLimiter!.lockoutMessageFor(loginEmail),
+            ),
             const SizedBox(height: 16),
           ],
           ThriftTextField(
@@ -411,6 +452,9 @@ class _EmailSignInBody extends StatelessWidget {
                   : () => context.go(RouteNames.forgotPassword),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.primaryLight,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               child: Text(
                 'Forgot password?',
@@ -421,20 +465,26 @@ class _EmailSignInBody extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          TurnstileChallenge(
-            key: turnstileKey,
-            action: 'login',
-            onToken: onTurnstileToken,
-            onError: (_) => onTurnstileClear(),
-            onExpired: onTurnstileClear,
+          const SizedBox(height: 16),
+          RepaintBoundary(
+            child: TurnstileChallenge(
+              key: turnstileKey,
+              action: 'login',
+              showSuccessMessage: false,
+              showLoadingMessage: false,
+              onToken: onTurnstileToken,
+              onError: (_) => onTurnstileClear(),
+              onExpired: onTurnstileClear,
+            ),
           ),
-          SizedBox(height: compact ? 16 : 20),
+          SizedBox(height: compact ? 20 : 24),
           ThriftButton(
             label: lockedOut ? 'Locked' : 'Sign In',
             onPressed: canSubmitEmail ? onSignIn : null,
             isLoading: isLoading,
           ),
+          SizedBox(height: compact ? 16 : 20),
+          const LegalConsentNotice(),
         ],
       ),
     );

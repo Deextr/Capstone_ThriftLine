@@ -1,0 +1,3 @@
+{
+  "_comment": "Rename to google-services.json after registering Android app com.example.thriftline in Firebase Console → Project settings → Your apps → Download google-services.json. .env FIREBASE_* keys are still required for this project."
+}

@@ -27,8 +27,29 @@ class AdminDashboardService {
       bucket: period.bucketParam,
     );
     final snapshot = AdminMarketplaceSnapshot.fromJson(map);
+    var overdue = snapshot.activity.ordersOverdueFulfillment;
+    try {
+      final raw = await _supabase.client.rpc('fulfillment_overdue_count');
+      if (raw is int) {
+        overdue = raw;
+      } else if (raw is num) {
+        overdue = raw.toInt();
+      }
+    } catch (e) {
+      debugPrint('fulfillment_overdue_count error: $e');
+    }
+    final merged = AdminMarketplaceSnapshot(
+      generatedAt: snapshot.generatedAt,
+      bucket: snapshot.bucket,
+      comparisonAvailable: snapshot.comparisonAvailable,
+      kpis: snapshot.kpis,
+      activity: snapshot.activity.copyWith(ordersOverdueFulfillment: overdue),
+      attention: snapshot.attention,
+      revenueSeries: snapshot.revenueSeries,
+      recentActivity: snapshot.recentActivity,
+    );
     await _cacheSnapshot(map);
-    return snapshot;
+    return merged;
   }
 
   /// Analytical reports still read the legacy snapshot fields.
