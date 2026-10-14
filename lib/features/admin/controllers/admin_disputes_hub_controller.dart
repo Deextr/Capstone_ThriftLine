@@ -24,6 +24,7 @@ class AdminDisputesHubController extends ChangeNotifier {
   AdminReportListFilter _statusFilter;
   AdminLookingForLifecycleFilter _lfLifecycleFilter =
       AdminLookingForLifecycleFilter.all;
+  String? _orderReasonFilter;
   AdminDateWindow? _dateWindow;
   final TextEditingController searchController = TextEditingController();
 
@@ -39,8 +40,10 @@ class AdminDisputesHubController extends ChangeNotifier {
   AdminModerationCategory get category => _category;
   AdminReportListFilter get statusFilter => _statusFilter;
   AdminLookingForLifecycleFilter get lfLifecycleFilter => _lfLifecycleFilter;
+  String? get orderReasonFilter => _orderReasonFilter;
   bool get isLookingForCategory =>
       _category == AdminModerationCategory.lookingFor;
+  bool get isOrderCategory => _category == AdminModerationCategory.order;
   AdminDateWindow? get dateWindow => _dateWindow;
   List<AdminModerationCaseRow> get items => _items;
   int get total => _total;
@@ -53,6 +56,7 @@ class AdminDisputesHubController extends ChangeNotifier {
       _statusFilter != AdminReportListFilter.all ||
       _lfLifecycleFilter != AdminLookingForLifecycleFilter.all ||
       _dateWindow != null ||
+      _orderReasonFilter != null ||
       searchController.text.trim().isNotEmpty;
 
   void scheduleSearch(String value) {
@@ -90,6 +94,15 @@ class AdminDisputesHubController extends ChangeNotifier {
     load();
   }
 
+  void setOrderReasonFilter(String? value) {
+    final next = value?.trim();
+    final normalized = (next == null || next.isEmpty) ? null : next;
+    if (_orderReasonFilter == normalized) return;
+    _orderReasonFilter = normalized;
+    _page = 0;
+    load();
+  }
+
   void setDateWindow(AdminDateWindow? value) {
     _dateWindow = value;
     _page = 0;
@@ -120,6 +133,7 @@ class AdminDisputesHubController extends ChangeNotifier {
     _statusFilter = AdminReportListFilter.all;
     _lfLifecycleFilter = AdminLookingForLifecycleFilter.all;
     _dateWindow = null;
+    _orderReasonFilter = null;
     searchController.clear();
     _page = 0;
     load();
@@ -149,8 +163,13 @@ class AdminDisputesHubController extends ChangeNotifier {
         from: _dateWindow?.from,
         toExclusive: _dateWindow?.toExclusive,
       );
-      _items = page.items;
-      _total = page.total;
+      var items = page.items;
+      final reason = _orderReasonFilter;
+      if (reason != null && isOrderCategory) {
+        items = items.where((row) => row.category == reason).toList();
+      }
+      _items = items;
+      _total = reason != null && isOrderCategory ? items.length : page.total;
     } catch (e) {
       debugPrint('AdminDisputesHubController.load error: $e');
       _items = const [];

@@ -50,6 +50,8 @@ extension AdminOrderCategoryX on AdminOrderCategory {
 AdminUnifiedStatusFilter adminUnifiedStatusFromQuery(String? raw) =>
     switch (raw?.trim()) {
       'cancelled_paid_review' => AdminUnifiedStatusFilter.cancelledPaidReview,
+      'preparing' => AdminUnifiedStatusFilter.preparing,
+      'delayed' => AdminUnifiedStatusFilter.delayed,
       _ => AdminUnifiedStatusFilter.any,
     };
 
@@ -78,6 +80,7 @@ enum AdminUnifiedStatusFilter {
   any,
   awaitingPayment,
   preparing,
+  delayed,
   shipped,
   completed,
   cancelled,
@@ -91,6 +94,7 @@ extension AdminUnifiedStatusFilterX on AdminUnifiedStatusFilter {
     AdminUnifiedStatusFilter.any => 'All statuses',
     AdminUnifiedStatusFilter.awaitingPayment => 'Awaiting payment',
     AdminUnifiedStatusFilter.preparing => 'Preparing order',
+    AdminUnifiedStatusFilter.delayed => 'Delayed 72h+',
     AdminUnifiedStatusFilter.shipped => 'Shipped',
     AdminUnifiedStatusFilter.completed => 'Completed',
     AdminUnifiedStatusFilter.cancelled => 'Cancelled (unpaid)',

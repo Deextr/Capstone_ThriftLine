@@ -6,6 +6,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/fulfillment_sla.dart';
+import '../../../../models/community_report_model.dart';
 import '../../../../models/order_model.dart';
 import '../../../../models/return_shipment.dart';
 import '../../../../widgets/thrift_widgets.dart';
@@ -20,12 +22,14 @@ class MyPurchaseOrderCard extends StatelessWidget {
     required this.category,
     this.reviewActionKind,
     this.onReviewTap,
+    this.orderReport,
   });
 
   final OrderModel order;
   final BuyerPurchaseCategory category;
   final ReviewActionKind? reviewActionKind;
   final VoidCallback? onReviewTap;
+  final CommunityReportModel? orderReport;
 
   @override
   Widget build(BuildContext context) {
@@ -122,32 +126,52 @@ class MyPurchaseOrderCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (_actionLabel() != null) ...[
+            if (_actionLabel() != null || _showFulfillmentReport()) ...[
               const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerRight,
-                child: OutlinedButton(
-                  onPressed: () => _onAction(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primary),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: Text(
-                    _actionLabel()!,
-                    style: AppTypography.caption.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    if (_showFulfillmentReport())
+                      _FulfillmentReportButton(
+                        sla: fulfillmentSlaForOrder(order, report: orderReport),
+                        onReport: () => context.push(
+                          RouteNames.orderFulfillmentReportFor(order.id),
+                        ),
+                        onReview: orderReport == null
+                            ? null
+                            : () => context.push(
+                                RouteNames.reportDetailFor(orderReport!.id),
+                              ),
+                      ),
+                    if (_actionLabel() != null)
+                      OutlinedButton(
+                        onPressed: () => _onAction(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.primary),
+                          minimumSize: const Size(0, 44),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Text(
+                          _actionLabel()!,
+                          style: AppTypography.caption.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
@@ -207,11 +231,28 @@ class MyPurchaseOrderCard extends StatelessWidget {
     }
 
     final delivery = buyerDeliveryStatus(order);
+    final sla = fulfillmentSlaForOrder(order, report: orderReport);
+    var message = delivery.message;
+    if (sla.cta == FulfillmentReportCta.waiting &&
+        sla.reportUnlocksAt != null) {
+      message =
+          '${delivery.message} You can report a delay in ${formatFulfillmentRemaining(sla.reportUnlocksAt)}.';
+    } else if (sla.cta == FulfillmentReportCta.ready) {
+      message =
+          '${delivery.message} The seller has not updated this order. You can report a problem. Unprocessed orders are cancelled 72 hours after payment.';
+    } else if (sla.cta == FulfillmentReportCta.underReview) {
+      message = '${delivery.message} Your report is under review.';
+    }
     return _StatusCopy(
       title: delivery.title,
-      message: delivery.message,
-      color: delivery.color,
+      message: message,
+      color: sla.delayedForAdmin ? AppColors.warning : delivery.color,
     );
+  }
+
+  bool _showFulfillmentReport() {
+    final sla = fulfillmentSlaForOrder(order, report: orderReport);
+    return sla.cta != FulfillmentReportCta.hidden;
   }
 
   String? _actionLabel() {
@@ -250,6 +291,60 @@ class MyPurchaseOrderCard extends StatelessWidget {
       return;
     }
     context.push(RouteNames.trackOrderFor(order.id));
+  }
+}
+
+class _FulfillmentReportButton extends StatelessWidget {
+  const _FulfillmentReportButton({
+    required this.sla,
+    required this.onReport,
+    this.onReview,
+  });
+
+  final FulfillmentSlaView sla;
+  final VoidCallback onReport;
+  final VoidCallback? onReview;
+
+  @override
+  Widget build(BuildContext context) {
+    if (sla.cta == FulfillmentReportCta.underReview) {
+      return OutlinedButton(
+        onPressed: onReview,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.warning,
+          side: const BorderSide(color: AppColors.warning),
+          minimumSize: const Size(0, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ),
+        child: Text(
+          'Under review',
+          style: AppTypography.caption.copyWith(fontWeight: FontWeight.w700),
+        ),
+      );
+    }
+    final waiting = sla.cta == FulfillmentReportCta.waiting;
+    return Semantics(
+      button: true,
+      enabled: !waiting,
+      label: waiting
+          ? 'Report a problem available in ${formatFulfillmentRemaining(sla.reportUnlocksAt)}'
+          : 'Report a problem with this order',
+      child: OutlinedButton(
+        onPressed: waiting ? null : onReport,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.error,
+          side: BorderSide(color: waiting ? AppColors.border : AppColors.error),
+          minimumSize: const Size(0, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ),
+        child: Text(
+          waiting
+              ? 'Report in ${formatFulfillmentRemaining(sla.reportUnlocksAt)}'
+              : 'Report a problem',
+          style: AppTypography.caption.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
   }
 }
 

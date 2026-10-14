@@ -11,9 +11,12 @@ import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../chat/presentation/widgets/share_looking_for_sheet.dart';
 import '../../controllers/looking_for_controller.dart';
+import '../../domain/looking_for_feed_query.dart';
 import '../../domain/looking_for_lifecycle.dart';
 import '../widgets/create_looking_for_sheet.dart';
 import '../widgets/looking_for_browse_feed_skeleton.dart';
+import '../widgets/looking_for_filter_sheet.dart';
+import '../widgets/looking_for_tab_chrome.dart';
 import '../widgets/report_looking_for_sheet.dart';
 
 class BuyerLookingForTab extends StatefulWidget {
@@ -29,12 +32,8 @@ class BuyerLookingForTab extends StatefulWidget {
 class _BuyerLookingForTabState extends State<BuyerLookingForTab>
     with SingleTickerProviderStateMixin {
   TabController? _tab;
-  String _selectedFilter = 'Recently Posted';
-  final List<String> _filters = [
-    'Recently Posted',
-    'Most Popular',
-    'Highest Budget',
-  ];
+  LookingForSort _sort = LookingForSort.recentlyPosted;
+  LookingForFeedFilters _filters = const LookingForFeedFilters();
 
   @override
   void initState() {
@@ -53,7 +52,27 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
     super.dispose();
   }
 
-  bool get _showingBrowse => widget.sellerWorkspace || (_tab?.index ?? 0) == 0;
+  TabBar _lookingForTabBar() {
+    return TabBar(
+      controller: _tab,
+      isScrollable: true,
+      tabAlignment: TabAlignment.start,
+      labelColor: AppColors.primaryDark,
+      indicatorColor: AppColors.primary,
+      indicatorWeight: 2.5,
+      labelStyle: AppTypography.caption.copyWith(fontWeight: FontWeight.w700),
+      unselectedLabelStyle: AppTypography.caption.copyWith(
+        fontWeight: FontWeight.w500,
+      ),
+      unselectedLabelColor: AppColors.textSecondary,
+      dividerColor: AppColors.border,
+      tabs: const [
+        Tab(text: 'Browse'),
+        Tab(text: 'My active'),
+        Tab(text: 'Inactive'),
+      ],
+    );
+  }
 
   Future<void> _openCreateSheet() async {
     final looking = context.read<LookingForController>();
@@ -151,6 +170,39 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
     showThriftSnackBar(context, 'Report sent. An admin will review it.');
   }
 
+  Future<void> _close(LookingForModel post) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mark as fulfilled?'),
+        content: const Text(
+          'Sellers will no longer see this as an active request. You can still '
+          'find it under Inactive Requests.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Mark fulfilled'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final error = await context.read<LookingForController>().closePost(
+      post.id,
+    );
+    if (!mounted) return;
+    if (error != null) {
+      showThriftSnackBar(context, error, isError: true);
+      return;
+    }
+    showThriftSnackBar(context, 'Request marked as fulfilled.');
+  }
+
   Future<void> _delete(LookingForModel post) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -186,9 +238,18 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
   @override
   Widget build(BuildContext context) {
     final looking = context.watch<LookingForController>();
-    final browsePosts = _applyFilter(looking.browsePosts);
-    final activePosts = _applyFilter(looking.myActivePosts);
-    final inactivePosts = looking.myInactivePosts;
+    final browsePosts = _queryPosts(
+      looking.browsePosts,
+      section: _LookingSection.browse,
+    );
+    final activePosts = _queryPosts(
+      looking.myActivePosts,
+      section: _LookingSection.active,
+    );
+    final inactivePosts = _queryPosts(
+      looking.myInactivePosts,
+      section: _LookingSection.inactive,
+    );
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -201,91 +262,64 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
               final notice = widget.sellerWorkspace
                   ? null
                   : looking.postingRestrictionMessage;
-              final filterHeight = _showingBrowse ? 52.0 : 0.0;
-              final tabHeight = widget.sellerWorkspace ? 0.0 : 48.0;
-              final noticeHeight = notice == null ? 0.0 : 48.0;
               return [
                 SliverAppBar(
                   floating: true,
                   pinned: true,
                   title: Text(
-                    widget.sellerWorkspace ? 'Buyer Requests' : 'Looking For',
+                    widget.sellerWorkspace ? 'Buyer requests' : 'Looking For',
                     style: AppTypography.heading,
                   ),
                   backgroundColor: AppColors.surface,
-                  elevation: innerBoxIsScrolled ? 1 : 0,
-                  bottom: PreferredSize(
-                    preferredSize: Size.fromHeight(
-                      filterHeight + tabHeight + noticeHeight,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (notice != null)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                            child: Text(
-                              notice,
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                        if (_showingBrowse)
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                            child: Row(
-                              children: _filters.map((filter) {
-                                final isSelected = _selectedFilter == filter;
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: FilterChip(
-                                    label: Text(filter),
-                                    selected: isSelected,
-                                    onSelected: (_) {
-                                      setState(() => _selectedFilter = filter);
-                                    },
-                                    visualDensity: VisualDensity.compact,
-                                    selectedColor: AppColors.primaryLight,
-                                    checkmarkColor: AppColors.primaryDark,
-                                    labelStyle: TextStyle(
-                                      color: isSelected
-                                          ? AppColors.primaryDark
-                                          : AppColors.textPrimary,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w600
-                                          : FontWeight.w500,
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        if (!widget.sellerWorkspace && _tab != null)
-                          TabBar(
-                            controller: _tab,
-                            isScrollable: true,
-                            tabAlignment: TabAlignment.start,
-                            labelColor: AppColors.primaryDark,
-                            indicatorColor: AppColors.primary,
-                            unselectedLabelColor: AppColors.textSecondary,
-                            tabs: const [
-                              Tab(text: 'Browse Requests'),
-                              Tab(text: 'My Active Requests'),
-                              Tab(text: 'Inactive Requests'),
-                            ],
-                          ),
-                      ],
+                  surfaceTintColor: Colors.transparent,
+                  elevation: innerBoxIsScrolled ? 0.5 : 0,
+                ),
+                SliverToBoxAdapter(
+                  child: ColoredBox(
+                    color: AppColors.surface,
+                    child: LookingForWorkspaceIntro(
+                      sellerWorkspace: widget.sellerWorkspace,
                     ),
                   ),
                 ),
+                if (notice != null)
+                  SliverToBoxAdapter(
+                    child: ColoredBox(
+                      color: AppColors.surface,
+                      child: LookingForRestrictionBanner(message: notice),
+                    ),
+                  ),
+                SliverToBoxAdapter(
+                  child: ColoredBox(
+                    color: AppColors.surface,
+                    child: LookingForFeedToolbar(
+                      sort: _sort,
+                      filters: _filters,
+                      onSortChanged: (value) => setState(() => _sort = value),
+                      onOpenFilters: () => _openFilters(
+                        showInactiveStatus:
+                            !widget.sellerWorkspace &&
+                            (_tab?.index ?? 0) == 2,
+                      ),
+                      onClearFilters: () =>
+                          setState(() => _filters = const LookingForFeedFilters()),
+                    ),
+                  ),
+                ),
+                if (!widget.sellerWorkspace && _tab != null)
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _LookingForTabBarDelegate(
+                      tabBar: _lookingForTabBar(),
+                    ),
+                  ),
               ];
             },
             body: widget.sellerWorkspace || _tab == null
                 ? _buildList(
                     looking,
                     browsePosts,
+                    sourceCount: looking.browsePosts.length,
                     section: _LookingSection.browse,
                     showRespond: true,
                   )
@@ -295,18 +329,21 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
                       _buildList(
                         looking,
                         browsePosts,
+                        sourceCount: looking.browsePosts.length,
                         section: _LookingSection.browse,
                         showShare: true,
                       ),
                       _buildList(
                         looking,
                         activePosts,
+                        sourceCount: looking.myActivePosts.length,
                         section: _LookingSection.active,
                         showShare: true,
                       ),
                       _buildList(
                         looking,
                         inactivePosts,
+                        sourceCount: looking.myInactivePosts.length,
                         section: _LookingSection.inactive,
                       ),
                     ],
@@ -338,21 +375,31 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
     );
   }
 
-  List<LookingForModel> _applyFilter(List<LookingForModel> posts) {
-    final copy = [...posts];
-    if (_selectedFilter == 'Most Popular') {
-      copy.sort((a, b) => b.responseCount.compareTo(a.responseCount));
-    } else if (_selectedFilter == 'Highest Budget') {
-      copy.sort((a, b) => b.budgetMax.compareTo(a.budgetMax));
-    } else {
-      copy.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    }
-    return copy;
+  List<LookingForModel> _queryPosts(
+    List<LookingForModel> source, {
+    required _LookingSection section,
+  }) {
+    return queryLookingForPosts(
+      source,
+      sort: _sort,
+      filters: _filters,
+      applyInactiveStatus: section == _LookingSection.inactive,
+    );
+  }
+
+  Future<void> _openFilters({required bool showInactiveStatus}) async {
+    await LookingForFilterSheet.show(
+      context,
+      initial: _filters,
+      showInactiveStatus: showInactiveStatus,
+      onApply: (value) => setState(() => _filters = value),
+    );
   }
 
   Widget _buildList(
     LookingForController looking,
     List<LookingForModel> posts, {
+    required int sourceCount,
     required _LookingSection section,
     bool showRespond = false,
     bool showShare = false,
@@ -371,6 +418,21 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
         onRetry: looking.refresh,
       );
     }
+    if (posts.isEmpty &&
+        sourceCount > 0 &&
+        (_filters.hasAnyFilter || _sort != LookingForSort.recentlyPosted)) {
+      return EmptyState(
+        icon: Icons.filter_list_off,
+        title: 'No matching requests',
+        message:
+            'Try adjusting filters or sort. You can reset everything from the toolbar.',
+        actionLabel: 'Clear filters',
+        onAction: () => setState(() {
+          _filters = const LookingForFeedFilters();
+          _sort = LookingForSort.recentlyPosted;
+        }),
+      );
+    }
     if (lookingForShowsEmpty(
       isLoading: looking.isLoading,
       postCount: posts.length,
@@ -381,15 +443,18 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
     final me = looking.auth.user?.id;
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     final useFeed = section == _LookingSection.browse;
+    final header = _sectionHeader(section, posts.length);
 
     return RefreshIndicator(
       onRefresh: looking.refresh,
       color: AppColors.primary,
       child: ListView.builder(
-        padding: EdgeInsets.fromLTRB(0, useFeed ? 0 : 8, 0, 96.0 + bottomInset),
-        itemCount: posts.length,
+        padding: EdgeInsets.fromLTRB(0, 8, 0, 96.0 + bottomInset),
+        itemCount: posts.length + (header == null ? 0 : 1),
         itemBuilder: (_, i) {
-          final post = posts[i];
+          if (header != null && i == 0) return header;
+          final postIndex = i - (header == null ? 0 : 1);
+          final post = posts[postIndex];
           final isOwn = me != null && me == post.buyerId;
           final ownerSection =
               !widget.sellerWorkspace &&
@@ -406,6 +471,7 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
             onShare: () => _share(post),
             onRespond: () => _iHaveThis(post),
             onEdit: () => _edit(post),
+            onClose: () => _close(post),
             onDelete: () => _delete(post),
             onRepost: () => _repost(post),
             onReport: () => _report(post),
@@ -413,6 +479,24 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
         },
       ),
     );
+  }
+
+  Widget? _sectionHeader(_LookingSection section, int count) {
+    if (section == _LookingSection.browse) return null;
+    return switch (section) {
+      _LookingSection.active => LookingForListSectionHeader(
+        title: 'Active requests',
+        subtitle:
+            'These are visible to sellers until they expire or you mark them fulfilled.',
+        count: count,
+      ),
+      _LookingSection.inactive => LookingForListSectionHeader(
+        title: 'Past requests',
+        subtitle: 'Expired or fulfilled requests. Repost to ask again.',
+        count: count,
+      ),
+      _ => null,
+    };
   }
 
   Widget _empty(_LookingSection section) {
@@ -452,3 +536,31 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
 }
 
 enum _LookingSection { browse, active, inactive }
+
+class _LookingForTabBarDelegate extends SliverPersistentHeaderDelegate {
+  _LookingForTabBarDelegate({required this.tabBar});
+
+  final TabBar tabBar;
+
+  @override
+  double get minExtent => tabBar.preferredSize.height;
+
+  @override
+  double get maxExtent => tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return ColoredBox(
+      color: AppColors.surface,
+      child: tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _LookingForTabBarDelegate oldDelegate) =>
+      tabBar != oldDelegate.tabBar;
+}

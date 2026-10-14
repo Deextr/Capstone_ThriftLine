@@ -315,9 +315,21 @@ class _AdminWebOrdersTransactionsPageState
                             formatCurrency(order.totalAmount),
                             style: AppTypography.tableBody,
                           ),
-                          AdminStatusBadge(
-                            status: order.unifiedStatus.badgeKey,
-                            label: order.unifiedStatus.label,
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AdminStatusBadge(
+                                status: order.unifiedStatus.badgeKey,
+                                label: order.unifiedStatus.label,
+                              ),
+                              if (order.isFulfillmentDelayed) ...[
+                                const SizedBox(height: 4),
+                                const AdminStatusBadge(
+                                  status: 'pending',
+                                  label: 'Delayed 72h+',
+                                ),
+                              ],
+                            ],
                           ),
                           AdminTablePhilippinesDateTimeCell(
                             dateTime: order.createdAt,

@@ -17,6 +17,7 @@ import '../../../../widgets/bid_card.dart';
 import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/buyer_bids_controller.dart';
+import '../../data/auction_checkout_order.dart';
 import '../widgets/bid_phone_verification_prompt.dart';
 import '../widgets/payment_deadline_text.dart';
 
@@ -30,6 +31,7 @@ class BuyerBidsTab extends StatefulWidget {
 class _BuyerBidsTabState extends State<BuyerBidsTab>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  String? _preparingCheckoutAuctionId;
 
   @override
   void initState() {
@@ -41,6 +43,46 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _openAuctionPayment(
+    BuildContext context,
+    BuyerBidsController bidsCtrl,
+    UserBid bid,
+  ) async {
+    final auctionId = bid.auctionId;
+    if (auctionId == null || auctionId.isEmpty) {
+      showThriftSnackBar(
+        context,
+        'This win has no auction yet. Pull to refresh.',
+        isError: true,
+      );
+      return;
+    }
+    setState(() => _preparingCheckoutAuctionId = auctionId);
+    try {
+      final prepared = await bidsCtrl.prepareWonAuctionCheckout(
+        auctionId,
+        knownOrderId: bid.auctionOrderId,
+      );
+      if (!context.mounted) return;
+      final orderId = prepared.orderId;
+      if (!prepared.success || orderId == null || orderId.isEmpty) {
+        if (!context.mounted) return;
+        showThriftSnackBar(
+          context,
+          buyerFacingAuctionOrderError(prepared),
+          isError: true,
+        );
+        return;
+      }
+      if (!context.mounted) return;
+      context.push(RouteNames.paymentForOrder(orderId));
+    } finally {
+      if (mounted) {
+        setState(() => _preparingCheckoutAuctionId = null);
+      }
+    }
   }
 
   @override
@@ -410,54 +452,32 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                             child: ThriftButton(
                               label: 'Pay now',
                               expand: true,
-                              onPressed: () {
-                                final orderId = bid.auctionOrderId;
-                                if (orderId == null || orderId.isEmpty) {
-                                  showThriftSnackBar(
-                                    context,
-                                    'Offer not ready. Pull to refresh.',
-                                    isError: true,
-                                  );
-                                  return;
-                                }
-                                context.push(
-                                  RouteNames.paymentForOrder(orderId),
-                                );
-                              },
+                              onPressed: _preparingCheckoutAuctionId != null
+                                  ? null
+                                  : () => _openAuctionPayment(
+                                      context,
+                                      bidsCtrl,
+                                      bid,
+                                    ),
                             ),
                           ),
                         ],
                       ),
                     ] else
                       ThriftButton(
-                        label: isExpired ? 'Payment expired' : 'Pay now',
-                        onPressed: isExpired
+                        label: isExpired
+                            ? 'Payment expired'
+                            : _preparingCheckoutAuctionId == bid.auctionId
+                            ? 'Preparing…'
+                            : 'Pay now',
+                        onPressed: isExpired ||
+                                _preparingCheckoutAuctionId != null
                             ? null
-                            : () async {
-                                final auctionId = bid.auctionId;
-                                if (auctionId == null || auctionId.isEmpty) {
-                                  showThriftSnackBar(
-                                    context,
-                                    'This win has no auction yet. Pull to refresh.',
-                                    isError: true,
-                                  );
-                                  return;
-                                }
-                                final orderId = await bidsCtrl
-                                    .orderIdForWonAuction(auctionId);
-                                if (!mounted) return;
-                                if (orderId == null) {
-                                  showThriftSnackBar(
-                                    context,
-                                    'Your pending order is not ready yet. Pull to refresh.',
-                                    isError: true,
-                                  );
-                                  return;
-                                }
-                                context.push(
-                                  RouteNames.paymentForOrder(orderId),
-                                );
-                              },
+                            : () => _openAuctionPayment(
+                                context,
+                                bidsCtrl,
+                                bid,
+                              ),
                       ),
                   ],
                 ),

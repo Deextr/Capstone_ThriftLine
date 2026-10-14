@@ -3,6 +3,7 @@ import 'package:thriftline/core/routes/auth_redirect.dart';
 import 'package:thriftline/core/routes/route_names.dart';
 import 'package:thriftline/core/utils/validators.dart';
 import 'package:thriftline/features/auth/data/password_recovery_link.dart';
+import 'package:thriftline/features/auth/domain/auth_error.dart';
 import 'package:thriftline/features/buyer/data/paymongo_return_link.dart';
 import 'package:thriftline/providers/auth_provider.dart';
 
@@ -124,6 +125,17 @@ void main() {
         ),
         isNull,
       );
+    });
+  });
+
+  group('password reset acknowledgement copy', () {
+    test('does not claim delivery or registration status', () {
+      const email = 'someone@example.com';
+      final body = passwordResetAcknowledgementBody(email);
+      expect(body, contains('If an account exists'));
+      expect(body, contains(email));
+      expect(body.toLowerCase(), isNot(contains('has been sent')));
+      expect(body.toLowerCase(), isNot(contains('not registered')));
     });
   });
 

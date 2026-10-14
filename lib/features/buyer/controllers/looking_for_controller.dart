@@ -394,6 +394,24 @@ class LookingForController extends ChangeNotifier {
     }
   }
 
+  Future<String?> closePost(String postId) async {
+    final user = _auth.user;
+    if (user == null) return 'Please sign in to close this request.';
+    try {
+      final error = await _callLookingFor(
+        'close_looking_for_request',
+        {'p_post_id': postId},
+        'Could not close this request. Please try again.',
+      );
+      if (error != null) return error;
+      await loadPosts();
+      return null;
+    } catch (e) {
+      debugPrint('LookingForController.closePost error: $e');
+      return 'Could not close this request. Please try again.';
+    }
+  }
+
   Future<String?> deletePost(String postId) async {
     final user = _auth.user;
     if (user == null) return 'Please sign in to delete this request.';

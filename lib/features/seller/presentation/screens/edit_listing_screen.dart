@@ -143,6 +143,10 @@ class EditListingScreen extends StatelessWidget {
                       child: ListingFormatTypeRow(
                         selectedFormat: c.selectedFormat,
                         onFormatSelected: c.selectFormat,
+                        readOnly: c.formatLocked,
+                        lockReason: c.formatLocked
+                            ? 'Listing format cannot be changed while an auction is active.'
+                            : null,
                       ),
                     ),
                     ListingFormSection(
@@ -366,7 +370,7 @@ class _SlotWidget extends StatelessWidget {
       img = Image.network(
         (slot as ExistingSlot).image.imageUrl,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _placeholder(),
+        errorBuilder: (_, error, stackTrace) => _placeholder(),
       );
     } else {
       img = Image.memory((slot as NewSlot).image.bytes, fit: BoxFit.cover);
@@ -718,32 +722,143 @@ class _EditAuctionPricingFields extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (c.coreBiddingLocked) ...[
+          Container(
+            padding: const EdgeInsets.all(AppConstants.spacingMd),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.lock_outline,
+                  size: 20,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Core bidding parameters locked',
+                        style: AppTypography.label.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Starting bid, duration, and minimum increment cannot be edited during active bidding because bids have already been placed.',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppConstants.spacingMd),
+        ],
         ThriftTextField(
           label: 'Starting bid',
+          labelSuffix: c.coreBiddingLocked
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.lock_outline,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Locked',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                )
+              : null,
           hint: 'Minimum opening bid in pesos',
           controller: c.startBidCtrl,
           onChanged: c.onStartBidChanged,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           error: c.fieldErrors['price'],
+          readOnly: c.coreBiddingLocked,
         ),
         const SizedBox(height: AppConstants.spacingMd),
         const ListingAuctionQuantityNote(),
         const SizedBox(height: AppConstants.spacingLg),
-        Text('Auction duration', style: AppTypography.label),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Auction duration', style: AppTypography.label),
+            if (c.coreBiddingLocked)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.lock_outline,
+                    size: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Locked',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
         const SizedBox(height: 4),
         AuctionDurationSelector(
           selectedDays: c.auctionDurationDays,
           onDaysSelected: c.selectAuctionDuration,
           previewEndsAt: c.previewAuctionEndsAt,
           durationError: c.fieldErrors['duration'],
+          readOnly: c.coreBiddingLocked,
         ),
         const SizedBox(height: AppConstants.spacingLg),
-        Text('Minimum bid increment', style: AppTypography.label),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Minimum bid increment', style: AppTypography.label),
+            if (c.coreBiddingLocked)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.lock_outline,
+                    size: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Locked',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
         const SizedBox(height: 4),
         BidIncrementSelector(
           selectedIncrement: c.bidIncrement,
           onIncrementSelected: c.selectBidIncrement,
           incrementError: c.fieldErrors['increment'],
+          readOnly: c.coreBiddingLocked,
         ),
       ],
     );

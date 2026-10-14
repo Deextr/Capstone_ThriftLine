@@ -47,6 +47,14 @@ class TurnstileChallengeState extends State<TurnstileChallenge> {
   int _mountGeneration = 0;
 
   @override
+  void initState() {
+    super.initState();
+    if (TurnstileConfig.isConfigured) {
+      _controller = TurnstileController();
+    }
+  }
+
+  @override
   void dispose() {
     _controller?.dispose();
     super.dispose();
@@ -122,7 +130,10 @@ class TurnstileChallengeState extends State<TurnstileChallenge> {
       );
     }
 
-    _controller ??= TurnstileController();
+    final controller = _controller;
+    if (controller == null) {
+      return const SizedBox.shrink();
+    }
 
     final isLight =
         widget.appearance == TurnstileChallengeAppearance.lightSurface;
@@ -133,48 +144,6 @@ class TurnstileChallengeState extends State<TurnstileChallenge> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (widget.showLoadingMessage && _loading && !_solved)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: isLight ? AppColors.primary : Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'Loading verification…',
-                  style: AppTypography.caption.copyWith(color: captionColor),
-                ),
-              ],
-            ),
-          ),
-        if (widget.showSuccessMessage && _solved)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  size: 18,
-                  color: AppColors.success,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Verification complete',
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.success,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
         SizedBox(
           width: double.infinity,
           child: Center(
@@ -182,14 +151,18 @@ class TurnstileChallengeState extends State<TurnstileChallenge> {
               width: TurnstileSize.normal.width,
               height: TurnstileSize.normal.height,
               child: CloudflareTurnstile(
-                key: ValueKey('turnstile_$_mountGeneration'),
+                key: ValueKey(
+                  'turnstile_${widget.appearance.name}_$_mountGeneration',
+                ),
                 siteKey: TurnstileConfig.siteKey,
                 baseUrl: TurnstileConfig.baseUrl,
                 action: widget.action,
-                controller: _controller,
+                controller: controller,
                 options: TurnstileOptions(
                   size: TurnstileSize.normal,
-                  theme: TurnstileTheme.light,
+                  theme: isLight
+                      ? TurnstileTheme.light
+                      : TurnstileTheme.dark,
                   retryAutomatically: true,
                 ),
                 onTokenReceived: _handleToken,
@@ -210,6 +183,50 @@ class TurnstileChallengeState extends State<TurnstileChallenge> {
             ),
           ),
         ),
+        if (widget.showLoadingMessage && _loading && !_solved)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: isLight ? AppColors.primary : Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Loading verification…',
+                  style: AppTypography.caption.copyWith(color: captionColor),
+                ),
+              ],
+            ),
+          ),
+        if (widget.showSuccessMessage && _solved)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 18,
+                  color: AppColors.success,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Verification complete',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.success,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
         const SizedBox(height: 8),
         Text(
           'Protected by Cloudflare',

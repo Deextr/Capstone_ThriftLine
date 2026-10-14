@@ -223,12 +223,16 @@ Deno.serve(async (req) => {
     });
   }
 
+  const accountKind = typeof kind === "string"
+    ? kind.trim().toLowerCase()
+    : "none";
+
   // Same response whether the address is missing or Google-only, so this
   // endpoint cannot be used to list accounts. A recovery link is only minted
   // for an email/password identity. That avoids attaching a password to a
   // Google-only account.
-  if (kind !== "email") {
-    console.log(`send-password-reset skipped kind=${kind ?? "unknown"}`);
+  if (accountKind !== "email") {
+    console.log(`send-password-reset skipped kind=${accountKind}`);
     return json(200, { ok: true });
   }
 

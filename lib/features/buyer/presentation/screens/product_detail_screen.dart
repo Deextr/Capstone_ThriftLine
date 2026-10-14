@@ -19,6 +19,7 @@ import '../../../../widgets/countdown_timer.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../seller/presentation/widgets/end_auction_dialog.dart';
 import '../../controllers/product_detail_controller.dart';
+import '../../data/auction_checkout_order.dart';
 import '../widgets/bid_phone_verification_prompt.dart';
 import '../widgets/buy_now_quantity_selector.dart';
 
@@ -447,12 +448,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     BuildContext context,
     ProductDetailController controller,
   ) async {
-    final orderId = await controller.getWonAuctionOrderId();
+    final prepared = await controller.prepareWonAuctionCheckout();
     if (!context.mounted) return;
-    if (orderId == null || orderId.isEmpty) {
+    final orderId = prepared.orderId;
+    if (!prepared.success || orderId == null || orderId.isEmpty) {
       showThriftSnackBar(
         context,
-        'Your pending order is not ready yet. Please try again.',
+        buyerFacingAuctionOrderError(prepared),
         isError: true,
       );
       return;

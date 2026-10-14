@@ -350,7 +350,8 @@ enum MessageType {
   text,
   image,
   offer,
-  lookingFor;
+  lookingFor,
+  product;
 
   String get dbValue => switch (this) {
     MessageType.lookingFor => 'looking_for',
@@ -361,6 +362,7 @@ enum MessageType {
     'looking_for' || 'lookingFor' => MessageType.lookingFor,
     'image' => MessageType.image,
     'offer' => MessageType.offer,
+    'product' => MessageType.product,
     _ => MessageType.text,
   };
 }

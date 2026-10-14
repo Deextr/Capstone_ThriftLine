@@ -277,18 +277,42 @@ class AuthService {
     required String turnstileToken,
   }) async {
     try {
-      final response = await _supabaseService.client.functions.invoke(
-        'send-password-reset',
-        body: {'email': email.trim(), 'turnstile_token': turnstileToken.trim()},
-      );
-      final data = response.data;
+      final body = {
+        'email': email.trim(),
+        'turnstile_token': turnstileToken.trim(),
+      };
+
+      late final int responseStatus;
+      late final dynamic data;
+
+      if (kIsWeb) {
+        final webResponse = await SupabaseEdgeFunctionClient.postJson(
+          'send-password-reset',
+          body: body,
+        );
+        responseStatus = webResponse.status;
+        data = webResponse.data;
+      } else {
+        final response = await _supabaseService.client.functions.invoke(
+          'send-password-reset',
+          body: body,
+        );
+        responseStatus = response.status;
+        data = response.data;
+      }
+
+      final payload = parseEdgeFunctionError(data);
+      if (responseStatus >= 400) {
+        debugPrint(
+          'AuthService.requestPasswordReset failed: status=$responseStatus',
+        );
+        return passwordResetUiMessage(payload.message);
+      }
       if (data is Map && data['error'] != null) {
         return passwordResetUiMessage(data['error'].toString());
       }
-      if (response.status >= 400) {
-        debugPrint(
-          'AuthService.requestPasswordReset failed: status=${response.status}',
-        );
+      if (data is! Map || data['ok'] != true) {
+        debugPrint('AuthService.requestPasswordReset unexpected body: $data');
         return passwordResetUiMessage(null);
       }
       return null;

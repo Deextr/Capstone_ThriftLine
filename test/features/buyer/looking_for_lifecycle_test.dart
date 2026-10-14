@@ -77,6 +77,17 @@ void main() {
     expect(request(serverNow: before).canRepost, isFalse);
   });
 
+  test('an active request can be closed by its owner', () {
+    expect(request(serverNow: before).canClose, isTrue);
+  });
+
+  test('a fulfilled request cannot be closed again', () {
+    final post = request(serverNow: before, status: 'fulfilled');
+    expect(post.canClose, isFalse);
+    expect(post.showInBrowse, isFalse);
+    expect(post.showInInactive, isTrue);
+  });
+
   test('a moderation removal is not an expiration and cannot be reposted', () {
     final post = request(serverNow: after, moderationRemovedAt: after);
     expect(post.lifecycle, LookingForLifecycle.removed);

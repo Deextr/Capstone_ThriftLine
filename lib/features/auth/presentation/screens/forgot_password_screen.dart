@@ -7,6 +7,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/validators.dart';
+import '../../domain/auth_error.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../widgets/auth_branding.dart';
@@ -69,11 +70,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
     final screenHeight = MediaQuery.sizeOf(context).height;
     final compact = screenHeight < 700;
     const fieldLabelColor = Colors.white;
-    final canSubmit = !auth.isLoading && (_turnstileToken?.isNotEmpty ?? false);
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -92,7 +91,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     alignment: Alignment.centerLeft,
                     child: IconButton(
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => context.go(RouteNames.emailLogin),
+                      onPressed: _emailSent
+                          ? () => context.go(RouteNames.login)
+                          : () => context.go(RouteNames.emailLogin),
                     ),
                   ),
                   Expanded(
@@ -103,103 +104,50 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             AppConstants.spacingLg,
                             compact ? 4 : AppConstants.spacingSm,
                             AppConstants.spacingLg,
-                            AppConstants.spacingLg,
+                            AppConstants.spacingMd,
                           ),
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
                               minHeight:
                                   constraints.maxHeight -
-                                  (compact ? 4 : AppConstants.spacingSm) -
-                                  AppConstants.spacingLg,
+                                  (compact ? 4 : AppConstants.spacingSm),
                             ),
-                            child: _emailSent
-                                ? _EmailSentBody(
-                                    email: _emailController.text.trim(),
-                                    compact: compact,
-                                  )
-                                : Form(
-                                    key: _formKey,
-                                    autovalidateMode: _submitted
-                                        ? AutovalidateMode.onUserInteraction
-                                        : AutovalidateMode.disabled,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Center(
-                                          child: AuthBrandLogo(
-                                            size: compact ? 72 : 84,
-                                          ),
-                                        ),
-                                        SizedBox(height: compact ? 12 : 16),
-                                        Text(
-                                          'Forgot password',
-                                          style: AppTypography.heading.copyWith(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          'Enter the email you used for ThriftLine. '
-                                          'We will send you a secure link to choose a new password.',
-                                          style: AppTypography.body.copyWith(
-                                            color: Colors.white.withValues(
-                                              alpha: 0.82,
-                                            ),
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                        SizedBox(height: compact ? 24 : 32),
-                                        ThriftTextField(
-                                          label: 'Email',
-                                          hint: 'your@email.com',
-                                          controller: _emailController,
-                                          icon: Icons.email_outlined,
-                                          keyboardType:
-                                              TextInputType.emailAddress,
-                                          validator: Validators.email,
-                                          labelColor: fieldLabelColor,
-                                        ),
-                                        const SizedBox(height: 16),
-                                        TurnstileChallenge(
-                                          key: _turnstileKey,
-                                          action: 'password_reset',
-                                          onToken: (token) => setState(
-                                            () => _turnstileToken = token,
-                                          ),
-                                          onError: (_) => setState(
-                                            () => _turnstileToken = null,
-                                          ),
-                                          onExpired: () => setState(
-                                            () => _turnstileToken = null,
-                                          ),
-                                        ),
-                                        SizedBox(height: compact ? 20 : 24),
-                                        ThriftButton(
-                                          label: 'Send reset link',
-                                          onPressed: canSubmit ? _submit : null,
-                                          isLoading: auth.isLoading,
-                                        ),
-                                        const SizedBox(height: 20),
-                                        GestureDetector(
-                                          onTap: () =>
-                                              context.go(RouteNames.emailLogin),
-                                          child: Text(
-                                            'Back to login',
-                                            style: AppTypography.body.copyWith(
-                                              color: AppColors.primaryLight,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                            child: IndexedStack(
+                              index: _emailSent ? 1 : 0,
+                              sizing: StackFit.loose,
+                              children: [
+                                Selector<AuthProvider, bool>(
+                                  selector: (_, auth) => auth.isLoading,
+                                  builder: (context, isLoading, _) {
+                                    final canSubmit = !isLoading &&
+                                        (_turnstileToken?.isNotEmpty ?? false);
+                                    return _ForgotPasswordForm(
+                                      formKey: _formKey,
+                                      compact: compact,
+                                      submitted: _submitted,
+                                      emailController: _emailController,
+                                      turnstileKey: _turnstileKey,
+                                      fieldLabelColor: fieldLabelColor,
+                                      canSubmit: canSubmit,
+                                      isLoading: isLoading,
+                                      onTurnstileToken: (token) {
+                                        if (_turnstileToken == token) return;
+                                        setState(() => _turnstileToken = token);
+                                      },
+                                      onTurnstileClear: () {
+                                        if (_turnstileToken == null) return;
+                                        setState(() => _turnstileToken = null);
+                                      },
+                                      onSubmit: _submit,
+                                    );
+                                  },
+                                ),
+                                _PasswordResetAcknowledgedBody(
+                                  email: _emailController.text.trim(),
+                                  compact: compact,
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       },
@@ -215,8 +163,115 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 }
 
-class _EmailSentBody extends StatelessWidget {
-  const _EmailSentBody({required this.email, required this.compact});
+class _ForgotPasswordForm extends StatelessWidget {
+  const _ForgotPasswordForm({
+    required this.formKey,
+    required this.compact,
+    required this.submitted,
+    required this.emailController,
+    required this.turnstileKey,
+    required this.fieldLabelColor,
+    required this.canSubmit,
+    required this.isLoading,
+    required this.onTurnstileToken,
+    required this.onTurnstileClear,
+    required this.onSubmit,
+  });
+
+  final GlobalKey<FormState> formKey;
+  final bool compact;
+  final bool submitted;
+  final TextEditingController emailController;
+  final GlobalKey<TurnstileChallengeState> turnstileKey;
+  final Color fieldLabelColor;
+  final bool canSubmit;
+  final bool isLoading;
+  final ValueChanged<String> onTurnstileToken;
+  final VoidCallback onTurnstileClear;
+  final Future<void> Function() onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Form(
+      key: formKey,
+      autovalidateMode: submitted
+          ? AutovalidateMode.onUserInteraction
+          : AutovalidateMode.disabled,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Center(child: AuthBrandLogo(size: compact ? 64 : 72)),
+          SizedBox(height: compact ? 12 : 16),
+          Text(
+            'Forgot password',
+            style: AppTypography.heading.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Enter the email you use for ThriftLine. '
+            'If that account has a password, we can email '
+            'you a secure link to choose a new one.',
+            style: AppTypography.body.copyWith(
+              color: Colors.white.withValues(alpha: 0.82),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: compact ? 20 : 28),
+          ThriftTextField(
+            label: 'Email',
+            hint: 'your@email.com',
+            controller: emailController,
+            icon: Icons.email_outlined,
+            keyboardType: TextInputType.emailAddress,
+            validator: Validators.email,
+            labelColor: fieldLabelColor,
+          ),
+          const SizedBox(height: 16),
+          RepaintBoundary(
+            child: TurnstileChallenge(
+              key: turnstileKey,
+              action: 'password_reset',
+              showSuccessMessage: false,
+              showLoadingMessage: false,
+              onToken: onTurnstileToken,
+              onError: (_) => onTurnstileClear(),
+              onExpired: onTurnstileClear,
+            ),
+          ),
+          SizedBox(height: compact ? 20 : 24),
+          ThriftButton(
+            label: 'Send reset link',
+            onPressed: canSubmit ? onSubmit : null,
+            isLoading: isLoading,
+          ),
+          SizedBox(height: compact ? 16 : 20),
+          GestureDetector(
+            onTap: () => context.go(RouteNames.emailLogin),
+            child: Text(
+              'Back to login',
+              style: AppTypography.body.copyWith(
+                color: AppColors.primaryLight,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PasswordResetAcknowledgedBody extends StatelessWidget {
+  const _PasswordResetAcknowledgedBody({
+    required this.email,
+    required this.compact,
+  });
 
   final String email;
   final bool compact;
@@ -225,8 +280,10 @@ class _EmailSentBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.start,
       children: [
+        Center(child: AuthBrandLogo(size: compact ? 64 : 72)),
+        SizedBox(height: compact ? 20 : 28),
         Center(
           child: Container(
             width: compact ? 64 : 72,
@@ -245,7 +302,7 @@ class _EmailSentBody extends StatelessWidget {
         ),
         SizedBox(height: compact ? 20 : 28),
         Text(
-          'Check your email',
+          passwordResetAcknowledgementTitle,
           style: AppTypography.heading.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.w600,
@@ -254,10 +311,7 @@ class _EmailSentBody extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          'If an email and password account exists for $email, you will receive '
-          'a password reset link shortly. Open it on this device to choose a '
-          'new password. If you created your account with Continue with Google, '
-          'sign in with Google instead.',
+          passwordResetAcknowledgementBody(email),
           style: AppTypography.body.copyWith(
             color: Colors.white.withValues(alpha: 0.82),
           ),

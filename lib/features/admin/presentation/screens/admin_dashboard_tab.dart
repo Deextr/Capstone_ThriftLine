@@ -342,6 +342,13 @@ class _ActivityPanel extends StatelessWidget {
             label: 'Orders awaiting fulfillment',
             value: formatDashboardCount(activity.ordersAwaitingFulfillment),
             note: 'Now',
+            onTap: () => context.go(RouteNames.adminOrdersPreparing()),
+          ),
+          AdminStatLine(
+            label: 'Overdue fulfillment (72h+)',
+            value: formatDashboardCount(activity.ordersOverdueFulfillment),
+            note: 'Now',
+            onTap: () => context.go(RouteNames.adminOrdersDelayedFulfillment()),
           ),
         ],
       ),

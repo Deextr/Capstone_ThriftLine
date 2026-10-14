@@ -61,30 +61,50 @@ class ListingFormatTypeRow extends StatelessWidget {
     super.key,
     required this.selectedFormat,
     required this.onFormatSelected,
+    this.readOnly = false,
+    this.lockReason,
   });
 
   final ListingFormat selectedFormat;
   final ValueChanged<ListingFormat> onFormatSelected;
+  final bool readOnly;
+  final String? lockReason;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _FormatCard(
-          label: 'Fixed price',
-          icon: Icons.sell_outlined,
-          format: ListingFormat.fixedPrice,
-          selectedFormat: selectedFormat,
-          onTap: () => onFormatSelected(ListingFormat.fixedPrice),
+        Row(
+          children: [
+            _FormatCard(
+              label: 'Fixed price',
+              icon: Icons.sell_outlined,
+              format: ListingFormat.fixedPrice,
+              selectedFormat: selectedFormat,
+              onTap: () => onFormatSelected(ListingFormat.fixedPrice),
+              readOnly: readOnly,
+            ),
+            const SizedBox(width: 8),
+            _FormatCard(
+              label: 'Auction',
+              icon: Icons.gavel_outlined,
+              format: ListingFormat.auction,
+              selectedFormat: selectedFormat,
+              onTap: () => onFormatSelected(ListingFormat.auction),
+              readOnly: readOnly,
+            ),
+          ],
         ),
-        const SizedBox(width: 8),
-        _FormatCard(
-          label: 'Auction',
-          icon: Icons.gavel_outlined,
-          format: ListingFormat.auction,
-          selectedFormat: selectedFormat,
-          onTap: () => onFormatSelected(ListingFormat.auction),
-        ),
+        if (readOnly && lockReason != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            lockReason!,
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -132,12 +152,14 @@ class AuctionDurationSelector extends StatelessWidget {
     required this.onDaysSelected,
     required this.previewEndsAt,
     this.durationError,
+    this.readOnly = false,
   });
 
   final int selectedDays;
   final ValueChanged<int> onDaysSelected;
   final DateTime previewEndsAt;
   final String? durationError;
+  final bool readOnly;
 
   static const _dayOptions = [1, 3, 5, 7];
 
@@ -165,7 +187,8 @@ class AuctionDurationSelector extends StatelessWidget {
                   child: _DurationOptionTile(
                     label: days == 1 ? '1 day' : '$days days',
                     selected: selected,
-                    onTap: () => onDaysSelected(days),
+                    readOnly: readOnly,
+                    onTap: readOnly ? null : () => onDaysSelected(days),
                   ),
                 );
               }).toList(),
@@ -234,11 +257,13 @@ class BidIncrementSelector extends StatelessWidget {
     required this.selectedIncrement,
     required this.onIncrementSelected,
     this.incrementError,
+    this.readOnly = false,
   });
 
   final double selectedIncrement;
   final ValueChanged<double> onIncrementSelected;
   final String? incrementError;
+  final bool readOnly;
 
   static const _increments = [10.0, 20.0, 50.0, 100.0];
 
@@ -261,7 +286,8 @@ class BidIncrementSelector extends StatelessWidget {
               label: '₱${value.toInt()}',
               selected: selected,
               compact: true,
-              onTap: () => onIncrementSelected(value),
+              readOnly: readOnly,
+              onTap: readOnly ? null : () => onIncrementSelected(value),
             );
           }).toList(),
         ),
@@ -285,6 +311,7 @@ class _FormatCard extends StatelessWidget {
     required this.format,
     required this.selectedFormat,
     required this.onTap,
+    this.readOnly = false,
   });
 
   final String label;
@@ -292,18 +319,23 @@ class _FormatCard extends StatelessWidget {
   final ListingFormat format;
   final ListingFormat selectedFormat;
   final VoidCallback onTap;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
     final isSelected = selectedFormat == format;
     return Expanded(
       child: GestureDetector(
-        onTap: onTap,
+        onTap: readOnly ? null : onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.primaryLight : AppColors.surface,
+            color: isSelected
+                ? AppColors.primaryLight
+                : (readOnly
+                    ? AppColors.surfaceVariant.withValues(alpha: 0.5)
+                    : AppColors.surface),
             borderRadius: BorderRadius.circular(AppConstants.radiusMd),
             border: Border.all(
               color: isSelected ? AppColors.primary : AppColors.border,
@@ -312,10 +344,28 @@ class _FormatCard extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Icon(
-                icon,
-                color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                size: 22,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    color: isSelected
+                        ? AppColors.primary
+                        : (readOnly
+                            ? AppColors.textHint
+                            : AppColors.textSecondary),
+                    size: 22,
+                  ),
+                  if (readOnly && isSelected) ...[
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.lock_outline,
+                      size: 14,
+                      color: AppColors.primaryDark,
+                    ),
+                  ],
+                ],
               ),
               const SizedBox(height: 6),
               Text(
@@ -324,7 +374,7 @@ class _FormatCard extends StatelessWidget {
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   color: isSelected
                       ? AppColors.primaryDark
-                      : AppColors.textPrimary,
+                      : (readOnly ? AppColors.textHint : AppColors.textPrimary),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -342,19 +392,21 @@ class _DurationOptionTile extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.compact = false,
+    this.readOnly = false,
   });
 
   final String label;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool compact;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: readOnly ? null : onTap,
         borderRadius: BorderRadius.circular(AppConstants.radiusMd),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
@@ -363,7 +415,11 @@ class _DurationOptionTile extends StatelessWidget {
             vertical: compact ? 10 : 14,
           ),
           decoration: BoxDecoration(
-            color: selected ? AppColors.primaryLight : AppColors.surface,
+            color: selected
+                ? AppColors.primaryLight
+                : (readOnly
+                    ? AppColors.surfaceVariant.withValues(alpha: 0.5)
+                    : AppColors.surface),
             borderRadius: BorderRadius.circular(AppConstants.radiusMd),
             border: Border.all(
               color: selected ? AppColors.primary : AppColors.border,
@@ -376,7 +432,9 @@ class _DurationOptionTile extends StatelessWidget {
                   style: AppTypography.label.copyWith(
                     color: selected
                         ? AppColors.primaryDark
-                        : AppColors.textPrimary,
+                        : (readOnly
+                            ? AppColors.textHint
+                            : AppColors.textPrimary),
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                   ),
                   textAlign: TextAlign.center,
@@ -389,7 +447,9 @@ class _DurationOptionTile extends StatelessWidget {
                         style: AppTypography.label.copyWith(
                           color: selected
                               ? AppColors.primaryDark
-                              : AppColors.textPrimary,
+                              : (readOnly
+                                  ? AppColors.textHint
+                                  : AppColors.textPrimary),
                           fontWeight:
                               selected ? FontWeight.w600 : FontWeight.w500,
                         ),
@@ -397,8 +457,8 @@ class _DurationOptionTile extends StatelessWidget {
                     ),
                     if (selected) ...[
                       const SizedBox(width: 8),
-                      const Icon(
-                        Icons.check_circle,
+                      Icon(
+                        readOnly ? Icons.lock_outline : Icons.check_circle,
                         color: AppColors.primary,
                         size: 20,
                       ),

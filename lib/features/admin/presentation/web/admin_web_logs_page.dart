@@ -178,10 +178,7 @@ class _AdminWebLogsPageState extends State<AdminWebLogsPage> {
             rows: [
               for (final row in controller.rows)
                 [
-                  Text(
-                    row.moduleLabel,
-                    style: AppTypography.tableBodyMedium,
-                  ),
+                  Text(row.moduleLabel, style: AppTypography.tableBodyMedium),
                   Text(row.displayEvent, style: AppTypography.tableBody),
                   AdminTableCellText(
                     primary: row.actorRoleDisplayLine,

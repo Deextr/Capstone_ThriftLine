@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/fulfillment_sla.dart';
 import '../../buyer/data/order_query.dart';
 import '../../../models/order_model.dart';
 import '../domain/admin_order_management.dart';
@@ -19,6 +20,7 @@ class AdminOrderRow {
     required this.createdAt,
     required this.orderKind,
     required this.unifiedStatus,
+    this.paidAt,
   });
 
   final String orderId;
@@ -31,6 +33,14 @@ class AdminOrderRow {
   final DateTime createdAt;
   final AdminOrderKind orderKind;
   final AdminUnifiedOrderStatus unifiedStatus;
+  final DateTime? paidAt;
+
+  bool get isFulfillmentDelayed {
+    if (orderStatus.trim().toLowerCase() != 'paid') return false;
+    if (paymentStatus.trim().toLowerCase() != 'paid') return false;
+    final clock = paidAt ?? createdAt;
+    return DateTime.now().difference(clock) >= kFulfillmentAdminDelayed;
+  }
 
   factory AdminOrderRow.fromJson(Map<String, dynamic> json) {
     final buyer = json['buyer'];
@@ -62,6 +72,7 @@ class AdminOrderRow {
         paymentStatus: paymentStatus,
         escrowStatus: escrowStatus,
       ),
+      paidAt: _paidAtFromRow(json),
     );
   }
 
@@ -101,6 +112,29 @@ String _paymentFromRow(Map<String, dynamic> json) {
   final chosen = paid ?? latest;
   if (chosen == null) return 'pending';
   return (chosen['payment_status'] as String?)?.trim() ?? 'pending';
+}
+
+DateTime? _paidAtFromRow(Map<String, dynamic> json) {
+  final payments = json['payments'];
+  DateTime? earliest;
+  void consider(Map<dynamic, dynamic> raw) {
+    final status = raw['payment_status']?.toString().trim().toLowerCase();
+    if (status != 'paid') return;
+    final stamp =
+        DateTime.tryParse(raw['updated_at']?.toString() ?? '') ??
+        DateTime.tryParse(raw['created_at']?.toString() ?? '');
+    if (stamp == null) return;
+    if (earliest == null || stamp.isBefore(earliest!)) earliest = stamp;
+  }
+
+  if (payments is List) {
+    for (final raw in payments) {
+      if (raw is Map) consider(raw);
+    }
+  } else if (payments is Map) {
+    consider(payments);
+  }
+  return earliest;
 }
 
 class AdminOrdersPage {
@@ -196,13 +230,13 @@ class AdminOrdersService {
       'order_id, order_number, order_type, auction_id, total_amount, '
       'order_status, created_at, '
       'buyer:buyer_id(full_name), seller:seller_id(full_name), '
-      'payments(payment_status, created_at), escrow(status)';
+      'payments(payment_status, created_at, updated_at), escrow(status)';
 
   static const _listSelectPaymentInner =
       'order_id, order_number, order_type, auction_id, total_amount, '
       'order_status, created_at, '
       'buyer:buyer_id(full_name), seller:seller_id(full_name), '
-      'payments!inner(payment_status, created_at), escrow(status)';
+      'payments!inner(payment_status, created_at, updated_at), escrow(status)';
 
   Future<AdminOrdersPage> list({
     required int page,
@@ -316,12 +350,12 @@ class AdminOrdersService {
         'order_id, order_number, order_type, auction_id, total_amount, '
         'order_status, created_at, '
         'buyer:buyer_id(full_name), seller:seller_id(full_name), '
-        'payments(payment_status, created_at)';
+        'payments(payment_status, created_at, updated_at)';
     const selectNoEscrowPaymentInner =
         'order_id, order_number, order_type, auction_id, total_amount, '
         'order_status, created_at, '
         'buyer:buyer_id(full_name), seller:seller_id(full_name), '
-        'payments!inner(payment_status, created_at)';
+        'payments!inner(payment_status, created_at, updated_at)';
 
     var filter = _supabase.client
         .from('orders')
@@ -381,7 +415,8 @@ class AdminOrdersService {
       AdminUnifiedStatusFilter.refunded ||
       AdminUnifiedStatusFilter.paymentFailed ||
       AdminUnifiedStatusFilter.cancelledPaidReview ||
-      AdminUnifiedStatusFilter.awaitingPayment => true,
+      AdminUnifiedStatusFilter.awaitingPayment ||
+      AdminUnifiedStatusFilter.delayed => true,
       _ => false,
     };
   }
@@ -397,6 +432,17 @@ class AdminOrdersService {
             .eq('order_status', 'pending')
             .eq('payments.payment_status', 'pending'),
       AdminUnifiedStatusFilter.preparing => filter.eq('order_status', 'paid'),
+      AdminUnifiedStatusFilter.delayed =>
+        filter
+            .eq('order_status', 'paid')
+            .eq('payments.payment_status', 'paid')
+            .lt(
+              'payments.updated_at',
+              DateTime.now()
+                  .toUtc()
+                  .subtract(kFulfillmentAdminDelayed)
+                  .toIso8601String(),
+            ),
       AdminUnifiedStatusFilter.shipped => filter.eq('order_status', 'shipped'),
       AdminUnifiedStatusFilter.completed => filter.eq(
         'order_status',

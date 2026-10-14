@@ -8,6 +8,8 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../providers/cart_provider.dart';
 import '../../../../providers/notifications_provider.dart';
+import '../../../auth/domain/account_mode.dart';
+import '../../../notifications/presentation/widgets/notification_permission_banner.dart';
 import '../../../../widgets/product_card.dart';
 import '../../controllers/home_controller.dart';
 import '../widgets/home_section_widgets.dart';
@@ -86,6 +88,9 @@ class _BuyerHomeTabState extends State<BuyerHomeTab> {
                       context.push(RouteNames.notifications),
                   onBagTap: () => context.push(RouteNames.cart),
                 ),
+              ),
+              const SliverToBoxAdapter(
+                child: NotificationPermissionBanner(mode: AccountMode.buyer),
               ),
               SliverToBoxAdapter(
                 child: Padding(

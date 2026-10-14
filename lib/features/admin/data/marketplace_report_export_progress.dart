@@ -8,6 +8,5 @@ class MarketplaceReportExportProgress {
   int get percent => (fraction.clamp(0.0, 1.0) * 100).round();
 }
 
-typedef MarketplaceReportExportProgressCallback = void Function(
-  MarketplaceReportExportProgress progress,
-);
+typedef MarketplaceReportExportProgressCallback =
+    void Function(MarketplaceReportExportProgress progress);

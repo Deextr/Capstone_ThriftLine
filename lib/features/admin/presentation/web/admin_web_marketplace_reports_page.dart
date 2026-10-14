@@ -75,7 +75,8 @@ class _AdminWebMarketplaceReportsPageState
               ),
               _ReportDateRangeDropdown(
                 window: controller.window,
-                onPresetKey: (key) => _applyDateRangeKey(context, controller, key),
+                onPresetKey: (key) =>
+                    _applyDateRangeKey(context, controller, key),
               ),
               ..._categoryFilters(controller),
             ],
@@ -94,10 +95,7 @@ class _AdminWebMarketplaceReportsPageState
               const LinearProgressIndicator(minHeight: 2),
             const SizedBox(height: 8),
             if (controller.isAllReportTypes)
-              _AllReportsDisplay(
-                controller: controller,
-                payload: payload,
-              )
+              _AllReportsDisplay(controller: controller, payload: payload)
             else
               _SingleReportDisplay(
                 controller: controller,
@@ -107,7 +105,8 @@ class _AdminWebMarketplaceReportsPageState
           ] else if (!controller.isLoading) ...[
             _EmptyReportState(
               title: 'Report unavailable',
-              message: controller.errorMessage ??
+              message:
+                  controller.errorMessage ??
                   'Unable to load data for this category.',
               onRetry: controller.load,
             ),
@@ -117,10 +116,7 @@ class _AdminWebMarketplaceReportsPageState
     );
   }
 
-  Future<void> _export(
-    BuildContext context, {
-    required bool pdf,
-  }) async {
+  Future<void> _export(BuildContext context, {required bool pdf}) async {
     final controller = context.read<AdminMarketplaceReportsController>();
     await _exportWithProgress(
       context,
@@ -161,7 +157,8 @@ class _AdminWebMarketplaceReportsPageState
     required Future<void> Function(
       MarketplaceReportPayload payload,
       void Function(MarketplaceReportExportProgress progress) onBuildProgress,
-    ) runExport,
+    )
+    runExport,
   }) async {
     final controller = context.read<AdminMarketplaceReportsController>();
     final messenger = ScaffoldMessenger.of(context);
@@ -197,10 +194,7 @@ class _AdminWebMarketplaceReportsPageState
       updateProgress(0.04, 'Fetching report data…');
       final payload = await controller.loadForExport(
         onProgress: (dataPhase) {
-          updateProgress(
-            0.04 + dataPhase * 0.28,
-            'Fetching report data…',
-          );
+          updateProgress(0.04 + dataPhase * 0.28, 'Fetching report data…');
         },
       );
       if (payload == null || !payload.success) {
@@ -218,15 +212,9 @@ class _AdminWebMarketplaceReportsPageState
       }
 
       updateProgress(0.34, 'Building file…');
-      await runExport(
-        payload,
-        (progress) {
-          updateProgress(
-            0.34 + progress.fraction * 0.64,
-            progress.message,
-          );
-        },
-      );
+      await runExport(payload, (progress) {
+        updateProgress(0.34 + progress.fraction * 0.64, progress.message);
+      });
 
       await controller.recordExport(
         format: exportFormat,
@@ -235,9 +223,7 @@ class _AdminWebMarketplaceReportsPageState
       updateProgress(1.0, 'Download complete');
       await Future<void>.delayed(const Duration(milliseconds: 350));
       if (context.mounted) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(successMessage)),
-        );
+        messenger.showSnackBar(SnackBar(content: Text(successMessage)));
       }
     } catch (e) {
       if (context.mounted) {
@@ -290,153 +276,156 @@ class _AdminWebMarketplaceReportsPageState
     if (controller.isAllReportTypes) return [];
     return switch (controller.selection.type) {
       AdminReportType.users => [
-          AdminFilterDropdown<String?>(
-            label: 'Account type',
-            value: controller.filters['account_type'],
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All records')),
-              DropdownMenuItem(value: 'buyer_only', child: Text('Buyer only')),
-              DropdownMenuItem(
-                value: 'buyer_seller',
-                child: Text('Buyer + Seller'),
-              ),
-            ],
-            onChanged: (v) => controller.setFilter('account_type', v),
-          ),
-          AdminFilterDropdown<String?>(
-            label: 'Account status',
-            value: controller.filters['account_status'],
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All statuses')),
-              DropdownMenuItem(value: 'active', child: Text('Active')),
-              DropdownMenuItem(value: 'suspended', child: Text('Disabled')),
-              DropdownMenuItem(value: 'banned', child: Text('Banned')),
-              DropdownMenuItem(value: 'deactivated', child: Text('Deactivated')),
-            ],
-            onChanged: (v) => controller.setFilter('account_status', v),
-          ),
-        ],
-      AdminReportType.ordersTransactions => [
-          AdminFilterDropdown<String?>(
-            label: 'Order type',
-            value: controller.filters['order_type'],
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All types')),
-              DropdownMenuItem(value: 'fixed_price', child: Text('Fixed price')),
-              DropdownMenuItem(value: 'auction', child: Text('Auction')),
-            ],
-            onChanged: (v) => controller.setFilter('order_type', v),
-          ),
-          AdminFilterDropdown<String?>(
-            label: 'Order status',
-            value: controller.filters['order_status'],
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All statuses')),
-              DropdownMenuItem(value: 'pending', child: Text('Pending')),
-              DropdownMenuItem(value: 'paid', child: Text('Paid')),
-              DropdownMenuItem(value: 'completed', child: Text('Completed')),
-              DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
-              DropdownMenuItem(value: 'disputed', child: Text('Disputed')),
-            ],
-            onChanged: (v) => controller.setFilter('order_status', v),
-          ),
-          AdminFilterDropdown<String?>(
-            label: 'Payment status',
-            value: controller.filters['payment_status'],
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All payments')),
-              DropdownMenuItem(value: 'paid', child: Text('Paid')),
-              DropdownMenuItem(value: 'pending', child: Text('Pending')),
-              DropdownMenuItem(value: 'failed', child: Text('Failed')),
-              DropdownMenuItem(value: 'refunded', child: Text('Refunded')),
-            ],
-            onChanged: (v) => controller.setFilter('payment_status', v),
-          ),
-        ],
-      AdminReportType.bidding => [
-          AdminFilterDropdown<String?>(
-            label: 'Auction outcome',
-            value: controller.filters['auction_outcome'],
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All records')),
-              DropdownMenuItem(value: 'with_winner', child: Text('With winner')),
-              DropdownMenuItem(value: 'no_winner', child: Text('No winner')),
-            ],
-            onChanged: (v) => controller.setFilter('auction_outcome', v),
-          ),
-        ],
-      AdminReportType.disputes => [
-          AdminFilterDropdown<String?>(
-            label: 'Dispute type',
-            value: controller.filters['dispute_type'],
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All types')),
-              DropdownMenuItem(value: 'community', child: Text('Community')),
-              DropdownMenuItem(value: 'order', child: Text('Order')),
-              DropdownMenuItem(value: 'looking_for', child: Text('Looking For')),
-            ],
-            onChanged: (v) => controller.setFilter('dispute_type', v),
-          ),
-          AdminFilterDropdown<String?>(
-            label: 'Dispute status',
-            value: controller.filters['dispute_status'],
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All statuses')),
-              DropdownMenuItem(value: 'under_review', child: Text('Under review')),
-              DropdownMenuItem(
-                value: 'needs_more_evidence',
-                child: Text('Needs evidence'),
-              ),
-              DropdownMenuItem(value: 'resolved', child: Text('Resolved')),
-              DropdownMenuItem(value: 'dismissed', child: Text('Dismissed')),
-            ],
-            onChanged: (v) => controller.setFilter('dispute_status', v),
-          ),
-        ],
-      AdminReportType.verifications => [
-          AdminFilterDropdown<String?>(
-            label: 'Application outcome',
-            value: controller.filters['verification_outcome'],
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All records')),
-              DropdownMenuItem(value: 'pending', child: Text('Pending')),
-              DropdownMenuItem(value: 'approved', child: Text('Approved')),
-              DropdownMenuItem(value: 'rejected', child: Text('Rejected')),
-            ],
-            onChanged: (v) => controller.setFilter('verification_outcome', v),
-          ),
-        ],
-      AdminReportType.security => [
-          if (controller.isSuperAdmin)
-            AdminFilterDropdown<String?>(
-              label: 'Event category',
-              value: controller.filters['event_category'],
-              items: const [
-                DropdownMenuItem(value: null, child: Text('All categories')),
-                DropdownMenuItem(
-                  value: 'authentication',
-                  child: Text('Authentication'),
-                ),
-                DropdownMenuItem(
-                  value: 'account_management',
-                  child: Text('Account management'),
-                ),
-                DropdownMenuItem(
-                  value: 'reports_disputes',
-                  child: Text('Reports & disputes'),
-                ),
-                DropdownMenuItem(
-                  value: 'payments_escrow',
-                  child: Text('Payments & escrow'),
-                ),
-                DropdownMenuItem(
-                  value: 'system_security',
-                  child: Text('System security'),
-                ),
-              ],
-              onChanged: (v) => controller.setFilter('event_category', v),
+        AdminFilterDropdown<String?>(
+          label: 'Account type',
+          value: controller.filters['account_type'],
+          items: const [
+            DropdownMenuItem(value: null, child: Text('All records')),
+            DropdownMenuItem(value: 'buyer_only', child: Text('Buyer only')),
+            DropdownMenuItem(
+              value: 'buyer_seller',
+              child: Text('Buyer + Seller'),
             ),
-        ],
+          ],
+          onChanged: (v) => controller.setFilter('account_type', v),
+        ),
+        AdminFilterDropdown<String?>(
+          label: 'Account status',
+          value: controller.filters['account_status'],
+          items: const [
+            DropdownMenuItem(value: null, child: Text('All statuses')),
+            DropdownMenuItem(value: 'active', child: Text('Active')),
+            DropdownMenuItem(value: 'suspended', child: Text('Disabled')),
+            DropdownMenuItem(value: 'banned', child: Text('Banned')),
+            DropdownMenuItem(value: 'deactivated', child: Text('Deactivated')),
+          ],
+          onChanged: (v) => controller.setFilter('account_status', v),
+        ),
+      ],
+      AdminReportType.ordersTransactions => [
+        AdminFilterDropdown<String?>(
+          label: 'Order type',
+          value: controller.filters['order_type'],
+          items: const [
+            DropdownMenuItem(value: null, child: Text('All types')),
+            DropdownMenuItem(value: 'fixed_price', child: Text('Fixed price')),
+            DropdownMenuItem(value: 'auction', child: Text('Auction')),
+          ],
+          onChanged: (v) => controller.setFilter('order_type', v),
+        ),
+        AdminFilterDropdown<String?>(
+          label: 'Order status',
+          value: controller.filters['order_status'],
+          items: const [
+            DropdownMenuItem(value: null, child: Text('All statuses')),
+            DropdownMenuItem(value: 'pending', child: Text('Pending')),
+            DropdownMenuItem(value: 'paid', child: Text('Paid')),
+            DropdownMenuItem(value: 'completed', child: Text('Completed')),
+            DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
+            DropdownMenuItem(value: 'disputed', child: Text('Disputed')),
+          ],
+          onChanged: (v) => controller.setFilter('order_status', v),
+        ),
+        AdminFilterDropdown<String?>(
+          label: 'Payment status',
+          value: controller.filters['payment_status'],
+          items: const [
+            DropdownMenuItem(value: null, child: Text('All payments')),
+            DropdownMenuItem(value: 'paid', child: Text('Paid')),
+            DropdownMenuItem(value: 'pending', child: Text('Pending')),
+            DropdownMenuItem(value: 'failed', child: Text('Failed')),
+            DropdownMenuItem(value: 'refunded', child: Text('Refunded')),
+          ],
+          onChanged: (v) => controller.setFilter('payment_status', v),
+        ),
+      ],
+      AdminReportType.bidding => [
+        AdminFilterDropdown<String?>(
+          label: 'Auction outcome',
+          value: controller.filters['auction_outcome'],
+          items: const [
+            DropdownMenuItem(value: null, child: Text('All records')),
+            DropdownMenuItem(value: 'with_winner', child: Text('With winner')),
+            DropdownMenuItem(value: 'no_winner', child: Text('No winner')),
+          ],
+          onChanged: (v) => controller.setFilter('auction_outcome', v),
+        ),
+      ],
+      AdminReportType.disputes => [
+        AdminFilterDropdown<String?>(
+          label: 'Dispute type',
+          value: controller.filters['dispute_type'],
+          items: const [
+            DropdownMenuItem(value: null, child: Text('All types')),
+            DropdownMenuItem(value: 'community', child: Text('Community')),
+            DropdownMenuItem(value: 'order', child: Text('Order')),
+            DropdownMenuItem(value: 'looking_for', child: Text('Looking For')),
+          ],
+          onChanged: (v) => controller.setFilter('dispute_type', v),
+        ),
+        AdminFilterDropdown<String?>(
+          label: 'Dispute status',
+          value: controller.filters['dispute_status'],
+          items: const [
+            DropdownMenuItem(value: null, child: Text('All statuses')),
+            DropdownMenuItem(
+              value: 'under_review',
+              child: Text('Under review'),
+            ),
+            DropdownMenuItem(
+              value: 'needs_more_evidence',
+              child: Text('Needs evidence'),
+            ),
+            DropdownMenuItem(value: 'resolved', child: Text('Resolved')),
+            DropdownMenuItem(value: 'dismissed', child: Text('Dismissed')),
+          ],
+          onChanged: (v) => controller.setFilter('dispute_status', v),
+        ),
+      ],
+      AdminReportType.verifications => [
+        AdminFilterDropdown<String?>(
+          label: 'Application outcome',
+          value: controller.filters['verification_outcome'],
+          items: const [
+            DropdownMenuItem(value: null, child: Text('All records')),
+            DropdownMenuItem(value: 'pending', child: Text('Pending')),
+            DropdownMenuItem(value: 'approved', child: Text('Approved')),
+            DropdownMenuItem(value: 'rejected', child: Text('Rejected')),
+          ],
+          onChanged: (v) => controller.setFilter('verification_outcome', v),
+        ),
+      ],
+      AdminReportType.security => [
+        if (controller.isSuperAdmin)
+          AdminFilterDropdown<String?>(
+            label: 'Event category',
+            value: controller.filters['event_category'],
+            items: const [
+              DropdownMenuItem(value: null, child: Text('All categories')),
+              DropdownMenuItem(
+                value: 'authentication',
+                child: Text('Authentication'),
+              ),
+              DropdownMenuItem(
+                value: 'account_management',
+                child: Text('Account management'),
+              ),
+              DropdownMenuItem(
+                value: 'reports_disputes',
+                child: Text('Reports & disputes'),
+              ),
+              DropdownMenuItem(
+                value: 'payments_escrow',
+                child: Text('Payments & escrow'),
+              ),
+              DropdownMenuItem(
+                value: 'system_security',
+                child: Text('System security'),
+              ),
+            ],
+            onChanged: (v) => controller.setFilter('event_category', v),
+          ),
+      ],
       AdminReportType.all => [],
     };
   }
@@ -539,10 +528,7 @@ class _SingleReportDisplay extends StatelessWidget {
 }
 
 class _AllReportsDisplay extends StatelessWidget {
-  const _AllReportsDisplay({
-    required this.controller,
-    required this.payload,
-  });
+  const _AllReportsDisplay({required this.controller, required this.payload});
 
   final AdminMarketplaceReportsController controller;
   final MarketplaceReportPayload payload;
@@ -579,7 +565,8 @@ class _AllReportsDisplay extends StatelessWidget {
   }
 }
 
-String _allSectionTitle(MarketplaceReportCategory category) => switch (category) {
+String _allSectionTitle(MarketplaceReportCategory category) =>
+    switch (category) {
       MarketplaceReportCategory.verifications => 'Seller Verification Reports',
       MarketplaceReportCategory.users => 'Users Reports',
       MarketplaceReportCategory.orders => 'Orders',
@@ -611,8 +598,7 @@ class _TypedReportBlock extends StatelessWidget {
     }
     final data = section!;
     final sectionCategory = _sectionCategoryFromTitle(title);
-    final hasSummary =
-        data.summary.isNotEmpty || data.breakdowns.isNotEmpty;
+    final hasSummary = data.summary.isNotEmpty || data.breakdowns.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -644,7 +630,7 @@ Widget _buildReportSummarySection({
 }) {
   final useOrdersTransactionsGrid =
       reportType == AdminReportType.ordersTransactions ||
-          sectionCategory == MarketplaceReportCategory.orders;
+      sectionCategory == MarketplaceReportCategory.orders;
   if (useOrdersTransactionsGrid) {
     return MarketplaceReportOrdersTransactionsGrid(
       orderMetrics: metrics,
@@ -673,10 +659,7 @@ MarketplaceReportCategory? _sectionCategoryFromTitle(String title) {
 }
 
 class _ReportContextBar extends StatelessWidget {
-  const _ReportContextBar({
-    required this.title,
-    required this.periodLabel,
-  });
+  const _ReportContextBar({required this.title, required this.periodLabel});
 
   final String title;
   final String periodLabel;
@@ -745,7 +728,9 @@ class _StaticDetailSection extends StatelessWidget {
             Spacer(),
             Text(
               '${payload.detailTotal} record${payload.detailTotal == 1 ? '' : 's'}',
-              style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -753,7 +738,8 @@ class _StaticDetailSection extends StatelessWidget {
         if (details.rows.isEmpty)
           const _EmptyReportState(
             title: 'No records in period',
-            message: 'Nothing was recorded for this report type in the selected date range.',
+            message:
+                'Nothing was recorded for this report type in the selected date range.',
           )
         else ...[
           AdminDataTable(
@@ -773,7 +759,9 @@ class _StaticDetailSection extends StatelessWidget {
               child: Text(
                 'Showing ${details.rows.length} of ${payload.detailTotal}. '
                 'Select this report type alone to browse pages, or export for the full dataset.',
-                style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
         ],
@@ -921,9 +909,11 @@ String _formatDisputeResolvedCell(
   List<dynamic> row,
   List<String> columns,
 ) {
-  final statusIdx =
-      columns.indexWhere((c) => c.trim().toLowerCase() == 'status');
-  final status = (statusIdx >= 0 ? row[statusIdx]?.toString() : null)
+  final statusIdx = columns.indexWhere(
+    (c) => c.trim().toLowerCase() == 'status',
+  );
+  final status =
+      (statusIdx >= 0 ? row[statusIdx]?.toString() : null)
           ?.trim()
           .toLowerCase()
           .replaceAll(' ', '_') ??
@@ -960,10 +950,14 @@ String _formatMarketplaceReportDetailValue(String columnHeader, String raw) {
   if (!_isReportDateTimeColumn(columnHeader)) return raw;
   final trimmed = raw.trim();
   if (trimmed.isEmpty || trimmed == '—') return raw;
-  if (RegExp(r'^[A-Z]{3} \d{1,2}, \d{4} \d{1,2}:\d{2} [AP]M$').hasMatch(trimmed)) {
+  if (RegExp(
+    r'^[A-Z]{3} \d{1,2}, \d{4} \d{1,2}:\d{2} [AP]M$',
+  ).hasMatch(trimmed)) {
     return trimmed;
   }
-  final legacy = RegExp(r'^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$').firstMatch(trimmed);
+  final legacy = RegExp(
+    r'^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$',
+  ).firstMatch(trimmed);
   if (legacy != null) {
     final manilaWall = DateTime.utc(
       int.parse(legacy.group(1)!),
@@ -1048,7 +1042,8 @@ List<List<Widget>> _detailTableRows(
   List<List<dynamic>> rows,
 ) {
   final alignments = _columnAlignmentsForHeaders(columns);
-  final styled = _uniformDetailColumnSpacing(columns) > 0 ||
+  final styled =
+      _uniformDetailColumnSpacing(columns) > 0 ||
       _detailColumnGapsAfter(columns) != null ||
       _isBiddingDetailColumns(columns) ||
       _isSecurityAuditDetailColumns(columns);
@@ -1141,10 +1136,7 @@ bool _isNumericReportColumn(String column) {
 }
 
 class _DetailSection extends StatelessWidget {
-  const _DetailSection({
-    required this.controller,
-    required this.payload,
-  });
+  const _DetailSection({required this.controller, required this.payload});
 
   final AdminMarketplaceReportsController controller;
   final MarketplaceReportPayload payload;
@@ -1171,14 +1163,18 @@ class _DetailSection extends StatelessWidget {
             Spacer(),
             Text(
               '${controller.detailTotal} record${controller.detailTotal == 1 ? '' : 's'}',
-              style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
         const SizedBox(height: 8),
         if (!hasRows)
           _EmptyReportState(
-            title: filteredEmpty ? 'No matching records' : 'No records in period',
+            title: filteredEmpty
+                ? 'No matching records'
+                : 'No records in period',
             message: filteredEmpty
                 ? 'Try adjusting or resetting your filters.'
                 : 'Nothing was recorded for this category in the selected date range.',
@@ -1190,10 +1186,15 @@ class _DetailSection extends StatelessWidget {
             columns: payload.details.columns,
             minWidth: _detailTableMinWidth(payload.details.columns),
             columnFlex: _detailColumnFlex(payload.details.columns),
-            columnAlignments: _columnAlignmentsForHeaders(payload.details.columns),
+            columnAlignments: _columnAlignmentsForHeaders(
+              payload.details.columns,
+            ),
             columnSpacing: _uniformDetailColumnSpacing(payload.details.columns),
             columnGapsAfter: _detailColumnGapsAfter(payload.details.columns),
-            rows: _detailTableRows(payload.details.columns, payload.details.rows),
+            rows: _detailTableRows(
+              payload.details.columns,
+              payload.details.rows,
+            ),
             isLoading: controller.isLoading,
             emptyTitle: 'No records',
             emptyMessage: 'No rows match the selected filters.',
@@ -1214,7 +1215,9 @@ class _DetailSection extends StatelessWidget {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 'Export includes up to ${marketplaceReportExportDetailCap} rows.',
-                style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
         ],
@@ -1274,22 +1277,25 @@ class _EmptyReportState extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: AppTypography.tableBodyMedium.copyWith(fontWeight: FontWeight.w600)),
+          Text(
+            title,
+            style: AppTypography.tableBodyMedium.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           SizedBox(height: 6),
           Text(
             message,
-            style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
           if (onRetry != null) ...[
             const SizedBox(height: 12),
-            TextButton(
-              onPressed: onRetry,
-              child: Text(retryLabel ?? 'Retry'),
-            ),
+            TextButton(onPressed: onRetry, child: Text(retryLabel ?? 'Retry')),
           ],
         ],
       ),
     );
   }
 }
-

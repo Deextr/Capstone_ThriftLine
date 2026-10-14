@@ -13,6 +13,9 @@ abstract final class AppConstants {
   static const String keyDisplayName = 'display_name';
   static const String keyEmailOtpPending = 'email_otp_pending';
 
+  /// Per-email failed login counts and lockout expiry (JSON map).
+  static const String keyLoginRateLimitState = 'login_rate_limit_state_v1';
+
   /// Survives process death while the user has not finished reset-password.
   static const String keyPasswordRecoveryPending = 'password_recovery_pending';
 
@@ -31,6 +34,16 @@ abstract final class AppConstants {
   static const String keyRecentSearchesPrefix = 'recent_searches_';
   static const String keyBuyerHomeCache = 'buyer_home_feed_cache';
   static const String keyAdminDashboardCache = 'admin_dashboard_snapshot';
+
+  /// Last meaningful admin-portal interaction (epoch ms), shared across tabs.
+  static const String keyAdminPortalLastActivityMs =
+      'admin_portal_last_activity_ms';
+
+  /// Incremented when any admin tab signs out (manual or inactivity).
+  static const String keyAdminPortalLogoutNonce = 'admin_portal_logout_nonce';
+
+  /// One-time banner on the admin login screen after forced sign-out.
+  static const String keyAdminPortalLoginNotice = 'admin_portal_login_notice';
 
   // Breakpoints (mobile-first)
   static const double breakpointTablet = 600;

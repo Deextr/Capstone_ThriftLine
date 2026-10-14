@@ -111,6 +111,17 @@ const List<ReportReason> kOrderSellerReportReasons = [
   ),
 ];
 
+/// Reasons allowed while an order is still preparing (not yet received).
+List<ReportReason> fulfillmentBuyerReportReasons() {
+  return kOrderBuyerReportReasons
+      .where(
+        (reason) =>
+            reason.slug == 'seller_not_processing_order' ||
+            reason.slug == 'other',
+      )
+      .toList(growable: false);
+}
+
 /// Legacy alias for screens still importing [kReportReasons].
 const List<ReportReason> kReportReasons = kCommunityReportReasons;
 

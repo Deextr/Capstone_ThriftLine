@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/services/supabase_service.dart';
 import '../features/auth/domain/account_mode.dart';
 import '../features/notifications/domain/notification_audience.dart';
-import '../models/enums.dart';
+import '../features/notifications/domain/notification_catalog.dart';
 import '../models/notification_model.dart';
 
 class NotificationsProvider extends ChangeNotifier {
@@ -14,6 +14,7 @@ class NotificationsProvider extends ChangeNotifier {
   RealtimeChannel? _channel;
   String? _userId;
   bool _isLoading = false;
+  String? _loadError;
   AccountMode _activeAccount = AccountMode.buyer;
   bool _hasSellerAccess = false;
 
@@ -26,6 +27,14 @@ class NotificationsProvider extends ChangeNotifier {
   );
 
   bool get isLoading => _isLoading;
+  String? get loadError => _loadError;
+
+  NotificationModel? findById(String id) {
+    for (final n in _items) {
+      if (n.id == id) return n;
+    }
+    return null;
+  }
 
   int get unreadCount => unreadNotificationsForAccountMode(
     _items,
@@ -44,42 +53,8 @@ class NotificationsProvider extends ChangeNotifier {
     if (changed) notifyListeners();
   }
 
-  List<NotificationModel> forTab(String tab) {
-    final visible = items;
-    return switch (tab) {
-      'orders' =>
-        visible
-            .where(
-              (n) =>
-                  n.type == NotificationType.shipped ||
-                  n.type == NotificationType.orderConfirmed,
-            )
-            .toList(),
-      'bids' =>
-        visible
-            .where(
-              (n) =>
-                  n.type == NotificationType.outbid ||
-                  n.type == NotificationType.wonBid,
-            )
-            .toList(),
-      'messages' =>
-        visible.where((n) => n.type == NotificationType.message).toList(),
-      'system' =>
-        visible
-            .where(
-              (n) =>
-                  n.type == NotificationType.system ||
-                  n.type == NotificationType.verificationSubmitted ||
-                  n.type == NotificationType.verificationApproved ||
-                  n.type == NotificationType.verificationRejected ||
-                  n.type == NotificationType.reportDecision ||
-                  n.type == NotificationType.review,
-            )
-            .toList(),
-      _ => visible,
-    };
-  }
+  List<NotificationModel> forTab(String tab) =>
+      items.where((n) => notificationMatchesTab(n, tab)).toList();
 
   Future<void> startForUser(String? userId) async {
     if (userId == null || userId.isEmpty) {
@@ -97,6 +72,7 @@ class NotificationsProvider extends ChangeNotifier {
     final userId = _userId;
     if (userId == null) return;
     _isLoading = true;
+    _loadError = null;
     notifyListeners();
     try {
       final rows = await _supabase.client
@@ -115,6 +91,7 @@ class NotificationsProvider extends ChangeNotifier {
           ),
         );
     } catch (e) {
+      _loadError = 'Check your connection and try again.';
       debugPrint('NotificationsProvider.refresh error: $e');
     } finally {
       _isLoading = false;
@@ -183,6 +160,23 @@ class NotificationsProvider extends ChangeNotifier {
           notifyListeners();
         },
       )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'notifications',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'user_id',
+          value: userId,
+        ),
+        callback: (payload) {
+          final item = NotificationModel.fromJson(payload.newRecord);
+          final index = _items.indexWhere((n) => n.id == item.id);
+          if (index < 0) return;
+          _items[index] = item;
+          notifyListeners();
+        },
+      )
       ..subscribe();
   }
 
@@ -190,6 +184,7 @@ class NotificationsProvider extends ChangeNotifier {
     final channel = _channel;
     _channel = null;
     _userId = null;
+    _loadError = null;
     _items.clear();
     if (channel != null) await _supabase.client.removeChannel(channel);
     notifyListeners();

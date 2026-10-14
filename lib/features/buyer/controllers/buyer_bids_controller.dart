@@ -9,6 +9,7 @@ import '../../../../models/bid_model.dart';
 import '../../../../models/enums.dart';
 import '../../../../models/product_model.dart';
 import '../../../../providers/auth_provider.dart';
+import '../data/auction_checkout_order.dart';
 import '../data/catalog_product_query.dart';
 import '../domain/bid_placement_result.dart';
 
@@ -428,32 +429,24 @@ class BuyerBidsController extends ChangeNotifier {
     }
   }
 
-  /// Pending order created by close_auctions / ensure_auction_order.
+  /// Pending order for a won auction (server-side idempotent prepare).
+  Future<AuctionCheckoutOrderResult> prepareWonAuctionCheckout(
+    String auctionId, {
+    String? knownOrderId,
+  }) async {
+    final trimmedOrderId = knownOrderId?.trim();
+    if (trimmedOrderId != null && trimmedOrderId.isNotEmpty) {
+      return AuctionCheckoutOrderResult(
+        success: true,
+        orderId: trimmedOrderId,
+      );
+    }
+    return ensureMyAuctionOrder(_supabase, auctionId);
+  }
+
   Future<String?> orderIdForWonAuction(String auctionId) async {
-    if (auctionId.isEmpty) return null;
-    try {
-      await _supabase.client.rpc('close_auctions');
-    } catch (e) {
-      debugPrint('orderIdForWonAuction close_auctions: $e');
-    }
-    try {
-      final userId = _auth.user?.id;
-      var query = _supabase.client
-          .from('orders')
-          .select('order_id')
-          .eq('auction_id', auctionId);
-      if (userId != null) {
-        query = query.eq('buyer_id', userId);
-      }
-      final row = await query
-          .order('created_at', ascending: false)
-          .limit(1)
-          .maybeSingle();
-      return row?['order_id'] as String?;
-    } catch (e) {
-      debugPrint('orderIdForWonAuction error: $e');
-      return null;
-    }
+    final result = await prepareWonAuctionCheckout(auctionId);
+    return result.orderId;
   }
 
   @override

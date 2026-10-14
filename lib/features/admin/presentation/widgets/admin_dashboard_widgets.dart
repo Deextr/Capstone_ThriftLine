@@ -1134,15 +1134,17 @@ class AdminStatLine extends StatelessWidget {
     required this.label,
     required this.value,
     this.note,
+    this.onTap,
   });
 
   final String label;
   final String value;
   final String? note;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
@@ -1165,6 +1167,12 @@ class AdminStatLine extends StatelessWidget {
           ),
         ],
       ),
+    );
+    if (onTap == null) return row;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: row,
     );
   }
 }

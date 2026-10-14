@@ -24,37 +24,50 @@ String marketplaceReportCategoryLabel(MarketplaceReportCategory category) =>
     };
 
 List<String> adminReportFilterKeys(AdminReportType type) => switch (type) {
-      AdminReportType.all => const [],
-      AdminReportType.verifications =>
-        marketplaceReportFilterKeysFor(MarketplaceReportCategory.verifications),
-      AdminReportType.users =>
-        marketplaceReportFilterKeysFor(MarketplaceReportCategory.users),
-      AdminReportType.ordersTransactions => const [
-          'order_type',
-          'order_status',
-          'seller',
-          'payment_status',
-        ],
-      AdminReportType.bidding =>
-        marketplaceReportFilterKeysFor(MarketplaceReportCategory.auctions),
-      AdminReportType.disputes =>
-        marketplaceReportFilterKeysFor(MarketplaceReportCategory.disputes),
-      AdminReportType.security =>
-        marketplaceReportFilterKeysFor(MarketplaceReportCategory.security),
-    };
+  AdminReportType.all => const [],
+  AdminReportType.verifications => marketplaceReportFilterKeysFor(
+    MarketplaceReportCategory.verifications,
+  ),
+  AdminReportType.users => marketplaceReportFilterKeysFor(
+    MarketplaceReportCategory.users,
+  ),
+  AdminReportType.ordersTransactions => const [
+    'order_type',
+    'order_status',
+    'seller',
+    'payment_status',
+  ],
+  AdminReportType.bidding => marketplaceReportFilterKeysFor(
+    MarketplaceReportCategory.auctions,
+  ),
+  AdminReportType.disputes => marketplaceReportFilterKeysFor(
+    MarketplaceReportCategory.disputes,
+  ),
+  AdminReportType.security => marketplaceReportFilterKeysFor(
+    MarketplaceReportCategory.security,
+  ),
+};
 
 /// Filter keys allowed per RPC category.
-List<String> marketplaceReportFilterKeysFor(MarketplaceReportCategory category) =>
-    switch (category) {
-      MarketplaceReportCategory.overview => const [],
-      MarketplaceReportCategory.users => const ['account_type', 'account_status'],
-      MarketplaceReportCategory.orders => const ['order_type', 'order_status', 'seller'],
-      MarketplaceReportCategory.payments => const ['payment_status'],
-      MarketplaceReportCategory.auctions => const ['auction_outcome'],
-      MarketplaceReportCategory.disputes => const ['dispute_type', 'dispute_status'],
-      MarketplaceReportCategory.verifications => const ['verification_outcome'],
-      MarketplaceReportCategory.security => const ['event_category'],
-    };
+List<String> marketplaceReportFilterKeysFor(
+  MarketplaceReportCategory category,
+) => switch (category) {
+  MarketplaceReportCategory.overview => const [],
+  MarketplaceReportCategory.users => const ['account_type', 'account_status'],
+  MarketplaceReportCategory.orders => const [
+    'order_type',
+    'order_status',
+    'seller',
+  ],
+  MarketplaceReportCategory.payments => const ['payment_status'],
+  MarketplaceReportCategory.auctions => const ['auction_outcome'],
+  MarketplaceReportCategory.disputes => const [
+    'dispute_type',
+    'dispute_status',
+  ],
+  MarketplaceReportCategory.verifications => const ['verification_outcome'],
+  MarketplaceReportCategory.security => const ['event_category'],
+};
 
 String marketplaceReportCategoryRpcValue(MarketplaceReportCategory category) =>
     switch (category) {
@@ -82,24 +95,24 @@ enum AdminReportType {
 const adminReportTypesInOrder = AdminReportType.values;
 
 String adminReportTypeLabel(AdminReportType type) => switch (type) {
-      AdminReportType.all => 'All Reports',
-      AdminReportType.verifications => 'Seller Verification Reports',
-      AdminReportType.users => 'Users Reports',
-      AdminReportType.ordersTransactions => 'Orders & Transactions Reports',
-      AdminReportType.bidding => 'Bidding Reports',
-      AdminReportType.disputes => 'Disputes Reports',
-      AdminReportType.security => 'Security & Activity Reports',
-    };
+  AdminReportType.all => 'All Reports',
+  AdminReportType.verifications => 'Seller Verification Reports',
+  AdminReportType.users => 'Users Reports',
+  AdminReportType.ordersTransactions => 'Orders & Transactions Reports',
+  AdminReportType.bidding => 'Bidding Reports',
+  AdminReportType.disputes => 'Disputes Reports',
+  AdminReportType.security => 'Security & Activity Reports',
+};
 
 String adminReportTypeQueryValue(AdminReportType type) => switch (type) {
-      AdminReportType.all => 'all',
-      AdminReportType.verifications => 'verifications',
-      AdminReportType.users => 'users',
-      AdminReportType.ordersTransactions => 'orders_transactions',
-      AdminReportType.bidding => 'bidding',
-      AdminReportType.disputes => 'disputes',
-      AdminReportType.security => 'security',
-    };
+  AdminReportType.all => 'all',
+  AdminReportType.verifications => 'verifications',
+  AdminReportType.users => 'users',
+  AdminReportType.ordersTransactions => 'orders_transactions',
+  AdminReportType.bidding => 'bidding',
+  AdminReportType.disputes => 'disputes',
+  AdminReportType.security => 'security',
+};
 
 AdminReportType adminReportTypeFromQuery(String? raw) {
   final value = raw?.toLowerCase().trim() ?? '';
@@ -107,7 +120,9 @@ AdminReportType adminReportTypeFromQuery(String? raw) {
     '' || 'all' || 'overview' => AdminReportType.all,
     'verifications' => AdminReportType.verifications,
     'users' => AdminReportType.users,
-    'orders' || 'payments' || 'orders_transactions' => AdminReportType.ordersTransactions,
+    'orders' ||
+    'payments' ||
+    'orders_transactions' => AdminReportType.ordersTransactions,
     'auctions' || 'bidding' => AdminReportType.bidding,
     'disputes' => AdminReportType.disputes,
     'security' => AdminReportType.security,
@@ -149,7 +164,8 @@ class MarketplaceReportSelection {
   bool get includesPaymentSection =>
       type == AdminReportType.ordersTransactions || type == AdminReportType.all;
 
-  MarketplaceReportCategory get singleCategory => adminReportPrimaryCategory(type);
+  MarketplaceReportCategory get singleCategory =>
+      adminReportPrimaryCategory(type);
 
   String get queryValue => adminReportTypeQueryValue(type);
 
@@ -186,7 +202,8 @@ String marketplaceReportComparisonLabel(MarketplaceReportComparisonMode mode) =>
     switch (mode) {
       MarketplaceReportComparisonMode.none => 'No comparison',
       MarketplaceReportComparisonMode.previousPeriod => 'Previous period',
-      MarketplaceReportComparisonMode.samePeriodLastYear => 'Same period last year',
+      MarketplaceReportComparisonMode.samePeriodLastYear =>
+        'Same period last year',
     };
 
 /// Philippine Time windows for admin marketplace reports (UTC+8, no DST).
@@ -297,10 +314,10 @@ class MarketplaceReportDateWindow {
       AdminDatePreset.thisMonth => 'Monthly',
       AdminDatePreset.last30Days => 'Monthly',
       AdminDatePreset.custom => AdminDateWindow(
-          preset: preset,
-          from: from.toLocal(),
-          toExclusive: toExclusive.toLocal(),
-        ).chipLabel,
+        preset: preset,
+        from: from.toLocal(),
+        toExclusive: toExclusive.toLocal(),
+      ).chipLabel,
       AdminDatePreset.lastYear => 'Yearly',
     };
   }
@@ -335,7 +352,8 @@ class MarketplaceReportDateWindow {
     return switch (mode) {
       MarketplaceReportComparisonMode.none => null,
       MarketplaceReportComparisonMode.previousPeriod => _previousEquivalent(),
-      MarketplaceReportComparisonMode.samePeriodLastYear => _samePeriodLastYear(),
+      MarketplaceReportComparisonMode.samePeriodLastYear =>
+        _samePeriodLastYear(),
     };
   }
 
@@ -366,7 +384,14 @@ class MarketplaceReportDateWindow {
     if (month == 2 && day == 29) {
       day = 28;
     }
-    return DateTime(year, month, day, manila.hour, manila.minute, manila.second);
+    return DateTime(
+      year,
+      month,
+      day,
+      manila.hour,
+      manila.minute,
+      manila.second,
+    );
   }
 }
 

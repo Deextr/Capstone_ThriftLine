@@ -49,6 +49,8 @@ import '../../features/seller/controllers/seller_orders_controller.dart';
 import '../../providers/cart_provider.dart';
 import '../../features/buyer/presentation/screens/product_detail_screen.dart';
 import '../../features/buyer/data/buyer_purchase_category.dart';
+import '../../features/buyer/controllers/buyer_transaction_history_controller.dart';
+import '../../features/buyer/presentation/screens/buyer_transaction_history_screen.dart';
 import '../../features/buyer/presentation/screens/my_purchases_screen.dart';
 import '../../features/buyer/presentation/screens/saved_items_screen.dart';
 import '../../features/buyer/presentation/screens/buyer_search_tab.dart';
@@ -86,7 +88,9 @@ import '../../features/trust_safety/presentation/screens/my_reports_screen.dart'
 import '../../features/trust_safety/presentation/screens/report_appeal_screen.dart';
 import '../../features/trust_safety/presentation/screens/report_detail_screen.dart';
 import '../../features/trust_safety/controllers/order_delivery_report_controller.dart';
+import '../../features/trust_safety/controllers/order_fulfillment_report_controller.dart';
 import '../../features/trust_safety/presentation/screens/order_delivery_report_screen.dart';
+import '../../features/trust_safety/presentation/screens/order_fulfillment_report_screen.dart';
 import '../../features/trust_safety/presentation/screens/report_seller_screen.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -361,6 +365,17 @@ GoRouter createMobileAppRouter({
         ),
       ),
       GoRoute(
+        path: RouteNames.orderFulfillmentReport,
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => OrderFulfillmentReportController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+            orderId: state.pathParameters['orderId']!,
+          ),
+          child: const OrderFulfillmentReportScreen(),
+        ),
+      ),
+      GoRoute(
         path: RouteNames.addListing,
         builder: (context, _) => ChangeNotifierProvider(
           create: (context) => AddListingController(
@@ -482,6 +497,16 @@ GoRouter createMobileAppRouter({
         redirect: (_, _) => RouteNames.myPurchases,
       ),
       GoRoute(
+        path: RouteNames.transactionHistory,
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => BuyerTransactionHistoryController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+          ),
+          child: const BuyerTransactionHistoryScreen(),
+        ),
+      ),
+      GoRoute(
         path: RouteNames.savedItems,
         builder: (_, _) => const SavedItemsScreen(),
       ),
@@ -523,8 +548,9 @@ GoRouter createMobileAppRouter({
               .map((id) => id.trim())
               .where((id) => id.isNotEmpty)
               .toList();
-          final checkoutSource =
-              state.uri.queryParameters['source']?.trim().toLowerCase();
+          final checkoutSource = state.uri.queryParameters['source']
+              ?.trim()
+              .toLowerCase();
           final isBuyNowCheckout = checkoutSource == 'buy_now';
           final scopedProduct = isBuyNowCheckout
               ? state.uri.queryParameters['product']
@@ -689,13 +715,12 @@ GoRouter createAppRouter({
   required AppProvider appProvider,
   PaymongoReturnCoordinator? paymongoReturn,
   PasswordRecoveryCoordinator? passwordRecovery,
-}) =>
-    createMobileAppRouter(
-      authProvider: authProvider,
-      appProvider: appProvider,
-      paymongoReturn: paymongoReturn,
-      passwordRecovery: passwordRecovery,
-    );
+}) => createMobileAppRouter(
+  authProvider: authProvider,
+  appProvider: appProvider,
+  paymongoReturn: paymongoReturn,
+  passwordRecovery: passwordRecovery,
+);
 
 List<GoRoute> _homeCollectionRoutes() {
   GoRoute collection(String path, HomeCollectionType type) {

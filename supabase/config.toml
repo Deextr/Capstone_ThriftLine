@@ -17,6 +17,12 @@ verify_jwt = false
 [functions.complete-expired-inspections]
 verify_jwt = false
 
+[functions.process-fulfillment-sla]
+verify_jwt = false
+
+[functions.send-push-notification]
+verify_jwt = false
+
 [functions.resolve-delivery-payment]
 verify_jwt = true
 

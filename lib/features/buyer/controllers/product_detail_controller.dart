@@ -11,6 +11,7 @@ import '../../../providers/auth_provider.dart';
 import '../../chat/data/conversation_service.dart';
 import '../../seller/data/auction_relist_feedback.dart';
 import '../../seller/data/listing_bucket.dart';
+import '../data/auction_checkout_order.dart';
 import '../data/catalog_product_query.dart';
 import '../domain/bid_placement_result.dart';
 
@@ -293,30 +294,26 @@ class ProductDetailController extends ChangeNotifier {
     return "You've been outbid";
   }
 
-  Future<String?> getWonAuctionOrderId() async {
+  Future<AuctionCheckoutOrderResult> prepareWonAuctionCheckout() async {
     final aid = auctionId;
-    final uid = _auth.user?.id;
-    if (aid == null || uid == null) return null;
-    try {
-      final row = await _supabase.client
-          .from('orders')
-          .select('order_id')
-          .eq('auction_id', aid)
-          .eq('buyer_id', uid)
-          .order('created_at', ascending: false)
-          .limit(1)
-          .maybeSingle();
-      if (row != null && row['order_id'] != null) {
-        return row['order_id'] as String;
-      }
-      final rpcRes = await _supabase.client.rpc(
-        'ensure_auction_order',
-        params: {'p_auction_id': aid},
+    if (aid == null) {
+      return const AuctionCheckoutOrderResult(
+        success: false,
+        error: 'Auction not found.',
       );
-      if (rpcRes != null) return rpcRes.toString();
-    } catch (e) {
-      debugPrint('ProductDetailController.getWonAuctionOrderId error: $e');
     }
+    return ensureMyAuctionOrder(_supabase, aid);
+  }
+
+  Future<String?> getWonAuctionOrderId() async {
+    final result = await prepareWonAuctionCheckout();
+    if (result.success && result.orderId != null) {
+      return result.orderId;
+    }
+    debugPrint(
+      'ProductDetailController.getWonAuctionOrderId: '
+      '${result.code ?? 'failed'} ${result.error ?? ''}',
+    );
     return null;
   }
 

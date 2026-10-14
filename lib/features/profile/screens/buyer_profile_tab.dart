@@ -74,6 +74,11 @@ class BuyerProfileTab extends StatelessWidget {
                 onTap: () => context.push(RouteNames.myPurchases),
               ),
               _MenuItem(
+                icon: Icons.receipt_long_outlined,
+                label: 'Transaction History',
+                onTap: () => context.push(RouteNames.transactionHistory),
+              ),
+              _MenuItem(
                 icon: Icons.star_outline_rounded,
                 label: toRateCount > 0 ? 'To Rate ($toRateCount)' : 'To Rate',
                 onTap: () async {
@@ -128,11 +133,6 @@ class BuyerProfileTab extends StatelessWidget {
                   activeTrackColor: AppColors.primary.withValues(alpha: 0.4),
                   activeThumbColor: AppColors.primary,
                 ),
-              ),
-              _MenuItem(
-                icon: Icons.payment_outlined,
-                label: 'Payment Methods',
-                onTap: () => showThriftSnackBar(context, 'Coming soon'),
               ),
               _MenuItem(
                 icon: Icons.location_on_outlined,
@@ -352,11 +352,7 @@ class _MenuItem extends StatelessWidget {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Icon(icon, color: AppColors.textPrimary, size: 22),
       title: Text(label, style: AppTypography.body),
-      trailing: Icon(
-        Icons.chevron_right,
-        size: 20,
-        color: AppColors.textHint,
-      ),
+      trailing: Icon(Icons.chevron_right, size: 20, color: AppColors.textHint),
       onTap: onTap,
     );
   }
@@ -396,11 +392,7 @@ class _TrustMenuItem extends StatelessWidget {
         style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
       ),
       subtitle: Text(subtitle, style: AppTypography.caption),
-      trailing: Icon(
-        Icons.chevron_right,
-        size: 20,
-        color: AppColors.textHint,
-      ),
+      trailing: Icon(Icons.chevron_right, size: 20, color: AppColors.textHint),
       onTap: onTap,
     );
   }

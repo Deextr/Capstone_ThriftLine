@@ -131,7 +131,9 @@ class CommunityReportModel extends BaseModel {
       reportedUsername: username,
       reportedDisplayName: display,
       reporterUsername: reporterName,
-      reporterDisplayName: reporterDisplay,
+      reporterDisplayName: row['reporter_id'] == null
+          ? 'System'
+          : reporterDisplay,
       reportedRole: user?['role'] as String?,
       reporterRole: reporter?['role'] as String?,
       reportedShopName: user?['shop_name'] as String?,
@@ -146,7 +148,8 @@ class CommunityReportModel extends BaseModel {
       createdAt: parseTime(row['created_at']) ?? DateTime.now(),
       resolvedAt: parseTime(row['resolved_at']),
       evidence: evidence,
-      evidenceAttemptCount: (row['evidence_attempt_count'] as num?)?.toInt() ?? 1,
+      evidenceAttemptCount:
+          (row['evidence_attempt_count'] as num?)?.toInt() ?? 1,
       reporterInstruction: row['reporter_instruction'] as String?,
       productId: row['product_id'] as String?,
       disputeId: row['dispute_id'] as String?,

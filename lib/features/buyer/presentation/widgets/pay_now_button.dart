@@ -24,13 +24,16 @@ class PayNowButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<BuyerOrdersController>();
+    final busy = controller.isStartingPayment || controller.isConfirmingPayment;
     return ThriftButton(
       label: controller.isStartingPayment
           ? 'Opening PayMongo…'
+          : controller.isConfirmingPayment
+          ? 'Checking payment status...'
           : 'Pay $amountLabel',
-      isLoading: controller.isStartingPayment,
+      isLoading: busy,
       expand: expand,
-      onPressed: controller.isStartingPayment
+      onPressed: busy
           ? null
           : () => startPaymongoPayment(
               context: context,

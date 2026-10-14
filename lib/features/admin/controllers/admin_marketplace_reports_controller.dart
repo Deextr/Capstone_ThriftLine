@@ -12,24 +12,25 @@ class AdminMarketplaceReportsController extends ChangeNotifier {
     required bool isSuperAdmin,
     MarketplaceReportSelection initialSelection =
         const MarketplaceReportSelection.all(),
-  })  : _service = AdminMarketplaceReportService(supabase),
-        _audit = AdminAuditService(supabase),
-        _isSuperAdmin = isSuperAdmin,
-        _selection = initialSelection {
+  }) : _service = AdminMarketplaceReportService(supabase),
+       _audit = AdminAuditService(supabase),
+       _isSuperAdmin = isSuperAdmin,
+       _selection = initialSelection {
     load();
   }
 
   @visibleForTesting
   AdminMarketplaceReportsController.preview({
     required MarketplaceReportPayload payload,
-    MarketplaceReportSelection selection = const MarketplaceReportSelection.all(),
+    MarketplaceReportSelection selection =
+        const MarketplaceReportSelection.all(),
     bool isSuperAdmin = false,
-  })  : _service = AdminMarketplaceReportService(_PreviewSupabase()),
-        _audit = AdminAuditService(_PreviewSupabase()),
-        _isSuperAdmin = isSuperAdmin,
-        _selection = selection,
-        _payload = payload,
-        _isLoading = false;
+  }) : _service = AdminMarketplaceReportService(_PreviewSupabase()),
+       _audit = AdminAuditService(_PreviewSupabase()),
+       _isSuperAdmin = isSuperAdmin,
+       _selection = selection,
+       _payload = payload,
+       _isLoading = false;
 
   final AdminMarketplaceReportService _service;
   final AdminAuditService _audit;
@@ -151,7 +152,8 @@ class AdminMarketplaceReportsController extends ChangeNotifier {
       if (generation != _loadGeneration) return;
       _payload = result;
       _paymentsPayload = null;
-      if (_selection.type == AdminReportType.ordersTransactions && result.success) {
+      if (_selection.type == AdminReportType.ordersTransactions &&
+          result.success) {
         _paymentsPayload = await _service.loadReport(
           category: MarketplaceReportCategory.payments,
           window: _window,
@@ -241,9 +243,7 @@ class AdminMarketplaceReportsController extends ChangeNotifier {
     final total = first.detailTotal;
     if (onProgress != null) {
       onProgress(
-        total <= 0
-            ? 1.0
-            : (first.details.rows.length / total).clamp(0.05, 1.0),
+        total <= 0 ? 1.0 : (first.details.rows.length / total).clamp(0.05, 1.0),
       );
     }
     if (total <= first.details.rows.length) return first;

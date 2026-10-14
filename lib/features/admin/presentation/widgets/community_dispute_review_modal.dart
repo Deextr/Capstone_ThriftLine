@@ -332,11 +332,7 @@ class _CommunityDisputeReviewModalState
           ),
           IconButton(
             tooltip: 'Close (Esc)',
-            icon: Icon(
-              Icons.close,
-              size: 20,
-              color: AppColors.textSecondary,
-            ),
+            icon: Icon(Icons.close, size: 20, color: AppColors.textSecondary),
             onPressed: () => Navigator.of(context).pop(false),
           ),
         ],

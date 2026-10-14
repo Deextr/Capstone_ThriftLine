@@ -102,6 +102,18 @@ void main() {
       expect(sellerOrderBucketFor(order), isNull);
     });
 
+    test('cancelled paid orders cannot arrange delivery', () {
+      final order = _order(
+        id: 'sla-cancel',
+        status: 'cancelled',
+        payment: 'refunded',
+        shipment: {'delivery_status': 'seller_preparing', 'order_id': 'sla-cancel'},
+      );
+      expect(sellerOrderBucketFor(order), SellerOrderBucket.cancelled);
+      expect(order.canArrangeDelivery, isFalse);
+      expect(order.isToShip, isFalse);
+    });
+
     test('paid preparing orders stay in To Ship, not Shipped', () {
       final order = _order(
         id: 'paid',

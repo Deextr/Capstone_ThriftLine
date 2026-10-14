@@ -70,6 +70,14 @@ class LookingForDetailController extends ChangeNotifier {
     return error;
   }
 
+  Future<String?> closeAsFulfilled() async {
+    final error = await _looking.closePost(postId);
+    if (error == null) {
+      await load();
+    }
+    return error;
+  }
+
   Future<ChatActionResult> sendIHaveThis() async {
     final post = _post;
     if (post == null) {

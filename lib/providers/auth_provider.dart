@@ -318,7 +318,6 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     _isLoading = true;
     _resolvingTrustedDevice = true;
-    await _setEmailOtpPending(true);
     notifyListeners();
 
     try {

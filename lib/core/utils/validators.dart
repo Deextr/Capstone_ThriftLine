@@ -5,6 +5,12 @@ abstract final class Validators {
   static const fullNameInvalidMessage =
       'Full name can only include letters, spaces, hyphens, and apostrophes.';
 
+  /// Minimum length after [normalizeFullName] (see QA BUY-VAL-001).
+  static const int fullNameMinLength = 2;
+
+  static const fullNameTooShortMessage =
+      'Full name must be at least 2 characters long.';
+
   static const riderNameRequiredMessage = 'Enter the rider name.';
 
   static const riderNameInvalidMessage =
@@ -51,6 +57,9 @@ abstract final class Validators {
     if (raw.trim().isEmpty) return fullNameRequiredMessage;
 
     final normalized = normalizeFullName(raw);
+    if (normalized.length < fullNameMinLength) {
+      return fullNameTooShortMessage;
+    }
     if (!_fullNamePattern.hasMatch(normalized)) {
       return fullNameInvalidMessage;
     }

@@ -34,7 +34,29 @@
   <link rel="preconnect" href="https://challenges.cloudflare.com">
   <link rel="dns-prefetch" href="https://challenges.cloudflare.com">
 </head>
-<body>
-  <script src="flutter_bootstrap.js" async></script>
+<body style="margin:0;background:#F8FAFC;">
+  <div id="boot" style="font-family:system-ui,sans-serif;color:#0F172A;padding:32px;">
+    Loading ThriftLine Admin…
+  </div>
+  <noscript>
+    <p style="font-family: system-ui, sans-serif; padding: 24px;">
+      ThriftLine Admin requires JavaScript. Open
+      <a href="/admin/login">/admin/login</a>.
+    </p>
+  </noscript>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        regs.forEach(function (reg) { reg.unregister(); });
+      });
+    }
+  </script>
+  <script src="flutter_bootstrap.js?v=20261011c" async></script>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var boot = document.getElementById('boot');
+      if (boot) boot.remove();
+    });
+  </script>
 </body>
 </html>

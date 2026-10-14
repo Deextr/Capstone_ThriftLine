@@ -62,9 +62,7 @@ class MarketplaceReportPayload {
         rangeTo: parseReportDate(json['range_to']),
         compareFrom: parseReportDate(json['compare_from']),
         compareTo: parseReportDate(json['compare_to']),
-        summary: parseReportMetrics(
-          (json['overview'] as Map?)?['summary'],
-        ),
+        summary: parseReportMetrics((json['overview'] as Map?)?['summary']),
         comparison: parseReportComparison(
           (json['overview'] as Map?)?['comparison'],
         ),
@@ -88,7 +86,9 @@ class MarketplaceReportPayload {
       summary: parseReportMetrics(json['summary']),
       comparison: parseReportComparison(json['comparison']),
       breakdowns: parseReportBreakdowns(json['breakdowns']),
-      details: MarketplaceReportDetails.fromJson(asStringKeyMap(json['details'])),
+      details: MarketplaceReportDetails.fromJson(
+        asStringKeyMap(json['details']),
+      ),
       detailTotal: asReportInt(json['detail_total']),
       limitations: parseStringList(json['limitations']),
       error: json['error']?.toString(),
@@ -111,7 +111,9 @@ class MarketplaceReportPayload {
       summary: parseReportMetrics(bundle['summary']),
       comparison: parseReportComparison(bundle['comparison']),
       breakdowns: parseReportBreakdowns(bundle['breakdowns']),
-      details: MarketplaceReportDetails.fromJson(asStringKeyMap(bundle['details'])),
+      details: MarketplaceReportDetails.fromJson(
+        asStringKeyMap(bundle['details']),
+      ),
       detailTotal: asReportInt(bundle['detail_total']),
       limitations: parseStringList(bundle['limitations']),
     );
@@ -186,7 +188,8 @@ class MarketplaceReportDetails {
 
   factory MarketplaceReportDetails.fromJson(Map<String, dynamic>? json) {
     if (json == null) return empty;
-    final columns = (json['columns'] as List?)
+    final columns =
+        (json['columns'] as List?)
             ?.map((e) => e.toString())
             .toList(growable: false) ??
         const [];
@@ -278,7 +281,8 @@ List<MarketplaceReportBreakdown> parseReportBreakdowns(Object? raw) {
       .whereType<Map>()
       .map((m) {
         final map = Map<String, dynamic>.from(m);
-        final columns = (map['columns'] as List?)
+        final columns =
+            (map['columns'] as List?)
                 ?.map((e) => e.toString())
                 .toList(growable: false) ??
             const [];
@@ -286,7 +290,9 @@ List<MarketplaceReportBreakdown> parseReportBreakdowns(Object? raw) {
         final rows = rowsRaw
             .map((row) {
               if (row is! List) return <String>[];
-              return row.map((c) => c?.toString() ?? '').toList(growable: false);
+              return row
+                  .map((c) => c?.toString() ?? '')
+                  .toList(growable: false);
             })
             .toList(growable: false);
         return MarketplaceReportBreakdown(

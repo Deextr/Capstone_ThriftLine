@@ -397,14 +397,18 @@ class _PendingOrderCard extends StatelessWidget {
           Divider(height: 1, color: AppColors.border),
           const SizedBox(height: 10),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Order #${order.orderNumber}',
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.textHint,
+              Expanded(
+                child: Text(
+                  'Order #${order.orderNumber}',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textHint,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               ThriftButton(
                 label: 'Rate Now',
                 icon: Icons.star_outline_rounded,

@@ -22,6 +22,29 @@ void openNotification(
     return;
   }
 
+  final reportIdPlain = notification.data['report_id']?.trim();
+  if (reportIdPlain != null &&
+      reportIdPlain.isNotEmpty &&
+      notification.type == NotificationType.system &&
+      notification.data['can_appeal'] != 'true') {
+    router.push(RouteNames.myReports);
+    return;
+  }
+
+  final conversationId = notification.data['conversation_id']?.trim();
+  if (notification.type == NotificationType.message &&
+      conversationId != null &&
+      conversationId.isNotEmpty) {
+    router.push(RouteNames.chatThread(conversationId));
+    return;
+  }
+
+  final postId = notification.data['post_id']?.trim();
+  if (postId != null && postId.isNotEmpty) {
+    router.push(RouteNames.lookingForPost(postId));
+    return;
+  }
+
   final orderId = notification.data['order_id']?.trim();
   final event = notification.data['event']?.trim();
   if (orderId != null && orderId.isNotEmpty) {
@@ -33,12 +56,15 @@ void openNotification(
       return;
     }
     if (activeAccount == AccountMode.seller &&
-        notification.audience == NotificationAudience.seller) {
+        (notification.audience == NotificationAudience.seller ||
+            notification.data.containsKey('order_id'))) {
       router.push('/seller-order/$orderId');
       return;
     }
     if (activeAccount == AccountMode.buyer &&
-        notification.audience == NotificationAudience.buyer) {
+        (notification.audience == NotificationAudience.buyer ||
+            notification.type == NotificationType.orderConfirmed ||
+            notification.type == NotificationType.shipped)) {
       router.push(RouteNames.trackOrderFor(orderId));
       return;
     }
@@ -58,6 +84,12 @@ void openNotification(
     if (activeAccount == AccountMode.seller) {
       router.push(RouteNames.becomeSeller);
     }
+    return;
+  }
+
+  if (notification.data.containsKey('payout_id') &&
+      activeAccount == AccountMode.seller) {
+    router.push(RouteNames.sellerHome);
     return;
   }
 }

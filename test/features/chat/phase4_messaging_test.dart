@@ -163,6 +163,32 @@ void main() {
       expect(outOfOrder.first.content, 'one-updated');
     });
 
+    test('product rows keep embedded product fields', () {
+      final msg = MessageModel.fromSupabase({
+        'message_id': 'm10',
+        'conversation_id': 'c1',
+        'sender_id': 'aaa',
+        'content': 'Shared a product',
+        'message_type': 'product',
+        'product_id': 'p1',
+        'created_at': '2026-09-10T12:00:00Z',
+        'product': {
+          'product_id': 'p1',
+          'name': 'Vintage jacket',
+          'price': 450,
+          'status': 'active',
+          'images': [
+            {'image_url': 'https://example.com/j.jpg', 'is_primary': true},
+          ],
+        },
+      });
+      expect(msg.type, MessageType.product);
+      expect(msg.productId, 'p1');
+      expect(msg.productName, 'Vintage jacket');
+      expect(msg.productPrice, 450);
+      expect(msg.productShareAvailable, isTrue);
+    });
+
     test('image rows keep attachment_path', () {
       final msg = MessageModel.fromSupabase({
         'message_id': 'm9',
@@ -194,6 +220,12 @@ void main() {
         ),
         isFalse,
       );
+    });
+  });
+
+  group('product share copy', () {
+    test('default share body is stable', () {
+      expect(productShareMessageBody(), 'Shared a product');
     });
   });
 

@@ -25,6 +25,7 @@ class LookingForCard extends StatelessWidget {
     this.onEdit,
     this.onDelete,
     this.onRepost,
+    this.onClose,
     this.onReport,
     this.onTap,
   });
@@ -41,6 +42,7 @@ class LookingForCard extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onRepost;
+  final VoidCallback? onClose;
   final VoidCallback? onReport;
   final VoidCallback? onTap;
 
@@ -62,121 +64,80 @@ class LookingForCard extends StatelessWidget {
   Widget _feed(BuildContext context) {
     final hasImage =
         post.thumbnailUrl != null && post.thumbnailUrl!.trim().isNotEmpty;
-    final budgetLine =
-        '${formatCurrency(post.budgetMin)} – ${formatCurrency(post.budgetMax)}';
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: AppColors.surface,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: _LookingForCardShell(
+        onTap: onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            InkWell(
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 8, 0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ThriftAvatar(imageUrl: post.buyerAvatar, size: 44),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            post.buyerName.trim().isEmpty
-                                ? 'Buyer'
-                                : post.buyerName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.body.copyWith(
-                              fontWeight: FontWeight.w700,
-                              height: 1.2,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            formatRelativeTime(post.createdAt),
-                            style: AppTypography.caption.copyWith(
-                              color: AppColors.textHint,
-                            ),
-                          ),
-                          if (post.location.trim().isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              post.location,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    _menu(),
-                  ],
-                ),
-              ),
-            ),
-            InkWell(
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      post.title,
-                      style: AppTypography.subheading.copyWith(
-                        fontWeight: FontWeight.w700,
-                        height: 1.25,
-                      ),
-                    ),
-                    if (post.description.trim().isNotEmpty) ...[
-                      const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ThriftAvatar(imageUrl: post.buyerAvatar, size: 40),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        post.description,
+                        post.buyerName.trim().isEmpty
+                            ? 'Buyer'
+                            : post.buyerName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: AppTypography.body.copyWith(
-                          color: AppColors.textPrimary,
-                          height: 1.4,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
                         ),
                       ),
-                    ],
-                    const SizedBox(height: 10),
-                    Text(
-                      budgetLine,
-                      style: AppTypography.body.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryDark,
-                      ),
-                    ),
-                    if (post.size != null && post.size!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
-                        'Size ${post.size!.trim()}',
+                        formatRelativeTime(post.createdAt),
                         style: AppTypography.caption.copyWith(
-                          color: AppColors.textSecondary,
+                          color: AppColors.textHint,
                         ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
+                _menu(hideShareInMenu: showShare),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _LookingForInfoChips(post: post, showLifecycle: true),
+            const SizedBox(height: 10),
+            Text(
+              post.title,
+              style: AppTypography.subheading.copyWith(
+                fontWeight: FontWeight.w700,
+                height: 1.25,
               ),
             ),
+            if (post.description.trim().isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                post.description,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.body.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+            ],
             if (hasImage) ...[
               const SizedBox(height: 12),
-              InkWell(
-                onTap: onTap,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
                 child: _FeedImage(url: post.thumbnailUrl!),
               ),
             ],
-            const SizedBox(height: 4),
-            Divider(height: 1, color: AppColors.border),
-            _feedActions(context),
+            if (showShare || showRespondButton) ...[
+              const SizedBox(height: 14),
+              _feedActions(context),
+            ],
           ],
         ),
       ),
@@ -184,127 +145,89 @@ class LookingForCard extends StatelessWidget {
   }
 
   Widget _feedActions(BuildContext context) {
-    if (!showShare && !showRespondButton) {
-      return const SizedBox(height: 4);
-    }
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (showShare)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: onShare,
-                icon: const Icon(Icons.share_outlined, size: 22),
-                label: const Text('Share'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.textPrimary,
-                  minimumSize: const Size(48, 44),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                ),
+    return Row(
+      children: [
+        if (showShare)
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: onShare,
+              icon: const Icon(Icons.share_outlined, size: 18),
+              label: const Text('Share'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.textPrimary,
+                side: BorderSide(color: AppColors.border),
+                padding: const EdgeInsets.symmetric(vertical: 10),
               ),
             ),
-          if (showRespondButton)
-            ThriftButton(
-              label: 'I Have This Item',
+          ),
+        if (showShare && showRespondButton) const SizedBox(width: 10),
+        if (showRespondButton)
+          Expanded(
+            flex: showShare ? 1 : 2,
+            child: ThriftButton(
+              label: 'I Have This',
               expand: true,
               onPressed: onRespond,
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 
   Widget _compact(BuildContext context) {
     final image = post.thumbnailUrl;
-    return Material(
-      color: AppColors.surface,
-      child: InkWell(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: _LookingForCardShell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _Thumb(url: image, size: 72),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      post.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.body.copyWith(
-                        fontWeight: FontWeight.w700,
-                        height: 1.25,
-                      ),
-                    ),
-                    if (post.description.trim().isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        post.description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.textSecondary,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 6),
-                    Text(
-                      _metaLine(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.textHint,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      post.lifecycleLabel,
-                      style: AppTypography.caption.copyWith(
-                        color: _statusColor(post.lifecycle),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              _menu(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _detail(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ThriftAvatar(imageUrl: post.buyerAvatar, size: 40),
+            _Thumb(url: image, size: 76),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    post.buyerName,
+                    post.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: AppTypography.body.copyWith(
+                      fontWeight: FontWeight.w700,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  _LookingForStatusChip(
+                    label: post.lifecycleLabel,
+                    lifecycle: post.lifecycle,
+                  ),
+                  if (post.description.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      post.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textSecondary,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Text(
+                    '${formatCurrency(post.budgetMin)} – ${formatCurrency(post.budgetMax)}',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.primaryDark,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Text(
-                    _metaLine(),
+                    _metaLine(includeBudget: false),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: AppTypography.caption.copyWith(
                       color: AppColors.textHint,
                     ),
@@ -312,75 +235,104 @@ class LookingForCard extends StatelessWidget {
                 ],
               ),
             ),
-            _menu(),
+            _menu(hideShareInMenu: false),
           ],
         ),
-        const SizedBox(height: 16),
-        Text(
-          post.lifecycleLabel,
-          style: AppTypography.caption.copyWith(
-            color: _statusColor(post.lifecycle),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(post.title, style: AppTypography.heading.copyWith(fontSize: 20)),
-        if (post.description.trim().isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(post.description, style: AppTypography.body),
-        ],
-        const SizedBox(height: 12),
-        Text(
-          'Budget ${formatCurrency(post.budgetMin)} – ${formatCurrency(post.budgetMax)}',
-          style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
-        ),
-        if (post.thumbnailUrl != null && post.thumbnailUrl!.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: _Thumb(url: post.thumbnailUrl, size: 220, expand: true),
-          ),
-        ],
-        if (showShare || showRespondButton) ...[
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              if (showShare)
-                TextButton.icon(
-                  onPressed: onShare,
-                  icon: const Icon(Icons.share_outlined, size: 18),
-                  label: const Text('Share'),
-                ),
-              const Spacer(),
-              if (showRespondButton)
-                ThriftButton(
-                  label: 'I Have This Item',
-                  expand: false,
-                  onPressed: onRespond,
-                ),
-            ],
-          ),
-        ],
-      ],
+      ),
     );
   }
 
-  String _metaLine() {
+  Widget _detail(BuildContext context) {
+    return _LookingForCardShell(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ThriftAvatar(imageUrl: post.buyerAvatar, size: 44),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      post.buyerName,
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      formatRelativeTime(post.createdAt),
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textHint,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _menu(hideShareInMenu: showShare),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _LookingForInfoChips(post: post, showLifecycle: true),
+          const SizedBox(height: 12),
+          Text(
+            post.title,
+            style: AppTypography.heading.copyWith(fontSize: 20, height: 1.2),
+          ),
+          if (post.description.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              post.description,
+              style: AppTypography.body.copyWith(height: 1.45),
+            ),
+          ],
+          if (post.thumbnailUrl != null && post.thumbnailUrl!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: _Thumb(url: post.thumbnailUrl, size: 220, expand: true),
+            ),
+          ],
+          if (showShare || showRespondButton) ...[
+            const SizedBox(height: 16),
+            _feedActions(context),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _metaLine({bool includeBudget = true}) {
     final parts = <String>[
-      shortPersonName(post.buyerName),
+      post.category.label,
       formatRelativeTime(post.createdAt),
     ];
     if (post.size != null && post.size!.trim().isNotEmpty) {
-      parts.add(post.size!.trim());
+      parts.add('Size ${post.size!.trim()}');
+    }
+    if (includeBudget) {
+      parts.add(
+        '${formatCurrency(post.budgetMin)}–${formatCurrency(post.budgetMax)}',
+      );
     }
     return parts.join(' · ');
   }
 
-  Widget _menu() {
+  Widget _menu({required bool hideShareInMenu}) {
     final items = <PopupMenuEntry<String>>[
-      if (showShare) const PopupMenuItem(value: 'share', child: Text('Share')),
+      if (showShare && !hideShareInMenu)
+        const PopupMenuItem(value: 'share', child: Text('Share')),
       if (showReport)
         const PopupMenuItem(value: 'report', child: Text('Report request')),
+      if (showOwnerActions && post.canClose)
+        const PopupMenuItem(
+          value: 'close',
+          child: Text('Mark as fulfilled'),
+        ),
       if (showOwnerActions && post.canEdit)
         const PopupMenuItem(value: 'edit', child: Text('Edit')),
       if (showOwnerActions && post.canRepost)
@@ -398,6 +350,8 @@ class LookingForCard extends StatelessWidget {
             onShare?.call();
           case 'report':
             onReport?.call();
+          case 'close':
+            onClose?.call();
           case 'edit':
             onEdit?.call();
           case 'repost':
@@ -407,6 +361,128 @@ class LookingForCard extends StatelessWidget {
         }
       },
       itemBuilder: (_) => items,
+    );
+  }
+}
+
+class _LookingForCardShell extends StatelessWidget {
+  const _LookingForCardShell({
+    required this.child,
+    this.onTap,
+    this.padding = const EdgeInsets.all(14),
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Padding(padding: padding, child: child);
+    return Material(
+      color: AppColors.surface,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: onTap == null
+          ? content
+          : InkWell(onTap: onTap, child: content),
+    );
+  }
+}
+
+class _LookingForStatusChip extends StatelessWidget {
+  const _LookingForStatusChip({
+    required this.label,
+    required this.lifecycle,
+  });
+
+  final String label;
+  final LookingForLifecycle lifecycle;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _statusColor(lifecycle);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.caption.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+          fontSize: 11,
+        ),
+      ),
+    );
+  }
+}
+
+class _LookingForInfoChips extends StatelessWidget {
+  const _LookingForInfoChips({
+    required this.post,
+    required this.showLifecycle,
+  });
+
+  final LookingForModel post;
+  final bool showLifecycle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        _pill(
+          post.category.label,
+          foreground: AppColors.textSecondary,
+          background: AppColors.surfaceVariant,
+        ),
+        _pill(
+          '${formatCurrency(post.budgetMin)} – ${formatCurrency(post.budgetMax)}',
+          foreground: AppColors.primaryDark,
+          background: AppColors.primaryLight.withValues(alpha: 0.35),
+        ),
+        if (post.size != null && post.size!.trim().isNotEmpty)
+          _pill(
+            'Size ${post.size!.trim()}',
+            foreground: AppColors.textSecondary,
+            background: AppColors.surfaceVariant,
+          ),
+        if (showLifecycle)
+          _LookingForStatusChip(
+            label: post.lifecycleLabel,
+            lifecycle: post.lifecycle,
+          ),
+      ],
+    );
+  }
+
+  Widget _pill(
+    String text, {
+    required Color foreground,
+    required Color background,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        text,
+        style: AppTypography.caption.copyWith(
+          color: foreground,
+          fontWeight: FontWeight.w600,
+          fontSize: 11,
+        ),
+      ),
     );
   }
 }

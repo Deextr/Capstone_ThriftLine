@@ -142,7 +142,10 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
   }
 
   bool _paymentInProgress(BuyerOrdersController controller) {
-    return controller.isConfirmingPayment || controller.isStartingPayment;
+    return paymentNavigationBlocked(
+      isStartingPayment: controller.isStartingPayment,
+      isConfirmingPayment: controller.isConfirmingPayment,
+    );
   }
 
   @override
@@ -251,7 +254,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
                           ? 'Payment Expired'
                           : 'Payment Failed')
                     : confirming
-                    ? 'Confirming your payment...'
+                    ? 'Checking payment...'
                     : awaiting
                     ? 'Complete payment'
                     : paid
@@ -300,6 +303,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
                     paymentDueAt: order.paymentDueAt,
                     windowOpen: order.isPaymentWindowOpen,
                     confirming: confirming,
+                    statusUnverified: controller.isPaymentStatusUnverified,
                     selectedChannel: _selectedChannel,
                     isAbandoning: controller.isAbandoning,
                     isSavingAddress: controller.isSavingAddress,
@@ -307,6 +311,15 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
                       setState(() => _selectedChannel = channel);
                     },
                     onChangeAddress: () => _changeAddress(controller),
+                    onCheckStatus: () {
+                      unawaited(
+                        _runPaymongoReturnReconciliation(
+                          returnStatus: null,
+                          fromReturnRedirect: false,
+                          forceConfirmingUi: true,
+                        ),
+                      );
+                    },
                   )
                 : paid
                 ? _PaidPaymentBody(
@@ -315,17 +328,15 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
                     onViewOrder: () =>
                         context.go(RouteNames.orderConfirmFor(widget.orderId)),
                   )
-                : Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CircularProgressIndicator(
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(height: 16),
-                        Text('Loading your order…', style: AppTypography.body),
-                      ],
-                    ),
+                : ErrorState(
+                    message: order.isAuctionObligation
+                        ? (order.isPaymentWindowOpen
+                              ? 'This payment session is no longer active. '
+                                    'Return to Bids or My Purchases to pay again.'
+                              : 'Your payment window for this auction has ended.')
+                        : (controller.errorMessage ??
+                              'This checkout is no longer available.'),
+                    onRetry: () => controller.load(),
                   ),
           ),
         ),
@@ -363,9 +374,9 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Payment in progress'),
+          title: const Text('Checking payment'),
           content: const Text(
-            'We are still confirming your payment. Please wait a moment.',
+            "We're checking your payment status. Please wait while we confirm the result.",
           ),
           actions: [
             FilledButton(
@@ -405,6 +416,7 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
     );
 
     if (!mounted || leave != true) return;
+    context.read<PaymongoReturnCoordinator>().clearCheckoutOpened();
     await _leaveCheckout(
       controller: controller,
       origin: _origin(order),
@@ -519,15 +531,18 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
   Future<void> _runPaymongoReturnReconciliation({
     required String? returnStatus,
     required bool fromReturnRedirect,
+    bool forceConfirmingUi = false,
   }) async {
     if (!mounted) return;
     final coord = context.read<PaymongoReturnCoordinator>();
     final controller = context.read<BuyerOrdersController>();
-    final result = await controller.handlePaymongoAppReturn(
-      returnStatus: returnStatus,
-      fromReturnRedirect: fromReturnRedirect,
-      hostedCheckoutOpened: coord.isAwaitingCheckout(widget.orderId),
-    );
+    final result = forceConfirmingUi
+        ? await controller.checkPaymongoPaymentStatus()
+        : await controller.handlePaymongoAppReturn(
+            returnStatus: returnStatus,
+            fromReturnRedirect: fromReturnRedirect,
+            hostedCheckoutOpened: coord.isAwaitingCheckout(widget.orderId),
+          );
     if (!mounted) return;
     if (result == PaymongoAppReturnResult.paid ||
         result == PaymongoAppReturnResult.failed) {
@@ -573,8 +588,8 @@ class _FailedPaymentBody extends StatelessWidget {
               ? 'Your payment window ended before checkout completed.\nThis listing is still available if stock remains.'
               : 'Your payment window ended before checkout completed.\nYour items are still available in your Cart, subject to current stock availability.')
         : (buyNow
-              ? 'Your payment was not completed.\nThis listing is still available if stock remains.'
-              : 'Your payment was not completed.\nYour items are still available in your Cart, subject to current stock availability.');
+              ? 'Your payment was not completed. You can try again from this listing if stock remains.'
+              : 'Your payment was not completed. You can try again or return to your cart.');
 
     return Column(
       children: [

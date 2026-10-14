@@ -7,6 +7,8 @@ import '../../../models/chat_model.dart';
 import '../../../models/enums.dart';
 import '../../../models/looking_for_model.dart';
 import '../../../models/message_model.dart';
+import '../../../models/product_model.dart';
+import '../../buyer/data/catalog_product_query.dart';
 
 class FollowedSeller {
   const FollowedSeller({
@@ -44,6 +46,9 @@ String lookingForShareBody(LookingForModel post) {
 @visibleForTesting
 String lookingForIHaveThisBody() =>
     'I have an item that matches your Looking For request.';
+
+@visibleForTesting
+String productShareMessageBody() => 'Shared a product';
 
 @visibleForTesting
 bool isMessageAttachmentPathFor({
@@ -176,6 +181,17 @@ class ConversationService {
               post_id,
               title,
               reference_image_url
+            ),
+            product:products (
+              product_id,
+              name,
+              price,
+              status,
+              images:product_images (
+                image_url,
+                is_primary,
+                display_order
+              )
             )
           ''')
           .eq('conversation_id', conversationId)
@@ -263,6 +279,7 @@ class ConversationService {
     required String content,
     MessageType type = MessageType.text,
     String? lookingForPostId,
+    String? productId,
     double? offerAmount,
     String? attachmentPath,
   }) async {
@@ -276,6 +293,7 @@ class ConversationService {
       'content': content,
       'message_type': type.dbValue,
       'looking_for_post_id': ?lookingForPostId,
+      'product_id': ?productId,
       'offer_amount': ?offerAmount,
       'attachment_path': ?attachmentPath,
     };
@@ -362,6 +380,91 @@ class ConversationService {
       );
     }
     return null;
+  }
+
+  Future<List<ProductModel>> loadSellerShareableProducts(String sellerId) async {
+    final sellerProfiles = await fetchSellerProfilesMap(
+      _supabase.client,
+      extraSellerIds: [sellerId],
+      includeApproved: false,
+    );
+    final rows = await runProductCatalogSelect((select) async {
+      return await _supabase.client
+          .from('products')
+          .select(select)
+          .eq('seller_id', sellerId)
+          .eq('status', 'active')
+          .order('created_at', ascending: false)
+          .limit(100);
+    });
+    return hydrateCatalogProducts(rows as List<dynamic>, sellerProfiles);
+  }
+
+  Future<MessageModel?> loadMessageProductPreview(String productId) async {
+    if (productId.isEmpty) return null;
+    try {
+      final row = await _supabase.client
+          .from('products')
+          .select('''
+            product_id,
+            name,
+            price,
+            status,
+            images:product_images (
+              image_url,
+              is_primary,
+              display_order
+            )
+          ''')
+          .eq('product_id', productId)
+          .maybeSingle();
+      if (row == null) return null;
+      return MessageModel.fromSupabase({
+        'message_id': '',
+        'conversation_id': '',
+        'sender_id': '',
+        'content': '',
+        'message_type': 'product',
+        'product_id': productId,
+        'product': row,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('ConversationService.loadMessageProductPreview error ($e)');
+      return null;
+    }
+  }
+
+  Future<MessageModel> sendProductShare({
+    required String conversationId,
+    required String senderId,
+    required String productId,
+  }) async {
+    final row = await _supabase.client
+        .from('messages')
+        .insert({
+          'conversation_id': conversationId,
+          'sender_id': senderId,
+          'content': productShareMessageBody(),
+          'message_type': MessageType.product.dbValue,
+          'product_id': productId,
+        })
+        .select('''
+          *,
+          product:products (
+            product_id,
+            name,
+            price,
+            status,
+            images:product_images (
+              image_url,
+              is_primary,
+              display_order
+            )
+          )
+        ''')
+        .single();
+    return MessageModel.fromSupabase(row);
   }
 
   Future<String> sendIHaveThis({
