@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/ph_phone.dart';
+import '../../../core/utils/validators.dart';
+import '../../seller/domain/seller_address_draft.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../widgets/thrift_widgets.dart';
 import 'edit_profile_email_section.dart';
@@ -177,14 +179,9 @@ class _EditProfileFormState extends State<EditProfileForm> {
                   icon: widget.isSellerMode
                       ? Icons.store_outlined
                       : Icons.person_outline,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return widget.isSellerMode
-                          ? 'Shop name is required'
-                          : 'Full name is required';
-                    }
-                    return null;
-                  },
+                  validator: widget.isSellerMode
+                      ? sellerShopNameError
+                      : Validators.name,
                 ),
                 const SizedBox(height: 16),
                 ThriftTextField(
@@ -192,15 +189,7 @@ class _EditProfileFormState extends State<EditProfileForm> {
                   hint: 'john123',
                   controller: _usernameController,
                   icon: Icons.alternate_email,
-                  validator: (value) {
-                    final trimmed = value?.trim() ?? '';
-                    if (trimmed.isEmpty) return 'Username is required';
-                    final regex = RegExp(r'^[a-zA-Z0-9]+$');
-                    if (!regex.hasMatch(trimmed)) {
-                      return 'Letters and numbers only. No spaces or special characters.';
-                    }
-                    return null;
-                  },
+                  validator: Validators.usernameAlphanumeric,
                 ),
                 const SizedBox(height: 16),
                 EditProfileEmailSection(

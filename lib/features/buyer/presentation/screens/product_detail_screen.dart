@@ -715,7 +715,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                     ),
 
                     const SizedBox(height: 12),
-                    _buildLocationShippingSummary(product, controller.isAuction),
+                    _buildLocationShippingSummary(
+                      product,
+                      controller.isAuction,
+                    ),
 
                     const SizedBox(height: 16),
 
@@ -1198,7 +1201,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                       style: AppTypography.caption,
                     ),
                   if (isAuction &&
-                      product.shippingMode == ListingShippingMode.bidThreshold &&
+                      product.shippingMode ==
+                          ListingShippingMode.bidThreshold &&
                       product.shippingFee > 0)
                     Text(
                       'Standard fee: ${formatCurrency(product.shippingFee)}',
@@ -1559,8 +1563,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () =>
-                      _addFixedPriceToCart(context, cart, product),
+                  onPressed: () => _addFixedPriceToCart(context, cart, product),
                   icon: Icon(
                     Icons.add_shopping_cart_outlined,
                     color: AppColors.textPrimary,
@@ -1650,55 +1653,72 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
           );
         }
 
-        // Seller viewing ended auction: can relist or offer to next bidder
-        return Row(
+        // Seller viewing ended auction: relist only when payment window resolved.
+        final relistHint = controller.auctionRelistBlockedMessage;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (controller.canOfferToNextBidder) ...[
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _sellerOfferNextBidder(context, controller),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    side: const BorderSide(
-                      color: AppColors.primary,
-                      width: 1.5,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    'Offer Next Bidder',
-                    style: AppTypography.body.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                      fontSize: 15,
-                    ),
-                  ),
+            if (relistHint != null && !controller.canRelistAuctionListing) ...[
+              Text(
+                relistHint,
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(height: 12),
             ],
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () => _sellerRelist(context, controller),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            Row(
+              children: [
+                if (controller.canOfferToNextBidder) ...[
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () =>
+                          _sellerOfferNextBidder(context, controller),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        side: const BorderSide(
+                          color: AppColors.primary,
+                          width: 1.5,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Offer Next Bidder',
+                        style: AppTypography.body.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                child: Text(
-                  'Relist Auction',
-                  style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                    fontSize: 15,
+                  const SizedBox(width: 12),
+                ],
+                if (controller.canRelistAuctionListing)
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _sellerRelist(context, controller),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Relist Auction',
+                        style: AppTypography.body.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
+              ],
             ),
           ],
         );
@@ -1970,9 +1990,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
       );
       return;
     }
-    context.push(
-      RouteNames.checkoutFor(productId: product.id, buyNow: true),
-    );
+    context.push(RouteNames.checkoutFor(productId: product.id, buyNow: true));
   }
 }
 

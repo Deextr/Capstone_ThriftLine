@@ -10,6 +10,26 @@ enum AuctionRelistBlockReason {
   eligible,
 }
 
+bool winnerPaymentWindowBlocksRelist(ListingSnapshot listing) {
+  final winner = listing.winnerId != null && listing.winnerId!.isNotEmpty;
+  if (!winner) return false;
+  if (listing.productStatus == 'sold' || listing.paymentStatus == 'paid') {
+    return false;
+  }
+  if (listing.orderStatus == 'paid') return false;
+  if (listing.orderStatus == 'cancelled') return false;
+
+  if (listing.orderStatus == 'pending' && listing.paymentStatus != 'paid') {
+    if (listing.paymentDueAt == null) return true;
+    return listing.paymentDueAt!.isAfter(listing.now);
+  }
+
+  // Winner recorded but checkout state not yet loaded — do not allow relist.
+  if (listing.auctionStatus == 'ended') return true;
+
+  return false;
+}
+
 AuctionRelistBlockReason auctionRelistBlockReason(ListingSnapshot listing) {
   if (listing.listingType != 'auction') {
     return AuctionRelistBlockReason.notAuction;
@@ -29,17 +49,14 @@ AuctionRelistBlockReason auctionRelistBlockReason(ListingSnapshot listing) {
     return AuctionRelistBlockReason.stillActive;
   }
 
-  final winner = listing.winnerId != null && listing.winnerId!.isNotEmpty;
-  final unpaid =
-      listing.orderStatus == 'pending' && listing.paymentStatus != 'paid';
-  final windowOpen =
-      listing.paymentDueAt != null &&
-      listing.paymentDueAt!.isAfter(listing.now);
-  if (listing.auctionStatus == 'ended' && winner && unpaid && windowOpen) {
+  if (winnerPaymentWindowBlocksRelist(listing)) {
     return AuctionRelistBlockReason.awaitingPayment;
   }
 
   if (listing.auctionStatus == 'active' && pastEnd) {
+    if (listing.bidCount > 0) {
+      return AuctionRelistBlockReason.finalizationPending;
+    }
     return AuctionRelistBlockReason.eligible;
   }
 

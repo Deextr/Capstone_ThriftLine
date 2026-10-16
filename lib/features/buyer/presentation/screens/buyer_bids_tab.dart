@@ -61,10 +61,7 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
     }
     setState(() => _preparingCheckoutAuctionId = auctionId);
     try {
-      final prepared = await bidsCtrl.prepareWonAuctionCheckout(
-        auctionId,
-        knownOrderId: bid.auctionOrderId,
-      );
+      final prepared = await bidsCtrl.prepareWonAuctionCheckout(auctionId);
       if (!context.mounted) return;
       final orderId = prepared.orderId;
       if (!prepared.success || orderId == null || orderId.isEmpty) {

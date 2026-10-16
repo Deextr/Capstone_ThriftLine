@@ -102,6 +102,12 @@ class BuyerSearchController extends ChangeNotifier {
   }
 
   void applyFilters(BuyerSearchFilters filters) {
+    if (!filters.isPriceRangeValid) {
+      _errorMessage = BuyerSearchFilters.priceRangeInvalidMessage;
+      notifyListeners();
+      return;
+    }
+    _errorMessage = null;
     _filters = filters;
     unawaited(search(query: _lastQuery, reset: true));
   }
@@ -140,6 +146,19 @@ class BuyerSearchController extends ChangeNotifier {
       _errorMessage = null;
       _hasMore = false;
       _offset = 0;
+      notifyListeners();
+      return;
+    }
+
+    if (!_filters.isPriceRangeValid) {
+      _errorMessage = BuyerSearchFilters.priceRangeInvalidMessage;
+      if (reset) {
+        _results = [];
+        _hasMore = false;
+        _offset = 0;
+      }
+      _loading = false;
+      _loadingMore = false;
       notifyListeners();
       return;
     }

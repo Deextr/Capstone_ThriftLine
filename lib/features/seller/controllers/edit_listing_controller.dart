@@ -9,6 +9,8 @@ import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/enums.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../widgets/thrift_widgets.dart';
+import '../domain/product_image_storage.dart';
+import '../domain/product_listing_validation.dart';
 import 'add_listing_controller.dart'
     show
         CategoryItem,
@@ -122,6 +124,7 @@ class EditListingController extends ChangeNotifier {
 
   // â”€â”€ IDs to delete from product_images on save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   final List<String> _removedImageIds = [];
+  final List<String> _removedImageUrls = [];
 
   // â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -442,6 +445,7 @@ class EditListingController extends ChangeNotifier {
     final old = slotIndex < slots.length ? slots[slotIndex] : null;
     if (old is ExistingSlot) {
       _removedImageIds.add(old.image.imageId);
+      _removedImageUrls.add(old.image.imageUrl);
     }
     if (slotIndex < slots.length) {
       slots = [...slots]..[slotIndex] = newSlot;
@@ -456,6 +460,7 @@ class EditListingController extends ChangeNotifier {
     final slot = slots[slotIndex];
     if (slot is ExistingSlot) {
       _removedImageIds.add(slot.image.imageId);
+      _removedImageUrls.add(slot.image.imageUrl);
     }
     slots = [...slots]..removeAt(slotIndex);
     notifyListeners();
@@ -486,12 +491,9 @@ class EditListingController extends ChangeNotifier {
       fieldErrors['name'] = 'Name must be 100 characters or fewer.';
     }
 
-    final desc = descCtrl.text.trim();
-    if (desc.isEmpty) {
-      fieldErrors['description'] = 'Description is required.';
-    } else if (desc.length > 150) {
-      fieldErrors['description'] =
-          'Description must be 150 characters or fewer.';
+    final descriptionError = productDescriptionError(descCtrl.text);
+    if (descriptionError != null) {
+      fieldErrors['description'] = descriptionError;
     }
 
     if (selectedCategoryId == null) {
@@ -680,13 +682,23 @@ class EditListingController extends ChangeNotifier {
         }
       }
 
-      // 2. Delete removed images from product_images table
+      // 2. Delete removed images from Storage, then product_images
       if (_removedImageIds.isNotEmpty) {
+        final paths = productImageStoragePathsForSeller(
+          imageUrls: _removedImageUrls,
+          sellerId: sellerId,
+        );
+        if (paths.isNotEmpty) {
+          await _supabase.client.storage
+              .from(productImagesBucket)
+              .remove(paths);
+        }
         await _supabase.client
             .from('product_images')
             .delete()
             .inFilter('image_id', _removedImageIds);
         _removedImageIds.clear();
+        _removedImageUrls.clear();
       }
 
       // 3. Upload new images and insert rows
@@ -705,14 +717,14 @@ class EditListingController extends ChangeNotifier {
 
         final path = '$sellerId/$productId/edit_$idx.jpg';
         await _supabase.client.storage
-            .from('product-images')
+            .from(productImagesBucket)
             .uploadBinary(
               path,
               slot.image.bytes,
               fileOptions: FileOptions(contentType: 'image/jpeg'),
             );
         final url = _supabase.client.storage
-            .from('product-images')
+            .from(productImagesBucket)
             .getPublicUrl(path);
 
         await _supabase.client.from('product_images').insert({

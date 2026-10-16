@@ -142,7 +142,16 @@ void main() {
           allowedBarangays: [agdao],
           addressLine1: '123 Street',
         ),
-        'Please enter a store name.',
+        sellerShopNameRequiredMessage,
+      );
+      expect(
+        SellerAddressDraft.validate(
+          storeName: 'AB',
+          barangay: agdao,
+          allowedBarangays: [agdao],
+          addressLine1: '123 Street',
+        ),
+        sellerShopNameTooShortMessage,
       );
       expect(
         SellerAddressDraft.validate(
@@ -160,7 +169,16 @@ void main() {
           allowedBarangays: [agdao],
           addressLine1: '  ',
         ),
-        'Please enter Address Line 1.',
+        sellerShopAddressRequiredMessage,
+      );
+      expect(
+        SellerAddressDraft.validate(
+          storeName: 'Shop',
+          barangay: agdao,
+          allowedBarangays: [agdao],
+          addressLine1: 'AB',
+        ),
+        sellerShopAddressTooShortMessage,
       );
       expect(
         SellerAddressDraft.validate(

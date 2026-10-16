@@ -52,6 +52,7 @@ class _BuyerSearchFilterSheetState extends State<BuyerSearchFilterSheet> {
   late BuyerSearchSort _sort;
   late TextEditingController _minPrice;
   late TextEditingController _maxPrice;
+  String? _priceRangeError;
 
   @override
   void initState() {
@@ -71,10 +72,19 @@ class _BuyerSearchFilterSheetState extends State<BuyerSearchFilterSheet> {
     _maxPrice = TextEditingController(
       text: widget.initial.maxPrice?.toStringAsFixed(0) ?? '',
     );
+    _minPrice.addListener(_clearPriceRangeError);
+    _maxPrice.addListener(_clearPriceRangeError);
+  }
+
+  void _clearPriceRangeError() {
+    if (_priceRangeError == null) return;
+    setState(() => _priceRangeError = null);
   }
 
   @override
   void dispose() {
+    _minPrice.removeListener(_clearPriceRangeError);
+    _maxPrice.removeListener(_clearPriceRangeError);
     _minPrice.dispose();
     _maxPrice.dispose();
     super.dispose();
@@ -238,6 +248,16 @@ class _BuyerSearchFilterSheetState extends State<BuyerSearchFilterSheet> {
                         ),
                       ],
                     ),
+                    if (_priceRangeError != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _priceRangeError!,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     _SectionTitle('Condition'),
                     Wrap(
@@ -284,7 +304,15 @@ class _BuyerSearchFilterSheetState extends State<BuyerSearchFilterSheet> {
                   height: 50,
                   child: ElevatedButton(
                     onPressed: () {
-                      widget.onApply(_buildFilters());
+                      final filters = _buildFilters();
+                      if (!filters.isPriceRangeValid) {
+                        setState(
+                          () => _priceRangeError =
+                              BuyerSearchFilters.priceRangeInvalidMessage,
+                        );
+                        return;
+                      }
+                      widget.onApply(filters);
                       Navigator.pop(context);
                     },
                     style: ElevatedButton.styleFrom(

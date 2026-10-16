@@ -14,6 +14,7 @@ import '../../../../core/utils/supabase_rpc.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../data/listing_bucket.dart';
+import '../../data/seller_listing_delete_service.dart';
 import '../../data/seller_listings_refresh.dart';
 import '../widgets/end_auction_dialog.dart';
 
@@ -563,10 +564,7 @@ class _ListingCard extends StatelessWidget {
 
             if (_hasMenu)
               PopupMenuButton<String>(
-                icon: Icon(
-                  Icons.more_vert,
-                  color: AppColors.textSecondary,
-                ),
+                icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
                 onSelected: (value) => _onMenuAction(context, value),
                 itemBuilder: (_) {
                   final snapshot = item.snapshotAt(DateTime.now());
@@ -1027,6 +1025,16 @@ class _ListingCard extends StatelessWidget {
     }
 
     if (action == 'relist') {
+      final snapshot = item.snapshotAt(DateTime.now());
+      if (!canRelistAuction(snapshot)) {
+        showThriftSnackBar(
+          context,
+          auctionRelistHint(snapshot) ?? 'Could not relist this auction.',
+          isError: true,
+        );
+        return;
+      }
+
       final startPriceCtrl = TextEditingController(
         text: item.price.toStringAsFixed(0),
       );
@@ -1190,21 +1198,17 @@ class _ListingCard extends StatelessWidget {
       );
 
       if (confirmed == true && context.mounted) {
-        try {
-          final supabase = context.read<SupabaseService>();
-          await supabase.client
-              .from('products')
-              .update({'status': 'removed'})
-              .eq('product_id', item.productId);
-          if (context.mounted) {
-            showThriftSnackBar(context, 'Listing deleted');
-            await onChanged();
-          }
-        } catch (e) {
-          if (context.mounted) {
-            showThriftSnackBar(context, 'Failed to delete: $e', isError: true);
-          }
+        final supabase = context.read<SupabaseService>();
+        final error = await SellerListingDeleteService(
+          supabase,
+        ).deleteOwnListing(item.productId);
+        if (!context.mounted) return;
+        if (error != null) {
+          showThriftSnackBar(context, error, isError: true);
+          return;
         }
+        showThriftSnackBar(context, 'Listing deleted');
+        await onChanged();
       }
     }
   }

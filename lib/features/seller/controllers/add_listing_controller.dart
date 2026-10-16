@@ -11,6 +11,8 @@ import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../data/listing_limit.dart';
 import '../data/seller_listings_refresh.dart';
+import '../domain/product_image_storage.dart';
+import '../domain/product_listing_validation.dart';
 import '../../../core/utils/listing_shipping.dart';
 import '../../../models/enums.dart';
 import '../../../providers/auth_provider.dart';
@@ -650,13 +652,9 @@ class AddListingController extends ChangeNotifier {
       fieldErrors['name'] = 'Name must be 100 characters or fewer.';
     }
 
-    // Description
-    final desc = descCtrl.text.trim();
-    if (desc.isEmpty) {
-      fieldErrors['description'] = 'Description is required.';
-    } else if (desc.length > 150) {
-      fieldErrors['description'] =
-          'Description must be 150 characters or fewer.';
+    final descriptionError = productDescriptionError(descCtrl.text);
+    if (descriptionError != null) {
+      fieldErrors['description'] = descriptionError;
     }
 
     // Category
@@ -788,7 +786,7 @@ class AddListingController extends ChangeNotifier {
 
       final path = '$sellerId/$productId/$i.jpg';
       await _supabase.client.storage
-          .from('product-images')
+          .from(productImagesBucket)
           .uploadBinary(
             path,
             images[i].bytes,
@@ -796,7 +794,7 @@ class AddListingController extends ChangeNotifier {
           );
 
       final url = _supabase.client.storage
-          .from('product-images')
+          .from(productImagesBucket)
           .getPublicUrl(path);
       urls.add(url);
     }
@@ -823,7 +821,7 @@ class AddListingController extends ChangeNotifier {
       for (var i = 0; i < uploadedCount; i++) '$sellerId/$productId/$i.jpg',
     ];
     try {
-      await _supabase.client.storage.from('product-images').remove(paths);
+      await _supabase.client.storage.from(productImagesBucket).remove(paths);
     } catch (_) {
       // Best-effort â€” ignore any errors during cleanup.
     }

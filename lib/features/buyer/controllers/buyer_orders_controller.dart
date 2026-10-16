@@ -17,6 +17,7 @@ import '../../../providers/auth_provider.dart';
 import '../../profile/data/address_service.dart';
 import '../../trust_safety/data/report_query.dart';
 import '../../trust_safety/data/review_query.dart';
+import '../data/auction_checkout_order.dart';
 import '../data/checkout_payment_group.dart';
 import '../data/order_query.dart';
 import '../data/paymongo_checkout.dart';
@@ -117,6 +118,35 @@ class BuyerOrdersController extends ChangeNotifier {
         : (_order == null ? const <OrderModel>[] : [_order!]),
   );
 
+  Future<void> _healAuctionCheckoutOrderIfNeeded() async {
+    final current = _order;
+    final auctionId = current?.auctionId?.trim();
+    if (current == null ||
+        auctionId == null ||
+        auctionId.isEmpty ||
+        !current.isAuctionObligation ||
+        !current.needsBuyerPayment) {
+      return;
+    }
+    final missingLineItems = current.items.isEmpty;
+    final missingTotals = current.amount <= 0 || current.total <= 0;
+    if (!missingLineItems && !missingTotals) return;
+
+    final healed = await ensureMyAuctionOrder(_supabase, auctionId);
+    if (!healed.success || healed.orderId == null) return;
+
+    final myId = _auth.user?.id;
+    if (myId == null) return;
+    final refetched = await fetchOrderById(
+      _supabase,
+      healed.orderId!,
+      buyerId: myId,
+    );
+    if (refetched != null) {
+      _order = refetched;
+    }
+  }
+
   Future<void> load({bool showSpinner = true}) async {
     final myId = _auth.user?.id;
     final generation = ++_loadGeneration;
@@ -150,6 +180,10 @@ class BuyerOrdersController extends ChangeNotifier {
         );
         if (generation != _loadGeneration) return;
         _order = fetched;
+        if (_order != null) {
+          await _healAuctionCheckoutOrderIfNeeded();
+          if (generation != _loadGeneration) return;
+        }
         if (_order != null && _order!.needsBuyerPayment) {
           if (_skipPaymentReconcileOnce) {
             _skipPaymentReconcileOnce = false;
