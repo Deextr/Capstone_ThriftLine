@@ -201,9 +201,12 @@ class ProductModel {
       location: row['location'] as String?,
       showItemLocation: row['show_item_location'] as bool? ?? false,
       shippingMode: ListingShippingMode.fromDb(
-        row['shipping_mode'] as String?,
+        _shippingModeDbValue(row['shipping_mode']),
       ),
-      shippingFee: (row['shipping_fee'] as num?)?.toDouble() ?? 80,
+      shippingFee: _parseListingShippingFee(
+        row['shipping_fee'],
+        _shippingModeDbValue(row['shipping_mode']),
+      ),
       freeShippingQtyThreshold:
           (row['free_shipping_qty_threshold'] as num?)?.toInt(),
       freeShippingBidThreshold:
@@ -362,4 +365,19 @@ class ProductModel {
     distanceKm: distanceKm ?? this.distanceKm,
     likesCount: likesCount ?? this.likesCount,
   );
+}
+
+String? _shippingModeDbValue(Object? raw) {
+  if (raw == null) return null;
+  if (raw is String) return raw;
+  return raw.toString();
+}
+
+double _parseListingShippingFee(Object? rawFee, String? shippingModeRaw) {
+  final parsed = (rawFee as num?)?.toDouble();
+  if (parsed != null) return parsed < 0 ? 0 : parsed;
+  if (ListingShippingMode.fromDb(shippingModeRaw) == ListingShippingMode.free) {
+    return 0;
+  }
+  return 80;
 }

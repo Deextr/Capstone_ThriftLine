@@ -71,7 +71,7 @@ double calculateShopFixedShippingPreview(List<CartShippingLine> lines) {
   if (allFree) return 0;
   if (minThreshold != null && totalQty >= minThreshold) return 0;
   if (hasPaid) return maxFee;
-  return 80;
+  return 0;
 }
 
 double previewAuctionShipping({
