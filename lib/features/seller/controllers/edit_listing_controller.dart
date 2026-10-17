@@ -9,6 +9,8 @@ import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/enums.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../widgets/thrift_widgets.dart';
+import '../domain/product_image_storage.dart';
+import '../domain/product_listing_validation.dart';
 import 'add_listing_controller.dart'
     show
         CategoryItem,
@@ -89,9 +91,15 @@ class EditListingController extends ChangeNotifier {
   final TextEditingController sizeCtrl = TextEditingController();
   final TextEditingController colorCtrl = TextEditingController();
   final TextEditingController stockCtrl = TextEditingController(text: '1');
-  final TextEditingController shippingFeeCtrl = TextEditingController(text: '80');
-  final TextEditingController qtyThresholdCtrl = TextEditingController(text: '3');
-  final TextEditingController bidThresholdCtrl = TextEditingController(text: '500');
+  final TextEditingController shippingFeeCtrl = TextEditingController(
+    text: '80',
+  );
+  final TextEditingController qtyThresholdCtrl = TextEditingController(
+    text: '3',
+  );
+  final TextEditingController bidThresholdCtrl = TextEditingController(
+    text: '500',
+  );
 
   bool showItemLocation = false;
   ListingShippingMode shippingMode = ListingShippingMode.fixedFee;
@@ -122,6 +130,7 @@ class EditListingController extends ChangeNotifier {
 
   // â”€â”€ IDs to delete from product_images on save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   final List<String> _removedImageIds = [];
+  final List<String> _removedImageUrls = [];
 
   // â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -158,6 +167,14 @@ class EditListingController extends ChangeNotifier {
   }
 
   Future<void> _loadProduct() async {
+    final sellerId = _auth.user?.id;
+    if (sellerId == null) {
+      loadError = 'Sign in to edit this listing.';
+      initialLoading = false;
+      notifyListeners();
+      return;
+    }
+
     try {
       final row = await _supabase.client
           .from('products')
@@ -170,7 +187,15 @@ class EditListingController extends ChangeNotifier {
             'product_images(image_id, image_url, is_primary, display_order)',
           )
           .eq('product_id', productId)
-          .single();
+          .eq('seller_id', sellerId)
+          .maybeSingle();
+
+      if (row == null) {
+        loadError = 'This listing was not found or you cannot edit it.';
+        initialLoading = false;
+        notifyListeners();
+        return;
+      }
 
       // Text fields
       nameCtrl.text = row['name'] as String? ?? row['title'] as String? ?? '';
@@ -179,9 +204,11 @@ class EditListingController extends ChangeNotifier {
       sizeCtrl.text = row['size'] as String? ?? '';
       colorCtrl.text = row['color'] as String? ?? '';
       showItemLocation = row['show_item_location'] as bool? ?? false;
-      shippingMode = ListingShippingMode.fromDb(row['shipping_mode'] as String?);
-      shippingFeeCtrl.text =
-          ((row['shipping_fee'] as num?)?.toDouble() ?? 80).toString();
+      shippingMode = ListingShippingMode.fromDb(
+        row['shipping_mode'] as String?,
+      );
+      shippingFeeCtrl.text = ((row['shipping_fee'] as num?)?.toDouble() ?? 80)
+          .toString();
       final qtyTh = (row['free_shipping_qty_threshold'] as num?)?.toInt();
       if (qtyTh != null) qtyThresholdCtrl.text = qtyTh.toString();
       final bidTh = (row['free_shipping_bid_threshold'] as num?)?.toDouble();
@@ -240,9 +267,11 @@ class EditListingController extends ChangeNotifier {
 
             final status = auctionRow['status'] as String? ?? 'active';
             final endsAtStr = auctionRow['ends_at'] as String?;
-            auctionEndsAt =
-                endsAtStr != null ? DateTime.tryParse(endsAtStr) : null;
-            final isLive = status == 'active' &&
+            auctionEndsAt = endsAtStr != null
+                ? DateTime.tryParse(endsAtStr)
+                : null;
+            final isLive =
+                status == 'active' &&
                 (auctionEndsAt == null ||
                     auctionEndsAt!.isAfter(DateTime.now()));
             isAuctionActive = isLive;
@@ -255,8 +284,8 @@ class EditListingController extends ChangeNotifier {
             shippingConfigLocked = hasBids;
             coreBiddingLocked = hasBids;
 
-            final startPrice =
-                (auctionRow['starting_price'] as num?)?.toDouble();
+            final startPrice = (auctionRow['starting_price'] as num?)
+                ?.toDouble();
             if (startPrice != null && startPrice > 0) {
               originalStartingPrice = startPrice;
               startBidCtrl.text = startPrice.toString();
@@ -306,7 +335,7 @@ class EditListingController extends ChangeNotifier {
       initialLoading = false;
       notifyListeners();
     } catch (e) {
-      loadError = 'Failed to load listing: $e';
+      loadError = 'Unable to load this listing. Please try again.';
       initialLoading = false;
       notifyListeners();
     }
@@ -442,6 +471,7 @@ class EditListingController extends ChangeNotifier {
     final old = slotIndex < slots.length ? slots[slotIndex] : null;
     if (old is ExistingSlot) {
       _removedImageIds.add(old.image.imageId);
+      _removedImageUrls.add(old.image.imageUrl);
     }
     if (slotIndex < slots.length) {
       slots = [...slots]..[slotIndex] = newSlot;
@@ -456,6 +486,7 @@ class EditListingController extends ChangeNotifier {
     final slot = slots[slotIndex];
     if (slot is ExistingSlot) {
       _removedImageIds.add(slot.image.imageId);
+      _removedImageUrls.add(slot.image.imageUrl);
     }
     slots = [...slots]..removeAt(slotIndex);
     notifyListeners();
@@ -486,12 +517,9 @@ class EditListingController extends ChangeNotifier {
       fieldErrors['name'] = 'Name must be 100 characters or fewer.';
     }
 
-    final desc = descCtrl.text.trim();
-    if (desc.isEmpty) {
-      fieldErrors['description'] = 'Description is required.';
-    } else if (desc.length > 150) {
-      fieldErrors['description'] =
-          'Description must be 150 characters or fewer.';
+    final descriptionError = productDescriptionError(descCtrl.text);
+    if (descriptionError != null) {
+      fieldErrors['description'] = descriptionError;
     }
 
     if (selectedCategoryId == null) {
@@ -613,14 +641,15 @@ class EditListingController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final formatToSave =
-          formatLocked ? ListingFormat.auction : selectedFormat;
+      final formatToSave = formatLocked
+          ? ListingFormat.auction
+          : selectedFormat;
 
       // 1. Update products row
       final priceValue = formatToSave == ListingFormat.auction
           ? (coreBiddingLocked
-              ? originalStartingPrice
-              : (double.tryParse(startBidCtrl.text) ?? originalStartingPrice))
+                ? originalStartingPrice
+                : (double.tryParse(startBidCtrl.text) ?? originalStartingPrice))
           : double.parse(priceCtrl.text);
 
       await _supabase.client
@@ -656,7 +685,8 @@ class EditListingController extends ChangeNotifier {
               'free_shipping_bid_threshold': _resolvedBidThreshold(),
             },
           })
-          .eq('product_id', productId);
+          .eq('product_id', productId)
+          .eq('seller_id', sellerId);
 
       // 1b. Auction params go through ensure_product_auction (no client writes).
       // When core bidding is locked (active bidding with bids), skip modifying auction parameters.
@@ -680,13 +710,23 @@ class EditListingController extends ChangeNotifier {
         }
       }
 
-      // 2. Delete removed images from product_images table
+      // 2. Delete removed images from Storage, then product_images
       if (_removedImageIds.isNotEmpty) {
+        final paths = productImageStoragePathsForSeller(
+          imageUrls: _removedImageUrls,
+          sellerId: sellerId,
+        );
+        if (paths.isNotEmpty) {
+          await _supabase.client.storage
+              .from(productImagesBucket)
+              .remove(paths);
+        }
         await _supabase.client
             .from('product_images')
             .delete()
             .inFilter('image_id', _removedImageIds);
         _removedImageIds.clear();
+        _removedImageUrls.clear();
       }
 
       // 3. Upload new images and insert rows
@@ -705,14 +745,14 @@ class EditListingController extends ChangeNotifier {
 
         final path = '$sellerId/$productId/edit_$idx.jpg';
         await _supabase.client.storage
-            .from('product-images')
+            .from(productImagesBucket)
             .uploadBinary(
               path,
               slot.image.bytes,
               fileOptions: FileOptions(contentType: 'image/jpeg'),
             );
         final url = _supabase.client.storage
-            .from('product-images')
+            .from(productImagesBucket)
             .getPublicUrl(path);
 
         await _supabase.client.from('product_images').insert({

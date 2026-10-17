@@ -9,6 +9,7 @@ import '../../../../models/enums.dart';
 import '../../../../models/looking_for_model.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/looking_for_controller.dart';
+import '../../domain/looking_for_lifecycle.dart';
 
 /// Owns its [TextEditingController]s so Android back / dismiss cannot dispose
 /// them while the sheet widgets are still mounted.
@@ -49,6 +50,7 @@ class CreateLookingForSheet extends StatefulWidget {
 }
 
 class _CreateLookingForSheetState extends State<CreateLookingForSheet> {
+  final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _sizeCtrl = TextEditingController();
@@ -125,6 +127,7 @@ class _CreateLookingForSheetState extends State<CreateLookingForSheet> {
 
   Future<void> _submit() async {
     if (_submitting) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _submitting = true);
     final error = _isRepost
         ? await widget.controller.repostPost(
@@ -232,139 +235,147 @@ class _CreateLookingForSheetState extends State<CreateLookingForSheet> {
             ),
             const Divider(),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  Material(
-                    color: AppColors.background,
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      onTap: _submitting ? null : _pickImage,
+              child: Form(
+                key: _formKey,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                child: ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    Material(
+                      color: AppColors.background,
                       borderRadius: BorderRadius.circular(12),
-                      child: Ink(
-                        height: 140,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.border),
-                          image: _previewImage,
-                        ),
-                        child: !_hasPreview
-                            ? Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.add_photo_alternate_outlined,
-                                    size: 40,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Add Reference Image (Optional)',
-                                    style: AppTypography.caption,
-                                  ),
-                                ],
-                              )
-                            : Align(
-                                alignment: Alignment.topRight,
-                                child: IconButton(
-                                  onPressed: _submitting
-                                      ? null
-                                      : () => setState(() {
-                                          _imageBytes = null;
-                                          _clearedImage = true;
-                                        }),
-                                  icon: const Icon(
-                                    Icons.close,
-                                    color: Colors.white,
-                                  ),
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: Colors.black54,
+                      child: InkWell(
+                        onTap: _submitting ? null : _pickImage,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Ink(
+                          height: 140,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.border),
+                            image: _previewImage,
+                          ),
+                          child: !_hasPreview
+                              ? Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.add_photo_alternate_outlined,
+                                      size: 40,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Add Reference Image (Optional)',
+                                      style: AppTypography.caption,
+                                    ),
+                                  ],
+                                )
+                              : Align(
+                                  alignment: Alignment.topRight,
+                                  child: IconButton(
+                                    onPressed: _submitting
+                                        ? null
+                                        : () => setState(() {
+                                            _imageBytes = null;
+                                            _clearedImage = true;
+                                          }),
+                                    icon: const Icon(
+                                      Icons.close,
+                                      color: Colors.white,
+                                    ),
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: Colors.black54,
+                                    ),
                                   ),
                                 ),
-                              ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  ThriftTextField(
-                    label: 'What are you looking for?',
-                    controller: _nameCtrl,
-                    hint: 'e.g. Vintage Levi\'s 501',
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<ProductCategory>(
-                    // ignore: deprecated_member_use
-                    value: _category,
-                    decoration: const InputDecoration(
-                      labelText: 'Category',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                    items: ProductCategory.values
-                        .map(
-                          (c) =>
-                              DropdownMenuItem(value: c, child: Text(c.label)),
-                        )
-                        .toList(),
-                    onChanged: (v) {
-                      if (v != null) setState(() => _category = v);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  ThriftTextField(
-                    label: 'Description',
-                    controller: _descCtrl,
-                    maxLines: 4,
-                    hint:
-                        'Describe the specific details, colors, or condition you want...',
-                  ),
-                  const SizedBox(height: 16),
-                  ThriftTextField(
-                    label: 'Preferred Size',
-                    controller: _sizeCtrl,
-                    hint: 'e.g. M, 32, One Size',
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ThriftTextField(
-                          label: 'Budget Min (₱)',
-                          controller: _minCtrl,
-                          keyboardType: TextInputType.number,
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ThriftTextField(
-                          label: 'Budget Max (₱)',
-                          controller: _maxCtrl,
-                          keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 24),
+                    ThriftTextField(
+                      label: 'What are you looking for?',
+                      controller: _nameCtrl,
+                      hint: 'e.g. Vintage Levi\'s 501',
+                      maxLength: lookingForRequestTitleMaxLength,
+                      validator: lookingForRequestTitleError,
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<ProductCategory>(
+                      // ignore: deprecated_member_use
+                      value: _category,
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 40),
-                  ThriftButton(
-                    label: _submitting
-                        ? (_isRepost
-                              ? 'Posting again…'
-                              : _isEditing
-                              ? 'Saving…'
-                              : 'Posting…')
-                        : (_isRepost
-                              ? 'Post again'
-                              : _isEditing
-                              ? 'Save Changes'
-                              : 'Post Request'),
-                    onPressed: _submitting ? null : _submit,
-                  ),
-                  const SizedBox(height: 20),
-                ],
+                      items: ProductCategory.values
+                          .map(
+                            (c) => DropdownMenuItem(
+                              value: c,
+                              child: Text(c.label),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) setState(() => _category = v);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    ThriftTextField(
+                      label: 'Description',
+                      controller: _descCtrl,
+                      maxLines: 4,
+                      hint:
+                          'Describe the specific details, colors, or condition you want...',
+                    ),
+                    const SizedBox(height: 16),
+                    ThriftTextField(
+                      label: 'Preferred Size',
+                      controller: _sizeCtrl,
+                      hint: 'e.g. M, 32, One Size',
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ThriftTextField(
+                            label: 'Budget Min (₱)',
+                            controller: _minCtrl,
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ThriftTextField(
+                            label: 'Budget Max (₱)',
+                            controller: _maxCtrl,
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 40),
+                    ThriftButton(
+                      label: _submitting
+                          ? (_isRepost
+                                ? 'Posting again…'
+                                : _isEditing
+                                ? 'Saving…'
+                                : 'Posting…')
+                          : (_isRepost
+                                ? 'Post again'
+                                : _isEditing
+                                ? 'Save Changes'
+                                : 'Post Request'),
+                      onPressed: _submitting ? null : _submit,
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
             ),
           ],

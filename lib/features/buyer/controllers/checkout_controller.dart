@@ -10,6 +10,7 @@ import '../../../models/order_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/cart_provider.dart';
 import '../../profile/data/address_service.dart';
+import '../data/checkout_address_validation.dart';
 import '../data/order_query.dart';
 import '../data/paymongo_checkout.dart';
 
@@ -45,6 +46,7 @@ class CheckoutController extends ChangeNotifier {
   List<AddressModel> _addressBook = [];
   AddressModel? _selectedAddress;
   List<OrderModel> _awaitingPayment = [];
+  List<OrderModel> _pendingFixedPriceCheckouts = [];
   final Set<String> _selectedProductIds = {};
   bool _isLoading = true;
   bool _isSubmitting = false;
@@ -55,15 +57,12 @@ class CheckoutController extends ChangeNotifier {
   List<AddressModel> get addressBook => _addressBook;
   AddressModel? get selectedAddress => _selectedAddress;
   List<OrderModel> get awaitingPayment => _awaitingPayment;
+  List<OrderModel> get pendingFixedPriceCheckouts => _pendingFixedPriceCheckouts;
   bool get isLoading => _isLoading;
   bool get isSubmitting => _isSubmitting;
   bool get isContinuingToPayment => _isContinuingToPayment;
   bool get isCancellingCheckout => _isCancellingCheckout;
   String? get errorMessage => _errorMessage;
-  bool get hasAddress => _selectedAddress != null;
-
-  bool get hasValidDeliveryPhone =>
-      _selectedAddress?.hasValidPhoneContact ?? false;
   Set<String> get selectedProductIds => Set.unmodifiable(_selectedProductIds);
 
   String? get scopedProductId {
@@ -248,14 +247,19 @@ class CheckoutController extends ChangeNotifier {
     final buyerId = _auth.user?.id;
     if (buyerId == null) {
       _awaitingPayment = [];
+      _pendingFixedPriceCheckouts = [];
       return;
     }
     try {
       final orders = await fetchOrdersForBuyer(_supabase, buyerId);
       _awaitingPayment = buyerAwaitingPayment(orders);
+      _pendingFixedPriceCheckouts = orders
+          .where((order) => order.needsBuyerPayment && !order.isAuctionObligation)
+          .toList();
     } catch (e) {
       debugPrint('CheckoutController awaiting payment error: $e');
       _awaitingPayment = [];
+      _pendingFixedPriceCheckouts = [];
     }
   }
 
@@ -420,7 +424,12 @@ class CheckoutController extends ChangeNotifier {
         }
       }
 
-      final params = <String, dynamic>{'p_address_id': address?.id};
+      final params = <String, dynamic>{
+        'p_address_id':
+            address != null && checkoutDeliveryAddressError(address) == null
+            ? address.id
+            : null,
+      };
       final ids = currentSelected.map((item) => item.product.id).toList();
       final multiShop = groupCartItemsByShop(currentSelected).length > 1;
       if (ids.length > 1 || multiShop) {
@@ -433,6 +442,16 @@ class CheckoutController extends ChangeNotifier {
           : 'checkout_cart';
       final rpcRes = await _supabase.client.rpc(rpcName, params: params);
       if (!supabaseRpcSuccess(rpcRes)) {
+        final map = supabaseRpcMap(rpcRes);
+        if (map?['code'] == 'existing_unpaid_checkout') {
+          final existingId = map?['order_id']?.toString();
+          final error = existingId != null && existingId.isNotEmpty
+              ? '${map?['error'] ?? 'You already have an unpaid checkout for this item.'} Open your pending payment to continue.'
+              : (map?['error']?.toString() ??
+                    'You already have an unpaid checkout for this item.');
+          _errorMessage = error;
+          return (orderId: null, count: 0, error: error);
+        }
         final error = supabaseRpcError(
           rpcRes,
           fallback: 'Could not complete checkout.',

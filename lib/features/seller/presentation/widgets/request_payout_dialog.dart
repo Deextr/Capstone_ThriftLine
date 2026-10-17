@@ -51,19 +51,29 @@ Future<RequestPayoutResult> showRequestPayoutDialog(
       final amount = formatCentavos(availableCentavos);
       return AlertDialog(
         title: const Text('Request Payout'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _PayoutRow(label: 'Available Earnings', value: amount),
-            _PayoutRow(label: 'Payout Amount', value: amount),
-            const _PayoutRow(label: 'Payment Method', value: 'GCash'),
-            _PayoutRow(label: 'GCash Account Name', value: method.accountName),
-            _PayoutRow(
-              label: 'GCash Mobile Number',
-              value: formatPhMobile(method.mobileNumber),
-            ),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _PayoutRow(label: 'Payout Amount', value: amount),
+              _PayoutRow(
+                label: 'Send to GCash',
+                value:
+                    '${method.accountName}\n${formatPhMobile(method.mobileNumber)}',
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'This sends a request to ThriftLine. An admin transfers the '
+                'money to your GCash by hand and adds the GCash reference '
+                'here. It is not sent automatically.',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -74,7 +84,7 @@ Future<RequestPayoutResult> showRequestPayoutDialog(
           TextButton(
             onPressed: () =>
                 Navigator.pop(dialogContext, RequestPayoutResult.confirm),
-            child: const Text('Confirm Payout'),
+            child: const Text('Send payout request'),
           ),
         ],
       );

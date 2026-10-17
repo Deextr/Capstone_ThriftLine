@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import 'admin_portal_data_access.dart';
 
 class AdminTransactionRow {
   const AdminTransactionRow({
@@ -89,7 +90,7 @@ class AdminTransactionsService {
     final from = page * pageSize;
     final to = from + pageSize - 1;
 
-    var filter = _supabase.client
+    var filter = (await resolveAdminClient(_supabase))
         .from('payments')
         .select(
           'payment_id, payment_status, amount_centavos, created_at, '

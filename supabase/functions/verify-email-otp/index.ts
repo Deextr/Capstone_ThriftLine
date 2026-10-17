@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sessionIdFromAccessToken } from "../_shared/jwt.ts";
 import {
   hashDeviceToken,
   isDeviceToken,
@@ -101,11 +102,6 @@ Deno.serve(async (req) => {
       return json(400, { error: "That code is invalid." });
     }
 
-    await service
-      .from("email_otp_challenges")
-      .update({ consumed_at: new Date().toISOString() })
-      .eq("challenge_id", challenge.challenge_id);
-
     if (purpose === "email_change") {
       const { error: authUpdateError } = await service.auth.admin.updateUserById(
         userData.user.id,
@@ -121,8 +117,49 @@ Deno.serve(async (req) => {
         .from("users")
         .update({ email: challengeEmail })
         .eq("user_id", userData.user.id);
+      await service
+        .from("email_otp_challenges")
+        .update({ consumed_at: new Date().toISOString() })
+        .eq("challenge_id", challenge.challenge_id);
       return json(200, { ok: true, email: challengeEmail });
     }
+
+    const authHeaderValue = authHeader.startsWith("Bearer ")
+      ? authHeader.slice("Bearer ".length).trim()
+      : "";
+    const sessionId = sessionIdFromAccessToken(authHeaderValue);
+    const { data: gateOk, error: gateError } = await service.rpc(
+      "verify_email_login_session_gate",
+      { p_session_id: sessionId, p_user_id: userData.user.id },
+    );
+    if (gateError) {
+      console.error("verify-email-otp session gate verification failed");
+      return json(503, {
+        error: "Could not verify that code. Please try again.",
+      });
+    }
+    if (gateOk !== true && !sessionId) {
+      const { data: fallbackOk, error: fallbackError } = await service.rpc(
+        "verify_email_login_session_gate_for_user",
+        { p_user_id: userData.user.id },
+      );
+      if (fallbackError || fallbackOk !== true) {
+        console.error("verify-email-otp session gate fallback failed");
+        return json(503, {
+          error: "Could not verify that code. Please try again.",
+        });
+      }
+    } else if (gateOk !== true) {
+      console.error("verify-email-otp session gate verification returned false");
+      return json(503, {
+        error: "Could not verify that code. Please try again.",
+      });
+    }
+
+    await service
+      .from("email_otp_challenges")
+      .update({ consumed_at: new Date().toISOString() })
+      .eq("challenge_id", challenge.challenge_id);
 
     const deviceToken = body.device_token;
     if (isDeviceToken(deviceToken)) {

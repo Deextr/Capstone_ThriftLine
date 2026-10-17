@@ -37,7 +37,16 @@ class BuyerSearchFilters {
 
   static const cleared = BuyerSearchFilters();
 
+  static const priceRangeInvalidMessage =
+      'Minimum price cannot be greater than maximum price.';
+
   bool get hasPriceRange => minPrice != null || maxPrice != null;
+
+  /// When only one bound is set, or both bounds are unset, the range is valid.
+  bool get isPriceRangeValid {
+    if (minPrice == null || maxPrice == null) return true;
+    return minPrice! <= maxPrice!;
+  }
 
   bool get hasNonDefaultSort => sort != BuyerSearchSort.relevance;
 

@@ -258,12 +258,13 @@ class SellerPublicProfileController extends ChangeNotifier {
 
   Future<void> _refreshFollowerCount(String sellerUserId) async {
     try {
-      final rows = await _supabase.client
-          .from('follows')
-          .select('follower_id')
-          .eq('following_id', sellerUserId);
-      final count = (rows as List).length;
-      if (_sellerProfile != null) {
+      final row = await _supabase.client
+          .from('seller_profiles')
+          .select('follower_count')
+          .eq('seller_id', sellerUserId)
+          .maybeSingle();
+      final count = (row?['follower_count'] as num?)?.toInt();
+      if (_sellerProfile != null && count != null) {
         _sellerProfile = _sellerProfile!.copyWith(followerCount: count);
       }
     } catch (e) {

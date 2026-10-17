@@ -64,11 +64,26 @@ Future<AuctionCheckoutOrderResult> ensureMyAuctionOrder(
     );
   }
   try {
-    final raw = await supabase.client.rpc(
-      'ensure_my_auction_order',
-      params: {'p_auction_id': auctionId},
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final raw = await supabase.client.rpc(
+        'ensure_my_auction_order',
+        params: {'p_auction_id': auctionId},
+      );
+      final result = AuctionCheckoutOrderResult.fromRpc(raw);
+      if (result.success && result.orderId != null) {
+        return result;
+      }
+      if (result.code != 'order_not_ready' || attempt == 1) {
+        return result;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    }
+    return const AuctionCheckoutOrderResult(
+      success: false,
+      code: 'order_not_ready',
+      error:
+          'We could not prepare your auction order yet. Please try again in a moment.',
     );
-    return AuctionCheckoutOrderResult.fromRpc(raw);
   } catch (e) {
     return AuctionCheckoutOrderResult(
       success: false,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../data/admin_portal_data_access.dart';
 import '../data/admin_users_service.dart';
 
 class AdminUsersController extends ChangeNotifier {
@@ -70,7 +71,7 @@ class AdminUsersController extends ChangeNotifier {
       debugPrint('AdminUsersController.load error: $e');
       _rows = const [];
       _total = 0;
-      _error = 'Unable to load users. Check your connection and try again.';
+      _error = adminPortalAccessUserMessage(e);
     } finally {
       _loading = false;
       notifyListeners();

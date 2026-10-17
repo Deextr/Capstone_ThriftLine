@@ -144,15 +144,51 @@ class _ReportsListHeader extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  summary,
+                  style: AppTypography.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  controller.isFilterActive
+                      ? '$filtered matching · $total total'
+                      : '$total report${total == 1 ? '' : 's'}',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                if (controller.showPagination) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    controller.paginationRangeLabel,
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textHint,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               _FilterButton(activeCount: count, onTap: onFilterTap),
               if (controller.isFilterActive) ...[
-                SizedBox(width: 8),
+                const SizedBox(width: 4),
                 IconButton(
                   tooltip: 'Clear filters',
                   onPressed: controller.resetFilters,
@@ -168,35 +204,6 @@ class _ReportsListHeader extends StatelessWidget {
               ],
             ],
           ),
-          SizedBox(height: 8),
-          Text(
-            summary,
-            style: AppTypography.body.copyWith(
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          SizedBox(height: 2),
-          Text(
-            controller.isFilterActive
-                ? '$filtered matching · $total total'
-                : '$total report${total == 1 ? '' : 's'}',
-            style: AppTypography.caption.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-          if (controller.showPagination) ...[
-            SizedBox(height: 2),
-            Text(
-              controller.paginationRangeLabel,
-              style: AppTypography.caption.copyWith(
-                color: AppColors.textHint,
-                fontSize: 11,
-              ),
-            ),
-          ],
         ],
       ),
     );

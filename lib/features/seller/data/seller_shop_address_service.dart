@@ -38,10 +38,13 @@ class SellerShopAddressService {
       return 'Please select a Davao City barangay.';
     }
 
+    final shopNameError = sellerShopNameError(draft.storeName);
+    if (shopNameError != null) return shopNameError;
+
+    final addressError = sellerShopAddressLine1Error(draft.addressLine1);
+    if (addressError != null) return addressError;
+
     final shopName = draft.storeName.trim();
-    if (shopName.length < 2) {
-      return 'Shop name must be at least 2 characters.';
-    }
 
     try {
       await _supabase.client

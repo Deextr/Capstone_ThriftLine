@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../data/admin_dashboard_models.dart';
+import '../data/admin_portal_data_access.dart';
 import '../data/admin_verification_service.dart';
 
 class AdminSellerApplicationsController extends ChangeNotifier {
@@ -135,8 +136,7 @@ class AdminSellerApplicationsController extends ChangeNotifier {
       debugPrint('AdminSellerApplicationsController.load error: $e');
       _applications = const [];
       _total = 0;
-      _errorMessage =
-          'Unable to load seller applications. Please check your connection and try again.';
+      _errorMessage = adminPortalAccessUserMessage(e);
     } finally {
       _isLoading = false;
       notifyListeners();

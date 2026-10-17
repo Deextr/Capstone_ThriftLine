@@ -52,23 +52,14 @@ class MyShopController extends ChangeNotifier {
       try {
         final profile = await _supabase.client
             .from('seller_profiles')
-            .select()
+            .select('shop_bio, follower_count')
             .eq('seller_id', userId)
             .maybeSingle();
         final bio = profile?['shop_bio'] as String?;
         _shopBio = (bio != null && bio.trim().isNotEmpty) ? bio.trim() : null;
+        _followerCount = (profile?['follower_count'] as num?)?.toInt() ?? 0;
       } catch (e) {
         debugPrint('MyShopController: seller_profiles error ($e)');
-      }
-
-      try {
-        final followers = await _supabase.client
-            .from('follows')
-            .select('follower_id')
-            .eq('following_id', userId);
-        _followerCount = (followers as List).length;
-      } catch (e) {
-        debugPrint('MyShopController: follower count error ($e)');
       }
 
       try {

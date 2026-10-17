@@ -1,5 +1,44 @@
 import 'davao_barangay.dart';
 
+const int sellerShopNameMinLength = 3;
+const int sellerShopNameMaxLength = 80;
+
+const String sellerShopNameRequiredMessage = 'Shop name is required';
+
+const String sellerShopNameTooShortMessage =
+    'Shop name must be at least 3 characters';
+
+const String sellerShopNameTooLongMessage =
+    'Shop name cannot exceed 80 characters';
+
+const int sellerShopAddressLine1MinLength = 3;
+
+const String sellerShopAddressRequiredMessage = 'Address is required';
+
+const String sellerShopAddressTooShortMessage =
+    'Address must be at least 3 characters';
+
+String? sellerShopNameError(String? value) {
+  final trimmed = (value ?? '').trim();
+  if (trimmed.isEmpty) return sellerShopNameRequiredMessage;
+  if (trimmed.length < sellerShopNameMinLength) {
+    return sellerShopNameTooShortMessage;
+  }
+  if (trimmed.length > sellerShopNameMaxLength) {
+    return sellerShopNameTooLongMessage;
+  }
+  return null;
+}
+
+String? sellerShopAddressLine1Error(String? value) {
+  final trimmed = (value ?? '').trim();
+  if (trimmed.isEmpty) return sellerShopAddressRequiredMessage;
+  if (trimmed.length < sellerShopAddressLine1MinLength) {
+    return sellerShopAddressTooShortMessage;
+  }
+  return null;
+}
+
 /// Seller shop address collected on Become a Seller — Step 1.
 class SellerAddressDraft {
   const SellerAddressDraft({
@@ -40,15 +79,13 @@ class SellerAddressDraft {
     required List<DavaoBarangay> allowedBarangays,
     required String addressLine1,
   }) {
-    if (storeName.trim().isEmpty) {
-      return 'Please enter a store name.';
-    }
+    final shopNameError = sellerShopNameError(storeName);
+    if (shopNameError != null) return shopNameError;
     if (!DavaoBarangay.isAllowedSelection(barangay, allowedBarangays)) {
       return 'Please select a Davao City barangay.';
     }
-    if (addressLine1.trim().isEmpty) {
-      return 'Please enter Address Line 1.';
-    }
+    final addressError = sellerShopAddressLine1Error(addressLine1);
+    if (addressError != null) return addressError;
     return null;
   }
 }

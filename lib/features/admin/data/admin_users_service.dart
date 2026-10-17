@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import 'admin_portal_data_access.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../domain/marketplace_user_management.dart';
 
@@ -194,7 +195,7 @@ class AdminUsersService {
     String? accountType,
     String? status,
   }) async {
-    final raw = await _supabase.client.rpc(
+    final raw = await (await resolveAdminClient(_supabase)).rpc(
       'list_marketplace_users',
       params: {
         'p_search': search?.trim() ?? '',
@@ -223,7 +224,7 @@ class AdminUsersService {
   }
 
   Future<MarketplaceUserRow?> detail(String userId) async {
-    final raw = await _supabase.client.rpc(
+    final raw = await (await resolveAdminClient(_supabase)).rpc(
       'get_marketplace_user',
       params: {'p_user_id': userId},
     );
@@ -247,7 +248,7 @@ class AdminUsersService {
       );
     }
     try {
-      final raw = await _supabase.client.rpc(
+      final raw = await (await resolveAdminClient(_supabase)).rpc(
         'disable_marketplace_account',
         params: {
           'p_user_id': userId,

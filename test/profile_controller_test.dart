@@ -10,6 +10,11 @@ void main() {
     expect(controller.isValidUsernameFormat('john123'), true);
     expect(controller.isValidUsernameFormat('JohnSmith'), true);
     expect(controller.isValidUsernameFormat('razel2026'), true);
+    expect(controller.isValidUsernameFormat('abc'), true);
+
+    // Too short
+    expect(controller.isValidUsernameFormat('a'), false);
+    expect(controller.isValidUsernameFormat('ab'), false);
 
     // Invalid usernames
     expect(controller.isValidUsernameFormat('john smith'), false);

@@ -157,7 +157,8 @@ class LookingForController extends ChangeNotifier {
   }) async {
     final user = _auth.user;
     if (user == null) return 'Please sign in to post a request.';
-    if (title.trim().isEmpty) return 'Please enter what you are looking for.';
+    final titleError = lookingForRequestTitleError(title);
+    if (titleError != null) return titleError;
 
     // Do not notifyListeners here. The create sheet owns its submitting
     // spinner; notifying would rebuild Looking For (TabBar / NestedScrollView)
@@ -219,7 +220,8 @@ class LookingForController extends ChangeNotifier {
   }) async {
     final user = _auth.user;
     if (user == null) return 'Please sign in to repost this request.';
-    if (title.trim().isEmpty) return 'Please enter what you are looking for.';
+    final titleError = lookingForRequestTitleError(title);
+    if (titleError != null) return titleError;
 
     _isPosting = true;
     try {
@@ -334,7 +336,8 @@ class LookingForController extends ChangeNotifier {
   }) async {
     final user = _auth.user;
     if (user == null) return 'Please sign in to edit this request.';
-    if (title.trim().isEmpty) return 'Please enter what you are looking for.';
+    final titleError = lookingForRequestTitleError(title);
+    if (titleError != null) return titleError;
 
     _isPosting = true;
     try {

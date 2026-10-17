@@ -11,6 +11,7 @@ import '../../../providers/auth_provider.dart';
 import '../../chat/data/conversation_service.dart';
 import '../../seller/data/auction_relist_feedback.dart';
 import '../../seller/data/listing_bucket.dart';
+import '../../seller/data/listing_bucket.dart';
 import '../data/auction_checkout_order.dart';
 import '../data/catalog_product_query.dart';
 import '../domain/bid_placement_result.dart';
@@ -136,10 +137,31 @@ class ProductDetailController extends ChangeNotifier {
       endsAt: auctionEndTime,
       winnerId: _auction?['winner_id'] as String?,
       orderStatus: _auctionOrder?['order_status'] as String?,
+      paymentStatus: _auctionPaymentStatus,
       paymentDueAt: paymentDueAt,
       bidCount: bidCount,
       now: DateTime.now(),
     );
+  }
+
+  String? get _auctionPaymentStatus {
+    final payments = _auctionOrder?['payments'];
+    if (payments is! List || payments.isEmpty) return null;
+    final first = payments.first;
+    if (first is Map) return first['payment_status'] as String?;
+    return null;
+  }
+
+  bool get canRelistAuctionListing {
+    final snapshot = _listingSnapshot;
+    if (snapshot == null) return false;
+    return canRelistAuction(snapshot);
+  }
+
+  String? get auctionRelistBlockedMessage {
+    final snapshot = _listingSnapshot;
+    if (snapshot == null) return null;
+    return auctionRelistHint(snapshot);
   }
 
   /// Matches My Listings: edit is only offered for listings in the Active bucket.
@@ -346,6 +368,10 @@ class ProductDetailController extends ChangeNotifier {
     double? minimumIncrement,
   }) async {
     if (_productId.isEmpty) return 'Product not found.';
+    if (!canRelistAuctionListing) {
+      return auctionRelistBlockedMessage ??
+          'Awaiting winner payment: relisting is unavailable while the winning bidder\'s payment window is active.';
+    }
     try {
       await _closeExpiredAuctions();
       final params = <String, dynamic>{
@@ -509,18 +535,32 @@ class ProductDetailController extends ChangeNotifier {
               .toList(),
         );
 
-        // Load the current viewer's auction order to check payment status
+        // Load auction order for payment / relist eligibility.
         final uid = _auth.user?.id;
         if (uid != null) {
           try {
-            _auctionOrder = await _supabase.client
-                .from('orders')
-                .select('order_id, order_status, payment_due_at')
-                .eq('auction_id', auctionId)
-                .eq('buyer_id', uid)
-                .order('created_at', ascending: false)
-                .limit(1)
-                .maybeSingle();
+            if (isOwnListing) {
+              _auctionOrder = await _supabase.client
+                  .from('orders')
+                  .select(
+                    'order_id, order_status, payment_due_at, payments(payment_status)',
+                  )
+                  .eq('auction_id', auctionId)
+                  .order('created_at', ascending: false)
+                  .limit(1)
+                  .maybeSingle();
+            } else {
+              _auctionOrder = await _supabase.client
+                  .from('orders')
+                  .select(
+                    'order_id, order_status, payment_due_at, payments(payment_status)',
+                  )
+                  .eq('auction_id', auctionId)
+                  .eq('buyer_id', uid)
+                  .order('created_at', ascending: false)
+                  .limit(1)
+                  .maybeSingle();
+            }
           } catch (e) {
             debugPrint('_loadAuctionData order query: $e');
           }

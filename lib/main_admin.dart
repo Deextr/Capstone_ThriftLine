@@ -6,6 +6,7 @@ import 'core/config/supabase_config.dart';
 import 'core/routes/admin_app_router.dart';
 import 'core/services/shared_preferences_service.dart';
 import 'core/services/supabase_service.dart';
+import 'features/admin/data/admin_portal_data_access.dart';
 import 'features/admin/data/admin_portal_session.dart';
 import 'features/auth/data/auth_service.dart';
 import 'providers/auth_provider.dart';
@@ -20,6 +21,7 @@ Future<void> main() async {
 
     final prefs = await SharedPreferencesService.init();
     final supabaseService = SupabaseService();
+    AdminPortalDataAccess.bind(supabaseService);
     final authService = AuthService(supabaseService);
     final authProvider = AuthProvider(prefs, authService);
     final themeProvider = ThemeProvider(prefs);

@@ -35,13 +35,31 @@ void main() {
     expect(canEditListing(listing), isFalse);
   });
 
-  test('stale active past ends_at is inactive but relistable', () {
+  test('stale active past ends_at without bids is relistable', () {
     final listing = auction(
       auctionStatus: 'active',
       endsAt: now.subtract(const Duration(hours: 2)),
     );
     expect(listingBucketFor(listing), ListingBucket.inactive);
     expect(canRelistAuction(listing), isTrue);
+  });
+
+  test('stale active past ends_at with bids awaits finalization', () {
+    final listing = auction(
+      auctionStatus: 'active',
+      endsAt: now.subtract(const Duration(hours: 2)),
+      bidCount: 2,
+    );
+    expect(canRelistAuction(listing), isFalse);
+  });
+
+  test('winner inside payment window cannot relist', () {
+    final listing = auction(
+      winnerId: 'winner-1',
+      orderStatus: 'pending',
+      paymentDueAt: now.add(const Duration(hours: 6)),
+    );
+    expect(canRelistAuction(listing), isFalse);
   });
 
   test('active fixed-price listing can be edited', () {

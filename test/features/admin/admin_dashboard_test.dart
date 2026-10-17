@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:thriftline/core/constants/app_colors.dart';
 import 'package:thriftline/core/theme/app_theme.dart';
 import 'package:thriftline/features/admin/data/admin_dashboard_models.dart';
+import 'package:thriftline/features/admin/data/admin_dashboard_service.dart';
 import 'package:thriftline/features/admin/data/admin_marketplace_dashboard.dart';
 import 'package:thriftline/features/admin/data/admin_review_rules.dart';
 import 'package:thriftline/features/admin/domain/admin_dashboard_comparison.dart';
@@ -609,6 +610,23 @@ void main() {
       expect(
         () => AdminMarketplaceSnapshot.fromJson({'success': true}),
         throwsFormatException,
+      );
+    });
+  });
+
+  group('AdminDashboardService cache payload', () {
+    test('merges fulfillment overdue count into activity before caching', () {
+      final cached = AdminDashboardService.marketplaceCachePayload({
+        'success': true,
+        'activity': {'orders_awaiting_fulfillment': 3},
+      }, 9);
+      expect(
+        (cached['activity'] as Map)['orders_overdue_fulfillment'],
+        9,
+      );
+      expect(
+        (cached['activity'] as Map)['orders_awaiting_fulfillment'],
+        3,
       );
     });
   });

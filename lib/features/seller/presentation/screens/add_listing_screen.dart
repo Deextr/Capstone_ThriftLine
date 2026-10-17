@@ -9,6 +9,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../models/enums.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/add_listing_controller.dart';
+import '../../domain/product_listing_validation.dart';
 import '../widgets/add_listing_form_sections.dart';
 import '../widgets/listing_location_section.dart';
 import '../widgets/listing_shipping_section.dart';
@@ -244,13 +245,14 @@ class _DescriptionField extends StatelessWidget {
           controller: controller.descCtrl,
           onChanged: controller.onDescChanged,
           maxLines: 4,
+          maxLength: productDescriptionMaxLength,
           error: controller.fieldErrors['description'],
         ),
         const SizedBox(height: 4),
         Align(
           alignment: Alignment.centerRight,
           child: Text(
-            '${controller.descCtrl.text.length} / 150',
+            '${controller.descCtrl.text.length} / $productDescriptionMaxLength',
             style: AppTypography.caption,
           ),
         ),

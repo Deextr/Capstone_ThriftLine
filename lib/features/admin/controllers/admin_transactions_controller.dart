@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../data/admin_portal_data_access.dart';
 import '../data/admin_transactions_service.dart';
 
 class AdminTransactionsController extends ChangeNotifier {
@@ -43,8 +44,7 @@ class AdminTransactionsController extends ChangeNotifier {
     } catch (e) {
       debugPrint('AdminTransactionsController.load error: $e');
       _rows = const [];
-      _error =
-          'Unable to load transactions. Check your connection and try again.';
+      _error = adminPortalAccessUserMessage(e);
     } finally {
       _loading = false;
       notifyListeners();

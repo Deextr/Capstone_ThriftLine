@@ -377,11 +377,8 @@ class _LookingForFooter extends StatelessWidget {
       title: lookingForDisputeConfirmTitle(uiDecision),
       confirmLabel: lookingForDisputeActionLabel(uiDecision),
       destructive: lookingForDecisionRequiresViolation(uiDecision),
-      rows: [
-        ('Action', lookingForDisputeActionLabel(uiDecision)),
-        ('Message', controller.response.trim()),
-        ('Details', lookingForDisputeConfirmDetail(uiDecision)),
-      ],
+      messagePreview: controller.response.trim(),
+      detailText: lookingForDisputeConfirmDetail(uiDecision),
     );
     if (confirmed != true || !context.mounted) return;
 

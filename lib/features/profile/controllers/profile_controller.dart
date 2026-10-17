@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/ph_phone.dart';
+import '../../../core/utils/validators.dart';
+import '../../seller/domain/seller_address_draft.dart';
 import '../../../features/auth/domain/account_mode.dart';
 import '../../../models/user_model.dart';
 import '../../../providers/auth_provider.dart';
@@ -116,8 +118,7 @@ class ProfileController extends ChangeNotifier {
 
   bool isValidUsernameFormat(String username) {
     if (username.isEmpty) return false;
-    final regex = RegExp(r'^[a-zA-Z0-9]+$');
-    return regex.hasMatch(username);
+    return Validators.usernameAlphanumeric(username) == null;
   }
 
   Future<bool> updateProfile({
@@ -136,18 +137,28 @@ class ProfileController extends ChangeNotifier {
     _errorMessage = null;
     _successMessage = null;
 
-    final trimmedName = fullName.trim();
     final trimmedUsername = username.trim();
     final trimmedPhone = phone.trim();
     final authUser = _authProvider?.user;
     final authPhone = normalizePhMobile(authUser?.phone);
 
-    if (trimmedName.isEmpty) {
-      _errorMessage = isSellerMode
-          ? 'Shop name cannot be empty.'
-          : 'Full Name cannot be empty.';
-      notifyListeners();
-      return false;
+    final String profileName;
+    if (isSellerMode) {
+      final shopNameError = sellerShopNameError(fullName);
+      if (shopNameError != null) {
+        _errorMessage = shopNameError;
+        notifyListeners();
+        return false;
+      }
+      profileName = fullName.trim();
+    } else {
+      final nameError = Validators.name(fullName);
+      if (nameError != null) {
+        _errorMessage = nameError;
+        notifyListeners();
+        return false;
+      }
+      profileName = Validators.normalizeFullName(fullName);
     }
 
     if (trimmedUsername.isEmpty) {
@@ -156,9 +167,9 @@ class ProfileController extends ChangeNotifier {
       return false;
     }
 
-    if (!isValidUsernameFormat(trimmedUsername)) {
-      _errorMessage =
-          'Username must contain letters and numbers only, with no spaces or special characters.';
+    final usernameError = Validators.usernameAlphanumeric(trimmedUsername);
+    if (usernameError != null) {
+      _errorMessage = usernameError;
       notifyListeners();
       return false;
     }
@@ -194,17 +205,17 @@ class ProfileController extends ChangeNotifier {
         await _supabaseService.client
             .from('seller_profiles')
             .update({
-              'shop_name': trimmedName,
+              'shop_name': profileName,
               if (shopBio != null) 'shop_bio': shopBio.trim(),
             })
             .eq('seller_id', currentUserId);
-        _shopName = trimmedName;
+        _shopName = profileName;
         if (shopBio != null) _shopBio = shopBio.trim();
       } else {
         await _supabaseService.updateUserProfile(
           userId: currentUserId,
           data: {
-            'full_name': trimmedName,
+            'full_name': profileName,
             'updated_at': DateTime.now().toIso8601String(),
           },
         );
@@ -216,7 +227,7 @@ class ProfileController extends ChangeNotifier {
         'updated_at': DateTime.now().toIso8601String(),
       };
       if (!isSellerMode) {
-        userUpdate['full_name'] = trimmedName;
+        userUpdate['full_name'] = profileName;
       }
 
       await _supabaseService.updateUserProfile(
@@ -230,7 +241,7 @@ class ProfileController extends ChangeNotifier {
           (_currentUser ??
                   UserModel(
                     id: currentUserId,
-                    name: trimmedName,
+                    name: profileName,
                     username: trimmedUsername,
                     email: _authProvider?.user?.email ?? '',
                     phone: syncedPhone,
@@ -241,18 +252,18 @@ class ProfileController extends ChangeNotifier {
                   ))
               .copyWith(
                 name: isSellerMode
-                    ? (_currentUser?.name ?? trimmedName)
-                    : trimmedName,
+                    ? (_currentUser?.name ?? profileName)
+                    : profileName,
                 username: trimmedUsername,
                 phone: syncedPhone,
               );
 
       if (_authProvider != null) {
         await _authProvider.updateProfileData(
-          name: isSellerMode ? _authProvider.user?.name : trimmedName,
+          name: isSellerMode ? _authProvider.user?.name : profileName,
           username: trimmedUsername,
           phone: syncedPhone,
-          shopName: isSellerMode ? trimmedName : null,
+          shopName: isSellerMode ? profileName : null,
           shopBio: isSellerMode && shopBio != null ? shopBio.trim() : null,
         );
       }

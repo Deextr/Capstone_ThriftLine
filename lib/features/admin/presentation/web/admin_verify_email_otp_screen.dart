@@ -58,16 +58,27 @@ class _AdminVerifyEmailOtpScreenState extends State<AdminVerifyEmailOtpScreen> {
       return;
     }
 
+    if (_verifying) return;
     setState(() => _verifying = true);
     final auth = context.read<AuthProvider>();
-    final error = await auth.verifyEmailOtp(token: token);
-    if (!mounted) return;
-    setState(() => _verifying = false);
-    if (error != null) {
-      showThriftSnackBar(context, error, isError: true);
-      return;
+    try {
+      final error = await auth.verifyEmailOtp(token: token);
+      if (!mounted) return;
+      if (error != null) {
+        showThriftSnackBar(context, error, isError: true);
+        return;
+      }
+      context.go(RouteNames.adminDashboard);
+    } catch (_) {
+      if (!mounted) return;
+      showThriftSnackBar(
+        context,
+        'Could not verify that code. Please try again.',
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _verifying = false);
     }
-    context.go(RouteNames.adminDashboard);
   }
 
   @override
@@ -144,13 +155,26 @@ class _AdminVerifyEmailOtpScreenState extends State<AdminVerifyEmailOtpScreen> {
                       TextField(
                         controller: _codeCtrl,
                         enabled: !_verifying && !_sending,
+                        style: AppTypography.body.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                        cursorColor: AppColors.primary,
                         keyboardType: TextInputType.number,
                         textInputAction: TextInputAction.done,
                         decoration: InputDecoration(
                           labelText: '6-digit code',
                           hintText: '123456',
+                          labelStyle: AppTypography.label.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                          floatingLabelStyle: AppTypography.label.copyWith(
+                            color: AppColors.primary,
+                          ),
+                          hintStyle: AppTypography.body.copyWith(
+                            color: AppColors.textHint,
+                          ),
                           filled: true,
-                          fillColor: AppColors.background,
+                          fillColor: AppColors.surfaceVariant,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                             borderSide: BorderSide(color: AppColors.border),
@@ -158,6 +182,13 @@ class _AdminVerifyEmailOtpScreenState extends State<AdminVerifyEmailOtpScreen> {
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                             borderSide: BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: AppColors.primary,
+                              width: 1.5,
+                            ),
                           ),
                         ),
                         inputFormatters: [

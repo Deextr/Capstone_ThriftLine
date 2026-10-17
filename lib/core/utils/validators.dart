@@ -33,12 +33,36 @@ abstract final class Validators {
     return value.trim().replaceAll(RegExp(r'\s+'), ' ');
   }
 
+  static const int usernameMinLength = 3;
+
+  static const usernameRequiredMessage = 'Username is required';
+
+  static const usernameTooShortMessage =
+      'Username must be at least 3 characters';
+
+  static const usernameAlphanumericInvalidMessage =
+      'Letters and numbers only. No spaces or special characters.';
+
+  static const usernameUnderscoreInvalidMessage =
+      'Username can only contain letters, numbers, and underscores';
+
   static String? username(String? value) {
     final trimmed = value?.trim() ?? '';
-    if (trimmed.isEmpty) return 'Username is required';
-    if (trimmed.length < 3) return 'Username must be at least 3 characters';
+    if (trimmed.isEmpty) return usernameRequiredMessage;
+    if (trimmed.length < usernameMinLength) return usernameTooShortMessage;
     if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(trimmed)) {
-      return 'Username can only contain letters, numbers, and underscores';
+      return usernameUnderscoreInvalidMessage;
+    }
+    return null;
+  }
+
+  /// Buyer/seller edit profile: letters and numbers only (no underscores).
+  static String? usernameAlphanumeric(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) return usernameRequiredMessage;
+    if (trimmed.length < usernameMinLength) return usernameTooShortMessage;
+    if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(trimmed)) {
+      return usernameAlphanumericInvalidMessage;
     }
     return null;
   }

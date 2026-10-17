@@ -112,6 +112,7 @@ abstract final class RouteNames {
   static const String settings = '/settings';
   static const String purchaseHistory = '/purchase-history';
   static const String transactionHistory = '/transaction-history';
+  static const String sellerTransactionHistory = '/seller-transaction-history';
   static const String savedItems = '/saved-items';
   static const String followingShops = '/following-shops';
   static const String becomeSeller = '/become-seller';
@@ -221,6 +222,8 @@ abstract final class RouteNames {
   static const String adminOrdersTransactions = '/admin/orders-transactions';
   static const String adminOrderDetail = '/admin/orders/:id';
   static const String adminTransactions = '/admin/transactions';
+  static const String adminSellerPayouts = '/admin/seller-payouts';
+  static const String adminBuyerRefunds = '/admin/buyer-refunds';
   static const String adminSettings = '/admin/settings';
   static const String adminProfile = '/admin/profile';
 

@@ -37,7 +37,6 @@ class _OrderFulfillmentReportScreenState
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<OrderFulfillmentReportController>();
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final blockingLoadError =
         controller.errorMessage != null &&
         (controller.order == null || !controller.canSubmit);
@@ -46,7 +45,7 @@ class _OrderFulfillmentReportScreenState
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         backgroundColor: AppColors.background,
-        resizeToAvoidBottomInset: true,
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(
           title: const Text('Report a problem'),
           leading: IconButton(
@@ -111,15 +110,26 @@ class _OrderFulfillmentReportScreenState
                           ),
                           const SizedBox(height: 20),
                           ThriftTextField(
-                            label: 'Description',
-                            hint:
-                                'Tell us how long you have waited and any messages from the seller…',
+                            label: controller.detailsRequired
+                                ? 'Please describe the issue'
+                                : 'Additional details',
+                            hint: controller.detailsRequired
+                                ? 'Tell us how long you have waited and any messages from the seller…'
+                                : 'Add any extra context that may help (optional).',
                             controller: _details,
                             maxLines: 5,
                             maxLength: kReportDetailsMaxLength,
                             onChanged: context
                                 .read<OrderFulfillmentReportController>()
                                 .setDetails,
+                            labelSuffix: controller.detailsRequired
+                                ? null
+                                : Text(
+                                    'Optional',
+                                    style: AppTypography.caption.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
                           ),
                           const SizedBox(height: 6),
                           Align(
@@ -148,7 +158,7 @@ class _OrderFulfillmentReportScreenState
                       ),
                     ),
                     Padding(
-                      padding: EdgeInsets.fromLTRB(20, 8, 20, 16 + bottomInset),
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                       child: ThriftButton(
                         label: 'Submit report',
                         color: AppColors.error,

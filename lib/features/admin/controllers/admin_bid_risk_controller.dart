@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../data/admin_portal_data_access.dart';
 
 class AdminBidRiskEvent {
   const AdminBidRiskEvent({
@@ -65,7 +66,7 @@ class AdminBidRiskController extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      final rows = await _supabase.client
+      final rows = await (await resolveAdminClient(_supabase))
           .from('auction_bid_risk_events')
           .select()
           .order('created_at', ascending: false)
@@ -78,7 +79,7 @@ class AdminBidRiskController extends ChangeNotifier {
           .toList();
     } catch (e) {
       debugPrint('AdminBidRiskController.load: $e');
-      _error = 'Unable to load bid risk events.';
+      _error = adminPortalAccessUserMessage(e);
       _events = const [];
     } finally {
       _loading = false;

@@ -62,7 +62,10 @@ class AdminEscrowDecisionPanel extends StatelessWidget {
         if (paymentHold.isRefunded) ...[
           AdminCaseDetailField(
             label: 'Refund',
-            value: refundProviderMessage(paymentHold.refundProvider),
+            value: refundProviderMessage(
+              paymentHold.refundProvider,
+              refundState: paymentHold.refundState,
+            ),
             multiline: true,
           ),
           const SizedBox(height: 8),
@@ -210,11 +213,10 @@ class _FinancialResolutionChoicesState
       builder: (dialogContext) => AlertDialog(
         title: const Text('Confirm buyer refund?'),
         content: Text(
-          returnRequired
-              ? 'This resolves the dispute in the buyer\'s favor. The buyer is refunded now. '
-                    'The item must be returned and the seller will arrange pickup.'
-              : 'This resolves the dispute in the buyer\'s favor and refunds the buyer. '
-                    'No item return is required.',
+          'This resolves the dispute in the buyer\'s favor. '
+          '${returnRequired ? 'The item must be returned and the seller will arrange pickup.' : 'No item return is required.'} '
+          'ThriftLine asks PayMongo to return the payment. If PayMongo cannot, '
+          'the order shows that a manual GCash refund is needed.',
         ),
         actions: [
           TextButton(
@@ -283,7 +285,10 @@ class _FinancialResolutionChoicesState
       return;
     }
     if (refunded) {
-      final money = refundProviderMessage(result.refundProvider ?? 'internal');
+      final money = refundProviderMessage(
+        result.refundProvider ?? 'internal',
+        refundState: result.refundState,
+      );
       final item = returnRequired
           ? ' The seller must arrange the return.'
           : ' No return is required.';

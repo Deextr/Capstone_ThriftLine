@@ -216,6 +216,20 @@ class MyPurchaseOrderCard extends StatelessWidget {
           color: AppColors.warning,
         );
       }
+      if (order.isRefundInProgress) {
+        return const _StatusCopy(
+          title: 'Refund in progress',
+          message: 'Track it in Transaction history.',
+          color: AppColors.warning,
+        );
+      }
+      if (order.paymentStatus == 'refunded') {
+        return const _StatusCopy(
+          title: 'Refunded',
+          message: 'Your payment was returned.',
+          color: AppColors.warning,
+        );
+      }
       return const _StatusCopy(
         title: 'Return / Refund',
         message: 'Your request is being reviewed.',

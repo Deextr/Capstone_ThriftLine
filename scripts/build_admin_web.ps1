@@ -36,6 +36,16 @@ if (-not (Test-Path $sourceConfig)) {
 }
 Copy-Item $sourceConfig $configOut -Force
 
+Copy-Item (Join-Path $root 'web\vercel.json') (Join-Path $root 'build\web\vercel.json') -Force
+
+$vercelLink = Join-Path $PSScriptRoot 'vercel-admin.project.json'
+$vercelDir = Join-Path $root 'build\web\.vercel'
+if (-not (Test-Path $vercelLink)) {
+  throw "Missing $vercelLink (Vercel project link for thriftline-admin)."
+}
+New-Item -ItemType Directory -Force -Path $vercelDir | Out-Null
+Copy-Item $vercelLink (Join-Path $vercelDir 'project.json') -Force
+
 $assetConfig = Join-Path $root 'build\web\assets\assets\config\admin_config.json'
 if (-not (Test-Path $assetConfig)) {
   throw "Build output missing bundled $assetConfig"
@@ -57,8 +67,13 @@ if ($bootstrapText -match '"useLocalCanvasKit":true') {
 }
 
 Write-Host ''
-Write-Host 'Deploy this ZIP to Cloudflare Pages Production:' -ForegroundColor Green
-Write-Host "  $zipPath"
+Write-Host 'Vercel (recommended):' -ForegroundColor Green
+Write-Host '  cd build\web'
+Write-Host '  npx vercel --prod --yes'
+Write-Host '  https://thriftline-admin.vercel.app/admin/login'
 Write-Host ''
-Write-Host 'Then open an Incognito window:' -ForegroundColor Cyan
+Write-Host 'Or run: scripts\deploy_admin_web_vercel.ps1'
+Write-Host ''
+Write-Host 'Cloudflare Pages ZIP (optional):' -ForegroundColor Green
+Write-Host "  $zipPath"
 Write-Host '  https://thriftline-admin.pages.dev/admin/login'

@@ -20,6 +20,15 @@ const Duration lookingForReportCooldown = Duration(seconds: 20);
 
 const int lookingForReportDetailsMax = 400;
 
+const int lookingForRequestTitleMinLength = 5;
+const int lookingForRequestTitleMaxLength = 100;
+
+const String lookingForRequestTitleTooShortMessage =
+    'Title must be at least 5 characters';
+
+const String lookingForRequestTitleTooLongMessage =
+    'Title cannot exceed 100 characters';
+
 /// Shared with `looking_for_is_near_duplicate` in the lifecycle migration.
 const double lookingForNearDuplicateJaccard = 0.74;
 
@@ -314,6 +323,17 @@ extension LookingForLifecycleView on LookingForModel {
     expiresAt: expiresAt,
     serverNow: clock,
   );
+}
+
+String? lookingForRequestTitleError(String? value) {
+  final trimmed = (value ?? '').trim();
+  if (trimmed.length < lookingForRequestTitleMinLength) {
+    return lookingForRequestTitleTooShortMessage;
+  }
+  if (trimmed.length > lookingForRequestTitleMaxLength) {
+    return lookingForRequestTitleTooLongMessage;
+  }
+  return null;
 }
 
 String? lookingForReportDetailsError({

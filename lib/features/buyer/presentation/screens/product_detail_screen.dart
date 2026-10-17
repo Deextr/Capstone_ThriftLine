@@ -20,6 +20,7 @@ import '../../../../widgets/thrift_widgets.dart';
 import '../../../seller/presentation/widgets/end_auction_dialog.dart';
 import '../../controllers/product_detail_controller.dart';
 import '../../data/auction_checkout_order.dart';
+import '../../domain/bid_amount_validation.dart';
 import '../widgets/bid_phone_verification_prompt.dart';
 import '../widgets/buy_now_quantity_selector.dart';
 
@@ -485,6 +486,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     double minBid,
   ) {
     _bidController.text = minBid.toStringAsFixed(0);
+    String? bidInputError;
     ThriftBottomSheet.show(
       context,
       title: 'Place a Bid',
@@ -509,9 +511,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 children: [
                   IconButton(
                     onPressed: () {
-                      final v =
-                          (double.tryParse(_bidController.text) ?? minBid) -
-                          controller.minimumIncrement;
+                      final current = parseValidatedBidAmount(
+                        _bidController.text,
+                      );
+                      if (current == null) return;
+                      final v = current - controller.minimumIncrement;
                       if (v >= minBid) {
                         setStateSB(
                           () => _bidController.text = v.toStringAsFixed(0),
@@ -524,13 +528,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                     child: ThriftTextField(
                       controller: _bidController,
                       keyboardType: TextInputType.number,
+                      onChanged: (_) {
+                        if (bidInputError != null) {
+                          setStateSB(() => bidInputError = null);
+                        }
+                      },
                     ),
                   ),
                   IconButton(
                     onPressed: () {
-                      final v =
-                          (double.tryParse(_bidController.text) ?? minBid) +
-                          controller.minimumIncrement;
+                      final current = parseValidatedBidAmount(
+                        _bidController.text,
+                      );
+                      final base = current ?? minBid;
+                      final v = base + controller.minimumIncrement;
                       setStateSB(
                         () => _bidController.text = v.toStringAsFixed(0),
                       );
@@ -539,16 +550,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                   ),
                 ],
               ),
+              if (bidInputError != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  bidInputError!,
+                  style: AppTypography.caption.copyWith(color: AppColors.error),
+                ),
+              ],
               const SizedBox(height: 24),
               ThriftButton(
                 label: 'Confirm Bid',
                 variant: ThriftButtonVariant.primary,
                 onPressed: () async {
-                  final cleanText = _bidController.text.replaceAll(
-                    RegExp(r'[^\d.]'),
-                    '',
+                  final validationError = bidAmountValidationError(
+                    rawInput: _bidController.text,
+                    minimumBid: minBid,
                   );
-                  final amount = double.tryParse(cleanText) ?? minBid;
+                  if (validationError != null) {
+                    setStateSB(() => bidInputError = validationError);
+                    return;
+                  }
+                  final amount = parseValidatedBidAmount(_bidController.text)!;
                   final result = await controller.placeBid(amount);
                   if (!context.mounted) return;
                   if (result.isSuccess) {
@@ -715,7 +737,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                     ),
 
                     const SizedBox(height: 12),
-                    _buildLocationShippingSummary(product, controller.isAuction),
+                    _buildLocationShippingSummary(
+                      product,
+                      controller.isAuction,
+                    ),
 
                     const SizedBox(height: 16),
 
@@ -1198,7 +1223,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                       style: AppTypography.caption,
                     ),
                   if (isAuction &&
-                      product.shippingMode == ListingShippingMode.bidThreshold &&
+                      product.shippingMode ==
+                          ListingShippingMode.bidThreshold &&
                       product.shippingFee > 0)
                     Text(
                       'Standard fee: ${formatCurrency(product.shippingFee)}',
@@ -1559,8 +1585,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () =>
-                      _addFixedPriceToCart(context, cart, product),
+                  onPressed: () => _addFixedPriceToCart(context, cart, product),
                   icon: Icon(
                     Icons.add_shopping_cart_outlined,
                     color: AppColors.textPrimary,
@@ -1650,55 +1675,72 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
           );
         }
 
-        // Seller viewing ended auction: can relist or offer to next bidder
-        return Row(
+        // Seller viewing ended auction: relist only when payment window resolved.
+        final relistHint = controller.auctionRelistBlockedMessage;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (controller.canOfferToNextBidder) ...[
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _sellerOfferNextBidder(context, controller),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    side: const BorderSide(
-                      color: AppColors.primary,
-                      width: 1.5,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    'Offer Next Bidder',
-                    style: AppTypography.body.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                      fontSize: 15,
-                    ),
-                  ),
+            if (relistHint != null && !controller.canRelistAuctionListing) ...[
+              Text(
+                relistHint,
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(height: 12),
             ],
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () => _sellerRelist(context, controller),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            Row(
+              children: [
+                if (controller.canOfferToNextBidder) ...[
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () =>
+                          _sellerOfferNextBidder(context, controller),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        side: const BorderSide(
+                          color: AppColors.primary,
+                          width: 1.5,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Offer Next Bidder',
+                        style: AppTypography.body.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                child: Text(
-                  'Relist Auction',
-                  style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                    fontSize: 15,
+                  const SizedBox(width: 12),
+                ],
+                if (controller.canRelistAuctionListing)
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _sellerRelist(context, controller),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Relist Auction',
+                        style: AppTypography.body.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
+              ],
             ),
           ],
         );
@@ -1970,9 +2012,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
       );
       return;
     }
-    context.push(
-      RouteNames.checkoutFor(productId: product.id, buyNow: true),
-    );
+    context.push(RouteNames.checkoutFor(productId: product.id, buyNow: true));
   }
 }
 

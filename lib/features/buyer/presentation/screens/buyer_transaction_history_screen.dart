@@ -9,6 +9,7 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/buyer_transaction_history_controller.dart';
 import '../../data/buyer_transaction.dart';
+import '../widgets/buyer_refund_status_section.dart';
 
 class BuyerTransactionHistoryScreen extends StatefulWidget {
   const BuyerTransactionHistoryScreen({super.key});
@@ -45,7 +46,7 @@ class _BuyerTransactionHistoryScreenState
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Transaction History'),
+        title: const Text('Buyer transaction history'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.pop(),
@@ -250,13 +251,23 @@ class _TransactionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final refunded = transaction.status == BuyerTransactionStatus.refunded;
-    final statusVariant = refunded
-        ? BadgeVariant.warning
-        : BadgeVariant.success;
+    final refunded = transaction.status != BuyerTransactionStatus.successful;
+    final statusVariant = _statusVariant(transaction.status);
     final displayDate = refunded && transaction.refundedAt != null
         ? transaction.refundedAt!
         : transaction.paidAt;
+    final refundState = transaction.refundState;
+    final refundLine =
+        transaction.status == BuyerTransactionStatus.refundInProgress &&
+            refundState != null
+        ? buyerRefundHeadline(
+            refundState,
+            gcashSent: transaction.refundGcashSubmitted,
+          )
+        : null;
+    final refundNeedsAction =
+        refundState == BuyerRefundState.awaitingBuyerClaim ||
+        transaction.needsGcashDetails;
 
     return Semantics(
       button: true,
@@ -299,11 +310,27 @@ class _TransactionCard extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
-                  'Refunded ${formatCentavos(transaction.refundAmountCentavos!)}',
+                  transaction.status == BuyerTransactionStatus.refunded
+                      ? 'Refunded ${formatCentavos(transaction.refundAmountCentavos!)}'
+                      : 'Refund ${formatCentavos(transaction.refundAmountCentavos!)}',
                   style: AppTypography.caption.copyWith(
                     color: AppColors.warning,
                     fontWeight: FontWeight.w600,
                   ),
+                ),
+              ),
+            ],
+            if (refundLine != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                refundNeedsAction
+                    ? '$refundLine. Tap to continue.'
+                    : refundLine,
+                style: AppTypography.caption.copyWith(
+                  color: refundNeedsAction
+                      ? AppColors.warning
+                      : AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -384,8 +411,7 @@ class _EmptyFilterState extends StatelessWidget {
     final message = switch (filter) {
       BuyerTransactionFilter.successful =>
         'No successful payments match this filter.',
-      BuyerTransactionFilter.refunded =>
-        'No refunded payments match this filter.',
+      BuyerTransactionFilter.refunded => 'No refunds yet.',
       BuyerTransactionFilter.all => 'No transactions to show.',
     };
     return Padding(
@@ -448,69 +474,116 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
+BadgeVariant _statusVariant(BuyerTransactionStatus status) => switch (status) {
+  BuyerTransactionStatus.successful => BadgeVariant.success,
+  BuyerTransactionStatus.refundInProgress => BadgeVariant.primary,
+  BuyerTransactionStatus.refunded => BadgeVariant.warning,
+};
+
 void _showDetails(BuildContext context, BuyerTransaction transaction) {
-  final refunded = transaction.status == BuyerTransactionStatus.refunded;
+  final controller = context.read<BuyerTransactionHistoryController>();
+  controller.clearGcashError();
   showModalBottomSheet<void>(
     context: context,
     backgroundColor: AppColors.surface,
     showDragHandle: true,
     isScrollControlled: true,
-    builder: (context) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Transaction details', style: AppTypography.subheading),
-              const SizedBox(height: 4),
-              Text(
-                transaction.productTitle,
-                style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 16),
-              ThriftBadge(
-                label: buyerTransactionStatusLabel(transaction.status),
-                variant: refunded ? BadgeVariant.warning : BadgeVariant.success,
-              ),
-              const SizedBox(height: 16),
-              _DetailRow(
-                label: 'Amount paid',
-                value: formatCentavos(transaction.amountCentavos),
-              ),
-              if (refunded)
-                _DetailRow(
-                  label: 'Amount refunded',
-                  value: formatCentavos(
-                    transaction.refundAmountCentavos ??
-                        transaction.amountCentavos,
-                  ),
-                ),
-              if (transaction.paidAt != null)
-                _DetailRow(
-                  label: 'Paid on',
-                  value: formatFullDate(transaction.paidAt!),
-                ),
-              if (refunded && transaction.refundedAt != null)
-                _DetailRow(
-                  label: 'Refunded on',
-                  value: formatFullDate(transaction.refundedAt!),
-                ),
-              if (transaction.orderNumber.isNotEmpty)
-                _DetailRow(label: 'Order', value: transaction.orderNumber),
-              _DetailRow(label: 'Method', value: transaction.methodLabel),
-              if ((transaction.transactionReference ?? '').isNotEmpty)
-                _DetailRow(
-                  label: 'Reference',
-                  value: transaction.transactionReference!,
-                ),
-            ],
-          ),
-        ),
+    builder: (sheetContext) {
+      return ChangeNotifierProvider<BuyerTransactionHistoryController>.value(
+        value: controller,
+        child: _TransactionDetailsSheet(paymentId: transaction.paymentId),
       );
     },
   );
+}
+
+class _TransactionDetailsSheet extends StatelessWidget {
+  const _TransactionDetailsSheet({required this.paymentId});
+
+  final String paymentId;
+
+  @override
+  Widget build(BuildContext context) {
+    final transaction = context
+        .watch<BuyerTransactionHistoryController>()
+        .transactionById(paymentId);
+    if (transaction == null) {
+      return const SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Text('This transaction is no longer available.'),
+        ),
+      );
+    }
+    final refunded = transaction.status != BuyerTransactionStatus.successful;
+    final refundComplete =
+        transaction.status == BuyerTransactionStatus.refunded;
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          24 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Transaction details', style: AppTypography.subheading),
+            const SizedBox(height: 4),
+            Text(
+              transaction.productTitle,
+              style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ThriftBadge(
+                label: buyerTransactionStatusLabel(transaction.status),
+                variant: _statusVariant(transaction.status),
+              ),
+            ),
+            if (transaction.hasRefund) ...[
+              const SizedBox(height: 14),
+              BuyerRefundStatusSection(transaction: transaction),
+            ],
+            const SizedBox(height: 16),
+            _DetailRow(
+              label: 'Amount paid',
+              value: formatCentavos(transaction.amountCentavos),
+            ),
+            if (refunded)
+              _DetailRow(
+                label: refundComplete ? 'Amount refunded' : 'Refund amount',
+                value: formatCentavos(
+                  transaction.refundAmountCentavos ??
+                      transaction.amountCentavos,
+                ),
+              ),
+            if (transaction.paidAt != null)
+              _DetailRow(
+                label: 'Paid on',
+                value: formatFullDate(transaction.paidAt!),
+              ),
+            if (refunded && transaction.refundedAt != null)
+              _DetailRow(
+                label: 'Refund started',
+                value: formatFullDate(transaction.refundedAt!),
+              ),
+            if (transaction.orderNumber.isNotEmpty)
+              _DetailRow(label: 'Order', value: transaction.orderNumber),
+            _DetailRow(label: 'Method', value: transaction.methodLabel),
+            if ((transaction.transactionReference ?? '').isNotEmpty)
+              _DetailRow(
+                label: 'Reference',
+                value: transaction.transactionReference!,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _DetailRow extends StatelessWidget {

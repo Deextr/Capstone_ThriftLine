@@ -1,4 +1,5 @@
 import '../../../core/services/supabase_service.dart';
+import 'admin_portal_data_access.dart';
 import '../../seller/domain/external_selling.dart';
 
 class ExternalHistoryEvidence {
@@ -87,7 +88,7 @@ class ExternalHistoryService {
   final SupabaseService _supabase;
 
   Future<List<ExternalHistoryItem>> load(String verificationId) async {
-    final rows = await _supabase.client
+    final rows = await (await resolveAdminClient(_supabase))
         .from('external_transactions')
         .select(
           'transaction_id, platform, item_name, amount, transaction_date, listing_url, review_status, admin_review_note, external_transaction_evidence(evidence_type, storage_path)',
@@ -102,7 +103,7 @@ class ExternalHistoryService {
       for (final evidence in item.evidence) {
         String? url;
         try {
-          url = await _supabase.client.storage
+          url = await (await resolveAdminClient(_supabase)).storage
               .from('verification-docs')
               .createSignedUrl(evidence.storagePath, 60 * 10);
         } catch (_) {}
@@ -130,7 +131,7 @@ class ExternalHistoryService {
     required ExternalReviewStatus decision,
     String? note,
   }) async {
-    await _supabase.client.rpc(
+    await (await resolveAdminClient(_supabase)).rpc(
       'review_external_transaction',
       params: {
         'p_transaction_id': transactionId,

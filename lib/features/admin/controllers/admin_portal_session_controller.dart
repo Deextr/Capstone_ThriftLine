@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/services/shared_preferences_service.dart';
 import '../../../providers/auth_provider.dart';
+import '../data/admin_portal_session_service.dart';
 import '../data/admin_portal_tab_broadcast.dart';
 import '../domain/admin_portal_session_policy.dart';
 
@@ -12,20 +13,27 @@ class AdminPortalSessionController extends ChangeNotifier {
   AdminPortalSessionController({
     required SharedPreferencesService prefs,
     required AuthProvider auth,
+    AdminPortalSessionService? portalSession,
     AdminPortalTabBroadcast? tabBroadcast,
     Duration inactivityTimeout = adminPortalInactivityTimeout,
+    Duration serverActivitySyncInterval = const Duration(seconds: 30),
   }) : _prefs = prefs,
        _auth = auth,
+       _portalSession = portalSession,
        _tabBroadcast = tabBroadcast ?? AdminPortalTabBroadcast(),
-       _inactivityTimeout = inactivityTimeout;
+       _inactivityTimeout = inactivityTimeout,
+       _serverActivitySyncInterval = serverActivitySyncInterval;
 
   final SharedPreferencesService _prefs;
   final AuthProvider _auth;
+  final AdminPortalSessionService? _portalSession;
   final AdminPortalTabBroadcast _tabBroadcast;
   final Duration _inactivityTimeout;
+  final Duration _serverActivitySyncInterval;
 
   Timer? _deadlineTimer;
   int _lastPersistedActivityMs = 0;
+  int _lastServerTouchMs = 0;
   int _lastSeenLogoutNonce = 0;
   int _timerGeneration = 0;
   bool _monitoring = false;
@@ -63,6 +71,7 @@ class AdminPortalSessionController extends ChangeNotifier {
     unawaited(_prefs.setAdminPortalLastActivityMs(now));
     _tabBroadcast.notifyActivity(now);
     _scheduleDeadlineFrom(now);
+    _syncServerActivity(now);
   }
 
   Future<void> expireDueToInactivity() =>
@@ -122,6 +131,9 @@ class AdminPortalSessionController extends ChangeNotifier {
     _lastPersistedActivityMs = startMs;
     unawaited(_prefs.setAdminPortalLastActivityMs(startMs));
     _scheduleDeadlineFrom(startMs);
+    unawaited(
+      _bootstrapServerSession(reuseStoredActivity: reuseStoredActivity),
+    );
   }
 
   void _stopMonitoring({required bool clearClock}) {
@@ -158,6 +170,7 @@ class AdminPortalSessionController extends ChangeNotifier {
     _stopMonitoring(clearClock: true);
     try {
       await _prefs.setAdminPortalLoginNotice(notice);
+      await _portalSession?.revoke(reason: 'idle');
       await publishSignedOutToOtherTabs();
       await _auth.logout();
     } finally {
@@ -172,6 +185,7 @@ class AdminPortalSessionController extends ChangeNotifier {
       if (ms <= _lastPersistedActivityMs) return;
       _lastPersistedActivityMs = ms;
       _scheduleDeadlineFrom(ms);
+      _syncServerActivity(ms);
       return;
     }
     if (message.kind == AdminPortalTabMessageKind.signedOut) {
@@ -191,6 +205,49 @@ class AdminPortalSessionController extends ChangeNotifier {
         }
       }());
     }
+  }
+
+  Future<void> revokeServerSession({String reason = 'sign_out'}) async {
+    await _portalSession?.revoke(reason: reason);
+  }
+
+  Future<void> _bootstrapServerSession({
+    required bool reuseStoredActivity,
+  }) async {
+    final portal = _portalSession;
+    if (portal == null) return;
+    var ok = reuseStoredActivity ? await portal.touch() : await portal.begin();
+    if (!ok &&
+        reuseStoredActivity &&
+        adminPortalRemainingMs(
+              lastActivityMs: _lastPersistedActivityMs,
+              nowMs: DateTime.now().millisecondsSinceEpoch,
+              timeout: _inactivityTimeout,
+            ) >
+            0) {
+      ok = await portal.begin();
+    }
+    if (!ok && _monitoring && shouldMonitorAdminPortalSession(_auth)) {
+      await _expireSession(notice: adminPortalInactivityLogoutMessage);
+    } else if (ok) {
+      _lastServerTouchMs = DateTime.now().millisecondsSinceEpoch;
+    }
+  }
+
+  void _syncServerActivity(int activityMs) {
+    final portal = _portalSession;
+    if (portal == null || !_monitoring) return;
+    if (activityMs - _lastServerTouchMs <
+        _serverActivitySyncInterval.inMilliseconds) {
+      return;
+    }
+    _lastServerTouchMs = activityMs;
+    unawaited(() async {
+      final ok = await portal.touch();
+      if (!ok && _monitoring && shouldMonitorAdminPortalSession(_auth)) {
+        await _expireSession(notice: adminPortalInactivityLogoutMessage);
+      }
+    }());
   }
 }
 

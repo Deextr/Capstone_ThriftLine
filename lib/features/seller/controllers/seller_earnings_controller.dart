@@ -20,10 +20,12 @@ class SellerEarningsController extends ChangeNotifier {
   bool _isLoading = true;
   bool _isRequesting = false;
   String? _errorMessage;
+  String? _cancellingPayoutId;
 
   SellerEarningsSnapshot? get snapshot => _snapshot;
   bool get isLoading => _isLoading;
   bool get isRequesting => _isRequesting;
+  String? get cancellingPayoutId => _cancellingPayoutId;
   String? get errorMessage => _errorMessage;
   bool get canRequestPayout =>
       !_isRequesting && (_snapshot?.canRequestPayout ?? false);
@@ -51,8 +53,27 @@ class SellerEarningsController extends ChangeNotifier {
     return _payoutMethods.loadMine();
   }
 
+  Future<String?> cancelPayout(String payoutId) async {
+    if (_cancellingPayoutId != null) return null;
+    _cancellingPayoutId = payoutId;
+    notifyListeners();
+    try {
+      final error = await _service.cancelPayout(payoutId);
+      if (error != null) return error;
+      await load(silent: true);
+      return null;
+    } finally {
+      _cancellingPayoutId = null;
+      notifyListeners();
+    }
+  }
+
   Future<String?> requestPayout() async {
     final current = _snapshot;
+    if (current != null && current.hasOpenPayout) {
+      return 'You already have a payout request waiting. Wait for it to be '
+          'completed or cancel it first.';
+    }
     if (current == null || !current.canRequestPayout) {
       return 'There are no available earnings to pay out.';
     }

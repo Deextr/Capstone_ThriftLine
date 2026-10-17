@@ -431,16 +431,10 @@ class BuyerBidsController extends ChangeNotifier {
 
   /// Pending order for a won auction (server-side idempotent prepare).
   Future<AuctionCheckoutOrderResult> prepareWonAuctionCheckout(
-    String auctionId, {
-    String? knownOrderId,
-  }) async {
-    final trimmedOrderId = knownOrderId?.trim();
-    if (trimmedOrderId != null && trimmedOrderId.isNotEmpty) {
-      return AuctionCheckoutOrderResult(
-        success: true,
-        orderId: trimmedOrderId,
-      );
-    }
+    String auctionId,
+  ) async {
+    // Always use the authoritative RPC so line items, totals, and payment_due_at
+    // are healed — v_user_bids may expose an order_id before the row is payable.
     return ensureMyAuctionOrder(_supabase, auctionId);
   }
 

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../data/admin_orders_service.dart';
+import '../data/admin_portal_data_access.dart';
 import '../domain/admin_order_management.dart';
 
 class AdminOrdersListController extends ChangeNotifier {
@@ -83,7 +84,7 @@ class AdminOrdersListController extends ChangeNotifier {
     } catch (e) {
       debugPrint('AdminOrdersListController.load error: $e');
       _rows = const [];
-      _error = 'Unable to load orders. Check your connection and try again.';
+      _error = adminPortalAccessUserMessage(e);
     } finally {
       _loading = false;
       notifyListeners();

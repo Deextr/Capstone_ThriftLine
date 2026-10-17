@@ -56,7 +56,7 @@ The app code is ready. SMS will fail until these steps are done **outside Flutte
 2. Note the trial **sender ID** (or apply for an approved sender ID before production).
 3. Do **not** put the secret in `.env` or Dart — only Supabase Edge Function secrets.
 4. API reference: [UniSMS SMS docs](https://unismsapi.com/docs/sms) (`POST /sms`, Basic auth, E.164 `+639…`).
-5. Optional admin smoke test: deploy `test-unisms-sms` and follow [unisms-sms-testing.md](./unisms-sms-testing.md).
+5. Optional Super Admin smoke test: deploy `test-unisms-sms` and follow [unisms-sms-testing.md](./unisms-sms-testing.md).
 
 ### A2. FMCSMS account (legacy fallback)
 

@@ -187,24 +187,29 @@ void main() {
   });
 
   group('PayMongo channel', () {
-    test('accepts only card and gcash', () {
-      expect(parsePaymongoChannel('gcash'), 'gcash');
-      expect(parsePaymongoChannel('CARD'), 'card');
-      expect(parsePaymongoChannel('maya'), isNull);
+    test('accepts only QR Ph for new checkouts', () {
+      expect(kPaymongoChannels, ['qrph']);
+      expect(parsePaymongoChannel('qrph'), 'qrph');
+      expect(parsePaymongoChannel(' QRPH '), 'qrph');
+      expect(parsePaymongoChannel('gcash'), isNull);
+      expect(parsePaymongoChannel('card'), isNull);
       expect(parsePaymongoChannel('paymongo'), isNull);
+      expect(paymongoChannelLabel('qrph'), 'QR Ph');
+      expect(paymongoChannelCategory('qrph'), 'Scan to pay');
+    });
+
+    test('keeps labels for older card and GCash payments', () {
       expect(paymongoChannelLabel('gcash'), 'GCash');
       expect(paymongoChannelLabel('card'), 'Credit / Debit Card');
-      expect(paymongoChannelCategory('gcash'), 'E-Wallets');
-      expect(paymongoChannelCategory('card'), 'Cards');
     });
 
     test('rejects a checkout start without a supported channel', () {
       final result = PaymongoCheckoutResult.fromMap({
         'success': false,
-        'error': 'Choose Card or GCash.',
+        'error': 'Pay with QR Ph.',
       });
       expect(result.success, isFalse);
-      expect(result.error, 'Choose Card or GCash.');
+      expect(result.error, 'Pay with QR Ph.');
     });
   });
 

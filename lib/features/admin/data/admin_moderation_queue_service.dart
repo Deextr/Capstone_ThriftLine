@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
+import 'admin_portal_data_access.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/community_report_model.dart';
 import 'admin_delivery_dispute.dart';
@@ -211,7 +212,7 @@ class AdminModerationQueueService {
     DateTime? toExclusive,
   }) async {
     final offset = page * pageSize;
-    final raw = await _supabase.client.rpc(
+    final raw = await (await resolveAdminClient(_supabase)).rpc(
       'admin_moderation_queue',
       params: {
         'p_category': adminModerationCategoryParam(category),

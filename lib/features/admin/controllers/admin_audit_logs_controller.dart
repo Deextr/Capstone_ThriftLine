@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../data/admin_audit_log_models.dart';
 import '../data/admin_audit_service.dart';
 import '../data/admin_dashboard_models.dart';
+import '../data/admin_portal_data_access.dart';
 import '../data/admin_portal_session.dart';
 
 class AdminAuditLogsController extends ChangeNotifier {
@@ -78,7 +79,7 @@ class AdminAuditLogsController extends ChangeNotifier {
       AdminPortalSession.note(e);
       _rows = const [];
       _total = 0;
-      _error = 'Unable to load audit logs. Please try again.';
+      _error = adminPortalAccessUserMessage(e);
     } finally {
       _loading = false;
       notifyListeners();

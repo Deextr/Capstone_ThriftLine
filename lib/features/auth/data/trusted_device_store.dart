@@ -78,9 +78,20 @@ class TrustedDeviceStore {
   /// Token to present after password login. Rotates when this install is not
   /// the one that created the stored secret.
   Future<String> currentToken() async {
-    final token = await _storage.read(_tokenKey);
-    final secureInstall = await _storage.read(_installKey);
+    final token = await _readBoundToken();
     final prefsInstall = _prefs.deviceTrustInstallId;
+    var secureInstall = await _readInstallMarker();
+
+    if (!kIsWeb &&
+        token != null &&
+        isDeviceTrustToken(token) &&
+        prefsInstall != null &&
+        isDeviceTrustToken(prefsInstall) &&
+        secureInstall != prefsInstall) {
+      await _storage.write(_installKey, prefsInstall);
+      secureInstall = prefsInstall;
+    }
+
     if (_isBound(token, secureInstall, prefsInstall)) return token!;
     return rotate();
   }
@@ -90,7 +101,9 @@ class TrustedDeviceStore {
   /// Used when forgetting a device so a leftover keychain token can still be
   /// revoked. Does not create or rotate a token.
   Future<String?> storedToken() async {
-    final token = await _storage.read(_tokenKey);
+    final token = kIsWeb
+        ? _prefs.deviceTrustTokenWeb
+        : await _storage.read(_tokenKey);
     if (token != null && isDeviceTrustToken(token)) return token;
     return null;
   }
@@ -98,10 +111,40 @@ class TrustedDeviceStore {
   Future<String> rotate() async {
     final token = generateDeviceTrustToken();
     final installId = generateDeviceTrustToken();
-    await _storage.write(_tokenKey, token);
-    await _storage.write(_installKey, installId);
+    await _writeToken(token);
+    await _writeInstallMarker(installId);
     await _prefs.setDeviceTrustInstallId(installId);
     return token;
+  }
+
+  Future<String?> _readBoundToken() async {
+    if (kIsWeb) {
+      return _prefs.deviceTrustTokenWeb;
+    }
+    return _storage.read(_tokenKey);
+  }
+
+  Future<String?> _readInstallMarker() async {
+    if (kIsWeb) {
+      return _prefs.deviceTrustInstallId;
+    }
+    return _storage.read(_installKey);
+  }
+
+  Future<void> _writeToken(String token) async {
+    if (kIsWeb) {
+      await _prefs.setDeviceTrustTokenWeb(token);
+      return;
+    }
+    await _storage.write(_tokenKey, token);
+  }
+
+  Future<void> _writeInstallMarker(String installId) async {
+    if (kIsWeb) {
+      await _prefs.setDeviceTrustInstallId(installId);
+      return;
+    }
+    await _storage.write(_installKey, installId);
   }
 
   bool _isBound(String? token, String? secureInstall, String? prefsInstall) {

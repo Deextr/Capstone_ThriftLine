@@ -873,7 +873,13 @@ class AdminOrderReportEscrowSummary extends StatelessWidget {
       ('Escrow', deliveryHoldStatusLabel(hold.status)),
       ('Held amount', formatCentavos(hold.amountCentavos)),
       if (hold.isRefunded)
-        ('Refund', refundProviderMessage(hold.refundProvider)),
+        (
+          'Refund',
+          refundProviderMessage(
+            hold.refundProvider,
+            refundState: hold.refundState,
+          ),
+        ),
     ];
 
     if (compact) {

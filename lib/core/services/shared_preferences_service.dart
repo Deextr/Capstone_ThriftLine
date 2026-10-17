@@ -74,6 +74,16 @@ class SharedPreferencesService {
   Future<bool> setDeviceTrustInstallId(String value) =>
       _prefs.setString(AppConstants.keyDeviceTrustInstall, value);
 
+  /// Trusted-device secret on Flutter web (paired with [deviceTrustInstallId]).
+  String? get deviceTrustTokenWeb =>
+      _prefs.getString(AppConstants.keyDeviceTrustTokenWeb);
+
+  Future<bool> setDeviceTrustTokenWeb(String value) =>
+      _prefs.setString(AppConstants.keyDeviceTrustTokenWeb, value);
+
+  Future<void> clearDeviceTrustTokenWeb() =>
+      remove(AppConstants.keyDeviceTrustTokenWeb);
+
   /// Last Buyer/Seller workspace for [userId] on this device.
   ///
   /// Kept across logout so the same person returns to the mode they left.
@@ -141,6 +151,12 @@ class SharedPreferencesService {
 
   Future<void> clearAdminPortalLoginNotice() =>
       remove(AppConstants.keyAdminPortalLoginNotice);
+
+  bool get adminSidebarExpanded =>
+      _prefs.getBool(AppConstants.keyAdminSidebarExpanded) ?? true;
+
+  Future<bool> setAdminSidebarExpanded(bool value) =>
+      _prefs.setBool(AppConstants.keyAdminSidebarExpanded, value);
 
   Future<void> clearAuthSession() async {
     await setLoggedIn(false);
