@@ -1,6 +1,7 @@
 import '../../../models/enums.dart';
 import '../../../models/order_model.dart';
 import '../data/delivery_payment_hold.dart';
+import 'admin_order_filter_rules.dart';
 
 /// How the admin orders table is sorted (server-side).
 enum AdminOrdersSort { newest, oldest, amountHigh, amountLow }
@@ -52,6 +53,7 @@ AdminUnifiedStatusFilter adminUnifiedStatusFromQuery(String? raw) =>
       'cancelled_paid_review' => AdminUnifiedStatusFilter.cancelledPaidReview,
       'preparing' => AdminUnifiedStatusFilter.preparing,
       'delayed' => AdminUnifiedStatusFilter.delayed,
+      'refund_action' => AdminUnifiedStatusFilter.refundActionNeeded,
       _ => AdminUnifiedStatusFilter.any,
     };
 
@@ -85,6 +87,7 @@ enum AdminUnifiedStatusFilter {
   completed,
   cancelled,
   cancelledPaidReview,
+  refundActionNeeded,
   refunded,
   paymentFailed,
 }
@@ -100,6 +103,7 @@ extension AdminUnifiedStatusFilterX on AdminUnifiedStatusFilter {
     AdminUnifiedStatusFilter.cancelled => 'Cancelled (unpaid)',
     AdminUnifiedStatusFilter.cancelledPaidReview =>
       'Cancelled · payment review',
+    AdminUnifiedStatusFilter.refundActionNeeded => 'Refund needs action',
     AdminUnifiedStatusFilter.refunded => 'Refunded',
     AdminUnifiedStatusFilter.paymentFailed => 'Payment failed / expired',
   };
@@ -129,12 +133,37 @@ AdminUnifiedOrderStatus adminUnifiedOrderStatus({
   required String orderStatusDb,
   required String paymentStatus,
   String? escrowStatus,
+  String? refundState,
 }) {
   final os = orderStatusDb.trim().toLowerCase();
   final ps = paymentStatus.trim().toLowerCase();
   final escrow = escrowStatus?.trim().toLowerCase();
+  final refund = refundState?.trim().toLowerCase();
 
-  if (ps == 'refunded' || escrow == 'refunded') {
+  if (escrow == 'refunded' && ps != 'refunded') {
+    final inProgress = switch (refund) {
+      'provider_pending' => const AdminUnifiedOrderStatus(
+        label: 'Refund processing',
+        badgeKey: 'processing',
+      ),
+      'awaiting_buyer_claim' => const AdminUnifiedOrderStatus(
+        label: 'Refund · waiting for buyer claim',
+        badgeKey: 'pending',
+      ),
+      'manual_required' => const AdminUnifiedOrderStatus(
+        label: 'Refund needs action',
+        badgeKey: 'failed',
+      ),
+      _ => null,
+    };
+    if (inProgress != null) return inProgress;
+  }
+
+  if (adminOrderRefundFinanciallyCompleted(
+    paymentStatus: ps,
+    escrowStatus: escrow,
+    refundState: refund,
+  )) {
     if (os == 'cancelled') {
       return const AdminUnifiedOrderStatus(
         label: 'Cancelled · Refunded',
@@ -233,6 +262,7 @@ AdminUnifiedOrderStatus adminUnifiedOrderStatusFromOrder(
     orderStatusDb: adminOrderStatusDbFromModel(order),
     paymentStatus: order.paymentStatus,
     escrowStatus: escrow?.status,
+    refundState: escrow?.refundState,
   );
 }
 
@@ -319,7 +349,11 @@ String? _paymentReferenceDetail(Map<String, dynamic> payment) {
   final parts = <String>[];
   final channel = payment['paymongo_channel']?.toString().trim();
   if (channel != null && channel.isNotEmpty) {
-    parts.add(channel == 'gcash' ? 'GCash' : 'Card');
+    parts.add(switch (channel) {
+      'qrph' => 'QR Ph',
+      'gcash' => 'GCash',
+      _ => 'Card',
+    });
   }
   final paymongoId = payment['paymongo_payment_id']?.toString().trim();
   if (paymongoId != null && paymongoId.isNotEmpty) {
@@ -340,6 +374,7 @@ String adminOrderFulfillmentLabel(OrderModel order) {
 String adminPaymongoChannelLabel(String? channel) {
   final c = channel?.trim().toLowerCase() ?? '';
   return switch (c) {
+    'qrph' => 'QR Ph (PayMongo)',
     'gcash' => 'GCash (PayMongo)',
     'card' => 'Card (PayMongo)',
     _ => 'PayMongo',

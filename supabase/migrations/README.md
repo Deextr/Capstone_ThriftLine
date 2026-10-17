@@ -53,10 +53,14 @@ SMS. The Flutter app must never receive SMS provider credentials.
 | `UNISMS_API_SECRET_KEY` | UniSMS API secret (`Authorization: Basic` username, empty password). |
 | `UNISMS_SENDER_ID` | Approved or trial sender ID from the UniSMS dashboard. |
 | `UNISMS_API_URL` | Optional; defaults to `https://unismsapi.com/api`. |
+| `UNISMS_TEST_SMS_ENABLED` | Must be `true` to allow `test-unisms-sms` (off by default). |
+| `UNISMS_TEST_PHONE_ALLOWLIST` | Comma-separated `09…` numbers for Super Admin connectivity tests only. |
 | `FMCSMS_API_KEY`, `FMCSMS_FROM_NUMBER` | Only when `SMS_PROVIDER=fmcsms`. |
 
-Optional admin-only connectivity check: deploy `../functions/test-unisms-sms`
-(requires signed-in admin JWT). See `../../docs/agile/unisms-sms-testing.md`.
+Optional Super Admin connectivity check: deploy `../functions/test-unisms-sms`
+(requires migration `20261017210000_unisms_test_sms_guards.sql`, secrets
+`UNISMS_TEST_SMS_ENABLED=true` and `UNISMS_TEST_PHONE_ALLOWLIST`, and a Super
+Admin JWT). See `../../docs/agile/unisms-sms-testing.md`.
 
 ## Email OTP (signup and login)
 
@@ -169,11 +173,14 @@ supabase functions deploy send-password-reset --no-verify-jwt
 Set the **public** site key in Flutter `.env` as `TURNSTILE_SITE_KEY` and
 `TURNSTILE_BASE_URL` (must match the Turnstile widget domain list).
 
-**Bypass note:** GoTrue still accepts direct `grant_type=password` requests with
-the public anon key unless you add separate project-level Auth rate limits.
-Turnstile enforcement for the shipped app is on the Edge Function path; pairing
-with Supabase Auth rate limits is recommended defense in depth (Turnstile alone
-is not DDoS protection).
+**Password grant note:** GoTrue may still accept direct `grant_type=password`
+requests with the public anon key. Marketplace data access is gated by
+`20261017260000_email_login_otp_session_gate.sql`: password sessions need a
+verified row in `email_login_session_gates` (registered by `sign-in-with-email`
+or `send-email-otp`, verified by `verify-email-otp`). Direct password grants
+without that path cannot pass restrictive RLS. Turnstile and login throttles
+remain on the Edge Function path; pair with Supabase Auth rate limits for
+defense in depth.
 
 ## Seed data
 
@@ -364,6 +371,56 @@ Apply after `20260928120000_checkout_selected_cart.sql` if that file already ran
 Apply `20261014160000_notification_push_and_messages.sql` after `20261014150000` for chat message in-app alerts, FCM device tokens, and push dispatch. Deploy `../functions/send-push-notification` and set Edge secrets `FCM_SERVICE_ACCOUNT_JSON` (Firebase service account JSON) and optional `PUSH_DISPATCH_SECRET` (match Vault `push_dispatch_secret` for pg_net). Add Flutter `.env` keys `FIREBASE_API_KEY`, `FIREBASE_APP_ID`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_PROJECT_ID`.
 
 Apply `20261014120000` after `20261013200000`. Apply `20261014131000` if Transaction History fails with “varchar does not match text”. Deploy `../functions/process-fulfillment-sla`. Apply `20261014140000_schedule_process_fulfillment_sla_cron.sql` (or use Dashboard → Integrations → Cron) to POST the function every 10 minutes via `pg_cron` + `pg_net`. Enable **pg_cron** and **pg_net** extensions first if the migration notices they are missing. Optional: store the same value as Edge secret `FULFILLMENT_SLA_JOB_SECRET` in Vault as `fulfillment_sla_job_secret` so cron sends `x-fulfillment-sla-secret`. PayMongo refunds need `PAYMONGO_SECRET_KEY` on the function.
+
+## QR Ph checkout, buyer refunds, and Phase A seller payouts
+
+Do **not** edit earlier migrations. Apply these four files in order, after the
+fulfillment SLA files:
+
+| File | Purpose |
+| --- | --- |
+| `20261016140000_qrph_only_checkout.sql` | `prepare_paymongo_checkout` accepts only `qrph`. Older `card` / `gcash` rows stay valid. |
+| `20261016150000_refund_tracking.sql` | `escrow.refund_state`, `escrow_refund_details`, `escrow_refund_attempts`, truthful backfill, refund RPCs, buyer GCash details, admin manual refund record, `list_my_payment_transactions` with refund state |
+| `20261016155900_seller_payout_status_values.sql` | Adds `paid`, `rejected`, `cancelled` to `seller_payout_status_enum`. Run this file **by itself** and wait for success before the next file. |
+| `20261016160000_seller_payout_manual_transfer.sql` | Transfer record columns, one open request per seller, balance = released minus requested and paid, seller cancel, admin list / mark paid / reject, private `financial-evidence` bucket |
+| `20261017003000_admin_list_buyer_refunds.sql` | Admin list RPC for **Buyer refunds** module |
+| `20261017120000_manual_gcash_refunds_only.sql` | Buyer refunds via manual GCash only; blocks PayMongo retry RPC; updated buyer/admin notifications |
+| `20261017190000_late_paymongo_payment_refund.sql` | PayMongo paid webhooks after void/expiry/auction deadline record capture + manual GCash refund (no silent ignore) |
+| `20261017230000_admin_portal_idle_session.sql` | Server-enforced 10-minute admin portal idle session (`is_admin()` gate), session RPCs, financial-evidence delete policy |
+
+Run `../introspection/refunds_payouts_phase_a_verify.sql` and
+`../introspection/late_paymongo_payment_verify.sql` afterwards; all checks
+should report `PASS`.
+
+**Buyer refunds:** dispute and SLA cancellations record `internal` /
+`manual_required`. Admins send GCash and use **Record manual GCash refund**.
+PayMongo checkout and payment webhooks are unchanged.
+
+What the backfill does: an existing refund is `succeeded` only if PayMongo
+already reported `succeeded`. Other PayMongo refunds become
+`provider_pending`, and refunds without a PayMongo id become
+`manual_required`. Those payments go back to `paid` until the refund is
+confirmed, so nothing is shown as refunded before the money is back.
+
+Redeploy with the CLI (the functions import files from `../functions/_shared`):
+
+```bash
+supabase functions deploy create-paymongo-checkout
+supabase functions deploy resolve-delivery-payment
+supabase functions deploy process-fulfillment-sla --no-verify-jwt
+supabase functions deploy reconcile-refund
+supabase functions deploy paymongo-webhook --no-verify-jwt
+```
+
+`reconcile-refund` is admin-only (JWT checked, then `is_admin()`). The existing
+`process-fulfillment-sla` cron also re-checks open PayMongo refunds every run.
+All PayMongo calls use `PAYMONGO_SECRET_KEY` on the server. Flutter never gets it.
+
+In the PayMongo Dashboard, add these webhook events to the existing
+`paymongo-webhook` endpoint: `payment.refunded` and `payment.refund.updated`.
+
+Seller payouts are Phase A only: the app records requests and an admin's
+manual GCash transfer (amount, reference, date, receipt). It does not send money.
 
 ## Conventions
 

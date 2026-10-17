@@ -36,7 +36,6 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
     with WidgetsBindingObserver {
   var _didOpenPaidConfirmation = false;
   String? _handledPaymongoReturnQuery;
-  String? _selectedChannel;
 
   PaymongoReturnCoordinator? _paymongoReturn;
 
@@ -304,12 +303,8 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
                     windowOpen: order.isPaymentWindowOpen,
                     confirming: confirming,
                     statusUnverified: controller.isPaymentStatusUnverified,
-                    selectedChannel: _selectedChannel,
                     isAbandoning: controller.isAbandoning,
                     isSavingAddress: controller.isSavingAddress,
-                    onSelectChannel: (channel) {
-                      setState(() => _selectedChannel = channel);
-                    },
                     onChangeAddress: () => _changeAddress(controller),
                     onCheckStatus: () {
                       unawaited(
@@ -324,7 +319,6 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
                 : paid
                 ? _PaidPaymentBody(
                     orderNumber: order.orderNumber,
-                    channel: _selectedChannel,
                     onViewOrder: () =>
                         context.go(RouteNames.orderConfirmFor(widget.orderId)),
                   )
@@ -631,21 +625,15 @@ class _FailedPaymentBody extends StatelessWidget {
 class _PaidPaymentBody extends StatelessWidget {
   const _PaidPaymentBody({
     required this.orderNumber,
-    required this.channel,
     required this.onViewOrder,
   });
 
   final String orderNumber;
-  final String? channel;
   final VoidCallback onViewOrder;
 
   @override
   Widget build(BuildContext context) {
-    final method = channel == 'gcash'
-        ? 'GCash payment received.'
-        : channel == 'card'
-        ? 'Card payment received.'
-        : 'Your payment has been successfully confirmed.';
+    const method = 'Your QR Ph payment has been confirmed.';
     return Column(
       children: [
         const SizedBox(height: 24),

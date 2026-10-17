@@ -21,12 +21,10 @@ class PaymentCheckoutBody extends StatelessWidget {
     this.groupOrders = const [],
     required this.confirming,
     this.statusUnverified = false,
-    required this.selectedChannel,
     required this.isAbandoning,
     required this.isSavingAddress,
     required this.windowOpen,
     this.returnLabel = '',
-    required this.onSelectChannel,
     required this.onChangeAddress,
     this.onReturnToCart,
     this.onCheckStatus,
@@ -39,12 +37,10 @@ class PaymentCheckoutBody extends StatelessWidget {
   final List<OrderModel> groupOrders;
   final bool confirming;
   final bool statusUnverified;
-  final String? selectedChannel;
   final bool isAbandoning;
   final bool isSavingAddress;
   final bool windowOpen;
   final String returnLabel;
-  final ValueChanged<String> onSelectChannel;
   final VoidCallback onChangeAddress;
   final VoidCallback? onReturnToCart;
   final VoidCallback? onCheckStatus;
@@ -136,10 +132,7 @@ class PaymentCheckoutBody extends StatelessWidget {
                         'Pay securely through PayMongo. Your purchase completes after payment is confirmed.',
                   ),
                   const SizedBox(height: 12),
-                  _PaymentMethodSelector(
-                    selectedChannel: selectedChannel,
-                    onSelect: onSelectChannel,
-                  ),
+                  const _QrPhMethodRow(),
                 ],
                 if (paymentDueAt != null && windowOpen && !confirming) ...[
                   const SizedBox(height: 14),
@@ -155,7 +148,6 @@ class PaymentCheckoutBody extends StatelessWidget {
           totalLabel: totalLabel,
           confirming: confirming,
           statusUnverified: statusUnverified,
-          selectedChannel: selectedChannel,
           hasAddress: _hasValidDeliveryAddress,
           windowOpen: windowOpen,
           isAbandoning: isAbandoning,
@@ -582,124 +574,52 @@ class _PaymentAddressSection extends StatelessWidget {
   }
 }
 
-class _PaymentMethodSelector extends StatelessWidget {
-  const _PaymentMethodSelector({
-    required this.selectedChannel,
-    required this.onSelect,
-  });
-
-  final String? selectedChannel;
-  final ValueChanged<String> onSelect;
+class _QrPhMethodRow extends StatelessWidget {
+  const _QrPhMethodRow();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        for (var i = 0; i < kPaymongoChannels.length; i++) ...[
-          if (i > 0) const SizedBox(height: 10),
-          _PaymentMethodOption(
-            channel: kPaymongoChannels[i],
-            selected: selectedChannel == kPaymongoChannels[i],
-            onTap: () => onSelect(kPaymongoChannels[i]),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _PaymentMethodOption extends StatelessWidget {
-  const _PaymentMethodOption({
-    required this.channel,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String channel;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final label = paymongoChannelLabel(channel);
-    final subtitle = switch (channel) {
-      'gcash' => 'Pay with your GCash wallet',
-      'card' => 'Visa, Mastercard, and other major cards',
-      _ => 'Pay through PayMongo',
-    };
-    final icon = switch (channel) {
-      'gcash' => Icons.account_balance_wallet_rounded,
-      'card' => Icons.credit_card_rounded,
-      _ => Icons.payments_outlined,
-    };
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: selected
-                ? AppColors.primaryLight.withValues(alpha: 0.45)
-                : AppColors.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
-              width: selected ? 2 : 1,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(
+              Icons.qr_code_2_rounded,
+              color: AppColors.primaryDark,
+              size: 26,
             ),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? AppColors.primary.withValues(alpha: 0.12)
-                      : AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(10),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  paymongoChannelLabel(kPaymongoCheckoutChannel),
+                  style: AppTypography.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                child: Icon(
-                  icon,
-                  color: selected
-                      ? AppColors.primaryDark
-                      : AppColors.textSecondary,
+                const SizedBox(height: 2),
+                Text(
+                  'PayMongo shows a QR code. Scan it with GCash, Maya, or '
+                  'your bank app and approve the exact amount.',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: AppTypography.body.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                selected
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_off_rounded,
-                color: selected ? AppColors.primary : AppColors.textHint,
-                size: 22,
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -712,7 +632,6 @@ class _PaymentStickyBar extends StatelessWidget {
     required this.totalLabel,
     required this.confirming,
     required this.statusUnverified,
-    required this.selectedChannel,
     required this.hasAddress,
     required this.windowOpen,
     required this.isAbandoning,
@@ -727,7 +646,6 @@ class _PaymentStickyBar extends StatelessWidget {
   final String totalLabel;
   final bool confirming;
   final bool statusUnverified;
-  final String? selectedChannel;
   final bool hasAddress;
   final bool windowOpen;
   final bool isAbandoning;
@@ -764,7 +682,7 @@ class _PaymentStickyBar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (selectedChannel != null && !confirming) ...[
+            if (!confirming) ...[
               Row(
                 children: [
                   Text(
@@ -775,7 +693,7 @@ class _PaymentStickyBar extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    paymongoChannelLabel(selectedChannel!),
+                    paymongoChannelLabel(kPaymongoCheckoutChannel),
                     style: AppTypography.caption.copyWith(
                       fontWeight: FontWeight.w700,
                       color: AppColors.primaryDark,
@@ -817,15 +735,9 @@ class _PaymentStickyBar extends StatelessWidget {
                   label: 'Payment window ended',
                   onPressed: null,
                 )
-              else if (selectedChannel == null)
-                const ThriftButton(
-                  label: 'Select a payment method',
-                  onPressed: null,
-                )
               else
                 PayNowButton(
                   orderId: (payOrderId ?? order.id).trim(),
-                  channel: selectedChannel!,
                   amountLabel: totalLabel,
                 ),
             ],
@@ -834,9 +746,9 @@ class _PaymentStickyBar extends StatelessWidget {
               Text(
                 !hasAddress
                     ? 'Payment is unavailable until you add a delivery address.'
-                    : selectedChannel != null && windowOpen
-                    ? 'You will continue to PayMongo to complete payment.'
-                    : 'Choose a payment method above to continue.',
+                    : windowOpen
+                    ? 'You will continue to PayMongo to scan the QR Ph code.'
+                    : 'This payment window has ended.',
                 style: AppTypography.caption.copyWith(
                   color: !hasAddress
                       ? AppColors.error.withValues(alpha: 0.85)

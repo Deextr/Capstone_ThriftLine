@@ -276,9 +276,8 @@ class BuyerOrdersController extends ChangeNotifier {
   }
 
   Future<PaymongoCheckoutResult> startPaymongoCheckout(
-    String payOrderId, {
-    required String channel,
-  }) async {
+    String payOrderId,
+  ) async {
     if (_isStartingPayment) {
       return const PaymongoCheckoutResult(
         success: false,
@@ -300,7 +299,6 @@ class BuyerOrdersController extends ChangeNotifier {
       final result = await createPaymongoCheckout(
         _supabase,
         orderId: payOrderId,
-        channel: channel,
       );
       if (result.alreadyPaid) {
         _awaitingPaymongoReturn = false;

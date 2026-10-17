@@ -19,6 +19,8 @@ import '../../features/admin/domain/admin_order_management.dart';
 import '../../features/admin/domain/auction_bidding_violations.dart';
 import '../../features/admin/controllers/admin_reports_controller.dart';
 import '../../features/admin/controllers/admin_seller_applications_controller.dart';
+import '../../features/admin/controllers/admin_buyer_refunds_controller.dart';
+import '../../features/admin/controllers/admin_seller_payouts_controller.dart';
 import '../../features/admin/controllers/admin_users_controller.dart';
 import '../../features/admin/data/admin_review_rules.dart';
 import '../../features/admin/presentation/screens/admin_bid_risk_events_screen.dart';
@@ -43,6 +45,8 @@ import '../../features/admin/presentation/web/admin_web_analytics_reports_page.d
 import '../../features/admin/presentation/web/admin_web_disputes_page.dart';
 import '../../features/admin/presentation/web/admin_web_bidding_violations_page.dart';
 import '../../features/admin/presentation/web/admin_web_orders_transactions_page.dart';
+import '../../features/admin/presentation/web/admin_web_buyer_refunds_page.dart';
+import '../../features/admin/presentation/web/admin_web_seller_payouts_page.dart';
 import '../../features/admin/presentation/web/admin_web_shell.dart';
 import '../../features/admin/presentation/web/admin_web_users_page.dart';
 import '../services/shared_preferences_service.dart';
@@ -308,6 +312,30 @@ GoRouter createAdminAppRouter({required AuthProvider authProvider}) {
                 child: AdminWebOrdersTransactionsPage(initialOrderId: orderId),
               );
             },
+          ),
+          GoRoute(
+            path: RouteNames.adminSellerPayouts,
+            builder: (context, _) => ChangeNotifierProvider(
+              create: (context) => AdminSellerPayoutsController(
+                supabase: context.read<SupabaseService>(),
+                onWaitingCountChanged: context
+                    .read<AdminDashboardController>()
+                    .setPendingPayoutCount,
+              ),
+              child: const AdminWebSellerPayoutsPage(),
+            ),
+          ),
+          GoRoute(
+            path: RouteNames.adminBuyerRefunds,
+            builder: (context, _) => ChangeNotifierProvider(
+              create: (context) => AdminBuyerRefundsController(
+                supabase: context.read<SupabaseService>(),
+                onNeedsActionCountChanged: context
+                    .read<AdminDashboardController>()
+                    .setPendingBuyerRefundCount,
+              ),
+              child: const AdminWebBuyerRefundsPage(),
+            ),
           ),
           GoRoute(
             path: RouteNames.adminOrderDetail,

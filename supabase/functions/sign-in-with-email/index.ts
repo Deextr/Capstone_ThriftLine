@@ -1,5 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sessionIdFromAccessToken } from "../_shared/jwt.ts";
 import { clientIp, sha256Hex } from "../_shared/phone_otp.ts";
+import {
+  hashDeviceToken,
+  isDeviceToken,
+} from "../_shared/trusted_device.ts";
 import {
   turnstileUserMessage,
   verifyTurnstileToken,
@@ -360,6 +365,7 @@ Deno.serve(async (req) => {
     let email = "";
     let password = "";
     let turnstileToken = "";
+    let deviceTokenRaw: unknown = null;
     let loginPortal = "app";
     try {
       const body = await req.json();
@@ -370,6 +376,7 @@ Deno.serve(async (req) => {
         : typeof body?.captcha_token === "string"
         ? body.captcha_token
         : "";
+      deviceTokenRaw = body?.device_token;
       const portalRaw = typeof body?.login_portal === "string"
         ? body.login_portal.trim().toLowerCase()
         : "";
@@ -469,11 +476,15 @@ Deno.serve(async (req) => {
     );
     if (claimError) {
       console.error("sign-in-with-email rate limit RPC failed", claimError);
-      if (!isMissingAdminLockRpc(claimError)) {
+      if (isMissingAdminLockRpc(claimError)) {
         console.warn(
-          "sign-in-with-email continuing without email_login_abuse throttle",
+          "sign-in-with-email email_login_abuse RPC missing; apply migration 20261002130000",
         );
       }
+      return json(req, 503, {
+        error: "Sign-in is temporarily unavailable. Please try again.",
+        code: "unavailable",
+      });
     }
     if (claim === "cooldown") {
       return json(req, 429, {
@@ -594,29 +605,30 @@ Deno.serve(async (req) => {
       const portalActive = profile?.account_status === "active";
       const portalAdmin = portalRole === "admin" || portalRole === "super_admin";
       if (!portalAdmin || !portalActive) {
-        if (portalAdmin && userId) {
-          await revokeAuthUserSessions(userId);
-        }
+        await revokeAuthUserSessions(userId);
         const deactivated = portalAdmin && !portalActive;
-        await logAdminAuthAudit(service, {
-          eventType: "admin_login_denied",
-          status: "failed",
-          summary: deactivated
-            ? "Sign-in rejected: administrator account is deactivated"
-            : "Sign-in rejected: account is not an administrator",
-          actorEmail: email,
-          actorUserId: userId,
-          ipHash: ipHash,
-          details: {
-            login_portal: "admin",
-            reason: deactivated ? "admin_deactivated" : "admin_access_denied",
-          },
-        });
-        return json(req, 403, {
-          error: deactivated
-            ? "This administrator account is deactivated."
-            : "This account does not have admin access.",
-          code: deactivated ? "admin_deactivated" : "admin_access_denied",
+        if (deactivated) {
+          await logAdminAuthAudit(service, {
+            eventType: "admin_login_denied",
+            status: "failed",
+            summary: "Sign-in rejected: administrator account is deactivated",
+            actorEmail: email,
+            actorUserId: userId,
+            ipHash: ipHash,
+            details: {
+              login_portal: "admin",
+              reason: "admin_deactivated",
+            },
+          });
+          return json(req, 403, {
+            error: "This administrator account is deactivated.",
+            code: "admin_deactivated",
+          });
+        }
+        return await adminPortalInvalidPasswordResponse(req, service, {
+          email,
+          emailHash,
+          ipHash,
         });
       }
 
@@ -650,6 +662,18 @@ Deno.serve(async (req) => {
       const role = profile?.role;
       const status = profile?.account_status ?? "active";
       const administrator = role === "admin" || role === "super_admin";
+      if (administrator && status !== "active") {
+        await revokeAuthUserSessions(userId);
+        const banned = status === "banned";
+        return json(req, 403, {
+          error: banned
+            ? "This account has been permanently disabled."
+            : status === "suspended"
+            ? "This account has been disabled."
+            : "This account has been deactivated.",
+          code: banned ? "account_banned" : "account_disabled",
+        });
+      }
       if (!administrator && status !== "active") {
         await revokeAuthUserSessions(userId);
         const banned = status === "banned";
@@ -664,6 +688,51 @@ Deno.serve(async (req) => {
       }
     }
 
+    const accessToken = payload.access_token ?? "";
+    const sessionId = sessionIdFromAccessToken(accessToken);
+    if (!sessionId || !userId) {
+      if (userId) await revokeAuthUserSessions(userId);
+      return json(req, 503, {
+        error: "Sign-in is temporarily unavailable. Please try again.",
+        code: "unavailable",
+      });
+    }
+
+    let trustedSkip = false;
+    if (!isAdminPortal && isDeviceToken(deviceTokenRaw)) {
+      try {
+        const deviceHash = await hashDeviceToken(userId, deviceTokenRaw);
+        const { data: trusted, error: trustError } = await service.rpc(
+          "trusted_device_is_active",
+          { p_user_id: userId, p_device_token_hash: deviceHash },
+        );
+        if (trustError) {
+          console.error("sign-in-with-email trusted device lookup failed");
+        } else {
+          trustedSkip = trusted === true;
+        }
+      } catch (trustError) {
+        console.error("sign-in-with-email trusted device lookup threw", trustError);
+      }
+    }
+
+    const { error: gateError } = await service.rpc(
+      "register_email_login_session_gate",
+      {
+        p_session_id: sessionId,
+        p_user_id: userId,
+        p_trusted_skip: trustedSkip,
+      },
+    );
+    if (gateError) {
+      console.error("sign-in-with-email session gate registration failed", gateError);
+      await revokeAuthUserSessions(userId);
+      return json(req, 503, {
+        error: "Sign-in is temporarily unavailable. Please try again.",
+        code: "unavailable",
+      });
+    }
+
     return json(req, 200, {
       session: {
         access_token: payload.access_token,
@@ -671,6 +740,10 @@ Deno.serve(async (req) => {
         expires_in: payload.expires_in,
         token_type: payload.token_type ?? "bearer",
         user: payload.user,
+      },
+      email_otp: {
+        required: !trustedSkip,
+        skipped_trusted_device: trustedSkip,
       },
     });
   } catch (error) {

@@ -1,8 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { basicAuthHeader } from "../_shared/paymongo.ts";
-
-const PAYMONGO_REFUNDS_URL = "https://api.paymongo.com/v1/refunds";
+import { internalManualRefundOutcome } from "../_shared/internal_manual_refund.ts";
+import { retrieveRefund } from "../_shared/paymongo_refund.ts";
+import type { ServiceClient } from "../_shared/supabase_client.ts";
 
 type RpcMap = Record<string, unknown>;
 
@@ -24,23 +24,6 @@ function readInt(value: unknown): number | null {
     if (Number.isInteger(parsed)) return parsed;
   }
   return null;
-}
-
-function paymongoErrorCode(payload: unknown): string {
-  const root = asMap(payload);
-  const errors = root.errors;
-  if (!Array.isArray(errors) || errors.length === 0) return "";
-  return readString(asMap(errors[0]).code).toLowerCase();
-}
-
-function providerCannotRefund(status: number, code: string): boolean {
-  if (status === 404) return true;
-  return [
-    "payment_not_found",
-    "payment_not_refundable",
-    "resource_not_found",
-    "invalid_payment",
-  ].includes(code);
 }
 
 function jobSecretAllowed(req: Request): boolean {
@@ -98,13 +81,16 @@ Deno.serve(async (req) => {
     for (const row of rows) {
       const orderId = readString(asMap(row).order_id);
       if (!orderId) continue;
-      refunds.push(await refundStuckOrder(service, orderId, paymongoSecret));
+      refunds.push(await refundStuckOrder(service, orderId));
     }
+
+    const reconciled = await reconcilePendingRefunds(service, paymongoSecret);
 
     return json(200, {
       success: true,
       nudges: nudges.data ?? 0,
       refunds,
+      reconciled,
     });
   } catch (e) {
     return json(500, { error: e instanceof Error ? e.message : String(e) });
@@ -112,9 +98,8 @@ Deno.serve(async (req) => {
 });
 
 async function refundStuckOrder(
-  service: ReturnType<typeof createClient>,
+  service: ServiceClient,
   orderId: string,
-  paymongoSecret: string,
 ): Promise<Record<string, unknown>> {
   const prepared = await service.rpc("prepare_fulfillment_sla_refund", {
     p_order_id: orderId,
@@ -135,106 +120,21 @@ async function refundStuckOrder(
   }
 
   const amountCentavos = readInt(prep.amount_centavos);
-  const paymongoPaymentId = readString(prep.paymongo_payment_id);
-  const escrowId = readString(prep.escrow_id);
   if (amountCentavos == null || amountCentavos < 1) {
     await service.rpc("abort_fulfillment_sla_refund", { p_order_id: orderId });
     return { order_id: orderId, success: false, error: "No held payment." };
   }
 
-  let provider: "paymongo" | "internal" = "internal";
-  let refundId = "";
-  let providerStatus = "internal";
-  const canCallPaymongo = paymongoPaymentId.startsWith("pay_") &&
-    paymongoSecret.length > 0;
-
-  if (canCallPaymongo) {
-    try {
-      const paymongoRes = await fetch(PAYMONGO_REFUNDS_URL, {
-        method: "POST",
-        headers: {
-          Authorization: basicAuthHeader(paymongoSecret),
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "Idempotency-Key": escrowId || orderId,
-        },
-        body: JSON.stringify({
-          data: {
-            attributes: {
-              amount: amountCentavos,
-              payment_id: paymongoPaymentId,
-              reason: "requested_by_customer",
-              notes: "ThriftLine 72-hour fulfillment SLA auto-cancel refund",
-            },
-          },
-        }),
-      });
-      const paymongoText = await paymongoRes.text();
-      let paymongoJson: RpcMap = {};
-      try {
-        paymongoJson = asMap(JSON.parse(paymongoText));
-      } catch {
-        paymongoJson = {};
-      }
-
-      if (paymongoRes.status >= 500 || paymongoRes.status === 429) {
-        await service.rpc("abort_fulfillment_sla_refund", {
-          p_order_id: orderId,
-        });
-        return { order_id: orderId, success: false, error: "PayMongo busy." };
-      }
-      if (paymongoRes.ok) {
-        const data = asMap(paymongoJson.data);
-        const attributes = asMap(data.attributes);
-        const id = readString(data.id);
-        const status = readString(attributes.status).toLowerCase();
-        if (!id.startsWith("ref_") || status === "failed") {
-          await service.rpc("abort_fulfillment_sla_refund", {
-            p_order_id: orderId,
-          });
-          return {
-            order_id: orderId,
-            success: false,
-            error: "PayMongo rejected this refund.",
-          };
-        }
-        provider = "paymongo";
-        refundId = id;
-        providerStatus = status || "succeeded";
-      } else if (
-        providerCannotRefund(
-          paymongoRes.status,
-          paymongoErrorCode(paymongoJson),
-        )
-      ) {
-        provider = "internal";
-        providerStatus = paymongoErrorCode(paymongoJson) ||
-          "provider_not_refundable";
-      } else {
-        await service.rpc("abort_fulfillment_sla_refund", {
-          p_order_id: orderId,
-        });
-        return {
-          order_id: orderId,
-          success: false,
-          error: "PayMongo did not accept this refund.",
-        };
-      }
-    } catch {
-      await service.rpc("abort_fulfillment_sla_refund", { p_order_id: orderId });
-      return { order_id: orderId, success: false, error: "PayMongo network error." };
-    }
-  } else {
-    providerStatus = paymongoPaymentId.startsWith("pay_")
-      ? "provider_key_missing"
-      : "no_paymongo_payment_id";
-  }
+  const manual = internalManualRefundOutcome();
 
   const finalized = await service.rpc("finalize_fulfillment_sla_refund", {
     p_order_id: orderId,
-    p_provider: provider,
-    p_paymongo_refund_id: refundId || null,
-    p_provider_status: providerStatus,
+    p_provider: manual.provider,
+    p_paymongo_refund_id: manual.paymongoRefundId,
+    p_provider_status: manual.providerStatus,
+    p_transfer_link: manual.transferLink,
+    p_transfer_link_expires_at: manual.transferLinkExpiresAt,
+    p_provider_error: manual.providerError,
   });
   if (finalized.error) {
     return { order_id: orderId, success: false, error: finalized.error.message };
@@ -250,6 +150,63 @@ async function refundStuckOrder(
   return {
     order_id: orderId,
     success: true,
-    refund_provider: String(fin.refund_provider ?? provider),
+    refund_provider: String(fin.refund_provider ?? manual.provider),
+    refund_state: fin.refund_state ?? null,
   };
+}
+
+async function reconcilePendingRefunds(
+  service: ServiceClient,
+  paymongoSecret: string,
+): Promise<Array<Record<string, unknown>>> {
+  if (!paymongoSecret) return [];
+  const listed = await service.rpc("list_refunds_to_reconcile", { p_limit: 25 });
+  if (listed.error) {
+    console.error("list_refunds_to_reconcile", listed.error.message);
+    return [];
+  }
+  const rows = Array.isArray(listed.data) ? listed.data : [];
+  const results: Array<Record<string, unknown>> = [];
+  for (const raw of rows) {
+    const row = asMap(raw);
+    const escrowId = readString(row.escrow_id);
+    const refundId = readString(row.paymongo_refund_id);
+    if (!escrowId || !refundId) continue;
+    const retrieved = await retrieveRefund({
+      secret: paymongoSecret,
+      refundId,
+      channel: readString(row.paymongo_channel) || null,
+    });
+    await service.rpc("record_refund_attempt", {
+      p_escrow_id: escrowId,
+      p_source: "reconcile",
+      p_action: "retrieve",
+      p_outcome: retrieved.ok ? "updated" : "unknown",
+      p_paymongo_refund_id: refundId,
+      p_http_status: retrieved.ok ? 200 : retrieved.httpStatus,
+      p_provider_status: retrieved.ok ? retrieved.refund.status : null,
+      p_error_code: retrieved.ok ? null : "retrieve_failed",
+      p_has_transfer_link: retrieved.ok && retrieved.refund.transferLink != null,
+    });
+    if (!retrieved.ok) {
+      results.push({ escrow_id: escrowId, success: false });
+      continue;
+    }
+    const applied = await service.rpc("apply_refund_provider_update", {
+      p_paymongo_refund_id: refundId,
+      p_provider_status: retrieved.refund.status,
+      p_transfer_link: retrieved.refund.transferLink,
+      p_transfer_link_expires_at: retrieved.refund.transferLinkExpiresAt,
+      p_provider_error: retrieved.refund.status === "failed"
+        ? "provider_failed"
+        : null,
+    });
+    const map = asMap(applied.data);
+    results.push({
+      escrow_id: escrowId,
+      success: !applied.error && map.success !== false,
+      refund_state: map.refund_state ?? null,
+    });
+  }
+  return results;
 }

@@ -1,9 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { json } from "../_shared/cors.ts";
 import {
-  maskPhMobile,
-  normalizePhPhone,
-  sendUnisms,
-} from "../_shared/phone_otp.ts";
+  MAX_TEST_SMS_BODY_BYTES,
+  defaultTestUnismsDeps,
+  handleTestUnismsSmsRequest,
+} from "../_shared/unisms_test_sms.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,21 +12,20 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const DEFAULT_TEST_CONTENT = "ThriftLine UniSMS connectivity test.";
-
-function json(status: number, body: Record<string, unknown>) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
   if (req.method !== "POST") {
     return json(405, { error: "Method not allowed" });
+  }
+
+  const contentLength = Number(req.headers.get("Content-Length") ?? "0");
+  if (Number.isFinite(contentLength) && contentLength > MAX_TEST_SMS_BODY_BYTES) {
+    return json(413, {
+      error: "Request body is too large.",
+      code: "invalid_body",
+    });
   }
 
   try {
@@ -41,52 +41,43 @@ Deno.serve(async (req) => {
     );
 
     const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) {
-      return json(401, { error: "Sign in first.", code: "unauthenticated" });
-    }
+    const userId = !userError && userData.user ? userData.user.id : null;
 
-    const { data: profile, error: profileError } = await service
-      .from("users")
-      .select("role")
-      .eq("user_id", userData.user.id)
-      .maybeSingle();
-
-    if (profileError) throw profileError;
-    if (profile?.role !== "admin") {
-      return json(403, {
-        error: "Admin access required for SMS connectivity tests.",
-        code: "forbidden",
-      });
-    }
-
-    const body = await req.json();
-    const phone = normalizePhPhone(String(body.phone ?? ""));
-    if (!phone) {
+    let body: unknown = {};
+    try {
+      const raw = await req.text();
+      if (raw.length > MAX_TEST_SMS_BODY_BYTES) {
+        return json(413, {
+          error: "Request body is too large.",
+          code: "invalid_body",
+        });
+      }
+      body = raw.trim().length > 0 ? JSON.parse(raw) : {};
+    } catch {
       return json(400, {
-        error: "Enter a valid 11-digit mobile number starting with 09.",
-        code: "invalid_phone",
+        error: "Request body must be valid JSON.",
+        code: "invalid_body",
       });
     }
 
-    const content =
-      typeof body.content === "string" && body.content.trim().length > 0
-        ? body.content.trim().slice(0, 670)
-        : DEFAULT_TEST_CONTENT;
-
-    console.log("test-unisms-sms request", {
-      admin: userData.user.id.slice(0, 8),
-      phone: maskPhMobile(phone),
+    const deps = defaultTestUnismsDeps(service, userId, async (actorId) => {
+      const { data: profile, error: profileError } = await service
+        .from("users")
+        .select("role, account_status")
+        .eq("user_id", actorId)
+        .maybeSingle();
+      if (profileError) throw profileError;
+      if (!profile) return null;
+      return {
+        role: profile.role as string | null,
+        account_status: profile.account_status as string | null,
+      };
     });
 
-    const result = await sendUnisms(phone, content);
-
-    return json(result.accepted ? 200 : 502, {
-      ok: result.accepted,
-      http_status: result.status,
-      reference_id: result.referenceId ?? null,
-      delivery_status: result.deliveryStatus ?? null,
-      code: result.code ?? null,
-      error: result.accepted ? null : result.userMessage,
+    const outcome = await handleTestUnismsSmsRequest(body, deps);
+    return new Response(JSON.stringify(outcome.body), {
+      status: outcome.status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("test-unisms-sms", error);

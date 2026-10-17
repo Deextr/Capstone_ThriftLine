@@ -47,9 +47,18 @@ class OrderFulfillmentReportController extends ChangeNotifier {
   String? get evidenceError => _evidenceError;
   List<ReportReason> get reasons => fulfillmentBuyerReportReasons();
 
+  bool get detailsRequired => _reason?.slug == 'other';
+
+  String? get _detailsValidationError => communityReportDetailsError(
+    _details,
+    detailsRequired ? 'other' : null,
+  );
+
   bool get canSubmit {
     if (_isSubmitting || _order == null || _reason == null) return false;
-    if (reportDetailsError(_details) != null) return false;
+    if (_detailsValidationError != null) {
+      return false;
+    }
     if (_evidence.length < kReportEvidenceMinCount) return false;
     return fulfillmentSlaForOrder(_order!).canSubmitFulfillmentReport;
   }
@@ -157,8 +166,10 @@ class OrderFulfillmentReportController extends ChangeNotifier {
     if (reason == null) return (reportId: null, error: 'Choose a reason.');
     if (uid == null) return (reportId: null, error: 'Please sign in.');
 
-    final detailsError = reportDetailsError(_details);
-    if (detailsError != null) return (reportId: null, error: detailsError);
+    final detailsError = _detailsValidationError;
+    if (detailsError != null) {
+      return (reportId: null, error: detailsError);
+    }
 
     if (_evidence.length < kReportEvidenceMinCount) {
       _evidenceError = 'Please attach at least one photo as evidence.';

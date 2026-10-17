@@ -18,9 +18,8 @@ import '../features/auth/domain/phone_otp.dart';
 import '../features/auth/domain/trusted_device.dart';
 import '../models/enums.dart';
 
-/// TEMPORARY: skips the email OTP step on login and sign-up.
-/// Only takes effect in debug builds. Set to false to restore OTP.
-const bool kBypassEmailOtp = true;
+/// Debug-only escape hatch for local UI work. Must stay false for production builds.
+const bool kBypassEmailOtp = false;
 bool get _bypassOtp => kDebugMode && kBypassEmailOtp;
 
 /// Router-facing gate: a restored session is not enough while email OTP is
@@ -321,12 +320,20 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      String? deviceToken;
+      try {
+        deviceToken = await _trustedDevices.currentToken();
+      } catch (_) {
+        debugPrint('AuthProvider.loginWithEmail device token unavailable');
+      }
+
       final result = await _authService.signInWithEmail(
         email: email,
         password: password,
         consent: consent,
         turnstileToken: turnstileToken,
         loginPortal: loginPortal,
+        deviceToken: deviceToken,
       );
 
       if (!result.success || result.user == null) {
@@ -348,24 +355,11 @@ class AuthProvider extends ChangeNotifier {
       _syncActiveAccount(_user!, restoreFromPrefs: true);
       await _saveSession(_user!);
 
-      var serverTrusted = false;
-      try {
-        final deviceToken = await _trustedDevices.currentToken();
-        serverTrusted = await _authService.isTrustedDevice(
-          deviceToken: deviceToken,
-        );
-      } catch (_) {
-        debugPrint('AuthProvider.loginWithEmail trusted-device check failed');
-        serverTrusted = false;
-      }
-
-      // TEMP: _bypassOtp forces the skip (debug builds only), never for admins.
+      // Server registers the session gate (trusted skip or pending OTP). The
+      // client only mirrors that decision for routing.
       final skipOtp =
           (_bypassOtp && !result.user!.isAdmin) ||
-          shouldSkipEmailOtp(
-            passwordAccepted: true,
-            serverTrusted: serverTrusted,
-          );
+          !result.requiresEmailOtp;
       if (skipOtp) {
         await _setEmailOtpPending(false);
       } else {

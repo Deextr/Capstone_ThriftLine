@@ -150,6 +150,9 @@ void main() {
       expect(reportReasonLabel('abusive_behavior'), 'Harassment or Abusive Behavior');
       expect(communityReportDetailsError('', 'scam_or_fraud'), isNull);
       expect(communityReportDetailsError('', 'other'), isNotNull);
+      expect(buyerReportDetailsError('', requireDetails: false), isNull);
+      expect(buyerReportDetailsError('short', requireDetails: false), isNull);
+      expect(buyerReportDetailsError('', requireDetails: true), isNotNull);
     });
 
     test('maps studio statuses to readable labels', () {

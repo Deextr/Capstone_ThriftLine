@@ -113,13 +113,17 @@ abstract final class AppTypography {
   static TextStyle get button => _buttonBase;
 
   static TextTheme textThemeFor(AppPaletteColors colors) {
+    final body = _bodyBase.copyWith(color: colors.primary);
     return GoogleFonts.interTextTheme().copyWith(
       displayMedium: _displayBase.copyWith(color: colors.primary),
       headlineMedium: _headingBase.copyWith(color: colors.primary),
       titleMedium: _subheadingBase.copyWith(color: colors.primary),
-      bodyMedium: _bodyBase.copyWith(color: colors.primary),
+      titleLarge: _subheadingBase.copyWith(color: colors.primary),
+      bodyLarge: body,
+      bodyMedium: body,
       bodySmall: _captionBase.copyWith(color: colors.secondary),
       labelMedium: _labelBase.copyWith(color: colors.secondary),
+      labelLarge: _labelBase.copyWith(color: colors.secondary),
     );
   }
 

@@ -6,12 +6,13 @@ AdminAuditLogRow _row({
   String? targetId,
   String summary = '',
   String eventType = '',
+  String category = 'account_management',
   Map<String, dynamic> details = const {},
 }) {
   return AdminAuditLogRow(
     logId: 'log-1',
     createdAt: DateTime.utc(2026, 1, 1),
-    category: 'account_management',
+    category: category,
     eventType: eventType,
     status: 'success',
     summary: summary,
@@ -79,5 +80,41 @@ void main() {
 
     expect(row.targetDisplayPrimary, 'ops@thriftline.test');
     expect(row.targetDisplaySecondary, 'Ref 55555555');
+  });
+
+  test('buyer refund manual completion shows order number from details', () {
+    final row = _row(
+      targetType: 'order',
+      targetId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      eventType: 'manual_refund_recorded',
+      category: 'payments_escrow',
+      summary: 'Confirmed manual GCash refund of ₱500.00 for Order #TL-1001',
+      details: const {'order_number': 'TL-1001'},
+    );
+
+    expect(row.displayEvent, 'Manual GCash refund confirmed');
+    expect(row.targetDisplayPrimary, 'TL-1001');
+    expect(row.moduleLabel, 'Orders & payments');
+  });
+
+  test('seller payout events use friendly labels', () {
+    final paid = _row(
+      targetType: 'seller_payout',
+      targetId: 'payout-1',
+      eventType: 'seller_payout_paid',
+      category: 'payments_escrow',
+      summary: 'Confirmed GCash payout of ₱1,200.00',
+    );
+    final rejected = _row(
+      targetType: 'seller_payout',
+      targetId: 'payout-2',
+      eventType: 'seller_payout_rejected',
+      category: 'payments_escrow',
+      summary: 'Rejected payout request of ₱1,200.00',
+    );
+
+    expect(paid.displayEvent, 'Seller payout confirmed');
+    expect(rejected.displayEvent, 'Seller payout rejected');
+    expect(paid.targetDisplayPrimary, 'Seller payout');
   });
 }

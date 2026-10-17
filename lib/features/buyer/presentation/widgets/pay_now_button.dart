@@ -11,13 +11,11 @@ class PayNowButton extends StatelessWidget {
   const PayNowButton({
     super.key,
     required this.orderId,
-    required this.channel,
     required this.amountLabel,
     this.expand = true,
   });
 
   final String orderId;
-  final String channel;
   final String amountLabel;
   final bool expand;
 
@@ -30,7 +28,7 @@ class PayNowButton extends StatelessWidget {
           ? 'Opening PayMongo…'
           : controller.isConfirmingPayment
           ? 'Checking payment status...'
-          : 'Pay $amountLabel',
+          : 'Pay $amountLabel with QR Ph',
       isLoading: busy,
       expand: expand,
       onPressed: busy
@@ -39,7 +37,6 @@ class PayNowButton extends StatelessWidget {
               context: context,
               controller: controller,
               orderId: orderId,
-              channel: channel,
             ),
     );
   }
@@ -49,12 +46,8 @@ Future<void> startPaymongoPayment({
   required BuildContext context,
   required BuyerOrdersController controller,
   required String orderId,
-  required String channel,
 }) async {
-  final result = await controller.startPaymongoCheckout(
-    orderId,
-    channel: channel,
-  );
+  final result = await controller.startPaymongoCheckout(orderId);
   if (!context.mounted) return;
 
   if (result.alreadyPaid) {

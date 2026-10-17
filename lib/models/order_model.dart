@@ -134,7 +134,11 @@ class OrderModel {
     return needsBuyerPayment && due.isAfter(DateTime.now());
   }
 
-  bool get isRefundedSale => paymentStatus == 'refunded';
+  /// Payment stays `paid` until the refund is confirmed back with the buyer.
+  bool get isRefundInProgress =>
+      status == OrderStatus.cancelled && paymentStatus == 'paid';
+
+  bool get isRefundedSale => paymentStatus == 'refunded' || isRefundInProgress;
 
   bool get isPaymentPending =>
       status == OrderStatus.paymentPending || status == OrderStatus.placed;
@@ -182,6 +186,12 @@ class OrderModel {
 
   /// Auction wins require payment. Abandoned fixed-price checkouts do not.
   bool get showsAsAwaitingPayment => needsBuyerPayment && isAuctionObligation;
+
+  /// Fixed-price reservations void after 90 minutes (`expire_unpaid_checkouts`).
+  DateTime? get unpaidFixedPriceReservationExpiresAt {
+    if (isAuctionObligation || !needsBuyerPayment) return null;
+    return createdAt.add(const Duration(minutes: 90));
+  }
 
   bool get showsInPurchaseHistory =>
       !isPaymentPending && !isFailedCheckout && !isAbandonedCheckout;

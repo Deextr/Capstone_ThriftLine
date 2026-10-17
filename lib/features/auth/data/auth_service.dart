@@ -129,14 +129,18 @@ class AuthService {
     required LegalConsent consent,
     required String turnstileToken,
     LoginPortal loginPortal = LoginPortal.app,
+    String? deviceToken,
   }) async {
     try {
-      final body = {
+      final body = <String, dynamic>{
         'email': email.trim(),
         'password': password,
         'turnstile_token': turnstileToken.trim(),
         'login_portal': loginPortal.apiValue,
       };
+      if (deviceToken != null && deviceToken.isNotEmpty) {
+        body['device_token'] = deviceToken;
+      }
 
       late final int responseStatus;
       late final dynamic data;
@@ -202,9 +206,17 @@ class AuthService {
         );
 
         final userRecord = await getUserRecord(supabaseUser.id);
+        final emailOtp = data['email_otp'];
+        var requiresEmailOtp = true;
+        if (emailOtp is Map) {
+          final required = emailOtp['required'];
+          if (required is bool && required == false) {
+            requiresEmailOtp = false;
+          }
+        }
         return AuthResult.success(
           await hydrateUser(supabaseUser, userRecord),
-          requiresEmailOtp: true,
+          requiresEmailOtp: requiresEmailOtp,
         );
       }
 

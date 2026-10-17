@@ -32,6 +32,7 @@ class CheckoutScreen extends StatelessWidget {
     final reviewShops = checkout.checkoutShops;
     final reviewCount = checkout.selectedCount;
     final awaiting = checkout.awaitingPayment;
+    final pendingFixed = checkout.pendingFixedPriceCheckouts;
 
     return PopScope(
       canPop: false,
@@ -80,6 +81,8 @@ class CheckoutScreen extends StatelessWidget {
                 children: [
                   if (awaiting.isNotEmpty)
                     _AwaitingPaymentBanner(awaiting: awaiting),
+                  if (pendingFixed.isNotEmpty)
+                    _PendingFixedCheckoutBanner(orders: pendingFixed),
                   if (reviewShops.length > 1)
                     _MultiSellerNotice(sellerCount: reviewShops.length),
                   Padding(
@@ -329,6 +332,84 @@ class _AwaitingPaymentBanner extends StatelessWidget {
   }
 }
 
+class _PendingFixedCheckoutBanner extends StatelessWidget {
+  const _PendingFixedCheckoutBanner({required this.orders});
+
+  final List<OrderModel> orders;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              orders.length == 1
+                  ? 'You have an unpaid checkout'
+                  : 'You have ${orders.length} unpaid checkouts',
+              style: AppTypography.subheading.copyWith(fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Reserved items are held for about 90 minutes. Finish payment or cancel to release stock.',
+              style: AppTypography.caption.copyWith(fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            for (final order in orders.take(3))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: ThriftCard(
+                  onTap: () =>
+                      context.push(RouteNames.paymentForOrder(order.id)),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              order.productTitle,
+                              style: AppTypography.body.copyWith(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              'Order #${order.orderNumber} · ${formatCurrency(order.total)}',
+                              style: AppTypography.caption.copyWith(
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _MultiSellerNotice extends StatelessWidget {
   const _MultiSellerNotice({required this.sellerCount});
   final int sellerCount;
@@ -377,6 +458,7 @@ class _CheckoutBottomBar extends StatelessWidget {
     final checkout = context.watch<CheckoutController>();
     final total = checkout.total;
     final blocked = checkout.hasUnpaidCheckouts;
+    final addressError = checkout.deliveryAddressError;
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -433,6 +515,14 @@ class _CheckoutBottomBar extends StatelessWidget {
             ),
             const SizedBox(height: 10),
           ],
+          if (addressError != null) ...[
+            Text(
+              addressError,
+              style: AppTypography.caption.copyWith(color: AppColors.error),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+          ],
           if (checkout.errorMessage != null) ...[
             Text(
               checkout.errorMessage!,
@@ -471,6 +561,7 @@ class _CheckoutBottomBar extends StatelessWidget {
               ElevatedButton(
                 onPressed:
                     blocked ||
+                            !checkout.hasValidDeliveryAddress ||
                             checkout.isLoading ||
                             checkout.isSubmitting ||
                             checkout.isContinuingToPayment

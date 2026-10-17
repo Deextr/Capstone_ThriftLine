@@ -224,6 +224,8 @@ class AdminAuditLogRow {
       'escrow' => 'Escrow payment',
       'admin_invitation' => 'Admin invitation',
       'order' => 'Order',
+      'seller_payout' => 'Seller payout',
+      'external_transaction' => 'External selling history',
       _ => titleCase(type),
     };
   }
@@ -252,6 +254,13 @@ class AdminAuditLogRow {
       'admin_invitation_accepted' => 'Admin invitation',
       'admin_activated' || 'admin_deactivated' => 'Administrator account',
       'super_admin_designated' => 'Super Admin account',
+      'buyer_refund_decided' => 'Buyer refund',
+      'manual_refund_recorded' => 'Buyer refund',
+      'seller_payout_paid' => 'Seller payout',
+      'seller_payout_rejected' => 'Seller payout',
+      'external_transaction_reviewed' => 'External selling history',
+      'return_shipment_cancelled' => 'Order dispute',
+      'marketplace_report_exported' => 'Marketplace report',
       _ => null,
     };
   }
@@ -291,6 +300,13 @@ const _eventLabels = <String, String>{
   'admin_deactivated': 'Admin deactivated',
   'super_admin_designated': 'Super Admin designated',
   'marketplace_account_disabled': 'Disabled user account',
+  'buyer_refund_decided': 'Buyer refund approved',
+  'manual_refund_recorded': 'Manual GCash refund confirmed',
+  'seller_payout_paid': 'Seller payout confirmed',
+  'seller_payout_rejected': 'Seller payout rejected',
+  'external_transaction_reviewed': 'External history reviewed',
+  'return_shipment_cancelled': 'Return shipment stopped',
+  'marketplace_report_exported': 'Report exported',
 };
 
 abstract final class AdminAuditCategory {

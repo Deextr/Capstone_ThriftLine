@@ -52,6 +52,7 @@ Future<void> confirmAdminSignOut(BuildContext context) async {
   String? error;
   session.beginManualSignOut();
   try {
+    await session.revokeServerSession(reason: 'sign_out');
     error = await auth.logout(forgetDevice: forgetDevice);
     if (error == null) {
       await session.publishSignedOutToOtherTabs();

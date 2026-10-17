@@ -38,4 +38,23 @@ class SellerEarningsService {
       return 'Could not record that payout request.';
     }
   }
+
+  Future<String?> cancelPayout(String payoutId) async {
+    try {
+      final rpcRes = await _supabase.client.rpc(
+        'cancel_my_seller_payout',
+        params: {'p_payout_id': payoutId},
+      );
+      if (!supabaseRpcSuccess(rpcRes)) {
+        return supabaseRpcError(
+          rpcRes,
+          fallback: 'Could not cancel that payout request.',
+        );
+      }
+      return null;
+    } catch (e) {
+      debugPrint('cancel_my_seller_payout error: $e');
+      return 'Could not cancel that payout request.';
+    }
+  }
 }

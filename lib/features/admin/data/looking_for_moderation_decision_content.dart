@@ -55,9 +55,8 @@ String lookingForDisputeConfirmDetail(
   String? uiDecision,
 ) => switch (uiDecision) {
   kLookingForDecisionRemovePost =>
-    'The Looking For post will be marked removed by moderation and cannot be '
-        'reposted. Strike rules may apply once per post. Other open reports on '
-        'this post will close with the same enforcement without duplicate strikes.',
+    'The post is removed and cannot be reposted. One strike may apply per post. '
+        'Other open reports on this post close without duplicate strikes.',
   kLookingForDecisionDismissReport =>
     'The report will be closed. No strike or removal is applied. Other open '
         'reports on this post stay open unless you decide them separately.',

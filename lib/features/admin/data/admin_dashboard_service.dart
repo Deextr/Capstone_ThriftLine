@@ -48,7 +48,7 @@ class AdminDashboardService {
       revenueSeries: snapshot.revenueSeries,
       recentActivity: snapshot.recentActivity,
     );
-    await _cacheSnapshot(map);
+    await _cacheSnapshot(_marketplaceCachePayload(map, overdue));
     return merged;
   }
 
@@ -99,6 +99,26 @@ class AdminDashboardService {
       );
     }
     return map;
+  }
+
+  @visibleForTesting
+  static Map<String, dynamic> marketplaceCachePayload(
+    Map<String, dynamic> rpcMap,
+    int ordersOverdueFulfillment,
+  ) => _marketplaceCachePayload(rpcMap, ordersOverdueFulfillment);
+
+  static Map<String, dynamic> _marketplaceCachePayload(
+    Map<String, dynamic> rpcMap,
+    int ordersOverdueFulfillment,
+  ) {
+    final cache = Map<String, dynamic>.from(rpcMap);
+    final activityRaw = cache['activity'];
+    final activity = activityRaw is Map
+        ? Map<String, dynamic>.from(activityRaw)
+        : <String, dynamic>{};
+    activity['orders_overdue_fulfillment'] = ordersOverdueFulfillment;
+    cache['activity'] = activity;
+    return cache;
   }
 
   Future<void> _cacheSnapshot(Map<String, dynamic> json) async {

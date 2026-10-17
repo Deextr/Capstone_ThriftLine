@@ -2,9 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
-import '../../../core/utils/fulfillment_sla.dart';
 import '../../buyer/data/order_query.dart';
 import '../../../models/order_model.dart';
+import '../domain/admin_order_filter_rules.dart';
 import '../domain/admin_order_management.dart';
 import 'delivery_payment_hold.dart';
 
@@ -21,6 +21,7 @@ class AdminOrderRow {
     required this.orderKind,
     required this.unifiedStatus,
     this.paidAt,
+    this.fulfillmentOverdue = false,
   });
 
   final String orderId;
@@ -34,20 +35,16 @@ class AdminOrderRow {
   final AdminOrderKind orderKind;
   final AdminUnifiedOrderStatus unifiedStatus;
   final DateTime? paidAt;
+  final bool fulfillmentOverdue;
 
-  bool get isFulfillmentDelayed {
-    if (orderStatus.trim().toLowerCase() != 'paid') return false;
-    if (paymentStatus.trim().toLowerCase() != 'paid') return false;
-    final clock = paidAt ?? createdAt;
-    return DateTime.now().difference(clock) >= kFulfillmentAdminDelayed;
-  }
+  bool get isFulfillmentDelayed => fulfillmentOverdue;
 
   factory AdminOrderRow.fromJson(Map<String, dynamic> json) {
     final buyer = json['buyer'];
     final seller = json['seller'];
     final paymentStatus = _paymentFromRow(json);
     final orderStatus = (json['order_status'] as String?)?.trim() ?? 'pending';
-    final escrowStatus = _escrowStatusFromRow(json);
+    final escrowStatus = _escrowFieldFromRow(json, 'status');
     return AdminOrderRow(
       orderId: json['order_id'] as String,
       orderNumber: (json['order_number'] as String?)?.trim() ?? '',
@@ -71,24 +68,28 @@ class AdminOrderRow {
         orderStatusDb: orderStatus,
         paymentStatus: paymentStatus,
         escrowStatus: escrowStatus,
+        refundState: _escrowFieldFromRow(json, 'refund_state'),
       ),
       paidAt: _paidAtFromRow(json),
+      fulfillmentOverdue: adminOrderFulfillmentOverdueFromSlaFlags(
+        adminOrderSlaFlagsFromRow(json),
+      ),
     );
   }
 
   String get statusLabel => unifiedStatus.label;
 }
 
-String? _escrowStatusFromRow(Map<String, dynamic> json) {
+String? _escrowFieldFromRow(Map<String, dynamic> json, String field) {
   final raw = json['escrow'];
   if (raw is List && raw.isNotEmpty) {
     final first = raw.first;
     if (first is Map) {
-      return (first['status'] as String?)?.trim();
+      return (first[field] as String?)?.trim();
     }
   }
   if (raw is Map) {
-    return (raw['status'] as String?)?.trim();
+    return (raw[field] as String?)?.trim();
   }
   return null;
 }
@@ -226,17 +227,18 @@ class AdminOrdersService {
 
   final SupabaseService _supabase;
 
-  static const _listSelectBase =
+  static String _listSelect({
+    required bool paymentInner,
+    required bool slaFlagsInner,
+  }) =>
       'order_id, order_number, order_type, auction_id, total_amount, '
       'order_status, created_at, '
       'buyer:buyer_id(full_name), seller:seller_id(full_name), '
-      'payments(payment_status, created_at, updated_at), escrow(status)';
-
-  static const _listSelectPaymentInner =
-      'order_id, order_number, order_type, auction_id, total_amount, '
-      'order_status, created_at, '
-      'buyer:buyer_id(full_name), seller:seller_id(full_name), '
-      'payments!inner(payment_status, created_at, updated_at), escrow(status)';
+      'payments${paymentInner ? '!inner' : ''}'
+      '(payment_status, created_at, updated_at), '
+      'escrow(status, refund_state), '
+      'admin_order_sla_flags${slaFlagsInner ? '!inner' : ''}'
+      '(fulfillment_overdue, refund_needs_action, refund_completed)';
 
   Future<AdminOrdersPage> list({
     required int page,
@@ -253,9 +255,16 @@ class AdminOrdersService {
 
     final needsPaymentInner = _needsPaymentInnerJoin(unifiedStatus);
 
+    final needsSlaFlagsInner = _needsSlaFlagsInnerJoin(unifiedStatus);
+
     var filter = _supabase.client
         .from('orders')
-        .select(needsPaymentInner ? _listSelectPaymentInner : _listSelectBase);
+        .select(
+          _listSelect(
+            paymentInner: needsPaymentInner,
+            slaFlagsInner: needsSlaFlagsInner,
+          ),
+        );
 
     final orderType = category.dbOrderType;
     if (orderType != null) {
@@ -312,7 +321,8 @@ class AdminOrdersService {
           .toList();
       return AdminOrdersPage(rows: rows, total: response.count);
     } on PostgrestException catch (e) {
-      debugPrint('AdminOrdersService.list escrow embed failed: $e');
+      debugPrint('AdminOrdersService.list embed failed: $e');
+      if (needsSlaFlagsInner) rethrow;
       return _listWithoutEscrowEmbed(
         page: page,
         pageSize: pageSize,
@@ -350,12 +360,16 @@ class AdminOrdersService {
         'order_id, order_number, order_type, auction_id, total_amount, '
         'order_status, created_at, '
         'buyer:buyer_id(full_name), seller:seller_id(full_name), '
-        'payments(payment_status, created_at, updated_at)';
+        'payments(payment_status, created_at, updated_at), '
+        'escrow(status, refund_state), '
+        'admin_order_sla_flags(fulfillment_overdue, refund_needs_action, refund_completed)';
     const selectNoEscrowPaymentInner =
         'order_id, order_number, order_type, auction_id, total_amount, '
         'order_status, created_at, '
         'buyer:buyer_id(full_name), seller:seller_id(full_name), '
-        'payments!inner(payment_status, created_at, updated_at)';
+        'payments!inner(payment_status, created_at, updated_at), '
+        'escrow(status, refund_state), '
+        'admin_order_sla_flags(fulfillment_overdue, refund_needs_action, refund_completed)';
 
     var filter = _supabase.client
         .from('orders')
@@ -412,11 +426,18 @@ class AdminOrdersService {
 
   bool _needsPaymentInnerJoin(AdminUnifiedStatusFilter filter) {
     return switch (filter) {
-      AdminUnifiedStatusFilter.refunded ||
       AdminUnifiedStatusFilter.paymentFailed ||
       AdminUnifiedStatusFilter.cancelledPaidReview ||
-      AdminUnifiedStatusFilter.awaitingPayment ||
-      AdminUnifiedStatusFilter.delayed => true,
+      AdminUnifiedStatusFilter.awaitingPayment => true,
+      _ => false,
+    };
+  }
+
+  bool _needsSlaFlagsInnerJoin(AdminUnifiedStatusFilter filter) {
+    return switch (filter) {
+      AdminUnifiedStatusFilter.delayed ||
+      AdminUnifiedStatusFilter.refunded ||
+      AdminUnifiedStatusFilter.refundActionNeeded => true,
       _ => false,
     };
   }
@@ -432,17 +453,10 @@ class AdminOrdersService {
             .eq('order_status', 'pending')
             .eq('payments.payment_status', 'pending'),
       AdminUnifiedStatusFilter.preparing => filter.eq('order_status', 'paid'),
-      AdminUnifiedStatusFilter.delayed =>
-        filter
-            .eq('order_status', 'paid')
-            .eq('payments.payment_status', 'paid')
-            .lt(
-              'payments.updated_at',
-              DateTime.now()
-                  .toUtc()
-                  .subtract(kFulfillmentAdminDelayed)
-                  .toIso8601String(),
-            ),
+      AdminUnifiedStatusFilter.delayed => filter.eq(
+        'admin_order_sla_flags.fulfillment_overdue',
+        true,
+      ),
       AdminUnifiedStatusFilter.shipped => filter.eq('order_status', 'shipped'),
       AdminUnifiedStatusFilter.completed => filter.eq(
         'order_status',
@@ -456,9 +470,13 @@ class AdminOrdersService {
         filter
             .eq('order_status', 'cancelled')
             .eq('payments.payment_status', 'paid'),
+      AdminUnifiedStatusFilter.refundActionNeeded => filter.eq(
+        'admin_order_sla_flags.refund_needs_action',
+        true,
+      ),
       AdminUnifiedStatusFilter.refunded => filter.eq(
-        'payments.payment_status',
-        'refunded',
+        'admin_order_sla_flags.refund_completed',
+        true,
       ),
       AdminUnifiedStatusFilter.paymentFailed => filter.or(
         'payments.payment_status.eq.failed,payments.payment_status.eq.expired',

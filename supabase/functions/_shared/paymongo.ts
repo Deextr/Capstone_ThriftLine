@@ -499,3 +499,73 @@ export function isPaymongoCheckoutUrl(url: string): boolean {
 export function basicAuthHeader(secretKey: string): string {
   return `Basic ${btoa(`${secretKey.trim()}:`)}`;
 }
+
+const PAYMONGO_CHECKOUT_URL = "https://api.paymongo.com/v2/checkout_sessions";
+
+/** Loads a checkout session from PayMongo before expiring or reconciling. */
+export async function fetchPaymongoCheckoutSession(
+  secretKey: string,
+  sessionId: string,
+): Promise<CheckoutSessionOutcome | null> {
+  const id = sessionId.trim();
+  if (!id.startsWith("cs_")) return null;
+  let response: Response;
+  try {
+    response = await fetch(`${PAYMONGO_CHECKOUT_URL}/${id}`, {
+      method: "GET",
+      headers: {
+        Authorization: basicAuthHeader(secretKey),
+        Accept: "application/json",
+      },
+    });
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  try {
+    const payload = await response.json();
+    return checkoutSessionOutcome(payload);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Expires a prior PayMongo session only when it is safe (not paid / not in-flight
+ * for a successful payment the app must keep tracking).
+ */
+export async function expirePaymongoCheckoutSessionIfSafe(
+  secretKey: string,
+  sessionId: string,
+): Promise<void> {
+  const id = sessionId.trim();
+  if (!id.startsWith("cs_")) return;
+
+  const current = await fetchPaymongoCheckoutSession(secretKey, id);
+  if (current?.outcome === "paid") {
+    console.error(
+      "skip expire: checkout session already paid",
+      id.slice(0, 12),
+    );
+    return;
+  }
+  if (current?.outcome === "pending") {
+    console.error(
+      "skip expire: checkout session still pending payment",
+      id.slice(0, 12),
+    );
+    return;
+  }
+
+  try {
+    await fetch(`${PAYMONGO_CHECKOUT_URL}/${id}/expire`, {
+      method: "POST",
+      headers: {
+        Authorization: basicAuthHeader(secretKey),
+        Accept: "application/json",
+      },
+    });
+  } catch {
+    console.error("expire previous checkout session failed");
+  }
+}

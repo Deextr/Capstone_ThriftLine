@@ -27,6 +27,13 @@ class AddressModel {
 
   bool get hasValidPhoneContact => isPhMobile09Format(phoneNumber);
 
+  bool get isCompleteForDelivery =>
+      recipientName.trim().isNotEmpty &&
+      streetAddress.trim().isNotEmpty &&
+      barangay.trim().isNotEmpty &&
+      city.trim().isNotEmpty &&
+      hasValidPhoneContact;
+
   String get formatted {
     final parts = <String>[
       streetAddress,

@@ -1,6 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { basicAuthHeader, isPaymongoCheckoutUrl } from "../_shared/paymongo.ts";
+import {
+  basicAuthHeader,
+  expirePaymongoCheckoutSessionIfSafe,
+  isPaymongoCheckoutUrl,
+} from "../_shared/paymongo.ts";
 
 const PAYMONGO_CHECKOUT_URL = "https://api.paymongo.com/v2/checkout_sessions";
 
@@ -70,15 +74,15 @@ Deno.serve(async (req) => {
       : typeof body?.channel === "string"
       ? body.channel
       : "";
-    channel = rawChannel.trim().toLowerCase();
+    channel = rawChannel.trim().toLowerCase() || "qrph";
   } catch {
     return json(400, { success: false, error: "Order not found." });
   }
   if (!orderId || !isUuid(orderId)) {
     return json(400, { success: false, error: "Order not found." });
   }
-  if (channel !== "card" && channel !== "gcash") {
-    return json(400, { success: false, error: "Choose Card or GCash." });
+  if (channel !== "qrph") {
+    return json(400, { success: false, error: "Pay with QR Ph." });
   }
 
   const supabase = createClient(supabaseUrl, anonKey, {
@@ -169,18 +173,46 @@ Deno.serve(async (req) => {
   const previousSession = typeof prep.previous_session_id === "string"
     ? prep.previous_session_id
     : "";
-  if (previousSession) {
-    try {
-      await fetch(`${PAYMONGO_CHECKOUT_URL}/${previousSession}/expire`, {
-        method: "POST",
-        headers: {
-          Authorization: basicAuthHeader(paymongoSecret),
-          Accept: "application/json",
-        },
-      });
-    } catch {
-      console.error("expire previous checkout session failed");
-    }
+
+  const claimed = await service.rpc("claim_paymongo_checkout_session_init", {
+    p_payment_id: paymentId,
+    p_buyer_id: buyerId,
+  });
+  if (claimed.error) {
+    console.error("claim_paymongo_checkout_session_init", claimed.error.message);
+    return json(400, {
+      success: false,
+      error: "Unable to start payment right now. Please try again.",
+    });
+  }
+  const claimMap = (claimed.data ?? {}) as Record<string, unknown>;
+  if (claimMap.already_paid === true) {
+    await service.rpc("release_paymongo_checkout_session_init", {
+      p_payment_id: paymentId,
+    });
+    return json(200, {
+      success: true,
+      already_paid: true,
+      order_id: claimMap.order_id,
+    });
+  }
+  if (claimMap.reuse === true && typeof claimMap.checkout_url === "string") {
+    await service.rpc("release_paymongo_checkout_session_init", {
+      p_payment_id: paymentId,
+    });
+    return json(200, {
+      success: true,
+      already_paid: false,
+      checkout_url: claimMap.checkout_url,
+      session_id: claimMap.session_id,
+      payment_id: claimMap.payment_id,
+    });
+  }
+  if (claimMap.claimed !== true) {
+    const busyMessage = typeof claimMap.error === "string"
+      ? claimMap.error
+      : "Payment is already starting.";
+    return json(409, { success: false, error: busyMessage });
   }
 
   // PayMongo v2 checkout_sessions only support success_url and cancel_url.
@@ -190,9 +222,10 @@ Deno.serve(async (req) => {
   const cancelUrl = Deno.env.get("PAYMONGO_CANCEL_URL") ??
     `${supabaseUrl}/functions/v1/paymongo-return?status=cancel`;
 
-  let paymongoRes: Response;
   try {
-    paymongoRes = await fetch(PAYMONGO_CHECKOUT_URL, {
+    let paymongoRes: Response;
+    try {
+      paymongoRes = await fetch(PAYMONGO_CHECKOUT_URL, {
       method: "POST",
       headers: {
         Authorization: basicAuthHeader(paymongoSecret),
@@ -236,87 +269,99 @@ Deno.serve(async (req) => {
           },
         },
       }),
-    });
-  } catch {
-    console.error("paymongo create session network error");
-    return json(502, {
-      success: false,
-      error: "Unable to start payment right now. Please try again.",
-    });
-  }
+      });
+    } catch {
+      console.error("paymongo create session network error");
+      return json(502, {
+        success: false,
+        error: "Unable to start payment right now. Please try again.",
+      });
+    }
 
-  const paymongoText = await paymongoRes.text();
-  let paymongoJson: Record<string, unknown> = {};
-  try {
-    paymongoJson = JSON.parse(paymongoText) as Record<string, unknown>;
-  } catch {
-    paymongoJson = {};
-  }
+    const paymongoText = await paymongoRes.text();
+    let paymongoJson: Record<string, unknown> = {};
+    try {
+      paymongoJson = JSON.parse(paymongoText) as Record<string, unknown>;
+    } catch {
+      paymongoJson = {};
+    }
 
-  if (!paymongoRes.ok) {
+    if (!paymongoRes.ok) {
     console.error(
       "paymongo create session failed",
       paymongoRes.status,
       paymongoText.slice(0, 500),
     );
-    return json(502, {
-      success: false,
-      error: "Unable to start payment right now. Please try again.",
-    });
-  }
+      return json(502, {
+        success: false,
+        error: "Unable to start payment right now. Please try again.",
+      });
+    }
 
-  const data = (paymongoJson.data ?? {}) as Record<string, unknown>;
-  const attributes = (data.attributes ?? {}) as Record<string, unknown>;
-  const sessionId = typeof data.id === "string" ? data.id : "";
-  const checkoutUrl =
-    typeof attributes.checkout_url === "string" ? attributes.checkout_url : "";
-  if (!sessionId.startsWith("cs_") || !isPaymongoCheckoutUrl(checkoutUrl)) {
-    return json(502, {
-      success: false,
-      error: "Unable to start payment right now. Please try again.",
-    });
-  }
+    const data = (paymongoJson.data ?? {}) as Record<string, unknown>;
+    const attributes = (data.attributes ?? {}) as Record<string, unknown>;
+    const sessionId = typeof data.id === "string" ? data.id : "";
+    const checkoutUrl =
+      typeof attributes.checkout_url === "string" ? attributes.checkout_url : "";
+    if (!sessionId.startsWith("cs_") || !isPaymongoCheckoutUrl(checkoutUrl)) {
+      return json(502, {
+        success: false,
+        error: "Unable to start payment right now. Please try again.",
+      });
+    }
 
-  const attached = await service.rpc("attach_paymongo_checkout", {
-    p_payment_id: paymentId,
-    p_session_id: sessionId,
-    p_checkout_url: checkoutUrl,
-    p_buyer_id: buyerId,
-  });
-  if (attached.error) {
-    console.error("attach_paymongo_checkout", attached.error.message);
-    const attachDetail = attached.error.message?.trim();
-    return json(400, {
-      success: false,
-      error:
-        attachDetail && attachDetail.length > 0
-          ? attachDetail
-          : "Unable to start payment right now. Please try again.",
+    const attached = await service.rpc("attach_paymongo_checkout", {
+      p_payment_id: paymentId,
+      p_session_id: sessionId,
+      p_checkout_url: checkoutUrl,
+      p_buyer_id: buyerId,
     });
-  }
-  const attachMap = (attached.data ?? {}) as Record<string, unknown>;
-  if (attachMap.success === false) {
-    return json(400, {
-      success: false,
-      error: String(
-        attachMap.error ??
-          "Unable to start payment right now. Please try again.",
-      ),
-    });
-  }
-  if (attachMap.already_paid === true) {
+    if (attached.error) {
+      console.error("attach_paymongo_checkout", attached.error.message);
+      const attachDetail = attached.error.message?.trim();
+      return json(400, {
+        success: false,
+        error:
+          attachDetail && attachDetail.length > 0
+            ? attachDetail
+            : "Unable to start payment right now. Please try again.",
+      });
+    }
+    const attachMap = (attached.data ?? {}) as Record<string, unknown>;
+    if (attachMap.success === false) {
+      return json(400, {
+        success: false,
+        error: String(
+          attachMap.error ??
+            "Unable to start payment right now. Please try again.",
+        ),
+      });
+    }
+    if (attachMap.already_paid === true) {
+      return json(200, {
+        success: true,
+        already_paid: true,
+        order_id: attachMap.order_id,
+      });
+    }
+
+    if (previousSession && previousSession !== sessionId) {
+      await expirePaymongoCheckoutSessionIfSafe(
+        paymongoSecret,
+        previousSession,
+      );
+    }
+
     return json(200, {
       success: true,
-      already_paid: true,
-      order_id: attachMap.order_id,
+      already_paid: false,
+      checkout_url: checkoutUrl,
+      session_id: sessionId,
+      payment_id: paymentId,
+    });
+  } finally {
+    await service.rpc("release_paymongo_checkout_session_init", {
+      p_payment_id: paymentId,
     });
   }
-
-  return json(200, {
-    success: true,
-    already_paid: false,
-    checkout_url: checkoutUrl,
-    session_id: sessionId,
-    payment_id: paymentId,
-  });
 });

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sessionIdFromAccessToken } from "../_shared/jwt.ts";
 import {
   hashDeviceToken,
   isDeviceToken,
@@ -122,6 +123,23 @@ Deno.serve(async (req) => {
         .update({ email: challengeEmail })
         .eq("user_id", userData.user.id);
       return json(200, { ok: true, email: challengeEmail });
+    }
+
+    const authHeaderValue = authHeader.startsWith("Bearer ")
+      ? authHeader.slice("Bearer ".length).trim()
+      : "";
+    const sessionId = sessionIdFromAccessToken(authHeaderValue);
+    if (sessionId) {
+      const { error: gateError } = await service.rpc(
+        "verify_email_login_session_gate",
+        { p_session_id: sessionId, p_user_id: userData.user.id },
+      );
+      if (gateError) {
+        console.error("verify-email-otp session gate verification failed");
+        return json(503, {
+          error: "Could not verify that code. Please try again.",
+        });
+      }
     }
 
     const deviceToken = body.device_token;

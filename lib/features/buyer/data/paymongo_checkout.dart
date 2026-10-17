@@ -83,21 +83,26 @@ bool isSafePaymongoCheckoutUrl(String url) {
       uri.host.endsWith('.paymongo.com');
 }
 
-const kPaymongoChannels = <String>['card', 'gcash'];
+/// Checkout accepts QR Ph only. Card and GCash remain readable for past payments.
+const kPaymongoCheckoutChannel = 'qrph';
+
+const kPaymongoChannels = <String>[kPaymongoCheckoutChannel];
 
 String? parsePaymongoChannel(String? raw) {
   final value = raw?.trim().toLowerCase();
-  if (value == 'card' || value == 'gcash') return value;
+  if (value == kPaymongoCheckoutChannel) return value;
   return null;
 }
 
 String paymongoChannelLabel(String channel) => switch (channel) {
+  'qrph' => 'QR Ph',
   'card' => 'Credit / Debit Card',
   'gcash' => 'GCash',
   _ => 'PayMongo',
 };
 
 String paymongoChannelCategory(String channel) => switch (channel) {
+  'qrph' => 'Scan to pay',
   'card' => 'Cards',
   'gcash' => 'E-Wallets',
   _ => 'Payment',
@@ -203,13 +208,13 @@ Future<PaymongoReconcileResult> finalizeMyPaymongoCheckout(
 Future<PaymongoCheckoutResult> createPaymongoCheckout(
   SupabaseService supabase, {
   required String orderId,
-  required String channel,
+  String channel = kPaymongoCheckoutChannel,
 }) async {
   final parsed = parsePaymongoChannel(channel);
   if (parsed == null) {
     return const PaymongoCheckoutResult(
       success: false,
-      error: 'Choose Card or GCash.',
+      error: 'Pay with QR Ph.',
     );
   }
   try {
@@ -281,6 +286,14 @@ Future<PaymongoCheckoutResult> createPaymongoCheckout(
       'create-paymongo-checkout FunctionException '
       'status=${e.status} details=${e.details}',
     );
+    if (e.status == 409) {
+      final map = _functionExceptionMap(e);
+      return PaymongoCheckoutResult.fromMap({
+        'success': false,
+        'error':
+            map?['error']?.toString() ?? 'Payment is already starting.',
+      });
+    }
     return PaymongoCheckoutResult.fromMap(_functionExceptionMap(e));
   } catch (e, st) {
     debugPrint('createPaymongoCheckout error: $e\n$st');

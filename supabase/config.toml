@@ -52,3 +52,6 @@ verify_jwt = false
 
 [functions.invite-admin]
 verify_jwt = true
+
+[functions.reconcile-refund]
+verify_jwt = true

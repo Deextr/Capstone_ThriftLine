@@ -139,6 +139,8 @@ class SellerOrderDetailScreen extends StatelessWidget {
                         ? 'A delivery problem was reported. Automatic completion is paused.'
                         : order.isDeliveryFailed
                         ? 'Delivery was not completed. The parcel should not have been left with the buyer.'
+                        : order.isRefundInProgress
+                        ? 'This order was cancelled and the buyer is being refunded. This amount is not available as earnings.'
                         : order.isRefundedSale
                         ? 'The buyer was refunded. This amount is not available as earnings.'
                         : 'PayMongo confirmed this payment. Arrange a freelance rider when you are ready.',

@@ -16,6 +16,7 @@ import '../../../../providers/cart_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../widgets/buy_now_quantity_selector.dart';
 import '../../data/catalog_product_query.dart';
+import '../../../../core/utils/listing_shipping.dart';
 import '../../data/checkout_totals.dart';
 
 class BuyNowScreen extends StatefulWidget {
@@ -154,7 +155,11 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
     }
 
     final subtotal = product.price * _quantity;
-    final shipping = checkoutShippingFee(1);
+    final shipping = calculateShopFixedShippingPreview(
+      cartShippingLinesFromProducts([
+        (product: product, quantity: _quantity),
+      ]),
+    );
     final platform = checkoutPlatformFee(subtotal);
     final total = checkoutTotal(
       subtotal: subtotal,

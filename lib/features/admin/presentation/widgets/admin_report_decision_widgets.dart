@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../data/admin_report_decision_content.dart';
@@ -172,49 +173,179 @@ class AdminEditableGeneratedMessage extends StatelessWidget {
 Future<bool?> showAdminDecisionConfirmDialog({
   required BuildContext context,
   required String title,
-  required List<(String label, String value)> rows,
+  List<(String label, String value)> rows = const [],
   required String confirmLabel,
   bool destructive = false,
+  String? messagePreview,
+  String? detailText,
 }) {
+  final width = MediaQuery.sizeOf(context).width;
   return showDialog<bool>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(title),
-      content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final row in rows) ...[
-              Text(
-                row.$1,
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
+    builder: (ctx) => Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: width < 480 ? 16 : 28,
+        vertical: 24,
+      ),
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+        side: BorderSide(color: AppColors.border),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (destructive)
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.errorSoft,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.visibility_off_outlined,
+                        size: 22,
+                        color: AppColors.error,
+                      ),
+                    )
+                  else
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.gavel_outlined,
+                        size: 22,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        title,
+                        style: AppTypography.subheading.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 260),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (messagePreview != null &&
+                          messagePreview.trim().isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          'Message to member',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceVariant.withValues(
+                              alpha: 0.65,
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              AppConstants.radiusSm,
+                            ),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Text(
+                            messagePreview.trim(),
+                            style: AppTypography.body.copyWith(height: 1.4),
+                          ),
+                        ),
+                      ],
+                      for (var i = 0; i < rows.length; i++) ...[
+                        SizedBox(
+                          height: i == 0 &&
+                                  (messagePreview == null ||
+                                      messagePreview.trim().isEmpty)
+                              ? 16
+                              : 14,
+                        ),
+                        Text(
+                          rows[i].$1,
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          rows[i].$2,
+                          style: AppTypography.body.copyWith(height: 1.4),
+                        ),
+                      ],
+                      if (detailText != null &&
+                          detailText.trim().isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        Text(
+                          detailText.trim(),
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.textSecondary,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(row.$2, style: AppTypography.body.copyWith(height: 1.4)),
-              const SizedBox(height: 12),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                  if (destructive)
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text(confirmLabel),
+                    )
+                  else
+                    FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text(confirmLabel),
+                    ),
+                ],
+              ),
             ],
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(
-            confirmLabel,
-            style: destructive
-                ? TextStyle(color: Theme.of(ctx).colorScheme.error)
-                : null,
           ),
         ),
-      ],
+      ),
     ),
   );
 }

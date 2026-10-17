@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { sessionIdFromAccessToken } from "../_shared/jwt.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -85,6 +86,23 @@ Deno.serve(async (req) => {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) {
       return json(401, { error: "Sign in first." });
+    }
+
+    const bearer = authHeader.startsWith("Bearer ")
+      ? authHeader.slice("Bearer ".length).trim()
+      : "";
+    const sessionId = sessionIdFromAccessToken(bearer);
+    if (sessionId) {
+      const { error: gateEnsureError } = await service.rpc(
+        "ensure_email_login_session_gate",
+        { p_session_id: sessionId, p_user_id: userData.user.id },
+      );
+      if (gateEnsureError) {
+        console.error("send-email-otp session gate ensure failed");
+        return json(503, {
+          error: "We could not send the email. Please try again.",
+        });
+      }
     }
 
     let body: Record<string, unknown> = {};

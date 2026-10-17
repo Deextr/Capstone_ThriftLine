@@ -274,6 +274,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                                         controller: _emailController,
                                         focusNode: _emailFocus,
                                         enabled: !_busy,
+                                        style: AppTypography.body.copyWith(
+                                          color: AppColors.textPrimary,
+                                        ),
+                                        cursorColor: AppColors.primary,
                                         keyboardType:
                                             TextInputType.emailAddress,
                                         textInputAction: TextInputAction.next,
@@ -293,6 +297,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                                         controller: _passwordController,
                                         focusNode: _passwordFocus,
                                         enabled: !_busy,
+                                        style: AppTypography.body.copyWith(
+                                          color: AppColors.textPrimary,
+                                        ),
+                                        cursorColor: AppColors.primary,
                                         obscureText: _obscure,
                                         textInputAction: TextInputAction.done,
                                         autofillHints: const [
@@ -383,8 +391,13 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     return InputDecoration(
       labelText: label,
       hintText: hint,
+      labelStyle: AppTypography.label.copyWith(color: AppColors.textSecondary),
+      floatingLabelStyle: AppTypography.label.copyWith(
+        color: AppColors.primary,
+      ),
+      hintStyle: AppTypography.body.copyWith(color: AppColors.textHint),
       filled: true,
-      fillColor: AppColors.background,
+      fillColor: AppColors.surfaceVariant,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide(color: AppColors.border),

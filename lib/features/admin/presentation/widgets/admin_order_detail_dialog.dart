@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../models/order_model.dart';
 import '../../data/admin_orders_service.dart';
 import '../../data/delivery_payment_hold.dart';
+import '../../domain/admin_buyer_refund.dart';
 import '../../domain/admin_order_management.dart';
+import 'admin_buyer_refund_from_order.dart';
 import 'admin_review_widgets.dart';
 import 'admin_ui_components.dart';
 
@@ -27,6 +30,7 @@ Future<void> showAdminOrderDetailDialog({
     barrierDismissible: true,
     builder: (dialogContext) {
       return _AdminOrderDetailDialog(
+        hostContext: context,
         summary: summary,
         loadDetail: loadDetail,
         onOpenSiblingOrder: onOpenSiblingOrder,
@@ -37,11 +41,13 @@ Future<void> showAdminOrderDetailDialog({
 
 class _AdminOrderDetailDialog extends StatefulWidget {
   const _AdminOrderDetailDialog({
+    required this.hostContext,
     required this.summary,
     required this.loadDetail,
     this.onOpenSiblingOrder,
   });
 
+  final BuildContext hostContext;
   final AdminOrderRow summary;
   final Future<AdminOrderDetailBundle?> Function() loadDetail;
   final void Function(String siblingOrderId)? onOpenSiblingOrder;
@@ -77,6 +83,16 @@ class _AdminOrderDetailDialogState extends State<_AdminOrderDetailDialog> {
   }
 
   void _close() => Navigator.of(context).pop();
+
+  Future<void> _openBuyerRefundModule() async {
+    final detail = _detail;
+    if (detail == null) return;
+    await openBuyerRefundDetailFromOrder(
+      hostContext: widget.hostContext,
+      detail: detail,
+      closeOrderModal: _close,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -132,6 +148,7 @@ class _AdminOrderDetailDialogState extends State<_AdminOrderDetailDialog> {
                         : _OrderModalBody(
                             detail: _detail!,
                             onOpenSiblingOrder: widget.onOpenSiblingOrder,
+                            onOpenBuyerRefund: _openBuyerRefundModule,
                           ),
                   ),
                 ],
@@ -162,7 +179,6 @@ class _OrderModalHeader extends StatelessWidget {
     final displayRef = reference.isNotEmpty ? reference : 'Order';
     final createdAt = order?.createdAt ?? summary.createdAt;
     final kind = detail?.orderKind ?? summary.orderKind;
-    final unified = detail?.unifiedStatus ?? summary.unifiedStatus;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 4, 14),
@@ -186,10 +202,6 @@ class _OrderModalHeader extends StatelessWidget {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     AdminOrderTypeBadge(label: adminOrderKindLabel(kind)),
-                    AdminStatusBadge(
-                      status: unified.badgeKey,
-                      label: unified.label,
-                    ),
                   ],
                 ),
                 SizedBox(height: 6),
@@ -242,10 +254,15 @@ class _ErrorBody extends StatelessWidget {
 }
 
 class _OrderModalBody extends StatelessWidget {
-  const _OrderModalBody({required this.detail, this.onOpenSiblingOrder});
+  const _OrderModalBody({
+    required this.detail,
+    this.onOpenSiblingOrder,
+    this.onOpenBuyerRefund,
+  });
 
   final AdminOrderDetailBundle detail;
   final void Function(String siblingOrderId)? onOpenSiblingOrder;
+  final Future<void> Function()? onOpenBuyerRefund;
 
   @override
   Widget build(BuildContext context) {
@@ -258,6 +275,12 @@ class _OrderModalBody extends StatelessWidget {
     final hasDisputesEscrow =
         detail.reports.isNotEmpty ||
         (detail.escrow != null && detail.escrow!.escrowId.isNotEmpty);
+    final refundHold = detail.escrow;
+    final hasRefund =
+        refundHold != null &&
+        refundHold.escrowId.isNotEmpty &&
+        refundHold.isRefunded &&
+        refundHold.refundState != null;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -273,18 +296,7 @@ class _OrderModalBody extends StatelessWidget {
             ),
             const SizedBox(height: 16),
           ],
-          _ModalSection(
-            title: 'Order summary',
-            child: _OrderSummaryBlock(
-              detail: detail,
-              onOpenSibling: onOpenSiblingOrder,
-            ),
-          ),
-          _sectionGap(),
-          _ModalSection(
-            title: 'Ordered items',
-            child: _LineItemsList(items: order.items),
-          ),
+          _OrderOverviewCard(detail: detail),
           _sectionGap(),
           _ModalSection(
             title: 'Buyer & seller',
@@ -292,9 +304,39 @@ class _OrderModalBody extends StatelessWidget {
           ),
           _sectionGap(),
           _ModalSection(
-            title: 'Payment breakdown',
-            child: _PaymentBreakdownBlock(detail: detail),
+            title: 'Ordered items',
+            child: _LineItemsList(items: order.items),
           ),
+          if (detail.siblings.isNotEmpty) ...[
+            _sectionGap(),
+            _MultiSellerInlineNotice(
+              siblings: detail.siblings,
+              onOpenSibling: onOpenSiblingOrder,
+            ),
+          ],
+          _sectionGap(),
+          _ModalSection(
+            title: 'Payment',
+            child: _PaymentBreakdownBlock(
+              detail: detail,
+              showRefundRow: !hasRefund,
+            ),
+          ),
+          if (hasRefund) ...[
+            _sectionGap(),
+            _ModalSection(
+              title: 'Buyer refund',
+              child: _OrderRefundReadOnlySection(
+                hold: refundHold,
+                onManageRefund:
+                    adminBuyerRefundNeedsAdminAction(
+                      refundState: refundHold.refundState,
+                    )
+                    ? onOpenBuyerRefund
+                    : null,
+              ),
+            ),
+          ],
           if (hasFulfillment) ...[
             _sectionGap(),
             _ModalSection(
@@ -357,11 +399,10 @@ class _ModalSection extends StatelessWidget {
   }
 }
 
-class _OrderSummaryBlock extends StatelessWidget {
-  const _OrderSummaryBlock({required this.detail, this.onOpenSibling});
+class _OrderOverviewCard extends StatelessWidget {
+  const _OrderOverviewCard({required this.detail});
 
   final AdminOrderDetailBundle detail;
-  final void Function(String orderId)? onOpenSibling;
 
   @override
   Widget build(BuildContext context) {
@@ -370,74 +411,132 @@ class _OrderSummaryBlock extends StatelessWidget {
     final method = payment != null
         ? adminPaymongoChannelLabel(payment['paymongo_channel'] as String?)
         : null;
+    final unified = detail.unifiedStatus;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Buyer total',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        formatCurrency(order.total),
+                        style: AppTypography.heading.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    AdminStatusBadge(
+                      status: unified.badgeKey,
+                      label: unified.label,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      adminPaymentStatusLabel(order.paymentStatus),
+                      style: AppTypography.caption.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (method != null)
+                      Text(
+                        method,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Fulfillment · ${adminOrderFulfillmentLabel(order)}',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            if (detail.orderKind == AdminOrderKind.auction) ...[
+              const SizedBox(height: 8),
+              _AuctionSummaryLines(order: order),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OrderRefundReadOnlySection extends StatelessWidget {
+  const _OrderRefundReadOnlySection({required this.hold, this.onManageRefund});
+
+  final DeliveryPaymentHold hold;
+  final Future<void> Function()? onManageRefund;
+
+  @override
+  Widget build(BuildContext context) {
+    final needsAction = adminBuyerRefundNeedsAdminAction(
+      refundState: hold.refundState,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Buyer total (this seller)',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  Text(
-                    formatCurrency(order.total),
-                    style: AppTypography.heading.copyWith(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  'Payment',
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                Text(
-                  adminPaymentStatusLabel(order.paymentStatus),
-                  style: AppTypography.tableBodyMedium.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (method != null)
-                  Text(
-                    method,
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-              ],
+            AdminStatusBadge(
+              status: adminBuyerRefundBadgeKey(hold.refundState),
+              label: adminRefundStateLabel(hold.refundState),
             ),
           ],
         ),
-        SizedBox(height: 10),
-        Text(
-          'Fulfillment: ${adminOrderFulfillmentLabel(order)}',
-          style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+        const SizedBox(height: 10),
+        _KVRow(
+          label: 'Refund amount',
+          value: formatCentavos(hold.amountCentavos),
         ),
-        if (detail.orderKind == AdminOrderKind.auction) ...[
-          const SizedBox(height: 10),
-          _AuctionSummaryLines(order: order),
-        ],
-        if (detail.siblings.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _MultiSellerInlineNotice(
-            siblings: detail.siblings,
-            onOpenSibling: onOpenSibling,
+        if (hold.refundCompletedAt != null)
+          _KVRow(
+            label: 'Completed',
+            value: formatAdminTableDateTime(hold.refundCompletedAt!),
+          ),
+        if (needsAction && onManageRefund != null) ...[
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            onPressed: () => onManageRefund!(),
+            icon: const Icon(Icons.open_in_new_rounded, size: 18),
+            label: const Text('Open in Buyer Refunds'),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Process manual GCash and record the transfer in Buyer Refunds.',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.35,
+            ),
           ),
         ],
       ],
@@ -760,9 +859,13 @@ class _LineItemThumbnail extends StatelessWidget {
 }
 
 class _PaymentBreakdownBlock extends StatelessWidget {
-  const _PaymentBreakdownBlock({required this.detail});
+  const _PaymentBreakdownBlock({
+    required this.detail,
+    this.showRefundRow = true,
+  });
 
   final AdminOrderDetailBundle detail;
+  final bool showRefundRow;
 
   @override
   Widget build(BuildContext context) {
@@ -799,7 +902,7 @@ class _PaymentBreakdownBlock extends StatelessWidget {
             allocationCentavos != null &&
             allocationCentavos.round() > 0)
           _KVRow(
-            label: 'PayMongo allocation',
+            label: 'Checkout allocation',
             value: formatCentavos(allocationCentavos.round()),
           ),
         const SizedBox(height: 8),
@@ -812,10 +915,17 @@ class _PaymentBreakdownBlock extends StatelessWidget {
             label: 'Escrow status',
             value: deliveryHoldStatusLabel(hold.status),
           ),
-        if (order.paymentStatus == 'refunded' ||
-            (hold != null && hold.isRefunded))
-          _KVRow(label: 'Refund', value: 'Recorded'),
-        if (ref != null) _KVRow(label: 'Provider reference', value: ref),
+        if (showRefundRow) ...[
+          if (hold != null && hold.isRefunded && hold.refundState != null)
+            _KVRow(
+              label: 'Refund',
+              value: adminRefundStateLabel(hold.refundState),
+            )
+          else if (order.paymentStatus == 'refunded' ||
+              (hold != null && hold.isRefunded))
+            _KVRow(label: 'Refund', value: 'Recorded'),
+        ],
+        if (ref != null) _KVRow(label: 'Payment reference', value: ref),
       ],
     );
   }
@@ -979,15 +1089,6 @@ class _DisputesEscrowBlock extends StatelessWidget {
             label: 'Seller portion',
             value: formatCentavos(hold.sellerAmountCentavos),
           ),
-          if (hold.isRefunded && hold.refundProvider.isNotEmpty) ...[
-            SizedBox(height: 4),
-            Text(
-              refundProviderMessage(hold.refundProvider),
-              style: AppTypography.caption.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
         ],
         if (detail.reports.isNotEmpty) ...[
           if (hasEscrow) const SizedBox(height: 14),

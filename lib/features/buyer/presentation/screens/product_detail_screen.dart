@@ -20,6 +20,7 @@ import '../../../../widgets/thrift_widgets.dart';
 import '../../../seller/presentation/widgets/end_auction_dialog.dart';
 import '../../controllers/product_detail_controller.dart';
 import '../../data/auction_checkout_order.dart';
+import '../../domain/bid_amount_validation.dart';
 import '../widgets/bid_phone_verification_prompt.dart';
 import '../widgets/buy_now_quantity_selector.dart';
 
@@ -485,6 +486,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     double minBid,
   ) {
     _bidController.text = minBid.toStringAsFixed(0);
+    String? bidInputError;
     ThriftBottomSheet.show(
       context,
       title: 'Place a Bid',
@@ -509,9 +511,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 children: [
                   IconButton(
                     onPressed: () {
-                      final v =
-                          (double.tryParse(_bidController.text) ?? minBid) -
-                          controller.minimumIncrement;
+                      final current = parseValidatedBidAmount(
+                        _bidController.text,
+                      );
+                      if (current == null) return;
+                      final v = current - controller.minimumIncrement;
                       if (v >= minBid) {
                         setStateSB(
                           () => _bidController.text = v.toStringAsFixed(0),
@@ -524,13 +528,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                     child: ThriftTextField(
                       controller: _bidController,
                       keyboardType: TextInputType.number,
+                      onChanged: (_) {
+                        if (bidInputError != null) {
+                          setStateSB(() => bidInputError = null);
+                        }
+                      },
                     ),
                   ),
                   IconButton(
                     onPressed: () {
-                      final v =
-                          (double.tryParse(_bidController.text) ?? minBid) +
-                          controller.minimumIncrement;
+                      final current = parseValidatedBidAmount(
+                        _bidController.text,
+                      );
+                      final base = current ?? minBid;
+                      final v = base + controller.minimumIncrement;
                       setStateSB(
                         () => _bidController.text = v.toStringAsFixed(0),
                       );
@@ -539,16 +550,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                   ),
                 ],
               ),
+              if (bidInputError != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  bidInputError!,
+                  style: AppTypography.caption.copyWith(color: AppColors.error),
+                ),
+              ],
               const SizedBox(height: 24),
               ThriftButton(
                 label: 'Confirm Bid',
                 variant: ThriftButtonVariant.primary,
                 onPressed: () async {
-                  final cleanText = _bidController.text.replaceAll(
-                    RegExp(r'[^\d.]'),
-                    '',
+                  final validationError = bidAmountValidationError(
+                    rawInput: _bidController.text,
+                    minimumBid: minBid,
                   );
-                  final amount = double.tryParse(cleanText) ?? minBid;
+                  if (validationError != null) {
+                    setStateSB(() => bidInputError = validationError);
+                    return;
+                  }
+                  final amount = parseValidatedBidAmount(_bidController.text)!;
                   final result = await controller.placeBid(amount);
                   if (!context.mounted) return;
                   if (result.isSuccess) {

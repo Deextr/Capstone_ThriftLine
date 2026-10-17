@@ -7,15 +7,6 @@ import '../core/constants/app_typography.dart';
 import '../core/theme/app_gradients.dart';
 import '../core/utils/seller_trust.dart';
 
-Widget? _hideTextCounter(
-  BuildContext context, {
-  required int currentLength,
-  required bool isFocused,
-  required int? maxLength,
-}) {
-  return null;
-}
-
 enum ThriftButtonVariant { primary, secondary, outline, ghost }
 
 class ThriftButton extends StatelessWidget {
@@ -225,6 +216,7 @@ class ThriftTextField extends StatefulWidget {
     this.autovalidateMode,
     this.onSubmitted,
     this.maxLength,
+    this.scrollPadding,
   });
 
   final String? label;
@@ -247,6 +239,7 @@ class ThriftTextField extends StatefulWidget {
   final AutovalidateMode? autovalidateMode;
   final ValueChanged<String>? onSubmitted;
   final int? maxLength;
+  final EdgeInsets? scrollPadding;
 
   @override
   State<ThriftTextField> createState() => _ThriftTextFieldState();
@@ -263,20 +256,30 @@ class _ThriftTextFieldState extends State<ThriftTextField> {
 
   @override
   Widget build(BuildContext context) {
+    final formatters = <TextInputFormatter>[
+      ...?widget.inputFormatters,
+      if (widget.maxLength != null)
+        LengthLimitingTextInputFormatter(widget.maxLength),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.label != null) ...[
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                widget.label!,
-                style: AppTypography.label.copyWith(
-                  color: widget.labelColor ?? AppColors.textPrimary,
+              Expanded(
+                child: Text(
+                  widget.label!,
+                  style: AppTypography.label.copyWith(
+                    color: widget.labelColor ?? AppColors.textPrimary,
+                  ),
                 ),
               ),
-              ?widget.labelSuffix,
+              if (widget.labelSuffix != null) ...[
+                const SizedBox(width: 8),
+                widget.labelSuffix!,
+              ],
             ],
           ),
           const SizedBox(height: AppConstants.spacingXs),
@@ -288,18 +291,15 @@ class _ThriftTextFieldState extends State<ThriftTextField> {
           onChanged: widget.onChanged,
           onFieldSubmitted: widget.onSubmitted,
           keyboardType: widget.keyboardType,
-          inputFormatters: widget.inputFormatters,
-          maxLength: widget.maxLength,
-          maxLengthEnforcement: widget.maxLength != null
-              ? MaxLengthEnforcement.enforced
-              : null,
-          buildCounter: widget.maxLength != null ? _hideTextCounter : null,
+          inputFormatters: formatters.isEmpty ? null : formatters,
           maxLines: widget.maxLines,
           onTap: widget.onTap,
           readOnly: widget.readOnly,
           autofocus: widget.autofocus,
           validator: widget.validator,
-          scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+          scrollPadding:
+              widget.scrollPadding ??
+              const EdgeInsets.fromLTRB(20, 20, 20, 24),
           autovalidateMode:
               widget.autovalidateMode ??
               (widget.validator != null

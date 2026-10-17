@@ -15,14 +15,27 @@ supabase functions deploy test-unisms-sms
 
 ## Phase A — Connectivity (`test-unisms-sms`)
 
-Sign in as an **admin** user in the app or obtain a user JWT, then:
+**Production safety:** the function is **disabled** unless the hosted secret `UNISMS_TEST_SMS_ENABLED=true` is set. Leave it unset in production unless you explicitly need connectivity tests.
+
+**Access:** active **Super Admin** only (regular admins, buyers, and sellers are rejected server-side).
+
+**Secrets (hosted):**
+
+| Secret | Purpose |
+| --- | --- |
+| `UNISMS_TEST_SMS_ENABLED` | Must be `true` to expose the function |
+| `UNISMS_TEST_PHONE_ALLOWLIST` | Comma-separated `09…` numbers allowed to receive test SMS |
+
+The message body is fixed on the server; clients may send only `{ "phone": "09XXXXXXXXX" }`.
+
+Sign in as a **Super Admin**, then:
 
 ```bash
 curl -X POST "$SUPABASE_URL/functions/v1/test-unisms-sms" \
   -H "Authorization: Bearer $USER_JWT" \
   -H "apikey: $SUPABASE_ANON_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"phone":"09XXXXXXXXX","content":"ThriftLine UniSMS connectivity test."}'
+  -d '{"phone":"09XXXXXXXXX"}'
 ```
 
 Record: HTTP status, `reference_id`, `delivery_status`, `code`, SMS received (Y/N).

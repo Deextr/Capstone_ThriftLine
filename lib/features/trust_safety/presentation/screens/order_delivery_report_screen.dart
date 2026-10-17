@@ -37,13 +37,11 @@ class _OrderDeliveryReportScreenState extends State<OrderDeliveryReportScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<OrderDeliveryReportController>();
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         backgroundColor: AppColors.background,
-        resizeToAvoidBottomInset: true,
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(
           title: const Text('Report a problem'),
           leading: IconButton(
@@ -67,94 +65,117 @@ class _OrderDeliveryReportScreenState extends State<OrderDeliveryReportScreen> {
                     ),
                   ),
                 )
-              : Column(
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   children: [
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                        keyboardDismissBehavior:
-                            ScrollViewKeyboardDismissBehavior.onDrag,
-                        children: [
-                          Text(
-                            'Tell us what went wrong',
-                            style: AppTypography.heading.copyWith(fontSize: 22),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Order #${controller.order?.orderNumber ?? '—'} · '
-                            '${controller.order?.productTitle ?? ''}',
-                            style: AppTypography.body.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Your report is private. Escrow stays protected while we review.',
-                            style: AppTypography.caption,
-                          ),
-                          const SizedBox(height: 20),
-                          Text('Reason', style: AppTypography.subheading),
-                          const SizedBox(height: 10),
-                          ...DeliveryDisputeReason.values.map(
-                            (reason) => _ReasonTile(
-                              label: reason.label,
-                              selected: controller.reason == reason,
-                              onTap: () => context
-                                  .read<OrderDeliveryReportController>()
-                                  .selectReason(reason),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          ThriftTextField(
-                            label: 'Description',
-                            hint: 'Describe the issue with your order…',
-                            controller: _details,
-                            maxLines: 5,
-                            maxLength: kReportDetailsMaxLength,
-                            onChanged: context
-                                .read<OrderDeliveryReportController>()
-                                .setDetails,
-                          ),
-                          const SizedBox(height: 6),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Text(
-                              '${controller.details.length}/$kReportDetailsMaxLength',
-                              style: AppTypography.caption,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          ReportEvidenceSection(
-                            evidence: controller.evidence,
-                            evidenceError: controller.evidenceError,
-                            required: true,
-                            onAddGallery: () => context
-                                .read<OrderDeliveryReportController>()
-                                .addEvidenceFromGallery(),
-                            onAddCamera: () => context
-                                .read<OrderDeliveryReportController>()
-                                .addEvidenceFromCamera(),
-                            onRemove: (i) => context
-                                .read<OrderDeliveryReportController>()
-                                .removeEvidence(i),
-                          ),
-                        ],
+                    Text(
+                      'Tell us what went wrong',
+                      style: AppTypography.heading.copyWith(fontSize: 22),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Order #${controller.order?.orderNumber ?? '—'} · '
+                      '${controller.order?.productTitle ?? ''}',
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textSecondary,
                       ),
                     ),
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(20, 8, 20, 16 + bottomInset),
-                      child: ThriftButton(
-                        label: 'Submit report',
-                        color: AppColors.error,
-                        isLoading: controller.isSubmitting,
-                        onPressed: controller.canSubmit
-                            ? () => _submit(context)
-                            : null,
+                    const SizedBox(height: 8),
+                    Text(
+                      'Your report is private. Escrow stays protected while we review.',
+                      style: AppTypography.caption,
+                    ),
+                    const SizedBox(height: 20),
+                    Text('Reason', style: AppTypography.subheading),
+                    const SizedBox(height: 10),
+                    ...DeliveryDisputeReason.values.map(
+                      (reason) => _ReasonTile(
+                        label: reason.label,
+                        selected: controller.reason == reason,
+                        onTap: () => context
+                            .read<OrderDeliveryReportController>()
+                            .selectReason(reason),
                       ),
                     ),
+                    const SizedBox(height: 20),
+                    ThriftTextField(
+                      label: controller.detailsRequired
+                          ? 'Please describe the issue'
+                          : 'Additional details',
+                      hint: controller.detailsRequired
+                          ? 'Describe the issue with your order…'
+                          : 'Add any extra context that may help (optional).',
+                      controller: _details,
+                      maxLines: 5,
+                      maxLength: kReportDetailsMaxLength,
+                      scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+                      onChanged: context
+                          .read<OrderDeliveryReportController>()
+                          .setDetails,
+                      labelSuffix: controller.detailsRequired
+                          ? null
+                          : Text(
+                              'Optional',
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                    ),
+                    if (controller.detailsRequired) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Required when you choose Other.',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '${controller.details.length}/$kReportDetailsMaxLength',
+                        style: AppTypography.caption,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    ReportEvidenceSection(
+                      evidence: controller.evidence,
+                      evidenceError: controller.evidenceError,
+                      required: true,
+                      onAddGallery: () => context
+                          .read<OrderDeliveryReportController>()
+                          .addEvidenceFromGallery(),
+                      onAddCamera: () => context
+                          .read<OrderDeliveryReportController>()
+                          .addEvidenceFromCamera(),
+                      onRemove: (i) => context
+                          .read<OrderDeliveryReportController>()
+                          .removeEvidence(i),
+                    ),
+                    const SizedBox(height: 88),
                   ],
                 ),
         ),
+        bottomNavigationBar: controller.isLoading ||
+                controller.order == null
+            ? null
+            : SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                  child: ThriftButton(
+                    label: 'Submit Report',
+                    color: AppColors.error,
+                    isLoading: controller.isSubmitting,
+                    onPressed: controller.canSubmit
+                        ? () => _submit(context)
+                        : null,
+                  ),
+                ),
+              ),
       ),
     );
   }

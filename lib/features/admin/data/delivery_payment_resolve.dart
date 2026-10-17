@@ -12,6 +12,7 @@ class DeliveryPaymentResult {
     this.decision,
     this.status,
     this.refundProvider,
+    this.refundState,
     this.amountCentavos,
     this.error,
   });
@@ -21,6 +22,9 @@ class DeliveryPaymentResult {
   final String? decision;
   final String? status;
   final String? refundProvider;
+
+  /// Where the buyer refund stands after this decision. Null for releases.
+  final String? refundState;
   final int? amountCentavos;
   final String? error;
 
@@ -43,6 +47,7 @@ class DeliveryPaymentResult {
       decision: map['decision']?.toString(),
       status: map['status']?.toString(),
       refundProvider: map['refund_provider']?.toString(),
+      refundState: map['refund_state']?.toString(),
       amountCentavos: asCentavos(map['amount_centavos']),
       error: map['error']?.toString(),
     );
@@ -64,6 +69,13 @@ Future<DeliveryPaymentResult> resolveDeliveryRelease(
       },
     );
     return DeliveryPaymentResult.fromMap(supabaseRpcMap(rpcRes));
+  } on PostgrestException catch (e) {
+    return DeliveryPaymentResult(
+      success: false,
+      error: e.message.contains('PayMongo')
+          ? e.message
+          : 'Could not release this payment.',
+    );
   } catch (_) {
     return const DeliveryPaymentResult(
       success: false,

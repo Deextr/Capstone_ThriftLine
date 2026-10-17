@@ -142,6 +142,12 @@ class SharedPreferencesService {
   Future<void> clearAdminPortalLoginNotice() =>
       remove(AppConstants.keyAdminPortalLoginNotice);
 
+  bool get adminSidebarExpanded =>
+      _prefs.getBool(AppConstants.keyAdminSidebarExpanded) ?? true;
+
+  Future<bool> setAdminSidebarExpanded(bool value) =>
+      _prefs.setBool(AppConstants.keyAdminSidebarExpanded, value);
+
   Future<void> clearAuthSession() async {
     await setLoggedIn(false);
     await remove(AppConstants.keyUserRole);

@@ -1,8 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { basicAuthHeader } from "../_shared/paymongo.ts";
-
-const PAYMONGO_REFUNDS_URL = "https://api.paymongo.com/v1/refunds";
+import { internalManualRefundOutcome } from "../_shared/internal_manual_refund.ts";
+import type { ServiceClient } from "../_shared/supabase_client.ts";
 
 type RpcMap = Record<string, unknown>;
 
@@ -26,23 +25,6 @@ function readInt(value: unknown): number | null {
   return null;
 }
 
-function paymongoErrorCode(payload: unknown): string {
-  const root = asMap(payload);
-  const errors = root.errors;
-  if (!Array.isArray(errors) || errors.length === 0) return "";
-  return readString(asMap(errors[0]).code).toLowerCase();
-}
-
-function providerCannotRefund(status: number, code: string): boolean {
-  if (status === 404) return true;
-  return [
-    "payment_not_found",
-    "payment_not_refundable",
-    "resource_not_found",
-    "invalid_payment",
-  ].includes(code);
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -53,7 +35,6 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-  const paymongoSecret = (Deno.env.get("PAYMONGO_SECRET_KEY") ?? "").trim();
   if (!supabaseUrl || !anonKey) {
     return json(500, { success: false, error: "Missing Supabase configuration" });
   }
@@ -118,15 +99,15 @@ Deno.serve(async (req) => {
       decision: "refund",
       status: "refunded",
       refund_provider: String(prep.refund_provider ?? "internal"),
+      refund_state: prep.refund_state ?? null,
       amount_centavos: prep.amount_centavos,
       ...recorded.fields,
     });
   }
 
   const amountCentavos = readInt(prep.amount_centavos);
-  const paymongoPaymentId = readString(prep.paymongo_payment_id);
   const escrowId = readString(prep.escrow_id);
-  if (amountCentavos == null || amountCentavos < 1) {
+  if (amountCentavos == null || amountCentavos < 1 || !escrowId) {
     await supabase.rpc("abort_delivery_refund", { p_dispute_id: disputeId });
     return json(400, {
       success: false,
@@ -134,109 +115,17 @@ Deno.serve(async (req) => {
     });
   }
 
-  let provider: "paymongo" | "internal" = "internal";
-  let refundId = "";
-  let providerStatus = "internal";
-
-  const canCallPaymongo = paymongoPaymentId.startsWith("pay_") &&
-    paymongoSecret.length > 0;
-
-  if (canCallPaymongo) {
-    let paymongoRes: Response;
-    try {
-      paymongoRes = await fetch(PAYMONGO_REFUNDS_URL, {
-        method: "POST",
-        headers: {
-          Authorization: basicAuthHeader(paymongoSecret),
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "Idempotency-Key": escrowId || disputeId,
-        },
-        body: JSON.stringify({
-          data: {
-            attributes: {
-              amount: amountCentavos,
-              payment_id: paymongoPaymentId,
-              reason: "requested_by_customer",
-              notes: "ThriftLine delivery-problem refund",
-            },
-          },
-        }),
-      });
-    } catch {
-      console.error("paymongo refund network error");
-      await supabase.rpc("abort_delivery_refund", { p_dispute_id: disputeId });
-      return json(502, {
-        success: false,
-        error: "Could not reach the payment provider. Try again.",
-      });
-    }
-
-    const paymongoText = await paymongoRes.text();
-    let paymongoJson: RpcMap = {};
-    try {
-      paymongoJson = asMap(JSON.parse(paymongoText));
-    } catch {
-      paymongoJson = {};
-    }
-
-    if (paymongoRes.status >= 500 || paymongoRes.status === 429) {
-      console.error("paymongo refund retryable", paymongoRes.status);
-      await supabase.rpc("abort_delivery_refund", { p_dispute_id: disputeId });
-      return json(502, {
-        success: false,
-        error: "The payment provider is busy. Try again.",
-      });
-    }
-
-    if (paymongoRes.status === 401 || paymongoRes.status === 403) {
-      console.error("paymongo refund auth failed");
-      await supabase.rpc("abort_delivery_refund", { p_dispute_id: disputeId });
-      return json(502, {
-        success: false,
-        error: "Could not reach the payment provider. Try again.",
-      });
-    }
-
-    if (paymongoRes.ok) {
-      const data = asMap(paymongoJson.data);
-      const attributes = asMap(data.attributes);
-      const id = readString(data.id);
-      const status = readString(attributes.status).toLowerCase();
-      if (!id.startsWith("ref_") || status === "failed") {
-        await supabase.rpc("abort_delivery_refund", { p_dispute_id: disputeId });
-        return json(502, {
-          success: false,
-          error: "The payment provider did not accept this refund. Try again.",
-        });
-      }
-      provider = "paymongo";
-      refundId = id;
-      providerStatus = status || "succeeded";
-    } else if (providerCannotRefund(paymongoRes.status, paymongoErrorCode(paymongoJson))) {
-      provider = "internal";
-      providerStatus = paymongoErrorCode(paymongoJson) || "provider_not_refundable";
-    } else {
-      console.error("paymongo refund rejected", paymongoRes.status);
-      await supabase.rpc("abort_delivery_refund", { p_dispute_id: disputeId });
-      return json(400, {
-        success: false,
-        error: "The payment provider did not accept this refund.",
-      });
-    }
-  } else {
-    provider = "internal";
-    providerStatus = paymongoPaymentId.startsWith("pay_")
-      ? "provider_key_missing"
-      : "no_paymongo_payment_id";
-  }
+  const manual = internalManualRefundOutcome();
 
   const finalized = await supabase.rpc("finalize_delivery_refund", {
     p_dispute_id: disputeId,
-    p_provider: provider,
-    p_paymongo_refund_id: refundId || null,
-    p_provider_status: providerStatus,
+    p_provider: manual.provider,
+    p_paymongo_refund_id: manual.paymongoRefundId,
+    p_provider_status: manual.providerStatus,
     p_admin_note: adminNote.trim() || null,
+    p_transfer_link: manual.transferLink,
+    p_transfer_link_expires_at: manual.transferLinkExpiresAt,
+    p_provider_error: manual.providerError,
   });
   if (finalized.error) {
     console.error("finalize_delivery_refund", finalized.error.message);
@@ -268,14 +157,15 @@ Deno.serve(async (req) => {
     already_decided: fin.already_decided === true,
     decision: "refund",
     status: "refunded",
-    refund_provider: String(fin.refund_provider ?? provider),
+    refund_provider: String(fin.refund_provider ?? manual.provider),
+    refund_state: fin.refund_state ?? null,
     amount_centavos: fin.amount_centavos ?? amountCentavos,
     ...recorded.fields,
   });
 });
 
 async function recordRefundReturn(
-  supabase: ReturnType<typeof createClient>,
+  supabase: ServiceClient,
   disputeId: string,
   returnRequired: boolean,
 ): Promise<{ error: boolean; body: RpcMap; fields: RpcMap }> {

@@ -156,6 +156,13 @@ abstract final class AppTheme {
           borderSide: const BorderSide(color: AppColors.error),
         ),
       ),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: AppColors.primary,
+        selectionColor: AppColors.primary.withValues(
+          alpha: isDark ? 0.35 : 0.25,
+        ),
+        selectionHandleColor: AppColors.primary,
+      ),
       datePickerTheme: DatePickerThemeData(
         backgroundColor: palette.surface,
         headerBackgroundColor: AppColors.primary,
@@ -256,11 +263,6 @@ abstract final class AppTheme {
           if (states.contains(WidgetState.selected)) return AppColors.primary;
           return palette.textSecondary;
         }),
-      ),
-      textSelectionTheme: TextSelectionThemeData(
-        cursorColor: AppColors.primary,
-        selectionColor: AppColors.primary.withValues(alpha: 0.24),
-        selectionHandleColor: AppColors.primary,
       ),
       scrollbarTheme: ScrollbarThemeData(
         thumbColor: WidgetStatePropertyAll(

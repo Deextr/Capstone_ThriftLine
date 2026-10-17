@@ -51,6 +51,8 @@ import '../../features/buyer/presentation/screens/product_detail_screen.dart';
 import '../../features/buyer/data/buyer_purchase_category.dart';
 import '../../features/buyer/controllers/buyer_transaction_history_controller.dart';
 import '../../features/buyer/presentation/screens/buyer_transaction_history_screen.dart';
+import '../../features/seller/controllers/seller_transaction_history_controller.dart';
+import '../../features/seller/presentation/screens/seller_transaction_history_screen.dart';
 import '../../features/buyer/presentation/screens/my_purchases_screen.dart';
 import '../../features/buyer/presentation/screens/saved_items_screen.dart';
 import '../../features/buyer/presentation/screens/buyer_search_tab.dart';
@@ -504,6 +506,16 @@ GoRouter createMobileAppRouter({
             auth: context.read<AuthProvider>(),
           ),
           child: const BuyerTransactionHistoryScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.sellerTransactionHistory,
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => SellerTransactionHistoryController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+          ),
+          child: const SellerTransactionHistoryScreen(),
         ),
       ),
       GoRoute(

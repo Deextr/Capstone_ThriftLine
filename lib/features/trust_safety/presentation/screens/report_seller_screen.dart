@@ -41,13 +41,12 @@ class _ReportSellerScreenState extends State<ReportSellerScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<ReportUserController>();
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         backgroundColor: AppColors.background,
-        resizeToAvoidBottomInset: true,
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(
           title: const Text('Report a Seller'),
           leading: IconButton(
@@ -60,13 +59,36 @@ class _ReportSellerScreenState extends State<ReportSellerScreen> {
               ? const Center(
                   child: CircularProgressIndicator(color: AppColors.primary),
                 )
+              : controller.hasResolvedTarget
+              ? Column(
+                  children: [
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        children: _reportFormFields(context, controller),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                      child: ThriftButton(
+                        label: 'Submit Report',
+                        loadingLabel: 'Submitting…',
+                        isLoading: controller.isSubmitting,
+                        onPressed: controller.canSubmit
+                            ? () => _submit(context)
+                            : null,
+                      ),
+                    ),
+                  ],
+                )
               : ListView(
-                  padding: EdgeInsets.fromLTRB(20, 8, 20, 24 + bottomInset),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   children: [
-                    if (controller.errorMessage != null &&
-                        !controller.hasResolvedTarget) ...[
+                    if (controller.errorMessage != null) ...[
                       Text(
                         controller.errorMessage!,
                         style: AppTypography.caption.copyWith(
@@ -75,126 +97,119 @@ class _ReportSellerScreenState extends State<ReportSellerScreen> {
                       ),
                       const SizedBox(height: 12),
                     ],
-                    if (!controller.hasResolvedTarget) ...[
-                      Text(
-                        'Who are you reporting?',
-                        style: AppTypography.subheading,
-                      ),
-                      const SizedBox(height: 12),
-                      ThriftTextField(
-                        hint: 'Search seller or shop…',
-                        controller: _search,
-                        icon: Icons.search,
-                        onChanged: controller.setSearchQuery,
-                      ),
-                      const SizedBox(height: 16),
-                      if (controller.isSearchActive)
-                        _SearchResultsSection(controller: controller)
-                      else
-                        _FollowingShopsSection(controller: controller),
-                      const SizedBox(height: 8),
-                    ],
-                    if (controller.hasResolvedTarget) ...[
-                      if (controller.selectedSeller != null)
-                        ReportSellerSelectedCard(
-                          candidate: controller.selectedSeller!,
-                          onChange: () {
-                            _search.clear();
-                            context.read<ReportUserController>()
-                              ..clearSelectedSeller()
-                              ..setSearchQuery('');
-                          },
-                        ),
-                      SizedBox(height: 24),
-                      Text(
-                        'Why are you reporting this seller?',
-                        style: AppTypography.subheading,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Select the reason that best describes the problem.',
-                        style: AppTypography.body.copyWith(
-                          color: AppColors.textSecondary,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      ...kCommunityReportReasons.map(
-                        (reason) => _ReasonOption(
-                          reason: reason,
-                          selected: controller.selectedCategory == reason.slug,
-                          onTap: () => context
-                              .read<ReportUserController>()
-                              .selectCategory(reason.slug),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      ThriftTextField(
-                        label: controller.detailsRequired
-                            ? 'Please describe the issue'
-                            : 'Additional Details (Optional)',
-                        hint: controller.detailsRequired
-                            ? 'Tell us what happened…'
-                            : 'Tell us anything else that may help us review your report.',
-                        controller: _details,
-                        maxLines: 5,
-                        maxLength: kReportDetailsMaxLength,
-                        onChanged: controller.setDetails,
-                        labelSuffix: controller.detailsRequired
-                            ? null
-                            : Text(
-                                'Optional',
-                                style: AppTypography.caption.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                      ),
-                      const SizedBox(height: 4),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          '${controller.details.length}/$kReportDetailsMaxLength',
-                          style: AppTypography.caption,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      ReportEvidenceSection(
-                        evidence: controller.evidence,
-                        evidenceError: controller.evidenceError,
-                        required: true,
-                        onAddGallery: () => context
-                            .read<ReportUserController>()
-                            .addEvidenceFromGallery(),
-                        onAddCamera: () => context
-                            .read<ReportUserController>()
-                            .addEvidenceFromCamera(),
-                        onRemove: (i) => context
-                            .read<ReportUserController>()
-                            .removeEvidence(i),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Your report stays private. The seller will not see who reported them. '
-                        'Our team reviews community reports in Disputes.',
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      ThriftButton(
-                        label: 'Submit Report',
-                        loadingLabel: 'Submitting…',
-                        isLoading: controller.isSubmitting,
-                        onPressed: controller.canSubmit
-                            ? () => _submit(context)
-                            : null,
-                      ),
-                    ],
+                    Text(
+                      'Who are you reporting?',
+                      style: AppTypography.subheading,
+                    ),
+                    const SizedBox(height: 12),
+                    ThriftTextField(
+                      hint: 'Search seller or shop…',
+                      controller: _search,
+                      icon: Icons.search,
+                      onChanged: controller.setSearchQuery,
+                    ),
+                    const SizedBox(height: 16),
+                    if (controller.isSearchActive)
+                      _SearchResultsSection(controller: controller)
+                    else
+                      _FollowingShopsSection(controller: controller),
+                    const SizedBox(height: 8),
                   ],
                 ),
         ),
       ),
     );
+  }
+
+  List<Widget> _reportFormFields(
+    BuildContext context,
+    ReportUserController controller,
+  ) {
+    return [
+      if (controller.selectedSeller != null)
+        ReportSellerSelectedCard(
+          candidate: controller.selectedSeller!,
+          onChange: () {
+            _search.clear();
+            context.read<ReportUserController>()
+              ..clearSelectedSeller()
+              ..setSearchQuery('');
+          },
+        ),
+      const SizedBox(height: 24),
+      Text(
+        'Why are you reporting this seller?',
+        style: AppTypography.subheading,
+      ),
+      const SizedBox(height: 4),
+      Text(
+        'Select the reason that best describes the problem.',
+        style: AppTypography.body.copyWith(
+          color: AppColors.textSecondary,
+          fontSize: 14,
+        ),
+      ),
+      const SizedBox(height: 14),
+      ...kCommunityReportReasons.map(
+        (reason) => _ReasonOption(
+          reason: reason,
+          selected: controller.selectedCategory == reason.slug,
+          onTap: () => context
+              .read<ReportUserController>()
+              .selectCategory(reason.slug),
+        ),
+      ),
+      const SizedBox(height: 24),
+      ThriftTextField(
+        label: controller.detailsRequired
+            ? 'Please describe the issue'
+            : 'Additional details',
+        hint: controller.detailsRequired
+            ? 'Tell us what happened…'
+            : 'Tell us anything else that may help us review your report.',
+        controller: _details,
+        maxLines: 5,
+        maxLength: kReportDetailsMaxLength,
+        onChanged: controller.setDetails,
+        labelSuffix: controller.detailsRequired
+            ? null
+            : Text(
+                'Optional',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+      ),
+      const SizedBox(height: 4),
+      Align(
+        alignment: Alignment.centerRight,
+        child: Text(
+          '${controller.details.length}/$kReportDetailsMaxLength',
+          style: AppTypography.caption,
+        ),
+      ),
+      const SizedBox(height: 24),
+      ReportEvidenceSection(
+        evidence: controller.evidence,
+        evidenceError: controller.evidenceError,
+        required: true,
+        onAddGallery: () => context
+            .read<ReportUserController>()
+            .addEvidenceFromGallery(),
+        onAddCamera: () =>
+            context.read<ReportUserController>().addEvidenceFromCamera(),
+        onRemove: (i) =>
+            context.read<ReportUserController>().removeEvidence(i),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        'Your report stays private. The seller will not see who reported them. '
+        'Our team reviews community reports in Disputes.',
+        style: AppTypography.caption.copyWith(
+          color: AppColors.textSecondary,
+        ),
+      ),
+    ];
   }
 
   Future<void> _submit(BuildContext context) async {

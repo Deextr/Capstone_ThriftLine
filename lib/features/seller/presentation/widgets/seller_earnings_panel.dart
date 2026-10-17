@@ -11,6 +11,7 @@ import '../../data/seller_earnings.dart';
 import '../../data/seller_payout_method.dart';
 import 'request_payout_dialog.dart';
 import 'seller_available_earnings_card.dart';
+import 'seller_payout_history.dart';
 
 class SellerEarningsPanel extends StatelessWidget {
   const SellerEarningsPanel({
@@ -54,6 +55,10 @@ class SellerEarningsPanel extends StatelessWidget {
   }
 
   String _availableStatus(SellerEarningsSnapshot snapshot) {
+    final open = snapshot.openPayout;
+    if (open != null) {
+      return 'Payout of ${formatCentavos(open.amountCentavos)} waiting for admin';
+    }
     if (snapshot.availableCentavos > 0) return 'Ready for payout';
     return 'No earnings available yet';
   }
@@ -92,7 +97,10 @@ class SellerEarningsPanel extends StatelessWidget {
       showThriftSnackBar(context, error, isError: true);
       return;
     }
-    showThriftSnackBar(context, 'Payout request recorded.');
+    showThriftSnackBar(
+      context,
+      'Payout request sent. An admin will transfer it to your GCash.',
+    );
   }
 }
 
@@ -105,40 +113,68 @@ class SellerEarningsFollowup extends StatelessWidget {
     if (snapshot == null) return const SizedBox.shrink();
 
     final hasRefunded = snapshot.refundedCentavos > 0;
-    if (snapshot.heldCentavos <= 0 && !hasRefunded) {
+    final hasWaiting = snapshot.payoutRequestedCentavos > 0;
+    final hasPaid = snapshot.payoutPaidCentavos > 0;
+    final hasMoneyLines =
+        snapshot.heldCentavos > 0 || hasRefunded || hasWaiting || hasPaid;
+    if (!hasMoneyLines && snapshot.payouts.isEmpty) {
       return const SizedBox.shrink();
     }
+
+    final lines = <Widget>[
+      if (snapshot.heldCentavos > 0)
+        _MoneyLine(
+          label: 'Held',
+          hint: 'Waiting for delivery & completion',
+          amount: formatCentavos(snapshot.heldCentavos),
+        ),
+      if (hasWaiting)
+        _MoneyLine(
+          label: 'Payout requested',
+          hint: 'Waiting for an admin to send it to your GCash',
+          amount: formatCentavos(snapshot.payoutRequestedCentavos),
+        ),
+      if (hasPaid)
+        _MoneyLine(
+          label: 'Paid out',
+          hint: 'Sent to your GCash by an admin',
+          amount: formatCentavos(snapshot.payoutPaidCentavos),
+        ),
+      if (hasRefunded)
+        _MoneyLine(
+          label: 'Refunded',
+          hint: 'Returned to buyers',
+          amount: formatCentavos(snapshot.refundedCentavos),
+        ),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Money in progress', style: AppTypography.subheading),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(AppConstants.radiusLg),
-            border: Border.all(color: AppColors.border),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-          child: Column(
-            children: [
-              _MoneyLine(
-                label: 'Held',
-                hint: 'Waiting for delivery & completion',
-                amount: formatCentavos(snapshot.heldCentavos),
-              ),
-              if (hasRefunded) ...[
-                Divider(height: 1, color: AppColors.border),
-                _MoneyLine(
-                  label: 'Refunded',
-                  hint: 'Returned to buyers',
-                  amount: formatCentavos(snapshot.refundedCentavos),
-                ),
+        if (lines.isNotEmpty) ...[
+          Text('Money in progress', style: AppTypography.subheading),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppConstants.radiusLg),
+              border: Border.all(color: AppColors.border),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            child: Column(
+              children: [
+                for (var i = 0; i < lines.length; i++) ...[
+                  if (i > 0) Divider(height: 1, color: AppColors.border),
+                  lines[i],
+                ],
               ],
-            ],
+            ),
           ),
-        ),
+        ],
+        if (snapshot.payouts.isNotEmpty) ...[
+          if (lines.isNotEmpty) const SizedBox(height: 20),
+          SellerPayoutHistory(payouts: snapshot.payouts),
+        ],
       ],
     );
   }

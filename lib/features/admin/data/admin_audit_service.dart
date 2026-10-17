@@ -104,6 +104,7 @@ class AdminAuditService {
     } catch (e, st) {
       debugPrint('AdminAuditService.record error: $e');
       debugPrintStack(stackTrace: st);
+      rethrow;
     }
   }
 

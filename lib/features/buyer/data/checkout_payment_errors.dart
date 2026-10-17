@@ -23,8 +23,9 @@ String buyerFacingPaymentStartError(String? raw) {
   if (lower.contains('delivery address')) {
     return 'Add a delivery address before paying.';
   }
-  if (lower.contains('choose card or gcash')) {
-    return 'Choose Card or GCash.';
+  if (lower.contains('pay with qr ph') ||
+      lower.contains('choose card or gcash')) {
+    return 'Pay with QR Ph.';
   }
   if (lower.contains('please sign in')) {
     return 'Please sign in to pay.';

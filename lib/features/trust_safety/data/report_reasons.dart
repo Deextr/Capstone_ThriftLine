@@ -261,16 +261,27 @@ String? reportDetailsError(String details) {
   return null;
 }
 
-/// Community seller reports: details optional unless reason is [other].
-String? communityReportDetailsError(String details, String? categorySlug) {
+/// Buyer report forms: details optional unless [requireDetails] (e.g. reason Other).
+String? buyerReportDetailsError(
+  String details, {
+  required bool requireDetails,
+}) {
   final trimmed = details.trim();
   if (trimmed.length > kReportDetailsMaxLength) {
     return 'Keep your report under 1,000 characters.';
   }
-  if (categorySlug == 'other' && trimmed.length < kReportDetailsMinLength) {
+  if (requireDetails && trimmed.length < kReportDetailsMinLength) {
     return 'Please describe the issue.';
   }
   return null;
+}
+
+/// Community seller reports: details optional unless reason is [other].
+String? communityReportDetailsError(String details, String? categorySlug) {
+  return buyerReportDetailsError(
+    details,
+    requireDetails: categorySlug == 'other',
+  );
 }
 
 String? deliveryFailureOtherDetailsError(String details) {

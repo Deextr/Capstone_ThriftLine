@@ -45,6 +45,9 @@ abstract final class AppConstants {
   /// One-time banner on the admin login screen after forced sign-out.
   static const String keyAdminPortalLoginNotice = 'admin_portal_login_notice';
 
+  /// Admin web shell sidebar expanded (true) vs icon rail (false).
+  static const String keyAdminSidebarExpanded = 'admin_sidebar_expanded';
+
   // Breakpoints (mobile-first)
   static const double breakpointTablet = 600;
   static const double breakpointDesktop = 1024;
