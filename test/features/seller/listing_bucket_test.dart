@@ -136,6 +136,29 @@ void main() {
     expect(listingBucketFor(listing), ListingBucket.active);
   });
 
+  test('fixed-price sold while checkout unpaid is awaiting payment', () {
+    final listing = ListingSnapshot(
+      productStatus: 'sold',
+      listingType: 'fixed_price',
+      orderStatus: 'pending',
+      paymentStatus: 'pending',
+      now: now,
+    );
+    expect(listingBucketFor(listing), ListingBucket.awaitingPayment);
+    expect(canEditListing(listing), isFalse);
+  });
+
+  test('fixed-price paid checkout is sold', () {
+    final listing = ListingSnapshot(
+      productStatus: 'sold',
+      listingType: 'fixed_price',
+      orderStatus: 'paid',
+      paymentStatus: 'paid',
+      now: now,
+    );
+    expect(listingBucketFor(listing), ListingBucket.sold);
+  });
+
   test('seller manual next-bidder offer is disabled (automatic fallback)', () {
     final listing = auction(orderStatus: 'cancelled', bidCount: 3);
     expect(canOfferToNextBidder(listing), isFalse);

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../models/order_model.dart';
+import '../../../../core/routes/paymongo_return_coordinator.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../providers/cart_provider.dart';
@@ -581,6 +582,10 @@ class _CheckoutBottomBar extends StatelessWidget {
                             final checkoutCtrl =
                                 context.read<CheckoutController>();
                             final buyNow = checkoutCtrl.isBuyNowCheckout;
+                            final paymongoReturn =
+                                context.read<PaymongoReturnCoordinator>();
+                            paymongoReturn.clear();
+                            paymongoReturn.clearCheckoutOpened();
                             context.go(
                               RouteNames.paymentForOrder(
                                 result.orderId!,

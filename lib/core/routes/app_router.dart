@@ -173,12 +173,22 @@ GoRouter createMobileAppRouter({
       if (authProvider.isFullyAuthenticated) {
         final paymongoLocation = paymongoReturn?.peekLocation();
         if (paymongoLocation != null) {
-          final paymentPath = paymongoLocation.split('?').first;
-          if (state.matchedLocation != paymentPath ||
+          final pendingUri = Uri.parse(paymongoLocation);
+          final paymentPath = pendingUri.path;
+          final pendingOrderId = pendingUri.pathSegments.length >= 2
+              ? pendingUri.pathSegments.last
+              : null;
+          final activeOrderId = state.pathParameters['orderId'];
+          if (activeOrderId != null &&
+              pendingOrderId != null &&
+              activeOrderId != pendingOrderId) {
+            paymongoReturn?.clear();
+          } else if (state.matchedLocation != paymentPath ||
               state.uri.queryParameters['returned'] != '1') {
             return paymongoLocation;
+          } else {
+            paymongoReturn?.clear();
           }
-          paymongoReturn?.clear();
         }
         if (isLogin ||
             isSignup ||

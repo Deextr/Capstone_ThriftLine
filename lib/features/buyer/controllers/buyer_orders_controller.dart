@@ -60,6 +60,7 @@ class BuyerOrdersController extends ChangeNotifier {
   AppLifecycleListener? _lifecycle;
   int _returnGeneration = 0;
   int _loadGeneration = 0;
+  int _inFlightLoads = 0;
   bool _disposed = false;
   bool _skipPaymentReconcileOnce = false;
   bool _checkoutClosed = false;
@@ -165,6 +166,7 @@ class BuyerOrdersController extends ChangeNotifier {
       _errorMessage = null;
       _notify();
     }
+    _inFlightLoads++;
     try {
       unawaited(_completeExpiredInspections());
       if (orderId == null) {
@@ -200,8 +202,9 @@ class BuyerOrdersController extends ChangeNotifier {
         if (_order != null && _order!.needsBuyerPayment) {
           if (_skipPaymentReconcileOnce) {
             _skipPaymentReconcileOnce = false;
-          } else if (_returnReconcileDepth == 0 &&
-              (!_order!.isAuctionObligation || _awaitingPaymongoReturn)) {
+          } else if (_returnReconcileDepth == 0 && _awaitingPaymongoReturn) {
+            // Only reconcile after PayMongo hosted checkout — not on every
+            // order reload (realtime would loop reconcile → UPDATE → reload).
             await _reconcileOpenCheckout(orderId!);
             if (generation != _loadGeneration) return;
           }
@@ -241,7 +244,9 @@ class BuyerOrdersController extends ChangeNotifier {
         );
       }
     } finally {
-      if (generation == _loadGeneration) {
+      _inFlightLoads--;
+      if (_inFlightLoads <= 0) {
+        _inFlightLoads = 0;
         _isLoading = false;
         _notify();
       }

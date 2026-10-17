@@ -218,38 +218,8 @@ Future<PaymongoCheckoutResult> createPaymongoCheckout(
     );
   }
   try {
-    final prepRaw = await supabase.client.rpc(
-      'prepare_paymongo_checkout',
-      params: {'p_order_id': orderId, 'p_channel': parsed},
-    );
-    final prep = supabaseRpcMap(prepRaw);
-    if (prep == null || prep['success'] != true) {
-      final message = buyerFacingPaymentStartError(
-        supabaseRpcError(
-          prep,
-          fallback: 'Unable to start payment right now. Please try again.',
-        ),
-      );
-      debugPrint('prepare_paymongo_checkout failed: $prepRaw');
-      return PaymongoCheckoutResult(success: false, error: message);
-    }
-    if (prep['already_paid'] == true) {
-      return PaymongoCheckoutResult.fromMap(prep);
-    }
-    if (prep['reuse'] == true) {
-      final reuseUrl = prep['checkout_url']?.toString().trim();
-      if (reuseUrl != null &&
-          reuseUrl.isNotEmpty &&
-          isSafePaymongoCheckoutUrl(reuseUrl)) {
-        return PaymongoCheckoutResult.fromMap({
-          'success': true,
-          'already_paid': false,
-          'checkout_url': reuseUrl,
-          'session_id': prep['session_id'],
-        });
-      }
-    }
-
+    // Edge function runs prepare_paymongo_checkout (service role when needed).
+    // Avoid a duplicate client RPC that can hit a stale (uuid, text) overload.
     final response = await supabase.client.functions
         .invoke(
           'create-paymongo-checkout',

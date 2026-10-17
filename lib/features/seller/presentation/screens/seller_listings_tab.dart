@@ -11,6 +11,7 @@ import '../../../../core/routes/route_names.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/supabase_rpc.dart';
+import '../../../../models/order_model.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../data/listing_bucket.dart';
@@ -68,6 +69,7 @@ class _ListingItem {
     endsAt: endsAt,
     winnerId: winnerId,
     orderStatus: orderStatus,
+    paymentStatus: null,
     paymentDueAt: paymentDueAt,
     bidCount: bidCount,
     now: now,
@@ -97,6 +99,9 @@ class _ListingItem {
     final auctionStatus = auction?['status'] as String?;
     final winnerId = auction?['winner_id'] as String?;
     final orderStatus = order?['order_status'] as String?;
+    final paymentStatus = order == null
+        ? null
+        : paymentStatusFromOrderRow(order);
     final bidCount = (auction?['bid_count'] as num?)?.toInt() ?? 0;
     final current = (auction?['current_price'] as num?)?.toDouble();
     final snapshot = ListingSnapshot(
@@ -106,6 +111,7 @@ class _ListingItem {
       endsAt: endsAt,
       winnerId: winnerId,
       orderStatus: orderStatus,
+      paymentStatus: paymentStatus,
       paymentDueAt: due,
       bidCount: bidCount,
       now: now,
@@ -251,7 +257,10 @@ class _SellerListingsTabState extends State<SellerListingsTab>
       if (auctionIds.isNotEmpty) {
         final orderRows = await supabase.client
             .from('orders')
-            .select('auction_id, order_status, payment_due_at')
+            .select(
+              'auction_id, order_status, payment_due_at, '
+              'payments(payment_status)',
+            )
             .inFilter('auction_id', auctionIds);
         for (final raw in orderRows as List) {
           final order = Map<String, dynamic>.from(raw as Map);
@@ -260,13 +269,42 @@ class _SellerListingsTabState extends State<SellerListingsTab>
         }
       }
 
+      final ordersByProduct = <String, Map<String, dynamic>>{};
+      final pendingFixedRows = await supabase.client
+          .from('orders')
+          .select(
+            'order_status, payment_due_at, '
+            'items:order_items(product_id), '
+            'payments(payment_status)',
+          )
+          .eq('seller_id', sellerId)
+          .eq('order_status', 'pending')
+          .filter('auction_id', 'is', null);
+      for (final raw in pendingFixedRows as List) {
+        final order = Map<String, dynamic>.from(raw as Map);
+        final items = order['items'] as List? ?? [];
+        for (final itemRaw in items) {
+          if (itemRaw is! Map) continue;
+          final item = Map<String, dynamic>.from(itemRaw);
+          final productId = item['product_id'] as String?;
+          if (productId == null || productId.isEmpty) continue;
+          ordersByProduct[productId] = order;
+        }
+      }
+
       final now = DateTime.now();
       final items = productRows
           .map(
             (row) => _ListingItem.fromRow(
               row,
-              order:
-                  ordersByAuction[_auctionMap(row['auctions'])?['auction_id']],
+              order: () {
+                final auctionOrder =
+                    ordersByAuction[_auctionMap(row['auctions'])?['auction_id']];
+                if (auctionOrder != null) return auctionOrder;
+                final productId = row['product_id'] as String?;
+                if (productId == null) return null;
+                return ordersByProduct[productId];
+              }(),
               now: now,
             ),
           )
