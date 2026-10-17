@@ -84,8 +84,8 @@ String formatAdminPhilippinesTime(DateTime dateTime) =>
 String formatTimeOfDay(DateTime dateTime) =>
     DateFormat('h:mm a').format(dateTime.toLocal());
 
-String formatRelativeTime(DateTime dateTime) {
-  final diff = DateTime.now().difference(dateTime);
+String formatRelativeTime(DateTime dateTime, {DateTime? now}) {
+  final diff = (now ?? DateTime.now()).difference(dateTime);
   if (diff.inMinutes < 1) return 'Just now';
   if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
   if (diff.inHours < 24) return '${diff.inHours}h ago';
