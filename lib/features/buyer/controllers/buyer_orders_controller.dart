@@ -181,6 +181,19 @@ class BuyerOrdersController extends ChangeNotifier {
         if (generation != _loadGeneration) return;
         _order = fetched;
         if (_order != null) {
+          if (_order!.needsBuyerPayment && !_order!.isAuctionObligation) {
+            await healMyPendingFixedCheckoutTotals(_supabase, _order!.id);
+            if (generation != _loadGeneration) return;
+            final refreshed = await fetchOrderById(
+              _supabase,
+              orderId!,
+              buyerId: myId,
+            );
+            if (generation != _loadGeneration) return;
+            if (refreshed != null) {
+              _order = refreshed;
+            }
+          }
           await _healAuctionCheckoutOrderIfNeeded();
           if (generation != _loadGeneration) return;
         }

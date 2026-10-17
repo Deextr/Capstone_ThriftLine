@@ -138,6 +138,23 @@ Future<void> syncMyUnpaidCheckouts(SupabaseService supabase) async {
   }
 }
 
+/// Recomputes pending fixed-price order totals from listing shipping settings.
+Future<void> healMyPendingFixedCheckoutTotals(
+  SupabaseService supabase,
+  String orderId,
+) async {
+  final id = orderId.trim();
+  if (id.isEmpty) return;
+  try {
+    await supabase.client.rpc(
+      'heal_my_pending_fixed_checkout_totals',
+      params: {'p_order_id': id},
+    );
+  } catch (e) {
+    debugPrint('heal_my_pending_fixed_checkout_totals error: $e');
+  }
+}
+
 /// Restores abandoned fixed-price checkouts to the cart.
 /// Do not call this on the payment screen — it would cancel the open checkout.
 Future<void> restoreAbandonedFixedPriceCheckouts(

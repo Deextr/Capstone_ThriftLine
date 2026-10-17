@@ -60,6 +60,18 @@ void main() {
       expect(fee, 0);
     });
 
+    test('fixed fee of zero is free shipping', () {
+      final fee = calculateShopFixedShippingPreview([
+        const CartShippingLine(
+          productId: 'a',
+          quantity: 1,
+          mode: ListingShippingMode.fixedFee,
+          shippingFee: 0,
+        ),
+      ]);
+      expect(fee, 0);
+    });
+
     test('uses max fee among paid modes when not free', () {
       final fee = calculateShopFixedShippingPreview([
         CartShippingLine(

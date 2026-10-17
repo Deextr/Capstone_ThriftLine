@@ -469,6 +469,7 @@ class CheckoutController extends ChangeNotifier {
           error: 'Checkout succeeded but no order was returned.',
         );
       }
+      await healMyPendingFixedCheckoutTotals(_supabase, orderId);
       try {
         await _supabase.client.rpc(
           'set_my_order_checkout_source',

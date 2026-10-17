@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../core/services/supabase_service.dart';
 import '../core/utils/stock_limits.dart';
 import '../features/buyer/data/cart_shop_group.dart';
-import '../features/buyer/data/checkout_totals.dart';
 import '../models/enums.dart';
 import '../models/product_model.dart';
 
@@ -126,24 +125,16 @@ class CartProvider extends ChangeNotifier {
   double get subtotal =>
       fixedPriceItems.fold(0.0, (sum, item) => sum + item.subtotal);
 
-  double get shippingFee => checkoutShippingFee(
-    checkoutSellerCount(fixedPriceItems.map((i) => i.product.sellerId)),
-  );
+  double get shippingFee => checkoutGroupsShipping(shopGroups);
 
-  double get platformFee => checkoutPlatformFee(subtotal);
+  double get platformFee => checkoutGroupsPlatformFee(shopGroups);
 
-  double get total => checkoutTotal(
-    subtotal: subtotal,
-    shippingFee: shippingFee,
-    platformFee: platformFee,
-  );
+  double get total => checkoutGroupsTotal(shopGroups);
 
   double get selectedSubtotal =>
       selectedItems.fold(0.0, (sum, item) => sum + item.subtotal);
 
-  double get selectedShippingFee => checkoutShippingFee(
-    checkoutSellerCount(selectedItems.map((item) => item.product.sellerId)),
-  );
+  double get selectedShippingFee => checkoutGroupsShipping(selectedShopGroups);
 
   double get selectedPlatformFee =>
       checkoutGroupsPlatformFee(selectedShopGroups);
