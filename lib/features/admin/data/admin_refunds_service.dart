@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart' show FunctionException;
 
 import '../../../core/services/supabase_service.dart';
+import 'admin_portal_data_access.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../domain/admin_buyer_refund.dart';
 import '../domain/admin_refund.dart';
@@ -34,7 +35,7 @@ class AdminRefundsService {
     required int limit,
     required int offset,
   }) async {
-    final raw = await _supabase.client.rpc(
+    final raw = await (await resolveAdminClient(_supabase)).rpc(
       'admin_list_buyer_refunds',
       params: {
         'p_status': status.rpcValue,
@@ -71,12 +72,12 @@ class AdminRefundsService {
   }
 
   Future<AdminRefundSnapshot> load(String escrowId) async {
-    final escrowRow = await _supabase.client
+    final escrowRow = await (await resolveAdminClient(_supabase))
         .from('escrow')
         .select('*')
         .eq('escrow_id', escrowId)
         .maybeSingle();
-    final detailsRow = await _supabase.client
+    final detailsRow = await (await resolveAdminClient(_supabase))
         .from('escrow_refund_details')
         .select(
           'transfer_link, transfer_link_expires_at, gcash_account_name, '
@@ -86,7 +87,7 @@ class AdminRefundsService {
         )
         .eq('escrow_id', escrowId)
         .maybeSingle();
-    final attemptRows = await _supabase.client
+    final attemptRows = await (await resolveAdminClient(_supabase))
         .from('escrow_refund_attempts')
         .select(
           'created_at, source, action, outcome, paymongo_refund_id, '
@@ -117,7 +118,7 @@ class AdminRefundsService {
     required String action,
   }) async {
     try {
-      final response = await _supabase.client.functions.invoke(
+      final response = await (await resolveAdminClient(_supabase)).functions.invoke(
         'reconcile-refund',
         body: {'escrow_id': escrowId, 'action': action},
       );
@@ -143,7 +144,7 @@ class AdminRefundsService {
     required String mobileNumber,
     String? note,
   }) async {
-    final raw = await _supabase.client.rpc(
+    final raw = await (await resolveAdminClient(_supabase)).rpc(
       'admin_record_manual_refund',
       params: {
         'p_escrow_id': escrowId,

@@ -29,6 +29,18 @@ bool authIsFullyAuthenticated({
   required bool emailOtpPending,
 }) => hasSession && !emailOtpPending;
 
+/// After a successful email OTP, keep the buyer off the verify screen even if
+/// a later RLS probe fails. Re-opening OTP after the code is consumed shows
+/// "No active code" on the next tap.
+@visibleForTesting
+bool shouldReopenEmailOtpFromAccessProbe({
+  required bool verifyJustSucceeded,
+  required bool serverAccessGranted,
+}) {
+  if (verifyJustSucceeded) return false;
+  return !serverAccessGranted;
+}
+
 /// Recovery sessions must not write ThriftLine's normal login cache.
 @visibleForTesting
 bool shouldPersistAuthSession({
@@ -203,6 +215,7 @@ class AuthProvider extends ChangeNotifier {
         if (bypassOtpForUser) await _prefs.setEmailOtpPending(false);
         _syncActiveAccount(currentUser, restoreFromPrefs: true);
         await _saveSession(currentUser);
+        await _reconcileEmailLoginGateState();
       } else {
         if (currentUser != null) {
           await _authService.signOut();
@@ -251,6 +264,12 @@ class AuthProvider extends ChangeNotifier {
       // A rejected Google→email signup signs the session back out. Ignore a
       // stale signedIn that finishes after that sign-out.
       if (_authService.currentSession == null) return;
+
+      if (authEvent == AuthChangeEvent.tokenRefreshed) {
+        await _reconcileEmailLoginGateState();
+        notifyListeners();
+        return;
+      }
 
       // signInWithEmail / loginWithGoogle already hydrated _user; repeating
       // getCurrentUser here duplicates getUser + profile queries on the UI path.
@@ -366,6 +385,7 @@ class AuthProvider extends ChangeNotifier {
         await _setEmailOtpPending(true);
         await sendEmailOtp();
       }
+      await _reconcileEmailLoginGateState();
       return EmailLoginResult.success();
     } finally {
       _resolvingTrustedDevice = false;
@@ -714,6 +734,29 @@ class AuthProvider extends ChangeNotifier {
     );
     if (error == null) {
       await _setEmailOtpPending(false);
+      try {
+        await _authService.claimEmailLoginSessionGateAfterOtp();
+      } catch (e) {
+        debugPrint('AuthProvider.verifyEmailOtp claim gate: $e');
+      }
+      final priorRole = _user?.role;
+      final priorStatus = _user?.accountStatus;
+      try {
+        await reloadUser();
+      } catch (e) {
+        debugPrint('AuthProvider.verifyEmailOtp reloadUser: $e');
+      }
+      if (_user != null &&
+          priorRole != null &&
+          priorRole.isAdministrator &&
+          !_user!.isAdministrator) {
+        _user = _user!.copyWith(
+          role: priorRole,
+          accountStatus: priorStatus ?? _user!.accountStatus,
+        );
+        await _saveSession(_user!);
+      }
+      await _reconcileEmailLoginGateState();
       if (_user?.isAdmin ?? false) {
         try {
           await _authService.recordAdminLoginCompletedAudit();
@@ -721,6 +764,7 @@ class AuthProvider extends ChangeNotifier {
           debugPrint('AuthProvider.verifyEmailOtp admin audit failed');
         }
       }
+      notifyListeners();
     }
     return error;
   }
@@ -801,6 +845,45 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _setEmailOtpPending(bool value) async {
     _emailOtpPending = value;
     await _prefs.setEmailOtpPending(value);
+  }
+
+  /// Keeps client OTP routing aligned with server session-gate / RLS state.
+  Future<void> reconcileEmailLoginGateState() =>
+      _reconcileEmailLoginGateState();
+
+  Future<void> _reconcileEmailLoginGateState() async {
+    if (_user == null ||
+        _passwordRecoveryActive ||
+        !usesEmailPasswordAuth) {
+      return;
+    }
+
+    try {
+      await _authService.claimEmailLoginSessionGateAfterOtp();
+      await _authService.syncEmailLoginSessionGate();
+    } catch (e) {
+      debugPrint('AuthProvider.reconcileEmailLoginGateState: $e');
+    }
+
+    final granted = await _authService.emailLoginAccessGranted();
+    if (granted && _emailOtpPending) {
+      await _setEmailOtpPending(false);
+      notifyListeners();
+      return;
+    }
+
+    // Never send the user back to OTP from a failed RLS probe. A consumed
+    // code cannot be reused, so reopening the screen looks like a no-op
+    // then "No active code" on the next tap.
+    if (shouldReopenEmailOtpFromAccessProbe(
+      verifyJustSucceeded: !_emailOtpPending,
+      serverAccessGranted: granted,
+    )) {
+      debugPrint(
+        'AuthProvider.reconcileEmailLoginGateState: access not granted; '
+        'leaving OTP routing unchanged',
+      );
+    }
   }
 
   Future<void> _clearSession() async {

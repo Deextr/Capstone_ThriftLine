@@ -1,0 +1,2 @@
+-- Run in Supabase Dashboard → SQL (same as 20261017290000_admin_portal_access_repair.sql).
+-- Copy the migration file contents if \i is unavailable.

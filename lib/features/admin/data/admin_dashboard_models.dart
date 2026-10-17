@@ -145,6 +145,16 @@ bool isAdminDashboardOfflineError(Object error) {
       text.contains('failed host');
 }
 
+/// Transient admin auth (portal idle clock, email OTP gate) vs offline.
+bool isAdminDashboardAccessError(Object error) {
+  final text = error.toString().toLowerCase();
+  return text.contains('only an admin can view') ||
+      text.contains('please sign in') ||
+      text.contains('admin access') ||
+      text.contains('email verification') ||
+      text.contains('42501');
+}
+
 class AdminDashboardCounts {
   const AdminDashboardCounts({
     required this.registeredInPeriod,

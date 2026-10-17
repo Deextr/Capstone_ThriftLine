@@ -16,10 +16,13 @@ class AdminDashboardService {
   final SupabaseService _supabase;
   final SharedPreferencesService? _prefs;
 
+  static const _cachePeriodKeyField = 'cache_period_key';
+
   Future<AdminMarketplaceSnapshot> loadMarketplace({
     required AdminDashboardPeriod period,
   }) async {
     final map = await _rpc(
+      period: period,
       from: period.from,
       to: period.toExclusive,
       compareFrom: period.requestsComparison ? period.compareFrom : null,
@@ -29,7 +32,9 @@ class AdminDashboardService {
     final snapshot = AdminMarketplaceSnapshot.fromJson(map);
     var overdue = snapshot.activity.ordersOverdueFulfillment;
     try {
-      final raw = await _supabase.client.rpc('fulfillment_overdue_count');
+      final raw = await _supabase.adminQuery(
+        (client) => client.rpc('fulfillment_overdue_count'),
+      );
       if (raw is int) {
         overdue = raw;
       } else if (raw is num) {
@@ -48,7 +53,7 @@ class AdminDashboardService {
       revenueSeries: snapshot.revenueSeries,
       recentActivity: snapshot.recentActivity,
     );
-    await _cacheSnapshot(_marketplaceCachePayload(map, overdue));
+    await _cacheSnapshot(period, _marketplaceCachePayload(map, overdue));
     return merged;
   }
 
@@ -56,17 +61,24 @@ class AdminDashboardService {
   Future<AdminDashboardSnapshot> loadSnapshot({
     required AdminDateWindow window,
   }) async {
-    final map = await _rpc(from: window.from, to: window.toExclusive);
+    final map = await _rpc(
+      from: window.from,
+      to: window.toExclusive,
+    );
     return AdminDashboardSnapshot.fromJson(map);
   }
 
-  AdminMarketplaceSnapshot? readCachedMarketplace() {
+  AdminMarketplaceSnapshot? readCachedMarketplace(AdminDashboardPeriod period) {
     final json = _prefs?.adminDashboardCacheJson;
     if (json == null || json.isEmpty) return null;
     try {
       final decoded = jsonDecode(json);
       final map = supabaseRpcMap(decoded);
       if (map == null || map['kpis'] is! Map) return null;
+      final cachedKey = map[_cachePeriodKeyField]?.toString();
+      if (cachedKey != null && cachedKey != period.cacheKey) {
+        return null;
+      }
       return AdminMarketplaceSnapshot.fromJson(map);
     } catch (e) {
       debugPrint('AdminDashboardService cache parse error: $e');
@@ -75,21 +87,24 @@ class AdminDashboardService {
   }
 
   Future<Map<String, dynamic>> _rpc({
+    AdminDashboardPeriod? period,
     DateTime? from,
     required DateTime to,
     DateTime? compareFrom,
     DateTime? compareTo,
     String? bucket,
   }) async {
-    final raw = await _supabase.client.rpc(
-      'admin_dashboard_snapshot',
-      params: {
-        'p_from': from?.toUtc().toIso8601String(),
-        'p_to': to.toUtc().toIso8601String(),
-        'p_compare_from': compareFrom?.toUtc().toIso8601String(),
-        'p_compare_to': compareTo?.toUtc().toIso8601String(),
-        'p_bucket': bucket,
-      },
+    final raw = await _supabase.adminQuery(
+      (client) => client.rpc(
+        'admin_dashboard_snapshot',
+        params: {
+          'p_from': from?.toUtc().toIso8601String(),
+          'p_to': to.toUtc().toIso8601String(),
+          'p_compare_from': compareFrom?.toUtc().toIso8601String(),
+          'p_compare_to': compareTo?.toUtc().toIso8601String(),
+          'p_bucket': bucket,
+        },
+      ),
     );
     final map = supabaseRpcMap(raw);
     if (map == null || map['success'] == false) {
@@ -97,6 +112,9 @@ class AdminDashboardService {
         supabaseRpcError(map, fallback: 'Unable to load the dashboard.') ??
             'Unable to load the dashboard.',
       );
+    }
+    if (period != null) {
+      map[_cachePeriodKeyField] = period.cacheKey;
     }
     return map;
   }
@@ -121,9 +139,14 @@ class AdminDashboardService {
     return cache;
   }
 
-  Future<void> _cacheSnapshot(Map<String, dynamic> json) async {
+  Future<void> _cacheSnapshot(
+    AdminDashboardPeriod period,
+    Map<String, dynamic> json,
+  ) async {
     try {
-      await _prefs?.setAdminDashboardCacheJson(jsonEncode(json));
+      final payload = Map<String, dynamic>.from(json)
+        ..[_cachePeriodKeyField] = period.cacheKey;
+      await _prefs?.setAdminDashboardCacheJson(jsonEncode(payload));
     } catch (e) {
       debugPrint('AdminDashboardService cache write error: $e');
     }

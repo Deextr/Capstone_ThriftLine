@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 import 'package:uuid/uuid.dart';
 
 import '../../../core/services/supabase_service.dart';
+import 'admin_portal_data_access.dart';
 
 /// Private bucket for payout and manual refund receipts. Admin-only.
 const kFinancialEvidenceBucket = 'financial-evidence';
@@ -80,7 +81,7 @@ class FinancialEvidenceStorage {
     final contentType = evidenceContentType(file.fileName, file.mimeType);
     final path =
         '$folder/$ownerId/${_uuid.v4()}.${evidenceExtension(file.fileName, contentType)}';
-    await _supabase.client.storage
+    await (await resolveAdminClient(_supabase)).storage
         .from(kFinancialEvidenceBucket)
         .uploadBinary(
           path,
@@ -91,20 +92,21 @@ class FinancialEvidenceStorage {
   }
 
   Future<void> remove(String path) async {
-    final referenced = await _supabase.client.rpc(
+    final referenced = await (await resolveAdminClient(_supabase)).rpc(
       'financial_evidence_path_is_referenced',
       params: {'p_path': path},
     );
     if (referenced == true) {
       throw StateError('Evidence is linked to a payout or refund record.');
     }
-    await _supabase.client.storage.from(kFinancialEvidenceBucket).remove([
+    await (await resolveAdminClient(_supabase)).storage.from(kFinancialEvidenceBucket).remove([
       path,
     ]);
   }
 
-  Future<String> signedUrl(String path) {
-    return _supabase.client.storage
+  Future<String> signedUrl(String path) async {
+    final client = await resolveAdminClient(_supabase);
+    return client.storage
         .from(kFinancialEvidenceBucket)
         .createSignedUrl(path, 60 * 10);
   }

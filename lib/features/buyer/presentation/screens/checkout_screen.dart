@@ -458,7 +458,6 @@ class _CheckoutBottomBar extends StatelessWidget {
     final checkout = context.watch<CheckoutController>();
     final total = checkout.total;
     final blocked = checkout.hasUnpaidCheckouts;
-    final addressError = checkout.deliveryAddressError;
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -515,14 +514,6 @@ class _CheckoutBottomBar extends StatelessWidget {
             ),
             const SizedBox(height: 10),
           ],
-          if (addressError != null) ...[
-            Text(
-              addressError,
-              style: AppTypography.caption.copyWith(color: AppColors.error),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 10),
-          ],
           if (checkout.errorMessage != null) ...[
             Text(
               checkout.errorMessage!,
@@ -561,7 +552,6 @@ class _CheckoutBottomBar extends StatelessWidget {
               ElevatedButton(
                 onPressed:
                     blocked ||
-                            !checkout.hasValidDeliveryAddress ||
                             checkout.isLoading ||
                             checkout.isSubmitting ||
                             checkout.isContinuingToPayment

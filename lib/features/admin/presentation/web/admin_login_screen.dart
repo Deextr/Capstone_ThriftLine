@@ -136,7 +136,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
 
     final auth = context.read<AuthProvider>();
     try {
-      if (auth.isAuthenticated && !auth.canUseAdminPortal) {
+      if (auth.isAuthenticated &&
+          !auth.canUseAdminPortal &&
+          !auth.isEmailOtpPending) {
         await auth.logout();
         if (!mounted) return;
       }
@@ -168,6 +170,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
           .read<AdminPortalSessionController>()
           .clearStaleLoginNotice();
       if (!mounted) return;
+      if (auth.isEmailOtpPending) {
+        context.go(RouteNames.adminVerifyEmailOtp);
+        return;
+      }
       if (!auth.canUseAdminPortal) {
         final deactivated = auth.isDeactivatedAdministrator;
         await auth.logout();
@@ -181,10 +187,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         return;
       }
       if (!mounted) return;
-      if (auth.isEmailOtpPending) {
-        context.go(RouteNames.adminVerifyEmailOtp);
-        return;
-      }
       final redirect = GoRouterState.of(
         context,
       ).uri.queryParameters['redirect'];

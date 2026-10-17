@@ -63,16 +63,6 @@ class CheckoutController extends ChangeNotifier {
   bool get isContinuingToPayment => _isContinuingToPayment;
   bool get isCancellingCheckout => _isCancellingCheckout;
   String? get errorMessage => _errorMessage;
-  bool get hasAddress => _selectedAddress != null;
-
-  bool get hasValidDeliveryPhone =>
-      _selectedAddress?.hasValidPhoneContact ?? false;
-
-  bool get hasValidDeliveryAddress =>
-      checkoutDeliveryAddressError(_selectedAddress) == null;
-
-  String? get deliveryAddressError =>
-      checkoutDeliveryAddressError(_selectedAddress);
   Set<String> get selectedProductIds => Set.unmodifiable(_selectedProductIds);
 
   String? get scopedProductId {
@@ -387,11 +377,6 @@ class CheckoutController extends ChangeNotifier {
       return (orderId: null, count: 0, error: 'Please sign in to check out.');
     }
     final address = _selectedAddress;
-    final addressError = checkoutDeliveryAddressError(address);
-    if (addressError != null) {
-      _errorMessage = addressError;
-      return (orderId: null, count: 0, error: addressError);
-    }
     if (_isSubmitting) {
       return (
         orderId: null,
@@ -439,7 +424,12 @@ class CheckoutController extends ChangeNotifier {
         }
       }
 
-      final params = <String, dynamic>{'p_address_id': address?.id};
+      final params = <String, dynamic>{
+        'p_address_id':
+            address != null && checkoutDeliveryAddressError(address) == null
+            ? address.id
+            : null,
+      };
       final ids = currentSelected.map((item) => item.product.id).toList();
       final multiShop = groupCartItemsByShop(currentSelected).length > 1;
       if (ids.length > 1 || multiShop) {

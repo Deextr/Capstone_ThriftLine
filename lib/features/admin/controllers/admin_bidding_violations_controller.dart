@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../data/admin_bidding_violations_service.dart';
+import '../data/admin_portal_data_access.dart';
 import '../domain/auction_bidding_violations.dart';
 
 class AdminBiddingViolationsController extends ChangeNotifier {
@@ -82,7 +83,7 @@ class AdminBiddingViolationsController extends ChangeNotifier {
       _stats = result.stats;
     } catch (e, st) {
       debugPrint('AdminBiddingViolationsController.load: $e\n$st');
-      _error = 'Unable to load bidding violations.';
+      _error = adminPortalAccessUserMessage(e);
       _summaries = const [];
       _stats = BiddingViolationsOverviewStats.empty;
     } finally {

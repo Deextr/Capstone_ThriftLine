@@ -34,6 +34,22 @@ class HomeFeedSection<T> {
   }
 }
 
+/// True when password email sessions are blocked by the server OTP gate (RLS
+/// returns empty catalogs without throwing).
+Future<bool> emailLoginCatalogAccessBlocked(SupabaseClient client) async {
+  try {
+    var result = await client.rpc('auth_email_login_access_granted');
+    if (result is bool && result) return false;
+
+    await client.rpc('sync_email_login_session_gate_from_verified');
+    result = await client.rpc('auth_email_login_access_granted');
+    if (result is bool) return !result;
+  } catch (e) {
+    debugPrint('emailLoginCatalogAccessBlocked: $e');
+  }
+  return false;
+}
+
 bool isHomeOfflineError(Object error) {
   final text = error.toString().toLowerCase();
   return text.contains('socket') ||

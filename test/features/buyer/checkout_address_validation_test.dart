@@ -3,7 +3,7 @@ import 'package:thriftline/features/buyer/data/checkout_address_validation.dart'
 import 'package:thriftline/models/address_model.dart';
 
 void main() {
-  test('requires a complete address and 09 mobile before checkout', () {
+  test('requires a complete address and 09 mobile before paying', () {
     expect(checkoutDeliveryAddressError(null), isNotNull);
     expect(
       checkoutDeliveryAddressError(

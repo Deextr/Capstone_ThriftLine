@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
+import 'admin_portal_data_access.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import 'admin_audit_log_models.dart';
 import 'admin_dashboard_models.dart';
@@ -35,7 +36,7 @@ class AdminAuditService {
     int limit = 25,
     int offset = 0,
   }) async {
-    final raw = await _supabase.client.rpc(
+    final raw = await (await resolveAdminClient(_supabase)).rpc(
       'list_admin_audit_logs',
       params: {
         'p_search': search?.trim().isEmpty ?? true ? null : search!.trim(),
@@ -89,7 +90,7 @@ class AdminAuditService {
     Map<String, dynamic>? details,
   }) async {
     try {
-      await _supabase.client.rpc(
+      await (await resolveAdminClient(_supabase)).rpc(
         'record_admin_audit_log',
         params: {
           'p_category': category,

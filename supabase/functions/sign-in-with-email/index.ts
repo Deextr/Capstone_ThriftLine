@@ -366,6 +366,7 @@ Deno.serve(async (req) => {
     let password = "";
     let turnstileToken = "";
     let deviceTokenRaw: unknown = null;
+    let devicePlatformRaw: unknown = null;
     let loginPortal = "app";
     try {
       const body = await req.json();
@@ -377,6 +378,7 @@ Deno.serve(async (req) => {
         ? body.captcha_token
         : "";
       deviceTokenRaw = body?.device_token;
+      devicePlatformRaw = body?.platform;
       const portalRaw = typeof body?.login_portal === "string"
         ? body.login_portal.trim().toLowerCase()
         : "";
@@ -578,6 +580,7 @@ Deno.serve(async (req) => {
     }
 
     const userId = payload.user?.id;
+    let appUserSnapshot: { role: string; account_status: string } | null = null;
     if (isAdminPortal) {
       if (!userId) {
         return json(req, 503, {
@@ -631,6 +634,11 @@ Deno.serve(async (req) => {
           ipHash,
         });
       }
+
+      appUserSnapshot = {
+        role: String(portalRole),
+        account_status: String(profile?.account_status ?? "active"),
+      };
 
       await clearAdminPortalFailures(service, emailHash);
       await logAdminAuthAudit(service, {
@@ -686,6 +694,12 @@ Deno.serve(async (req) => {
           code: banned ? "account_banned" : "account_disabled",
         });
       }
+      if (profile?.role) {
+        appUserSnapshot = {
+          role: String(profile.role),
+          account_status: String(status),
+        };
+      }
     }
 
     const accessToken = payload.access_token ?? "";
@@ -699,7 +713,7 @@ Deno.serve(async (req) => {
     }
 
     let trustedSkip = false;
-    if (!isAdminPortal && isDeviceToken(deviceTokenRaw)) {
+    if (isDeviceToken(deviceTokenRaw)) {
       try {
         const deviceHash = await hashDeviceToken(userId, deviceTokenRaw);
         const { data: trusted, error: trustError } = await service.rpc(
@@ -733,7 +747,26 @@ Deno.serve(async (req) => {
       });
     }
 
-    return json(req, 200, {
+    if (trustedSkip && isDeviceToken(deviceTokenRaw)) {
+      try {
+        const deviceHash = await hashDeviceToken(userId, deviceTokenRaw);
+        const { error: trustRegisterError } = await service.rpc(
+          "register_trusted_device",
+          {
+            p_user_id: userId,
+            p_device_token_hash: deviceHash,
+            p_platform: trustedPlatform(devicePlatformRaw),
+          },
+        );
+        if (trustRegisterError) {
+          console.error("sign-in-with-email trusted device refresh failed");
+        }
+      } catch (trustRegisterError) {
+        console.error("sign-in-with-email trusted device refresh threw", trustRegisterError);
+      }
+    }
+
+    const responseBody: Record<string, unknown> = {
       session: {
         access_token: payload.access_token,
         refresh_token: payload.refresh_token,
@@ -745,7 +778,11 @@ Deno.serve(async (req) => {
         required: !trustedSkip,
         skipped_trusted_device: trustedSkip,
       },
-    });
+    };
+    if (appUserSnapshot) {
+      responseBody.app_user = appUserSnapshot;
+    }
+    return json(req, 200, responseBody);
   } catch (error) {
     console.error("sign-in-with-email unhandled error", error);
     return json(req, 500, {

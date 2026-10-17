@@ -251,6 +251,32 @@ class HomeController extends ChangeNotifier {
         biddingError != null &&
         sellersError != null;
 
+    final catalogEmpty =
+        ending.isEmpty &&
+        suggested.isEmpty &&
+        bidding.isEmpty &&
+        sellers.isEmpty;
+    if (!failedEverything &&
+        catalogEmpty &&
+        endingError == null &&
+        suggestedError == null &&
+        biddingError == null &&
+        sellersError == null) {
+      if (await emailLoginCatalogAccessBlocked(client)) {
+        _isLoading = false;
+        _isOffline = anyOffline;
+        _showingCachedData = false;
+        _errorMessage =
+            'Could not load listings right now. Pull to refresh in a moment.';
+        _endingSoon = HomeFeedSection(errorMessage: _errorMessage);
+        _suggested = HomeFeedSection(errorMessage: _errorMessage);
+        _bidding = HomeFeedSection(errorMessage: _errorMessage);
+        _verifiedSellers = HomeFeedSection(errorMessage: _errorMessage);
+        notifyListeners();
+        return;
+      }
+    }
+
     if (failedEverything) {
       final restored = _restoreCache();
       _isLoading = false;

@@ -57,6 +57,11 @@ class AdminDashboardPeriod {
     AdminDashboardBucket.auto => 'auto',
   };
 
+  /// Stable id for dashboard cache entries (period + range bounds + bucket).
+  String get cacheKey =>
+      '${range.name}|${from?.toUtc().toIso8601String() ?? 'all'}|'
+      '${toExclusive.toUtc().toIso8601String()}|$bucketParam';
+
   String get chipLabel {
     if (range != AdminDashboardRange.custom ||
         customStart == null ||

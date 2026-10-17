@@ -1,4 +1,5 @@
 import '../../../core/services/supabase_service.dart';
+import 'admin_portal_data_access.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../domain/admin_seller_payout.dart';
 import 'financial_evidence_storage.dart';
@@ -16,7 +17,7 @@ class AdminSellerPayoutsService {
     required int limit,
     required int offset,
   }) async {
-    final raw = await _supabase.client.rpc(
+    final raw = await (await resolveAdminClient(_supabase)).rpc(
       'admin_list_seller_payouts',
       params: {
         'p_status': status.rpcValue,
@@ -60,7 +61,7 @@ class AdminSellerPayoutsService {
     required String evidencePath,
     String? note,
   }) async {
-    final raw = await _supabase.client.rpc(
+    final raw = await (await resolveAdminClient(_supabase)).rpc(
       'admin_mark_seller_payout_paid',
       params: {
         'p_payout_id': payoutId,
@@ -79,7 +80,7 @@ class AdminSellerPayoutsService {
     required String payoutId,
     required String reason,
   }) async {
-    final raw = await _supabase.client.rpc(
+    final raw = await (await resolveAdminClient(_supabase)).rpc(
       'admin_reject_seller_payout',
       params: {'p_payout_id': payoutId, 'p_reason': reason.trim()},
     );

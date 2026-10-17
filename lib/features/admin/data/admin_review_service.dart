@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
+import 'admin_portal_data_access.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/community_report_model.dart';
 import '../../../models/order_model.dart';
@@ -84,7 +85,7 @@ class AdminReviewService {
 
   Future<List<AdminReviewActivity>> _recentApplications() async {
     try {
-      final rows = await _supabase.client
+      final rows = await (await resolveAdminClient(_supabase))
           .from('user_verifications')
           .select(
             'verification_id, shop_name, verification_status, reviewed_at',
@@ -115,7 +116,7 @@ class AdminReviewService {
 
   Future<List<AdminReviewActivity>> _recentReports() async {
     try {
-      final rows = await _supabase.client
+      final rows = await (await resolveAdminClient(_supabase))
           .from('reports')
           .select('report_id, category, status, resolved_at')
           .inFilter('status', kAdminReportClosedStatuses)
@@ -144,7 +145,7 @@ class AdminReviewService {
 
   Future<List<AdminReviewActivity>> _recentDisputes() async {
     try {
-      final rows = await _supabase.client
+      final rows = await (await resolveAdminClient(_supabase))
           .from('delivery_disputes')
           .select('dispute_id, reason, resolved_at')
           .eq('status', kAdminDisputeClosedStatus)
@@ -181,7 +182,7 @@ class AdminReviewService {
     required String column,
     required String equals,
   }) async {
-    final rows = await _supabase.client
+    final rows = await (await resolveAdminClient(_supabase))
         .from(table)
         .select(column)
         .eq(column, equals);
@@ -193,7 +194,7 @@ class AdminReviewService {
     DateTime? from,
     DateTime? toExclusive,
   }) async {
-    var query = _supabase.client
+    var query = (await resolveAdminClient(_supabase))
         .from('reports')
         .select(
           '*, report_evidence(report_evidence_id, file_path, created_at)',
@@ -219,7 +220,7 @@ class AdminReviewService {
   }
 
   Future<CommunityReportModel?> getReport(String reportId) async {
-    final row = await _supabase.client
+    final row = await (await resolveAdminClient(_supabase))
         .from('reports')
         .select('*, report_evidence(report_evidence_id, file_path, created_at)')
         .eq('report_id', reportId)
@@ -233,7 +234,7 @@ class AdminReviewService {
   Future<List<AdminDeliveryDispute>> listDisputes({
     required AdminQueueFilter filter,
   }) async {
-    var query = _supabase.client.from('delivery_disputes').select();
+    var query = (await resolveAdminClient(_supabase)).from('delivery_disputes').select();
     if (filter == AdminQueueFilter.open) {
       query = query.eq('status', kAdminDisputeOpenStatus);
     } else {
@@ -260,7 +261,7 @@ class AdminReviewService {
     }
     if (orderId == null || orderId.isEmpty) return null;
     try {
-      final row = await _supabase.client
+      final row = await (await resolveAdminClient(_supabase))
           .from('delivery_disputes')
           .select()
           .eq('order_id', orderId)
@@ -285,7 +286,7 @@ class AdminReviewService {
     required String instruction,
   }) async {
     try {
-      final rpcRes = await _supabase.client.rpc(
+      final rpcRes = await (await resolveAdminClient(_supabase)).rpc(
         'admin_request_order_report_evidence',
         params: {
           'p_report_id': reportId,
@@ -315,7 +316,7 @@ class AdminReviewService {
     bool? returnRequired,
   }) async {
     try {
-      final rpcRes = await _supabase.client.rpc(
+      final rpcRes = await (await resolveAdminClient(_supabase)).rpc(
         'complete_order_report_resolution',
         params: {
           'p_report_id': reportId,
@@ -340,7 +341,7 @@ class AdminReviewService {
   }
 
   Future<AdminDeliveryDispute?> getDispute(String disputeId) async {
-    final row = await _supabase.client
+    final row = await (await resolveAdminClient(_supabase))
         .from('delivery_disputes')
         .select()
         .eq('dispute_id', disputeId)
@@ -359,7 +360,7 @@ class AdminReviewService {
     required String adminResponse,
   }) async {
     try {
-      final rpcRes = await _supabase.client.rpc(
+      final rpcRes = await (await resolveAdminClient(_supabase)).rpc(
         'decide_report',
         params: {
           'p_report_id': reportId,
@@ -385,7 +386,7 @@ class AdminReviewService {
     String? adminNote,
   }) async {
     try {
-      final rpcRes = await _supabase.client.rpc(
+      final rpcRes = await (await resolveAdminClient(_supabase)).rpc(
         'close_delivery_dispute',
         params: {'p_dispute_id': disputeId, 'p_admin_note': adminNote?.trim()},
       );
@@ -407,7 +408,7 @@ class AdminReviewService {
   Future<DeliveryPaymentHold?> _loadPaymentHold(String orderId) async {
     if (orderId.isEmpty) return null;
     try {
-      final row = await _supabase.client
+      final row = await (await resolveAdminClient(_supabase))
           .from('escrow')
           .select()
           .eq('order_id', orderId)
@@ -448,7 +449,7 @@ class AdminReviewService {
 
   Future<String?> cancelItemReturn(String disputeId) async {
     try {
-      final rpcRes = await _supabase.client.rpc(
+      final rpcRes = await (await resolveAdminClient(_supabase)).rpc(
         'cancel_return_shipment',
         params: {'p_dispute_id': disputeId},
       );
@@ -550,7 +551,7 @@ class AdminReviewService {
   Future<Map<String, OrderModel>> _loadOrders(Set<String> ids) async {
     if (ids.isEmpty) return {};
     try {
-      final rows = await _supabase.client
+      final rows = await (await resolveAdminClient(_supabase))
           .from('orders')
           .select(kOrderSelect)
           .inFilter('order_id', ids.toList());
@@ -574,7 +575,7 @@ class AdminReviewService {
     final signed = <ReportEvidenceItem>[];
     for (final item in report.evidence) {
       try {
-        final url = await _supabase.client.storage
+        final url = await (await resolveAdminClient(_supabase)).storage
             .from(kAdminEvidenceBucket)
             .createSignedUrl(item.filePath, kAdminSignedUrlSeconds);
         signed.add(item.copyWith(signedUrl: url));

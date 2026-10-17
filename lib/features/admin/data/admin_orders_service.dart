@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import 'admin_portal_data_access.dart';
 import '../../buyer/data/order_query.dart';
 import '../../../models/order_model.dart';
 import '../domain/admin_order_filter_rules.dart';
@@ -257,7 +258,7 @@ class AdminOrdersService {
 
     final needsSlaFlagsInner = _needsSlaFlagsInnerJoin(unifiedStatus);
 
-    var filter = _supabase.client
+    var filter = (await resolveAdminClient(_supabase))
         .from('orders')
         .select(
           _listSelect(
@@ -371,7 +372,7 @@ class AdminOrdersService {
         'escrow(status, refund_state), '
         'admin_order_sla_flags(fulfillment_overdue, refund_needs_action, refund_completed)';
 
-    var filter = _supabase.client
+    var filter = (await resolveAdminClient(_supabase))
         .from('orders')
         .select(
           needsPaymentInner ? selectNoEscrowPaymentInner : selectNoEscrow,
@@ -487,10 +488,11 @@ class AdminOrdersService {
   Future<AdminOrderDetailBundle?> fetchOrderDetailBundle(String orderId) async {
     final warnings = <String>[];
     Map<String, dynamic>? map;
+    final client = await resolveAdminClient(_supabase);
 
     try {
       final row = await runAdminOrderDetailSelect(
-        (select) => _supabase.client
+        (select) => client
             .from('orders')
             .select(select)
             .eq('order_id', orderId)
@@ -501,7 +503,7 @@ class AdminOrdersService {
     } catch (e, st) {
       debugPrint('AdminOrdersService.fetchOrderDetailBundle primary: $e\n$st');
       try {
-        final row = await _supabase.client
+        final row = await client
             .from('orders')
             .select('*, items:order_items(*), payments(*)')
             .eq('order_id', orderId)
@@ -584,7 +586,7 @@ class AdminOrdersService {
   }
 
   Future<Map<String, dynamic>?> _loadEscrowRow(String orderId) async {
-    final row = await _supabase.client
+    final row = await (await resolveAdminClient(_supabase))
         .from('escrow')
         .select('*')
         .eq('order_id', orderId)
@@ -594,7 +596,7 @@ class AdminOrdersService {
   }
 
   Future<Map<String, dynamic>?> fetchOrderDetail(String orderId) async {
-    return _supabase.client
+    return (await resolveAdminClient(_supabase))
         .from('orders')
         .select(
           '*, buyer:buyer_id(full_name, email), seller:seller_id(full_name, email), '
@@ -627,7 +629,7 @@ class AdminOrdersService {
     String currentOrderId,
   ) async {
     try {
-      final rows = await _supabase.client
+      final rows = await (await resolveAdminClient(_supabase))
           .from('orders')
           .select(
             'order_id, order_number, total_amount, '
@@ -663,7 +665,7 @@ class AdminOrdersService {
     String orderId,
   ) async {
     try {
-      final rows = await _supabase.client
+      final rows = await (await resolveAdminClient(_supabase))
           .from('reports')
           .select('report_id, status, reason, created_at')
           .eq('order_id', orderId)

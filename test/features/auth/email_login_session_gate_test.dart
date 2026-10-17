@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:thriftline/features/auth/data/auth_result.dart';
+import 'package:thriftline/providers/auth_provider.dart';
 
 bool emailOtpRequiredFromEdgeBody(Map<String, dynamic> data) {
   final emailOtp = data['email_otp'];
@@ -37,6 +38,28 @@ void main() {
 
       expect(pending.requiresEmailOtp, isTrue);
       expect(trusted.requiresEmailOtp, isFalse);
+    });
+  });
+
+  group('shouldReopenEmailOtpFromAccessProbe', () {
+    test('does not reopen OTP after a successful verify', () {
+      expect(
+        shouldReopenEmailOtpFromAccessProbe(
+          verifyJustSucceeded: true,
+          serverAccessGranted: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('does not reopen OTP when the server already granted access', () {
+      expect(
+        shouldReopenEmailOtpFromAccessProbe(
+          verifyJustSucceeded: false,
+          serverAccessGranted: true,
+        ),
+        isFalse,
+      );
     });
   });
 }

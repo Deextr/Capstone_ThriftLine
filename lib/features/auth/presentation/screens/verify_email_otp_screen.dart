@@ -59,16 +59,27 @@ class _VerifyEmailOtpScreenState extends State<VerifyEmailOtpScreen> {
       return;
     }
 
+    if (_verifying) return;
     setState(() => _verifying = true);
     final auth = context.read<AuthProvider>();
-    final error = await auth.verifyEmailOtp(token: token);
-    if (!mounted) return;
-    setState(() => _verifying = false);
-    if (error != null) {
-      showThriftSnackBar(context, error, isError: true);
-      return;
+    try {
+      final error = await auth.verifyEmailOtp(token: token);
+      if (!mounted) return;
+      if (error != null) {
+        showThriftSnackBar(context, error, isError: true);
+        return;
+      }
+      context.go(auth.homeRoute);
+    } catch (_) {
+      if (!mounted) return;
+      showThriftSnackBar(
+        context,
+        'Could not verify that code. Please try again.',
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _verifying = false);
     }
-    context.go(auth.homeRoute);
   }
 
   @override

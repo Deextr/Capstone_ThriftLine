@@ -35,6 +35,23 @@ void main() {
     });
   });
 
+  group('mergeAppUserProfileSnapshot', () {
+    test('fills role when profile fetch is blocked', () {
+      expect(
+        mergeAppUserProfileSnapshot(null, {
+          'role': 'super_admin',
+          'account_status': 'active',
+        }),
+        {'role': 'super_admin', 'account_status': 'active'},
+      );
+    });
+
+    test('leaves profile unchanged when app_user is missing', () {
+      const profile = {'role': 'buyer', 'account_status': 'active'};
+      expect(mergeAppUserProfileSnapshot(profile, null), profile);
+    });
+  });
+
   group('AuthResult email OTP', () {
     test('marks email/password success as requiring OTP', () {
       final result = AuthResult.success(null, requiresEmailOtp: true);

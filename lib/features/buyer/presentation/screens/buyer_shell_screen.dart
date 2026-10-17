@@ -31,6 +31,10 @@ class _BuyerShellScreenState extends State<BuyerShellScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await context.read<AuthProvider>().reconcileEmailLoginGateState();
+    });
     _tabs = [
       ChangeNotifierProvider(
         create: (context) => HomeController(

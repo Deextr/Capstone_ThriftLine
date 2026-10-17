@@ -1,4 +1,5 @@
 import '../../../core/services/supabase_service.dart';
+import 'admin_portal_data_access.dart';
 import '../domain/marketplace_report_catalog.dart';
 import 'marketplace_report_models.dart';
 
@@ -18,7 +19,7 @@ class AdminMarketplaceReportService {
     final rpcCategory = complete
         ? 'all'
         : marketplaceReportCategoryRpcValue(category);
-    final raw = await _supabase.client.rpc(
+    final raw = await (await resolveAdminClient(_supabase)).rpc(
       'admin_marketplace_report',
       params: {
         'p_category': rpcCategory,

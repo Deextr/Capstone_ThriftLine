@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../core/services/supabase_service.dart';
 import '../data/admin_dashboard_models.dart';
 import '../data/admin_moderation_queue_service.dart';
+import '../data/admin_portal_data_access.dart';
 import '../data/admin_review_rules.dart';
 
 class AdminDisputesHubController extends ChangeNotifier {
@@ -174,7 +175,7 @@ class AdminDisputesHubController extends ChangeNotifier {
       debugPrint('AdminDisputesHubController.load error: $e');
       _items = const [];
       _total = 0;
-      _errorMessage = 'Unable to load disputes.';
+      _errorMessage = adminPortalAccessUserMessage(e);
     } finally {
       _isLoading = false;
       notifyListeners();

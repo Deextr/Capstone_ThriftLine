@@ -29,6 +29,10 @@ abstract final class AppConstants {
   /// Non-secret marker that pairs with the secure-storage install token.
   /// Logout must keep it. It is not a credential and must not be the token.
   static const String keyDeviceTrustInstall = 'device_trust_install';
+
+  /// Web-only install token storage (Flutter web has no OS keystore).
+  /// Mobile keeps the raw token in secure storage only.
+  static const String keyDeviceTrustTokenWeb = 'device_trust_token_web';
   static const String keyActiveAccount = 'active_account';
   static const String keyActiveAccountUserId = 'active_account_user_id';
   static const String keyRecentSearchesPrefix = 'recent_searches_';

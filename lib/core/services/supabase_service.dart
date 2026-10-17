@@ -2,12 +2,22 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/supabase_config.dart';
 
+typedef AdminQueryPrepare = Future<void> Function();
+
 /// Provides convenient, centralized access to Supabase services.
 ///
 /// All Supabase interaction in the app should go through this class
 /// so that if the SDK changes, only this file needs updating.
 class SupabaseService {
   SupabaseService();
+
+  AdminQueryPrepare? adminQueryPrepare;
+
+  /// Runs an admin-portal query after optional [adminQueryPrepare] (admin app only).
+  Future<T> adminQuery<T>(Future<T> Function(SupabaseClient client) action) async {
+    await adminQueryPrepare?.call();
+    return action(client);
+  }
 
   /// The raw [SupabaseClient].
   SupabaseClient get client => SupabaseConfig.client;

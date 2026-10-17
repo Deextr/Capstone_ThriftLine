@@ -182,6 +182,23 @@ without that path cannot pass restrictive RLS. Turnstile and login throttles
 remain on the Edge Function path; pair with Supabase Auth rate limits for
 defense in depth.
 
+`20261017270000_email_otp_users_self_profile_read.sql`: lets each user read
+their own `users` row while OTP is pending (admin portal routing), splits
+write policies, and adds `verify_email_login_session_gate_for_user` when the
+JWT omits `session_id`.
+
+`20261017280000_email_login_gate_latest_session.sql`: fixes
+`auth_email_login_access_granted()` to use the latest verified gate per user
+when JWT `session_id` is missing, so admin RPCs (dashboard) work after email OTP.
+
+`20261017290000_admin_portal_access_repair.sql`: idempotent repair bundle (run this
+on hosted Supabase if `db push` history diverges): latest gate logic, users self-read
+during OTP, `admin_portal_access_status()` diagnostic RPC.
+
+`20261017310000_email_otp_claim_current_session.sql`: after a consumed login OTP,
+bind verification to the current JWT session_id (password grant / refresh can
+differ). Safe `_jwt_session_id()` parse. `claim_email_login_session_gate_after_otp()`.
+
 ## Seed data
 
 `../seed/` holds environment-specific data that is deliberately not part of the

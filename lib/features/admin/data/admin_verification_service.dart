@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import 'admin_portal_data_access.dart';
 
 class SellerApplication {
   const SellerApplication({
@@ -126,7 +127,7 @@ class AdminVerificationService {
   final SupabaseService _supabase;
 
   Future<SellerApplication?> getById(String verificationId) async {
-    final row = await _supabase.client
+    final row = await (await resolveAdminClient(_supabase))
         .from('user_verifications')
         .select()
         .eq('verification_id', verificationId)
@@ -134,7 +135,7 @@ class AdminVerificationService {
     if (row == null) return null;
     var application = SellerApplication.fromJson(row);
     try {
-      final profile = await _supabase.client
+      final profile = await (await resolveAdminClient(_supabase))
           .from('user_public_profiles')
           .select('full_name, username')
           .eq('user_id', application.userId)
@@ -204,7 +205,7 @@ class AdminVerificationService {
     final toIndex = fromIndex + pageSize - 1;
 
     var query = _applyVerificationFilters(
-      _supabase.client
+      (await resolveAdminClient(_supabase))
           .from('user_verifications')
           .select('*, users(full_name, email, username)'),
       status: status,
@@ -244,7 +245,7 @@ class AdminVerificationService {
     final toIndex = fromIndex + pageSize - 1;
 
     var query = _applyVerificationFilters(
-      _supabase.client.from('user_verifications').select(),
+      (await resolveAdminClient(_supabase)).from('user_verifications').select(),
       status: status,
       search: null,
       from: from,
@@ -285,7 +286,7 @@ class AdminVerificationService {
 
     final userIds = applications.map((app) => app.userId).toSet().toList();
     try {
-      final profiles = await _supabase.client
+      final profiles = await (await resolveAdminClient(_supabase))
           .from('users')
           .select('user_id, full_name, email, username')
           .inFilter('user_id', userIds);
@@ -351,7 +352,7 @@ class AdminVerificationService {
 
   Future<List<String>> _matchingUserIds(String term) async {
     try {
-      final rows = await _supabase.client
+      final rows = await (await resolveAdminClient(_supabase))
           .from('users')
           .select('user_id')
           .or(
@@ -378,7 +379,7 @@ class AdminVerificationService {
   /// Returns the count of verifications grouped by status.
   Future<({int pending, int approved, int rejected, int total})>
   countAll() async {
-    final rows = await _supabase.client
+    final rows = await (await resolveAdminClient(_supabase))
         .from('user_verifications')
         .select('verification_status');
     int pending = 0, approved = 0, rejected = 0;
@@ -402,7 +403,7 @@ class AdminVerificationService {
 
   Future<String?> signedUrl(String? path) async {
     if (path == null || path.isEmpty) return null;
-    final signed = await _supabase.client.storage
+    final signed = await (await resolveAdminClient(_supabase)).storage
         .from('verification-docs')
         .createSignedUrl(path, 60 * 10);
     return signed;
@@ -413,7 +414,7 @@ class AdminVerificationService {
     required String decision,
     String? reason,
   }) async {
-    await _supabase.client.rpc(
+    await (await resolveAdminClient(_supabase)).rpc(
       'review_seller_verification',
       params: {
         'p_verification_id': verificationId,

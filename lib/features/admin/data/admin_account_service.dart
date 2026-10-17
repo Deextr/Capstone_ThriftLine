@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import 'admin_portal_data_access.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../auth/domain/auth_error.dart';
 import 'admin_account_models.dart';
@@ -18,7 +19,7 @@ class AdminAccountService {
     int limit = 20,
     int offset = 0,
   }) async {
-    final raw = await _supabase.client.rpc(
+    final raw = await (await resolveAdminClient(_supabase)).rpc(
       'list_admin_accounts',
       params: {
         'p_search': search.trim(),
@@ -80,7 +81,7 @@ class AdminAccountService {
 
   Future<String?> completeInvitation() async {
     try {
-      await _supabase.client.rpc('complete_admin_invitation');
+      await (await resolveAdminClient(_supabase)).rpc('complete_admin_invitation');
       return null;
     } catch (e) {
       debugPrint('complete_admin_invitation error: $e');
@@ -97,7 +98,7 @@ class AdminAccountService {
 
   Future<AdminInviteResult> _invoke(Map<String, dynamic> body) async {
     try {
-      final response = await _supabase.client.functions.invoke(
+      final response = await (await resolveAdminClient(_supabase)).functions.invoke(
         'invite-admin',
         body: body,
       );

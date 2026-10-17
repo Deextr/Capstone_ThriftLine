@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
+import 'admin_portal_data_access.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../buyer/domain/looking_for_lifecycle.dart';
 
@@ -258,7 +259,7 @@ class LookingForModerationService {
 
   Future<DateTime> serverNow() async {
     try {
-      final raw = await _supabase.client.rpc('looking_for_server_now');
+      final raw = await (await resolveAdminClient(_supabase)).rpc('looking_for_server_now');
       final stamp = DateTime.tryParse(
         supabaseRpcMap(raw)?['now']?.toString() ?? '',
       );
@@ -272,7 +273,7 @@ class LookingForModerationService {
   Future<List<LookingForAdminReport>> listOpenReportsForPost(
     String postId,
   ) async {
-    final rows = await _supabase.client
+    final rows = await (await resolveAdminClient(_supabase))
         .from('admin_looking_for_report_queue')
         .select()
         .eq('post_id', postId)
@@ -285,7 +286,7 @@ class LookingForModerationService {
   }
 
   Future<List<LookingForAdminReport>> listReports() async {
-    final rows = await _supabase.client
+    final rows = await (await resolveAdminClient(_supabase))
         .from('admin_looking_for_report_queue')
         .select()
         .order('created_at', ascending: false)
@@ -297,7 +298,7 @@ class LookingForModerationService {
   }
 
   Future<LookingForAdminReport?> getReport(String reportId) async {
-    final row = await _supabase.client
+    final row = await (await resolveAdminClient(_supabase))
         .from('admin_looking_for_report_queue')
         .select()
         .eq('report_id', reportId)
@@ -313,7 +314,7 @@ class LookingForModerationService {
     bool violationConfirmed = false,
   }) async {
     try {
-      final raw = await _supabase.client.rpc(
+      final raw = await (await resolveAdminClient(_supabase)).rpc(
         'review_looking_for_report',
         params: {
           'p_report_id': reportId,
@@ -336,7 +337,7 @@ class LookingForModerationService {
   }
 
   Future<List<DisabledAccountRecord>> listDisabledAccounts() async {
-    final rows = await _supabase.client
+    final rows = await (await resolveAdminClient(_supabase))
         .from('admin_disabled_accounts')
         .select()
         .order('permanently_disabled_at', ascending: false);
@@ -347,7 +348,7 @@ class LookingForModerationService {
   }
 
   Future<List<LookingForViolationRecord>> violationsFor(String userId) async {
-    final rows = await _supabase.client
+    final rows = await (await resolveAdminClient(_supabase))
         .from('looking_for_violations')
         .select(
           'violation_id, user_id, post_id, strike_number, created_at, post:looking_for_posts(title)',

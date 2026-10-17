@@ -6,6 +6,7 @@ import '../../../core/services/shared_preferences_service.dart';
 import '../../../core/services/supabase_service.dart';
 import '../data/admin_dashboard_models.dart';
 import '../data/admin_dashboard_service.dart';
+import '../data/admin_portal_data_access.dart';
 import '../data/admin_refunds_service.dart';
 import '../data/admin_seller_payouts_service.dart';
 import '../data/admin_marketplace_dashboard.dart';
@@ -18,6 +19,11 @@ class AdminDashboardController extends ChangeNotifier {
   }) : _service = AdminDashboardService(supabase, prefs: prefs),
        _payouts = AdminSellerPayoutsService(supabase),
        _refunds = AdminRefundsService(supabase) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 90), (_) {
+      if (!_isLoading && !_isRefreshing) {
+        unawaited(load(refreshOnly: true));
+      }
+    });
     load();
   }
 
@@ -33,6 +39,8 @@ class AdminDashboardController extends ChangeNotifier {
   bool _showingCachedData = false;
   String? _errorMessage;
   int _loadEpoch = 0;
+  Timer? _refreshTimer;
+  String? _loadedPeriodKey;
 
   AdminMarketplaceSnapshot? get snapshot => _snapshot;
   AdminDashboardPeriod get period => _period;
@@ -51,11 +59,14 @@ class AdminDashboardController extends ChangeNotifier {
   int _pendingPayoutCount = 0;
   int _pendingBuyerRefundCount = 0;
 
-  /// Seller payout requests still waiting for a manual GCash transfer.
   int get pendingPayoutCount => _pendingPayoutCount;
-
-  /// Buyer refunds waiting for manual GCash or other admin follow-up.
   int get pendingBuyerRefundCount => _pendingBuyerRefundCount;
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
 
   void setPendingPayoutCount(int value) {
     if (_pendingPayoutCount == value) return;
@@ -85,15 +96,21 @@ class AdminDashboardController extends ChangeNotifier {
     }
   }
 
-  Future<void> load() async {
+  Future<void> load({bool refreshOnly = false}) async {
     unawaited(_loadPendingPayoutCount());
     unawaited(_loadPendingBuyerRefundCount());
     final epoch = ++_loadEpoch;
-    if (_snapshot == null) {
-      final cached = _service.readCachedMarketplace();
+    final period = _period;
+    final periodChanged = _loadedPeriodKey != period.cacheKey;
+
+    if (_snapshot == null || (periodChanged && !refreshOnly)) {
+      final cached = _service.readCachedMarketplace(period);
       if (cached != null) {
         _snapshot = cached;
         _showingCachedData = true;
+      } else if (periodChanged && _snapshot != null) {
+        _snapshot = null;
+        _showingCachedData = false;
       }
       _isLoading = true;
     } else {
@@ -104,10 +121,10 @@ class AdminDashboardController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final period = _period;
-      final snapshot = await _service.loadMarketplace(period: period);
+      final snapshot = await _loadMarketplaceWithRetry(period: period);
       if (epoch != _loadEpoch) return;
       _snapshot = snapshot;
+      _loadedPeriodKey = period.cacheKey;
       _showingCachedData = false;
       _isOffline = false;
       _errorMessage = null;
@@ -115,15 +132,17 @@ class AdminDashboardController extends ChangeNotifier {
       if (epoch != _loadEpoch) return;
       debugPrint('AdminDashboardController.load error: $e');
       _isOffline = isAdminDashboardOfflineError(e);
-      if (_snapshot != null) {
+      final detail = adminPortalAccessUserMessage(e);
+      if (_snapshot != null && _loadedPeriodKey == period.cacheKey) {
         _showingCachedData = true;
         _errorMessage = _isOffline
-            ? 'You appear to be offline. Showing saved dashboard numbers.'
-            : 'Could not refresh the dashboard. Showing saved numbers.';
+            ? 'You appear to be offline. Showing saved numbers for ${period.chipLabel}.'
+            : '$detail Showing saved numbers for ${period.chipLabel}.';
       } else {
+        _showingCachedData = false;
         _errorMessage = _isOffline
             ? 'You appear to be offline. Connect and try again.'
-            : 'Unable to load the dashboard.';
+            : detail;
       }
     } finally {
       if (epoch == _loadEpoch) {
@@ -135,8 +154,21 @@ class AdminDashboardController extends ChangeNotifier {
   }
 
   Future<void> setPeriod(AdminDashboardPeriod period) async {
+    if (_period.cacheKey == period.cacheKey) return;
     _period = period;
     notifyListeners();
     await load();
+  }
+
+  Future<AdminMarketplaceSnapshot> _loadMarketplaceWithRetry({
+    required AdminDashboardPeriod period,
+  }) async {
+    try {
+      return await _service.loadMarketplace(period: period);
+    } catch (e) {
+      if (!isAdminDashboardAccessError(e)) rethrow;
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      return _service.loadMarketplace(period: period);
+    }
   }
 }

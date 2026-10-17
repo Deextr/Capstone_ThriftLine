@@ -1,6 +1,5 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../../../core/services/supabase_service.dart';
+import 'admin_portal_data_access.dart';
 import '../domain/auction_bidding_violations.dart';
 
 class BiddingViolationsOverviewStats {
@@ -94,9 +93,9 @@ class BiddingViolationHistoryEntry {
 
 class AdminBiddingViolationsService {
   AdminBiddingViolationsService({required SupabaseService supabase})
-    : _client = supabase.client;
+    : _supabase = supabase;
 
-  final SupabaseClient _client;
+  final SupabaseService _supabase;
 
   Future<
     ({
@@ -105,7 +104,8 @@ class AdminBiddingViolationsService {
     })
   >
   loadViolators() async {
-    final sanctionRows = await _client
+    final client = await resolveAdminClient(_supabase);
+    final sanctionRows = await client
         .from('auction_bidding_sanctions')
         .select('''
           user_id,
@@ -125,7 +125,7 @@ class AdminBiddingViolationsService {
         .gt('violation_count', 0)
         .order('updated_at', ascending: false);
 
-    final violationRows = await _client
+    final violationRows = await client
         .from('auction_bidding_violations')
         .select('user_id, created_at')
         .order('created_at', ascending: false);
@@ -218,7 +218,8 @@ class AdminBiddingViolationsService {
   ) async {
     if (userId.trim().isEmpty) return const [];
 
-    final rows = await _client
+    final client = await resolveAdminClient(_supabase);
+    final rows = await client
         .from('auction_bidding_violations')
         .select('''
           violation_id,

@@ -140,6 +140,7 @@ class AuthService {
       };
       if (deviceToken != null && deviceToken.isNotEmpty) {
         body['device_token'] = deviceToken;
+        body['platform'] = trustedDevicePlatformLabel(defaultTargetPlatform);
       }
 
       late final int responseStatus;
@@ -205,7 +206,10 @@ class AuthService {
           avatarUrl: _extractAvatarUrlFromUser(supabaseUser),
         );
 
-        final userRecord = await getUserRecord(supabaseUser.id);
+        final userRecord = mergeAppUserProfileSnapshot(
+          await getUserRecord(supabaseUser.id),
+          data['app_user'],
+        );
         final emailOtp = data['email_otp'];
         var requiresEmailOtp = true;
         if (emailOtp is Map) {
@@ -602,6 +606,45 @@ class AuthService {
   ///
   /// Gmail SMTP credentials never leave the server. Returns an error message
   /// on failure, or `null` on success.
+  /// Mirrors [auth_email_login_access_granted] for the active JWT.
+  Future<bool> emailLoginAccessGranted() async {
+    try {
+      final result = await _supabaseService.client.rpc(
+        'auth_email_login_access_granted',
+      );
+      return result == true;
+    } catch (e) {
+      debugPrint('AuthService.emailLoginAccessGranted: $e');
+      return false;
+    }
+  }
+
+  /// Binds a refreshed GoTrue session_id to the latest verified email gate.
+  Future<bool> syncEmailLoginSessionGate() async {
+    try {
+      final result = await _supabaseService.client.rpc(
+        'sync_email_login_session_gate_from_verified',
+      );
+      return result == true;
+    } catch (e) {
+      debugPrint('AuthService.syncEmailLoginSessionGate: $e');
+      return false;
+    }
+  }
+
+  /// After a consumed login OTP, mark the current JWT session as verified.
+  Future<bool> claimEmailLoginSessionGateAfterOtp() async {
+    try {
+      final result = await _supabaseService.client.rpc(
+        'claim_email_login_session_gate_after_otp',
+      );
+      return result == true;
+    } catch (e) {
+      debugPrint('AuthService.claimEmailLoginSessionGateAfterOtp: $e');
+      return false;
+    }
+  }
+
   Future<String?> sendEmailOtp() async {
     try {
       final response = await _supabaseService.client.functions.invoke(
@@ -1036,4 +1079,23 @@ class AuthService {
       summary: 'Successful administrator login',
     );
   }
+}
+
+/// Merges role/account_status from [sign-in-with-email] when RLS hides the row.
+@visibleForTesting
+Map<String, dynamic>? mergeAppUserProfileSnapshot(
+  Map<String, dynamic>? profile,
+  dynamic appUser,
+) {
+  if (appUser is! Map) return profile;
+  final role = appUser['role']?.toString().trim();
+  final status = appUser['account_status']?.toString().trim();
+  if ((role == null || role.isEmpty) && (status == null || status.isEmpty)) {
+    return profile;
+  }
+  return {
+    ...?profile,
+    if (role != null && role.isNotEmpty) 'role': role,
+    if (status != null && status.isNotEmpty) 'account_status': status,
+  };
 }
