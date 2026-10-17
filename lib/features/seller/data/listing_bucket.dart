@@ -8,11 +8,19 @@ export 'listing_snapshot.dart';
 enum ListingBucket { active, awaitingPayment, sold, inactive }
 
 ListingBucket listingBucketFor(ListingSnapshot listing) {
-  if (listing.productStatus == 'sold' || listing.paymentStatus == 'paid') {
+  if (listing.paymentStatus == 'paid' || listing.orderStatus == 'paid') {
     return ListingBucket.sold;
   }
 
   if (listing.listingType != 'auction') {
+    final unpaidCheckout =
+        listing.orderStatus == 'pending' && listing.paymentStatus != 'paid';
+    if (unpaidCheckout) {
+      return ListingBucket.awaitingPayment;
+    }
+    if (listing.productStatus == 'sold') {
+      return ListingBucket.sold;
+    }
     return listing.productStatus == 'active'
         ? ListingBucket.active
         : ListingBucket.inactive;

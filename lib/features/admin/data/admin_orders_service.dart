@@ -231,15 +231,42 @@ class AdminOrdersService {
   static String _listSelect({
     required bool paymentInner,
     required bool slaFlagsInner,
-  }) =>
-      'order_id, order_number, order_type, auction_id, total_amount, '
-      'order_status, created_at, '
-      'buyer:buyer_id(full_name), seller:seller_id(full_name), '
-      'payments${paymentInner ? '!inner' : ''}'
-      '(payment_status, created_at, updated_at), '
-      'escrow(status, refund_state), '
-      'admin_order_sla_flags${slaFlagsInner ? '!inner' : ''}'
-      '(fulfillment_overdue, refund_needs_action, refund_completed)';
+    required _OrdersListEmbedProfile embedProfile,
+  }) {
+    final payments =
+        'payments${paymentInner ? '!inner' : ''}'
+        '(payment_status, created_at, updated_at)';
+    final buyerSeller =
+        'buyer:buyer_id(full_name), seller:seller_id(full_name)';
+    final base =
+        'order_id, order_number, order_type, auction_id, total_amount, '
+        'order_status, created_at, $buyerSeller, $payments';
+
+    return switch (embedProfile) {
+      _OrdersListEmbedProfile.full =>
+        '$base, escrow(status, refund_state), '
+        'admin_order_sla_flags${slaFlagsInner ? '!inner' : ''}'
+        '(fulfillment_overdue, refund_needs_action, refund_completed)',
+      _OrdersListEmbedProfile.noEscrowRefundState =>
+        '$base, escrow(status), '
+        'admin_order_sla_flags${slaFlagsInner ? '!inner' : ''}'
+        '(fulfillment_overdue, refund_needs_action, refund_completed)',
+      _OrdersListEmbedProfile.noSlaFlags =>
+        '$base, escrow(status, refund_state)',
+      _OrdersListEmbedProfile.minimal => base,
+    };
+  }
+
+  static bool _postgrestEmbedRecoverable(PostgrestException error) {
+    final code = error.code?.trim() ?? '';
+    if (code == 'PGRST200' || code == 'PGRST201') return true;
+    final message = error.message.toLowerCase();
+    return message.contains('relationship') ||
+        message.contains('admin_order_sla_flags') ||
+        message.contains('refund_state') ||
+        message.contains('schema cache') ||
+        message.contains('could not embed');
+  }
 
   Future<AdminOrdersPage> list({
     required int page,
@@ -258,12 +285,76 @@ class AdminOrdersService {
 
     final needsSlaFlagsInner = _needsSlaFlagsInnerJoin(unifiedStatus);
 
+    final (column, ascending) = switch (sort) {
+      AdminOrdersSort.newest => ('created_at', false),
+      AdminOrdersSort.oldest => ('created_at', true),
+      AdminOrdersSort.amountHigh => ('total_amount', false),
+      AdminOrdersSort.amountLow => ('total_amount', true),
+    };
+
+    final profiles = [
+      _OrdersListEmbedProfile.full,
+      _OrdersListEmbedProfile.noEscrowRefundState,
+      _OrdersListEmbedProfile.noSlaFlags,
+      _OrdersListEmbedProfile.minimal,
+    ];
+
+    PostgrestException? lastEmbedError;
+    for (final embedProfile in profiles) {
+      if (needsSlaFlagsInner &&
+          embedProfile != _OrdersListEmbedProfile.full &&
+          embedProfile != _OrdersListEmbedProfile.noEscrowRefundState) {
+        continue;
+      }
+      try {
+        return await _fetchOrdersPage(
+          embedProfile: embedProfile,
+          needsPaymentInner: needsPaymentInner,
+          needsSlaFlagsInner: needsSlaFlagsInner,
+          category: category,
+          unifiedStatus: unifiedStatus,
+          search: search,
+          dateFrom: dateFrom,
+          dateTo: dateTo,
+          from: from,
+          to: to,
+          column: column,
+          ascending: ascending,
+        );
+      } on PostgrestException catch (e) {
+        if (!_postgrestEmbedRecoverable(e)) rethrow;
+        lastEmbedError = e;
+        debugPrint(
+          'AdminOrdersService.list embed profile $embedProfile failed: $e',
+        );
+      }
+    }
+
+    if (lastEmbedError != null) throw lastEmbedError;
+    throw StateError('Admin orders list failed without a query error.');
+  }
+
+  Future<AdminOrdersPage> _fetchOrdersPage({
+    required _OrdersListEmbedProfile embedProfile,
+    required bool needsPaymentInner,
+    required bool needsSlaFlagsInner,
+    required AdminOrderCategory category,
+    required AdminUnifiedStatusFilter unifiedStatus,
+    required String search,
+    required DateTime? dateFrom,
+    required DateTime? dateTo,
+    required int from,
+    required int to,
+    required String column,
+    required bool ascending,
+  }) async {
     var filter = (await resolveAdminClient(_supabase))
         .from('orders')
         .select(
           _listSelect(
             paymentInner: needsPaymentInner,
             slaFlagsInner: needsSlaFlagsInner,
+            embedProfile: embedProfile,
           ),
         );
 
@@ -273,118 +364,12 @@ class AdminOrdersService {
     }
 
     filter =
-        _applyUnifiedStatusFilter(filter, unifiedStatus)
-            as PostgrestFilterBuilder<PostgrestList>;
-
-    final term = search.trim();
-    if (term.isNotEmpty) {
-      if (looksLikeUuid(term)) {
-        filter = filter.eq('order_id', term);
-      } else {
-        final escaped = term.replaceAll(',', '').replaceAll('%', '');
-        final pattern = '%$escaped%';
-        filter = filter.or(
-          'order_number.ilike.$pattern,buyer.full_name.ilike.$pattern,'
-          'seller.full_name.ilike.$pattern',
-        );
-      }
-    }
-
-    if (dateFrom != null) {
-      filter = filter.gte(
-        'created_at',
-        _startOfDay(dateFrom).toIso8601String(),
-      );
-    }
-    if (dateTo != null) {
-      filter = filter.lte('created_at', _endOfDay(dateTo).toIso8601String());
-    }
-
-    final (column, ascending) = switch (sort) {
-      AdminOrdersSort.newest => ('created_at', false),
-      AdminOrdersSort.oldest => ('created_at', true),
-      AdminOrdersSort.amountHigh => ('total_amount', false),
-      AdminOrdersSort.amountLow => ('total_amount', true),
-    };
-
-    try {
-      final response = await filter
-          .order(column, ascending: ascending)
-          .range(from, to)
-          .count(CountOption.exact);
-
-      final data = response.data as List? ?? const [];
-      final rows = data
-          .map(
-            (row) =>
-                AdminOrderRow.fromJson(Map<String, dynamic>.from(row as Map)),
-          )
-          .toList();
-      return AdminOrdersPage(rows: rows, total: response.count);
-    } on PostgrestException catch (e) {
-      debugPrint('AdminOrdersService.list embed failed: $e');
-      if (needsSlaFlagsInner) rethrow;
-      return _listWithoutEscrowEmbed(
-        page: page,
-        pageSize: pageSize,
-        category: category,
-        unifiedStatus: unifiedStatus,
-        search: search,
-        dateFrom: dateFrom,
-        dateTo: dateTo,
-        sort: sort,
-        from: from,
-        to: to,
-        column: column,
-        ascending: ascending,
-        needsPaymentInner: needsPaymentInner,
-      );
-    }
-  }
-
-  Future<AdminOrdersPage> _listWithoutEscrowEmbed({
-    required int page,
-    required int pageSize,
-    required AdminOrderCategory category,
-    required AdminUnifiedStatusFilter unifiedStatus,
-    required String search,
-    required DateTime? dateFrom,
-    required DateTime? dateTo,
-    required AdminOrdersSort sort,
-    required int from,
-    required int to,
-    required String column,
-    required bool ascending,
-    required bool needsPaymentInner,
-  }) async {
-    const selectNoEscrow =
-        'order_id, order_number, order_type, auction_id, total_amount, '
-        'order_status, created_at, '
-        'buyer:buyer_id(full_name), seller:seller_id(full_name), '
-        'payments(payment_status, created_at, updated_at), '
-        'escrow(status, refund_state), '
-        'admin_order_sla_flags(fulfillment_overdue, refund_needs_action, refund_completed)';
-    const selectNoEscrowPaymentInner =
-        'order_id, order_number, order_type, auction_id, total_amount, '
-        'order_status, created_at, '
-        'buyer:buyer_id(full_name), seller:seller_id(full_name), '
-        'payments!inner(payment_status, created_at, updated_at), '
-        'escrow(status, refund_state), '
-        'admin_order_sla_flags(fulfillment_overdue, refund_needs_action, refund_completed)';
-
-    var filter = (await resolveAdminClient(_supabase))
-        .from('orders')
-        .select(
-          needsPaymentInner ? selectNoEscrowPaymentInner : selectNoEscrow,
-        );
-
-    final orderType = category.dbOrderType;
-    if (orderType != null) {
-      filter = filter.eq('order_type', orderType);
-    }
-    filter =
-        _applyUnifiedStatusFilter(filter, unifiedStatus)
-            as PostgrestFilterBuilder<PostgrestList>;
+        _applyUnifiedStatusFilter(
+          filter,
+          unifiedStatus,
+          allowSlaEmbed: embedProfile == _OrdersListEmbedProfile.full ||
+              embedProfile == _OrdersListEmbedProfile.noEscrowRefundState,
+        ) as PostgrestFilterBuilder<PostgrestList>;
 
     final term = search.trim();
     if (term.isNotEmpty) {
@@ -445,8 +430,20 @@ class AdminOrdersService {
 
   PostgrestFilterBuilder<dynamic> _applyUnifiedStatusFilter(
     PostgrestFilterBuilder<dynamic> filter,
-    AdminUnifiedStatusFilter unifiedStatus,
-  ) {
+    AdminUnifiedStatusFilter unifiedStatus, {
+    bool allowSlaEmbed = true,
+  }) {
+    if (!allowSlaEmbed &&
+        (unifiedStatus == AdminUnifiedStatusFilter.delayed ||
+            unifiedStatus == AdminUnifiedStatusFilter.refunded ||
+            unifiedStatus == AdminUnifiedStatusFilter.refundActionNeeded)) {
+      throw AdminPortalAccessException(
+        'This status filter needs the admin SLA database view. Apply migration '
+        '20261017220000_admin_order_sla_refund_filters.sql on Supabase, then retry.',
+        code: 'migration_required',
+      );
+    }
+
     return switch (unifiedStatus) {
       AdminUnifiedStatusFilter.any => filter,
       AdminUnifiedStatusFilter.awaitingPayment =>
@@ -691,4 +688,11 @@ class AdminOrdersService {
 
   static DateTime _endOfDay(DateTime d) =>
       DateTime(d.year, d.month, d.day, 23, 59, 59, 999);
+}
+
+enum _OrdersListEmbedProfile {
+  full,
+  noEscrowRefundState,
+  noSlaFlags,
+  minimal,
 }

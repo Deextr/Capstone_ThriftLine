@@ -35,6 +35,7 @@ class PaymentProofScreen extends StatefulWidget {
 class _PaymentProofScreenState extends State<PaymentProofScreen>
     with WidgetsBindingObserver {
   var _didOpenPaidConfirmation = false;
+  var _scheduledAbandonedCheckoutExit = false;
   String? _handledPaymongoReturnQuery;
 
   PaymongoReturnCoordinator? _paymongoReturn;
@@ -201,10 +202,13 @@ class _PaymentProofScreenState extends State<PaymentProofScreen>
     _schedulePaidConfirmation(paid: paid, failed: failed, closing: closing);
 
     if (order.isAbandonedCheckout && !closing && !controller.isAbandoning) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        unawaited(_navigateAfterCheckoutExit(origin: origin, order: order));
-      });
+      if (!_scheduledAbandonedCheckoutExit) {
+        _scheduledAbandonedCheckoutExit = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          unawaited(_navigateAfterCheckoutExit(origin: origin, order: order));
+        });
+      }
       return Scaffold(
         appBar: AppBar(title: const Text('Complete payment')),
         body: Center(

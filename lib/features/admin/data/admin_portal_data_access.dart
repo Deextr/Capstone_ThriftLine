@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/supabase_errors.dart';
 import '../../../core/utils/supabase_rpc.dart';
 
 /// Resolves a Supabase client after admin portal access checks.
@@ -130,6 +131,27 @@ class AdminPortalAccessException implements Exception {
 
 String adminPortalAccessUserMessage(Object error) {
   if (error is AdminPortalAccessException) return error.message;
+  if (error is PostgrestException) {
+    final message = error.message.trim();
+    if (isPostgrestPermissionDenied(error)) {
+      return 'Administrator access required. Complete email verification or sign in again.';
+    }
+    if (message.isNotEmpty) {
+      final lower = message.toLowerCase();
+      if (lower.contains('admin_order_sla_flags') ||
+          error.code == 'PGRST200' ||
+          error.code == 'PGRST201') {
+        return 'Admin orders database view is missing or outdated. Apply migration '
+            '20261017220000_admin_order_sla_refund_filters.sql (or '
+            '20261018140000_admin_order_sla_postgrest_embed_repair.sql) on Supabase, '
+            'then retry.';
+      }
+      return message;
+    }
+  }
+  if (isLikelyNetworkError(error)) {
+    return 'Unable to load admin data. Check your connection and try again.';
+  }
   final text = error.toString();
   if (text.contains('Only an admin can view')) {
     return 'Administrator access required. Complete email verification or sign in again.';

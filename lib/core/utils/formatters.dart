@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 final _currencyFormat = NumberFormat.currency(
   locale: 'en_PH',
   symbol: '₱',
-  decimalDigits: 0,
+  decimalDigits: 2,
 );
 
 String formatCurrency(double amount) => _currencyFormat.format(amount);

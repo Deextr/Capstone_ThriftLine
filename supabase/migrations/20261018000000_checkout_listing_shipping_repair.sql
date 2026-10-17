@@ -582,7 +582,7 @@ BEGIN
     WHERE p.product_id = r.product_id;
 
     IF v_status IS DISTINCT FROM 'active'::product_status_enum
-       OR v_type IS DISTINCT FROM 'fixed_price'::product_status_enum THEN
+       OR v_type IS DISTINCT FROM 'fixed_price'::listing_type_enum THEN
       RETURN jsonb_build_object(
         'success', false,
         'error', COALESCE(r.title, 'This item') || ' is no longer available.'
@@ -833,7 +833,7 @@ BEGIN
     WHERE p.product_id = r.product_id;
 
     IF v_status IS DISTINCT FROM 'active'::product_status_enum
-       OR v_type IS DISTINCT FROM 'fixed_price'::product_status_enum THEN
+       OR v_type IS DISTINCT FROM 'fixed_price'::listing_type_enum THEN
       RETURN jsonb_build_object(
         'success', false,
         'error', COALESCE(r.title, 'This item') || ' is no longer available.'
