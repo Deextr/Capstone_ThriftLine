@@ -5,8 +5,10 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/admin_accounts_controller.dart';
 import '../../data/admin_account_models.dart';
+import '../widgets/admin_marketplace_user_dialogs.dart';
 import '../widgets/admin_ui_components.dart';
 
 class AdminWebAccountsPage extends StatefulWidget {
@@ -98,7 +100,7 @@ class _AdminWebAccountsPageState extends State<AdminWebAccountsPage> {
                 items: const [
                   DropdownMenuItem(value: null, child: Text('All statuses')),
                   DropdownMenuItem(value: 'active', child: Text('Active')),
-                  DropdownMenuItem(value: 'inactive', child: Text('Inactive')),
+                  DropdownMenuItem(value: 'inactive', child: Text('Disabled')),
                   DropdownMenuItem(value: 'invited', child: Text('Invited')),
                 ],
                 onChanged: controller.setStatusFilter,
@@ -121,6 +123,8 @@ class _AdminWebAccountsPageState extends State<AdminWebAccountsPage> {
               (account) => _AccountCard(
                 account: account,
                 onTap: () => _openAccountDetail(account),
+                onDisable: _disableAccount,
+                onEnable: _enableAccount,
               ),
             )
           else
@@ -138,27 +142,34 @@ class _AdminWebAccountsPageState extends State<AdminWebAccountsPage> {
                 'Role',
                 'Status',
                 'Created',
-                'Last sign-in',
+                'Actions',
               ],
               rows: [
                 for (final account in controller.rows)
                   [
-                    Text(
-                      account.fullName,
-                      style: AppTypography.tableBodyMedium,
+                    AdminTableApplicantCell(
+                      displayName: account.fullName,
+                      secondaryLine: account.roleLabel,
+                      avatarName: account.fullName,
                     ),
                     Text(account.email, style: AppTypography.tableBody),
                     Text(account.roleLabel, style: AppTypography.tableBody),
-                    _StatusChip(status: account.displayStatus),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: MarketplaceStatusBadge(
+                        status: account.statusBadgeKey,
+                      ),
+                    ),
                     Text(
                       formatAdminTableDate(account.createdAt),
                       style: AppTypography.tableBody,
                     ),
-                    Text(
-                      account.lastSignInAt == null
-                          ? '—'
-                          : formatAdminTableDateTime(account.lastSignInAt!),
-                      style: AppTypography.tableBody,
+                    AdminTableActionCell(
+                      child: _AdminAccountActions(
+                        account: account,
+                        onDisable: _disableAccount,
+                        onEnable: _enableAccount,
+                      ),
                     ),
                   ],
               ],
@@ -178,30 +189,48 @@ class _AdminWebAccountsPageState extends State<AdminWebAccountsPage> {
     );
   }
 
-  Widget _count(
-    AdminAccountsController controller,
-    String label,
-    int count,
-    String? status,
-  ) {
-    return SizedBox(
-      width: 180,
-      child: AdminStatCard(
-        label: label,
-        count: count,
-        icon: Icons.badge_outlined,
-        isSelected: controller.statusFilter == status && status != null,
-        onTap: status == null
-            ? null
-            : () => controller.setStatusFilter(
-                controller.statusFilter == status ? null : status,
-              ),
-      ),
+  Future<void> _openAccountDetail(AdminAccountRecord account) {
+    final controller = context.read<AdminAccountsController>();
+    return showAdminAccountDetailDialog(
+      context: context,
+      account: account,
+      controller: controller,
+      onDisable: _disableAccount,
+      onEnable: _enableAccount,
     );
   }
 
-  Future<void> _openAccountDetail(AdminAccountRecord account) {
-    return showAdminAccountDetailDialog(context: context, account: account);
+  Future<void> _disableAccount(AdminAccountRecord account) async {
+    if (!account.canDeactivate) return;
+    final confirmed = await _confirmAccountAccessChange(
+      context,
+      title: 'Disable admin account',
+      message:
+          'Disable ${account.fullName}? They will lose access to this admin portal immediately. Past decisions stay on record.',
+      action: 'Disable account',
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+    await context.read<AdminAccountsController>().setActive(
+      account,
+      active: false,
+    );
+  }
+
+  Future<void> _enableAccount(AdminAccountRecord account) async {
+    if (!account.canActivate) return;
+    final confirmed = await _confirmAccountAccessChange(
+      context,
+      title: 'Enable admin account',
+      message:
+          'Enable ${account.fullName}? They can sign in to this admin portal again.',
+      action: 'Enable account',
+    );
+    if (!confirmed || !mounted) return;
+    await context.read<AdminAccountsController>().setActive(
+      account,
+      active: true,
+    );
   }
 
   Future<void> _create(AdminAccountsController controller) async {
@@ -334,11 +363,48 @@ class _AdminWebAccountsPageState extends State<AdminWebAccountsPage> {
   }
 }
 
+Future<bool> _confirmAccountAccessChange(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String action,
+  bool destructive = false,
+}) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          style: destructive
+              ? FilledButton.styleFrom(backgroundColor: AppColors.error)
+              : null,
+          child: Text(action),
+        ),
+      ],
+    ),
+  );
+  return result == true;
+}
+
 class _AccountCard extends StatelessWidget {
-  const _AccountCard({required this.account, required this.onTap});
+  const _AccountCard({
+    required this.account,
+    required this.onTap,
+    required this.onDisable,
+    required this.onEnable,
+  });
 
   final AdminAccountRecord account;
   final VoidCallback onTap;
+  final Future<void> Function(AdminAccountRecord account) onDisable;
+  final Future<void> Function(AdminAccountRecord account) onEnable;
 
   @override
   Widget build(BuildContext context) {
@@ -367,20 +433,21 @@ class _AccountCard extends StatelessWidget {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(account.roleLabel),
-                  _StatusChip(status: account.displayStatus),
+                  MarketplaceStatusBadge(status: account.statusBadgeKey),
                 ],
+              ),
+              const SizedBox(height: 8),
+              _AdminAccountActions(
+                account: account,
+                onDisable: onDisable,
+                onEnable: onEnable,
               ),
               const SizedBox(height: 8),
               Text(
                 'Created ${formatAdminTableDate(account.createdAt)}',
-                style: AppTypography.caption,
-              ),
-              Text(
-                account.lastSignInAt == null
-                    ? 'No sign-in yet'
-                    : 'Last sign-in ${formatAdminTableDateTime(account.lastSignInAt!)}',
                 style: AppTypography.caption,
               ),
             ],
@@ -394,183 +461,366 @@ class _AccountCard extends StatelessWidget {
 Future<void> showAdminAccountDetailDialog({
   required BuildContext context,
   required AdminAccountRecord account,
+  required AdminAccountsController controller,
+  required Future<void> Function(AdminAccountRecord account) onDisable,
+  required Future<void> Function(AdminAccountRecord account) onEnable,
 }) {
   return showDialog<void>(
     context: context,
     builder: (dialogContext) {
-      return _AdminAccountDetailDialog(account: account);
+      return _AdminAccountDetailDialog(
+        account: account,
+        controller: controller,
+        onDisable: onDisable,
+        onEnable: onEnable,
+      );
     },
   );
 }
 
 class _AdminAccountDetailDialog extends StatelessWidget {
-  const _AdminAccountDetailDialog({required this.account});
+  const _AdminAccountDetailDialog({
+    required this.account,
+    required this.controller,
+    required this.onDisable,
+    required this.onEnable,
+  });
 
   final AdminAccountRecord account;
-
-  Future<bool> _confirm(
-    BuildContext context, {
-    required String title,
-    required String message,
-    required String action,
-  }) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(action),
-          ),
-        ],
-      ),
-    );
-    return result == true;
-  }
+  final AdminAccountsController controller;
+  final Future<void> Function(AdminAccountRecord account) onDisable;
+  final Future<void> Function(AdminAccountRecord account) onEnable;
 
   @override
   Widget build(BuildContext context) {
-    final controller = context.watch<AdminAccountsController>();
-
-    return AlertDialog(
-      title: Text(account.fullName),
-      content: SizedBox(
-        width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(account.email, style: AppTypography.body),
-            const SizedBox(height: 12),
-            Text(
-              '${account.roleLabel} · ${account.statusLabel}',
-              style: AppTypography.label.copyWith(fontWeight: FontWeight.w600),
+    final width = MediaQuery.sizeOf(context).width;
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          titlePadding: const EdgeInsets.fromLTRB(24, 20, 16, 0),
+          contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Administrator details',
+                  style: AppTypography.subheading,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Close',
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close, size: 20),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: width < 560 ? width : 500,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ThriftAvatar(
+                        imageUrl: '',
+                        name: account.fullName,
+                        size: 44,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              account.fullName,
+                              style: AppTypography.tableBodyMedium,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              account.email,
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      MarketplaceStatusBadge(status: account.statusBadgeKey),
+                      _AdminMetaChip(label: account.roleLabel),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Profile',
+                    style: AppTypography.label.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _AdminDetailRow(
+                    label: 'Email',
+                    value: account.email,
+                  ),
+                  _AdminDetailRow(
+                    label: 'Role',
+                    value: account.roleLabel,
+                  ),
+                  _AdminDetailRow(
+                    label: 'Portal status',
+                    value: account.statusLabel,
+                  ),
+                  _AdminDetailRow(
+                    label: 'Created',
+                    value: formatAdminTableDate(account.createdAt),
+                  ),
+                  _AdminDetailRow(
+                    label: 'Last sign-in',
+                    value: account.lastSignInAt == null
+                        ? 'No successful sign-in yet'
+                        : formatAdminTableDateTime(account.lastSignInAt!),
+                  ),
+                  if (account.isSuperAdmin) ...[
+                    const SizedBox(height: 12),
+                    _AdminNotice(
+                      message:
+                          'Super Admin accounts cannot be disabled from this screen.',
+                    ),
+                  ] else if (account.displayStatus == 'invited') ...[
+                    const SizedBox(height: 12),
+                    _AdminNotice(
+                      message:
+                          'This administrator has a pending invitation. Resend or revoke the invite below.',
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  Text(
+                    'Account access',
+                    style: AppTypography.label.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _AdminAccountActions(
+                    account: account,
+                    onDisable: (record) async {
+                      await onDisable(record);
+                      if (context.mounted) Navigator.of(context).pop();
+                    },
+                    onEnable: (record) async {
+                      await onEnable(record);
+                      if (context.mounted) Navigator.of(context).pop();
+                    },
+                  ),
+                  if (account.canResendInvite || account.canRevokeInvite) ...[
+                    const SizedBox(height: 18),
+                    Text(
+                      'Invitation',
+                      style: AppTypography.label.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (account.canResendInvite)
+                          OutlinedButton(
+                            onPressed: controller.isSaving
+                                ? null
+                                : () async {
+                                    await controller.resend(account);
+                                    if (context.mounted) {
+                                      Navigator.of(context).pop();
+                                    }
+                                  },
+                            child: const Text('Resend invitation'),
+                          ),
+                        if (account.canRevokeInvite)
+                          TextButton(
+                            onPressed: controller.isSaving
+                                ? null
+                                : () async {
+                                    final confirmed =
+                                        await _confirmAccountAccessChange(
+                                      context,
+                                      title: 'Revoke invitation',
+                                      message:
+                                          'Revoke the invitation for ${account.fullName}? The link will stop working.',
+                                      action: 'Revoke',
+                                      destructive: true,
+                                    );
+                                    if (!confirmed || !context.mounted) {
+                                      return;
+                                    }
+                                    await controller.revoke(account);
+                                    if (context.mounted) {
+                                      Navigator.of(context).pop();
+                                    }
+                                  },
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.error,
+                            ),
+                            child: const Text('Revoke invitation'),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              'Created ${formatAdminTableDate(account.createdAt)}',
-              style: AppTypography.caption,
-            ),
-            Text(
-              account.lastSignInAt == null
-                  ? 'No successful sign-in yet'
-                  : 'Last sign-in ${formatAdminTableDateTime(account.lastSignInAt!)}',
-              style: AppTypography.caption,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
             ),
           ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
-        ),
-        if (account.canResendInvite)
-          TextButton(
-            onPressed: controller.isSaving
-                ? null
-                : () async {
-                    await controller.resend(account);
-                    if (context.mounted) Navigator.pop(context);
-                  },
-            child: const Text('Resend invitation'),
-          ),
-        if (account.canRevokeInvite)
-          TextButton(
-            onPressed: controller.isSaving
-                ? null
-                : () async {
-                    final confirmed = await _confirm(
-                      context,
-                      title: 'Revoke invitation',
-                      message:
-                          'Revoke the invitation for ${account.fullName}? The link will stop working.',
-                      action: 'Revoke',
-                    );
-                    if (!confirmed || !context.mounted) return;
-                    await controller.revoke(account);
-                    if (context.mounted) Navigator.pop(context);
-                  },
-            child: const Text('Revoke invitation'),
-          ),
+        );
+      },
+    );
+  }
+}
+
+class _AdminAccountActions extends StatelessWidget {
+  const _AdminAccountActions({
+    required this.account,
+    required this.onDisable,
+    required this.onEnable,
+  });
+
+  final AdminAccountRecord account;
+  final Future<void> Function(AdminAccountRecord account) onDisable;
+  final Future<void> Function(AdminAccountRecord account) onEnable;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
         if (account.canDeactivate)
           TextButton(
-            onPressed: controller.isSaving
-                ? null
-                : () async {
-                    final confirmed = await _confirm(
-                      context,
-                      title: 'Deactivate administrator',
-                      message:
-                          'Deactivate ${account.fullName}? They lose admin access immediately. Past decisions stay on record.',
-                      action: 'Deactivate',
-                    );
-                    if (!confirmed || !context.mounted) return;
-                    await controller.setActive(account, active: false);
-                    if (context.mounted) Navigator.pop(context);
-                  },
-            child: const Text('Deactivate'),
+            onPressed: () async => onDisable(account),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF9F1239),
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+            child: const Text('Disable account'),
+          )
+        else if (account.displayStatus == 'active' && account.isSuperAdmin)
+          Text(
+            'Disable unavailable',
+            style: TextStyle(
+              color: AppColors.textHint,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         if (account.canActivate)
-          FilledButton(
-            onPressed: controller.isSaving
-                ? null
-                : () async {
-                    final confirmed = await _confirm(
-                      context,
-                      title: 'Activate administrator',
-                      message:
-                          'Activate ${account.fullName}? They can sign in to this portal again.',
-                      action: 'Activate',
-                    );
-                    if (!confirmed || !context.mounted) return;
-                    await controller.setActive(account, active: true);
-                    if (context.mounted) Navigator.pop(context);
-                  },
-            child: const Text('Activate'),
+          TextButton(
+            onPressed: () async => onEnable(account),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primaryDark,
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+            child: const Text('Re-enable account'),
           ),
       ],
     );
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status});
+class _AdminDetailRow extends StatelessWidget {
+  const _AdminDetailRow({required this.label, required this.value});
 
-  final String status;
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    final color = switch (status) {
-      'active' => AppColors.success,
-      'inactive' => AppColors.error,
-      'invited' => AppColors.warning,
-      _ => AppColors.textSecondary,
-    };
-    final label = switch (status) {
-      'active' => 'Active',
-      'inactive' => 'Inactive',
-      'invited' => 'Invited',
-      _ => status,
-    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 132,
+            child: Text(
+              label,
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Expanded(child: Text(value, style: AppTypography.body)),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminMetaChip extends StatelessWidget {
+  const _AdminMetaChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.border),
       ),
       child: Text(
         label,
-        style: AppTypography.caption.copyWith(
-          color: color,
+        style: AppTypography.badge.copyWith(
+          color: AppColors.textPrimary,
           fontWeight: FontWeight.w600,
+          fontSize: 11,
         ),
+      ),
+    );
+  }
+}
+
+class _AdminNotice extends StatelessWidget {
+  const _AdminNotice({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Text(
+        message,
+        style: AppTypography.caption.copyWith(height: 1.4),
       ),
     );
   }

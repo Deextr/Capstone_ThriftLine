@@ -198,6 +198,15 @@ class AdminAuditLogRow {
       if (name != null && name.isNotEmpty) return name;
     }
 
+    final enabled = RegExp(
+      r're-enabled marketplace account\s+(.+)$',
+      caseSensitive: false,
+    ).firstMatch(trimmed);
+    if (enabled != null) {
+      final name = enabled.group(1)?.trim();
+      if (name != null && name.isNotEmpty) return name;
+    }
+
     final invited = RegExp(
       r'invited administrator\s+(.+)$',
       caseSensitive: false,
@@ -240,7 +249,8 @@ class AdminAuditLogRow {
     return switch (eventType.trim().toLowerCase()) {
       'seller_verification_approved' ||
       'seller_verification_rejected' => 'Seller verification',
-      'marketplace_account_disabled' => 'Marketplace user',
+      'marketplace_account_disabled' ||
+      'marketplace_account_enabled' => 'Marketplace user',
       'report_decided' => 'Community report',
       'order_report_closed' ||
       'order_report_evidence_requested' => 'Order dispute',
@@ -300,6 +310,7 @@ const _eventLabels = <String, String>{
   'admin_deactivated': 'Admin deactivated',
   'super_admin_designated': 'Super Admin designated',
   'marketplace_account_disabled': 'Disabled user account',
+  'marketplace_account_enabled': 'Re-enabled user account',
   'buyer_refund_decided': 'Buyer refund approved',
   'manual_refund_recorded': 'Manual GCash refund confirmed',
   'seller_payout_paid': 'Seller payout confirmed',

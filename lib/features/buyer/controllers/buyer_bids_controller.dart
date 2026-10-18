@@ -124,6 +124,8 @@ class BuyerBidsController extends ChangeNotifier {
         _allBids = await _loadFromNestedBids(userId);
       }
 
+      await _prepareWonAuctionOrdersInBackground();
+
       _isLoading = false;
       if (!_disposed) notifyListeners();
     } catch (e) {
@@ -426,6 +428,29 @@ class BuyerBidsController extends ChangeNotifier {
     } catch (e) {
       debugPrint('decline_auction_second_chance error: $e');
       return 'Could not decline this offer.';
+    }
+  }
+
+  /// Ensures server-side pending orders exist for wins shown without order_id.
+  Future<void> _prepareWonAuctionOrdersInBackground() async {
+    final winsNeedingOrder = wonBids.where((b) {
+      final aid = b.auctionId;
+      if (aid == null || aid.isEmpty) return false;
+      final oid = b.auctionOrderId;
+      return oid == null || oid.isEmpty;
+    });
+    if (winsNeedingOrder.isEmpty) return;
+
+    var changed = false;
+    for (final bid in winsNeedingOrder) {
+      final auctionId = bid.auctionId!;
+      final prepared = await ensureMyAuctionOrder(_supabase, auctionId);
+      if (prepared.success && prepared.orderId != null) {
+        changed = true;
+      }
+    }
+    if (changed && !_disposed) {
+      unawaited(loadBids(showLoading: false, settleExpired: false));
     }
   }
 

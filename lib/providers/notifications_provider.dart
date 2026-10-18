@@ -100,17 +100,28 @@ class NotificationsProvider extends ChangeNotifier {
   }
 
   Future<void> markRead(String id) async {
-    final index = _items.indexWhere((n) => n.id == id);
-    if (index < 0 || _items[index].isRead) return;
-    _items[index] = _items[index].copyWith(isRead: true);
+    await markReadIds({id});
+  }
+
+  /// Marks each unread notification once; safe to call repeatedly with the same ids.
+  Future<void> markReadIds(Set<String> ids) async {
+    if (ids.isEmpty) return;
+    final toMark = <String>[];
+    for (var i = 0; i < _items.length; i++) {
+      if (ids.contains(_items[i].id) && !_items[i].isRead) {
+        _items[i] = _items[i].copyWith(isRead: true);
+        toMark.add(_items[i].id);
+      }
+    }
+    if (toMark.isEmpty) return;
     notifyListeners();
     try {
       await _supabase.client
           .from('notifications')
           .update({'is_read': true})
-          .eq('notification_id', id);
+          .inFilter('notification_id', toMark);
     } catch (e) {
-      debugPrint('NotificationsProvider.markRead error: $e');
+      debugPrint('NotificationsProvider.markReadIds error: $e');
     }
   }
 

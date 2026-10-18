@@ -48,6 +48,7 @@ void main() {
         _order(id: 'failed-checkout', status: 'cancelled', payment: 'failed'),
       ];
 
+      expect(sellerOrderCount(orders, SellerOrderBucket.all), 9);
       expect(sellerOrderCount(orders, SellerOrderBucket.pendingPayment), 1);
       expect(
         sellerOrdersInBucket(
@@ -82,9 +83,10 @@ void main() {
       );
       expect(order.isFailedCheckout, isTrue);
       expect(sellerOrderBucketFor(order), isNull);
-      for (final bucket in SellerOrderBucket.values) {
+      for (final bucket in SellerOrderBucket.statusBuckets) {
         expect(orderMatchesSellerBucket(order, bucket), isFalse);
       }
+      expect(orderMatchesSellerBucket(order, SellerOrderBucket.all), isFalse);
     });
 
     test('abandoned fixed-price voids are hidden from seller buckets', () {
@@ -170,10 +172,11 @@ void main() {
         _order(id: 'cancelled', status: 'cancelled', auctionId: 'auction-1'),
       ];
       for (final order in orders) {
-        final matches = SellerOrderBucket.values
+        final matches = SellerOrderBucket.statusBuckets
             .where((bucket) => orderMatchesSellerBucket(order, bucket))
             .toList();
         expect(matches, hasLength(1), reason: order.id);
+        expect(orderMatchesSellerBucket(order, SellerOrderBucket.all), isTrue);
       }
     });
   });

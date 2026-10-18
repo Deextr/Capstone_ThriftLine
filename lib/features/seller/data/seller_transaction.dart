@@ -1,3 +1,5 @@
+import '../../../core/utils/formatters.dart';
+import '../../../core/utils/transaction_history_format.dart';
 import '../../buyer/data/buyer_transaction.dart';
 
 export '../../buyer/data/buyer_transaction.dart'
@@ -18,6 +20,7 @@ class SellerTransaction {
     required this.orderId,
     required this.orderNumber,
     required this.productTitle,
+    this.productImageUrl,
     required this.status,
     required this.sellerAmountCentavos,
     required this.buyerPaidCentavos,
@@ -32,12 +35,19 @@ class SellerTransaction {
     this.escrowStatus,
     this.refundState,
     this.refundCompletedAt,
+    this.subtotalCentavos = 0,
+    this.shippingFeeCentavos = 0,
+    this.commissionRate = 0.05,
+    this.commissionAmountCentavos = 0,
+    this.commissionStatus = 'pending',
+    this.orderStatus,
   });
 
   final String paymentId;
   final String orderId;
   final String orderNumber;
   final String productTitle;
+  final String? productImageUrl;
   final BuyerTransactionStatus status;
   final int sellerAmountCentavos;
   final int buyerPaidCentavos;
@@ -52,6 +62,17 @@ class SellerTransaction {
   final String? escrowStatus;
   final BuyerRefundState? refundState;
   final DateTime? refundCompletedAt;
+  final int subtotalCentavos;
+  final int shippingFeeCentavos;
+  final double commissionRate;
+  final int commissionAmountCentavos;
+  final String commissionStatus;
+  final String? orderStatus;
+
+  int get netProductEarningsCentavos {
+    final net = subtotalCentavos - commissionAmountCentavos;
+    return net < 0 ? 0 : net;
+  }
 
   DateTime get sortDate =>
       refundedAt ?? paidAt ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -80,6 +101,9 @@ class SellerTransaction {
           (json['product_title'] as String?)?.trim().isNotEmpty == true
           ? (json['product_title'] as String).trim()
           : 'Order',
+      productImageUrl: sanitizeTransactionProductImageUrl(
+        json['product_image_url'] as String?,
+      ),
       status: status,
       sellerAmountCentavos:
           (json['seller_amount_centavos'] as num?)?.toInt() ?? 0,
@@ -97,6 +121,17 @@ class SellerTransaction {
       refundCompletedAt: DateTime.tryParse(
         json['refund_completed_at'] as String? ?? '',
       ),
+      subtotalCentavos: (json['subtotal_centavos'] as num?)?.toInt() ?? 0,
+      shippingFeeCentavos:
+          (json['shipping_fee_centavos'] as num?)?.toInt() ?? 0,
+      commissionRate: (json['commission_rate'] as num?)?.toDouble() ?? 0.05,
+      commissionAmountCentavos:
+          (json['commission_amount_centavos'] as num?)?.toInt() ?? 0,
+      commissionStatus:
+          (json['commission_status'] as String?)?.trim().isNotEmpty == true
+          ? (json['commission_status'] as String).trim()
+          : 'pending',
+      orderStatus: (json['order_status'] as String?)?.trim(),
     );
   }
 }
@@ -144,5 +179,68 @@ String sellerTransactionEarningsLabel(String? escrowStatus) {
     'released' => 'Paid out to balance',
     'refunded' => 'Returned to buyer',
     _ => '',
+  };
+}
+
+String sellerCommissionStatusLabel(String? status) {
+  return switch ((status ?? '').trim().toLowerCase()) {
+    'earned' => 'Earned',
+    'reversed' => 'Waived after refund',
+    'void' => 'Not earned',
+    'pending' => 'Not yet earned',
+    _ => 'Not yet earned',
+  };
+}
+
+extension SellerTransactionFilterLabel on BuyerTransactionFilter {
+  String get sellerHistoryLabel => switch (this) {
+    BuyerTransactionFilter.all => 'All',
+    BuyerTransactionFilter.successful => 'Sales',
+    BuyerTransactionFilter.refunded => 'Refunds',
+  };
+}
+
+/// Seller-facing payment status (plain language, not buyer-centric).
+String sellerTransactionStatusLabel(BuyerTransactionStatus status) {
+  return switch (status) {
+    BuyerTransactionStatus.successful => 'Completed',
+    BuyerTransactionStatus.refundInProgress => 'Buyer refund in progress',
+    BuyerTransactionStatus.refunded => 'Buyer refunded',
+  };
+}
+
+/// Short list-row hint when a buyer refund affects seller earnings.
+String? sellerRefundEarningsListHint(SellerTransaction transaction) {
+  final amount = transaction.refundAmountCentavos;
+  if (amount == null || amount <= 0) return null;
+  if (transaction.status == BuyerTransactionStatus.successful) return null;
+  final formatted = formatCentavos(amount);
+  return switch (transaction.status) {
+    BuyerTransactionStatus.refunded =>
+      '−$formatted deducted — returned to buyer',
+    BuyerTransactionStatus.refundInProgress =>
+      'Up to $formatted may be deducted if refund completes',
+    BuyerTransactionStatus.successful => null,
+  };
+}
+
+String sellerTransactionTypeSubtitle(SellerTransaction transaction) {
+  final method = transaction.methodLabel;
+  return switch (transaction.status) {
+    BuyerTransactionStatus.successful => 'Sale · $method',
+    BuyerTransactionStatus.refundInProgress => 'Refund · $method',
+    BuyerTransactionStatus.refunded => 'Refund · $method',
+  };
+}
+
+String sellerRefundDetailExplanation(SellerTransaction transaction) {
+  return switch (transaction.status) {
+    BuyerTransactionStatus.refunded =>
+      'The buyer was refunded. This amount was deducted from your earnings '
+          'for this order.',
+    BuyerTransactionStatus.refundInProgress =>
+      'The buyer\'s refund is still in progress. Your earnings may be '
+          'adjusted when it is completed.',
+    BuyerTransactionStatus.successful => '',
   };
 }

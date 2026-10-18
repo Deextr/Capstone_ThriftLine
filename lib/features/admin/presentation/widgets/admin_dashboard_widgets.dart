@@ -1328,7 +1328,7 @@ class AdminRevenueChart extends StatelessWidget {
             Text('Platform revenue', style: AppTypography.subheading),
             const SizedBox(height: 2),
             Text(
-              'ThriftLine fees on paid orders that have not been refunded.',
+              '5% commission on each completed seller order’s product subtotal. Shipping and buyer PayMongo fees are excluded.',
               style: AppTypography.caption.copyWith(
                 color: palette.textSecondary,
               ),

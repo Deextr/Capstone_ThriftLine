@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_gradients.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
@@ -13,6 +12,17 @@ import '../../data/admin_orders_service.dart';
 import '../../domain/admin_order_management.dart';
 import '../widgets/admin_order_detail_dialog.dart';
 import '../widgets/admin_ui_components.dart';
+
+/// Space between columns (index = gap after that column). Extra after Commission.
+const kAdminOrdersTransactionsColumnGaps = [
+  16.0,
+  16.0,
+  16.0,
+  16.0,
+  16.0,
+  36.0,
+  16.0,
+];
 
 /// Unified Orders & Transactions management for Admin Web.
 class AdminWebOrdersTransactionsPage extends StatefulWidget {
@@ -224,137 +234,166 @@ class _AdminWebOrdersTransactionsPageState
                 ),
               ),
             ),
-          Material(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-            clipBehavior: Clip.antiAlias,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AdminFilterBar(
-                    hasActiveFilters: controller.hasActiveFilters,
-                    onReset: () {
-                      _searchController.clear();
-                      controller.resetFilters();
-                    },
-                    children: [
-                      AdminSearchField(
-                        controller: _searchController,
-                        hintText: 'Search order ID, buyer, or seller',
-                        width: compact ? 280 : 280,
-                        onSubmitted: controller.setSearch,
-                        onClear: () => controller.setSearch(''),
-                      ),
-                      AdminFilterDropdown<AdminUnifiedStatusFilter>(
-                        value: controller.unifiedStatus,
-                        items: [
-                          for (final option in AdminUnifiedStatusFilter.values)
-                            DropdownMenuItem(
-                              value: option,
-                              child: Text(option.label),
-                            ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            controller.setUnifiedStatusFilter(value);
-                          }
-                        },
-                      ),
-                      AdminFilterDropdown<AdminOrdersSort>(
-                        value: controller.sort,
-                        items: [
-                          for (final option in AdminOrdersSort.values)
-                            DropdownMenuItem(
-                              value: option,
-                              child: Text(option.label),
-                            ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) controller.setSort(value);
-                        },
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: controller.isLoading
-                            ? null
-                            : () => _pickDateRange(controller),
-                        icon: const Icon(Icons.date_range, size: 16),
-                        label: Text(_dateRangeLabel(controller)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  AdminDataTable(
-                    isLoading: controller.isLoading,
-                    minWidth: 920,
-                    columnFlex: const [2, 2, 2, 1, 2, 2, 2],
-                    onRowTap: [
-                      for (final order in controller.rows)
-                        () => _openOrderDetail(order),
-                    ],
-                    columns: const [
-                      'Order ID',
-                      'Buyer',
-                      'Seller',
-                      'Order type',
-                      'Total',
-                      'Status',
-                      'Date & time',
-                    ],
-                    rows: [
-                      for (final order in controller.rows)
-                        [
-                          AdminTableCellText(primary: order.orderNumber),
-                          AdminTableCellText(primary: order.buyerName),
-                          AdminTableCellText(primary: order.sellerName),
-                          AdminOrderTypeBadge(
-                            label: adminOrderKindLabel(order.orderKind),
+          Padding(
+            padding: EdgeInsets.zero,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AdminFilterBar(
+                  hasActiveFilters: controller.hasActiveFilters,
+                  onReset: () {
+                    _searchController.clear();
+                    controller.resetFilters();
+                  },
+                  children: [
+                    AdminSearchField(
+                      controller: _searchController,
+                      hintText: 'Search order ID, buyer, or seller',
+                      width: compact ? 280 : 280,
+                      onSubmitted: controller.setSearch,
+                      onClear: () => controller.setSearch(''),
+                    ),
+                    AdminFilterDropdown<AdminUnifiedStatusFilter>(
+                      value: controller.unifiedStatus,
+                      items: [
+                        for (final option in AdminUnifiedStatusFilter.values)
+                          DropdownMenuItem(
+                            value: option,
+                            child: Text(option.label),
                           ),
-                          Text(
-                            formatCurrency(order.totalAmount),
-                            style: AppTypography.tableBody,
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          controller.setUnifiedStatusFilter(value);
+                        }
+                      },
+                    ),
+                    AdminFilterDropdown<AdminOrdersSort>(
+                      value: controller.sort,
+                      items: [
+                        for (final option in AdminOrdersSort.values)
+                          DropdownMenuItem(
+                            value: option,
+                            child: Text(option.label),
                           ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              AdminStatusBadge(
-                                status: order.unifiedStatus.badgeKey,
-                                label: order.unifiedStatus.label,
-                              ),
-                              if (order.isFulfillmentDelayed) ...[
-                                const SizedBox(height: 4),
-                                const AdminStatusBadge(
-                                  status: 'pending',
-                                  label: 'Delayed 72h+',
-                                ),
-                              ],
-                            ],
-                          ),
-                          AdminTablePhilippinesDateTimeCell(
-                            dateTime: order.createdAt,
-                          ),
-                        ],
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  AdminPagination(
-                    currentPage: controller.page,
-                    totalItems: controller.total,
-                    pageSize: controller.pageSize,
-                    pageSizeOptions: const [10, 25, 50],
-                    isLoading: controller.isLoading,
-                    onPageChanged: controller.setPage,
-                    onPageSizeChanged: controller.setPageSize,
-                  ),
-                ],
-              ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) controller.setSort(value);
+                      },
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: controller.isLoading
+                          ? null
+                          : () => _pickDateRange(controller),
+                      icon: const Icon(Icons.date_range, size: 16),
+                      label: Text(_dateRangeLabel(controller)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                AdminDataTable(
+                  isLoading: controller.isLoading,
+                  minWidth: 1240,
+                  columnFlex: const [3, 2, 2, 2, 2, 2, 3, 2],
+                  columnGapsAfter: kAdminOrdersTransactionsColumnGaps,
+                  columnAlignments: const [
+                    Alignment.centerLeft,
+                    Alignment.centerLeft,
+                    Alignment.centerLeft,
+                    Alignment.centerLeft,
+                    Alignment.centerRight,
+                    Alignment.centerRight,
+                    Alignment.centerLeft,
+                    Alignment.centerLeft,
+                  ],
+                  emptyTitle: 'No orders found',
+                  emptyMessage: controller.hasActiveFilters
+                      ? 'No orders match your search or filters. Try resetting or broadening the criteria.'
+                      : 'Orders will appear here once buyers check out.',
+                  onResetFilters: controller.hasActiveFilters
+                      ? () {
+                          _searchController.clear();
+                          controller.resetFilters();
+                        }
+                      : null,
+                  onRowTap: [
+                    for (final order in controller.rows)
+                      () => _openOrderDetail(order),
+                  ],
+                  columns: const [
+                    'Order',
+                    'Buyer',
+                    'Seller',
+                    'Type',
+                    'Total',
+                    'Commission',
+                    'Status',
+                    'Date & time',
+                  ],
+                  rows: [
+                    for (final order in controller.rows)
+                      _ordersTransactionsTableRow(order),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                AdminPagination(
+                  currentPage: controller.page,
+                  totalItems: controller.total,
+                  pageSize: controller.pageSize,
+                  pageSizeOptions: const [10, 25, 50],
+                  isLoading: controller.isLoading,
+                  onPageChanged: controller.setPage,
+                  onPageSizeChanged: controller.setPageSize,
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+}
+
+List<Widget> _ordersTransactionsTableRow(AdminOrderRow order) {
+  final orderRef = order.orderNumber.trim().isNotEmpty
+      ? order.orderNumber.trim()
+      : '—';
+  final commissionStatus = order.commissionStatus.trim().toLowerCase();
+  final showCommissionStatus = commissionStatus != 'earned';
+
+  return [
+    AdminTableCellText(
+      primary: orderRef,
+      secondary: order.orderId.trim().isNotEmpty && orderRef == '—'
+          ? _shortOrderId(order.orderId)
+          : null,
+      primaryStyle: AppTypography.tableBodyMedium.copyWith(
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    AdminTableCellText(primary: order.buyerName),
+    AdminTableCellText(primary: order.sellerName),
+    AdminOrderTypeBadge.forKind(order.orderKind),
+    AdminTableMoneyCell(amount: order.totalAmount, emphasize: true),
+    AdminTableCommissionCell(
+      amount: order.commissionAmount,
+      statusLabel: showCommissionStatus
+          ? adminOrderCommissionStatusLabel(order.commissionStatus)
+          : null,
+    ),
+    AdminTableOrderStatusCell(
+      badgeKey: order.unifiedStatus.badgeKey,
+      label: order.unifiedStatus.label,
+      fulfillmentDelayed: order.isFulfillmentDelayed,
+    ),
+    AdminTablePhilippinesDateTimeCell(dateTime: order.createdAt),
+  ];
+}
+
+String _shortOrderId(String orderId) {
+  final id = orderId.trim();
+  if (id.length <= 12) return id;
+  return '${id.substring(0, 8)}…';
 }
 
 class OrderCategorySegmentedNav extends StatelessWidget {

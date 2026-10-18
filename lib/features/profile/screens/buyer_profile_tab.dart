@@ -75,7 +75,7 @@ class BuyerProfileTab extends StatelessWidget {
               ),
               _MenuItem(
                 icon: Icons.receipt_long_outlined,
-                label: 'Buyer Transaction History',
+                label: 'Transaction History',
                 onTap: () => context.push(RouteNames.transactionHistory),
               ),
               _MenuItem(
@@ -144,15 +144,10 @@ class BuyerProfileTab extends StatelessWidget {
                 label: 'Settings',
                 onTap: () => context.push(RouteNames.settings),
               ),
-              Divider(height: 1, thickness: 1, color: AppColors.border),
-              if (auth.canSwitchAccounts)
-                _MenuItem(
-                  icon: Icons.sync_alt_rounded,
-                  label: 'Switch Account',
-                  onTap: () => SwitchAccountSheet.show(context),
-                )
-              else
+              if (!auth.canSwitchAccounts) ...[
+                Divider(height: 1, thickness: 1, color: AppColors.border),
                 _BecomeSellerTile(user: user),
+              ],
             ],
           ),
           _SectionCard(

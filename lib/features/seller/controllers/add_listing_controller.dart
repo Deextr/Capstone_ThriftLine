@@ -133,9 +133,15 @@ class AddListingController extends ChangeNotifier {
   final TextEditingController sizeCtrl = TextEditingController();
   final TextEditingController colorCtrl = TextEditingController();
   final TextEditingController stockCtrl = TextEditingController(text: '1');
-  final TextEditingController shippingFeeCtrl = TextEditingController(text: '80');
-  final TextEditingController qtyThresholdCtrl = TextEditingController(text: '3');
-  final TextEditingController bidThresholdCtrl = TextEditingController(text: '500');
+  final TextEditingController shippingFeeCtrl = TextEditingController(
+    text: '80',
+  );
+  final TextEditingController qtyThresholdCtrl = TextEditingController(
+    text: '3',
+  );
+  final TextEditingController bidThresholdCtrl = TextEditingController(
+    text: '500',
+  );
 
   bool showItemLocation = false;
   ListingShippingMode shippingMode = ListingShippingMode.fixedFee;

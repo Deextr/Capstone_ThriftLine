@@ -24,12 +24,22 @@ class BuyerTransactionHistoryController extends ChangeNotifier {
   String? _errorMessage;
   BuyerTransactionFilter _filter = BuyerTransactionFilter.all;
   BuyerTransactionSort _sort = BuyerTransactionSort.newest;
+  DateTime? _dateFilterFrom;
+  DateTime? _dateFilterTo;
 
   List<BuyerTransaction> get transactions => _transactions;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   BuyerTransactionFilter get filter => _filter;
   BuyerTransactionSort get sort => _sort;
+  DateTime? get dateFilterFrom => _dateFilterFrom;
+  DateTime? get dateFilterTo => _dateFilterTo;
+  bool get hasDateFilter => _dateFilterFrom != null || _dateFilterTo != null;
+
+  String get dateFilterSummary => buyerTransactionDateFilterSummary(
+    from: _dateFilterFrom,
+    to: _dateFilterTo,
+  );
 
   bool get hasAnyTransactions => _transactions.isNotEmpty;
 
@@ -37,6 +47,8 @@ class BuyerTransactionHistoryController extends ChangeNotifier {
     source: _transactions,
     filter: _filter,
     sort: _sort,
+    dateFrom: _dateFilterFrom,
+    dateTo: _dateFilterTo,
   );
 
   int countForFilter(BuyerTransactionFilter value) {
@@ -143,13 +155,45 @@ class BuyerTransactionHistoryController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setDateFilterSingleDay(DateTime day) {
+    final local = day.toLocal();
+    _dateFilterFrom = DateTime(local.year, local.month, local.day);
+    _dateFilterTo = _dateFilterFrom;
+    notifyListeners();
+  }
+
+  void setDateFilterRange(DateTime start, DateTime end) {
+    final a = start.toLocal();
+    final b = end.toLocal();
+    var from = DateTime(a.year, a.month, a.day);
+    var to = DateTime(b.year, b.month, b.day);
+    if (from.isAfter(to)) {
+      final swap = from;
+      from = to;
+      to = swap;
+    }
+    _dateFilterFrom = from;
+    _dateFilterTo = to;
+    notifyListeners();
+  }
+
+  void clearDateFilter() {
+    if (_dateFilterFrom == null && _dateFilterTo == null) return;
+    _dateFilterFrom = null;
+    _dateFilterTo = null;
+    notifyListeners();
+  }
+
   void resetFilters() {
     if (_filter == BuyerTransactionFilter.all &&
-        _sort == BuyerTransactionSort.newest) {
+        _sort == BuyerTransactionSort.newest &&
+        !hasDateFilter) {
       return;
     }
     _filter = BuyerTransactionFilter.all;
     _sort = BuyerTransactionSort.newest;
+    _dateFilterFrom = null;
+    _dateFilterTo = null;
     notifyListeners();
   }
 

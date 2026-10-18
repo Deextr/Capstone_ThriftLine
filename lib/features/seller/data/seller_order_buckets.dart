@@ -6,13 +6,19 @@ import '../../../widgets/thrift_widgets.dart';
 /// Seller workspace categories. These are display/filter buckets over the
 /// existing order + shipment lifecycle — not new database statuses.
 enum SellerOrderBucket {
+  all,
   pendingPayment,
   toShip,
   shipped,
   completed,
   cancelled;
 
+  /// Status tabs that partition the workspace ([all] is a combined view).
+  static List<SellerOrderBucket> get statusBuckets =>
+      values.where((b) => b != SellerOrderBucket.all).toList(growable: false);
+
   String get tabLabel => switch (this) {
+    SellerOrderBucket.all => 'All',
     SellerOrderBucket.pendingPayment => 'Pending',
     SellerOrderBucket.toShip => 'To Ship',
     SellerOrderBucket.shipped => 'Shipped',
@@ -21,6 +27,7 @@ enum SellerOrderBucket {
   };
 
   String get emptyTitle => switch (this) {
+    SellerOrderBucket.all => 'No orders yet',
     SellerOrderBucket.pendingPayment => 'No pending payments',
     SellerOrderBucket.toShip => 'No orders to ship',
     SellerOrderBucket.shipped => 'No shipped orders yet',
@@ -29,6 +36,8 @@ enum SellerOrderBucket {
   };
 
   String get emptyMessage => switch (this) {
+    SellerOrderBucket.all =>
+      'Sales from auctions and fixed-price listings will appear here.',
     SellerOrderBucket.pendingPayment =>
       'Auction wins waiting for the buyer to pay will appear here.',
     SellerOrderBucket.toShip =>
@@ -71,6 +80,9 @@ SellerOrderBucket? sellerOrderBucketFor(OrderModel order) {
 }
 
 bool orderMatchesSellerBucket(OrderModel order, SellerOrderBucket bucket) {
+  if (bucket == SellerOrderBucket.all) {
+    return sellerOrderBucketFor(order) != null;
+  }
   return sellerOrderBucketFor(order) == bucket;
 }
 

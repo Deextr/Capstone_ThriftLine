@@ -56,6 +56,7 @@ class MarketplaceUserRow {
     this.shopName,
     this.verificationStatus,
     this.canDisable = false,
+    this.canEnable = false,
     this.sanctionReason,
     this.permanentlyDisabledAt,
     this.restrictedUntil,
@@ -80,6 +81,7 @@ class MarketplaceUserRow {
   final String? shopName;
   final String? verificationStatus;
   final bool canDisable;
+  final bool canEnable;
   final String? sanctionReason;
   final DateTime? permanentlyDisabledAt;
   final DateTime? restrictedUntil;
@@ -115,10 +117,22 @@ class MarketplaceUserRow {
     trustLevel: trustLevel,
   );
 
+  bool get isPermanentlySanctioned =>
+      permanentlyDisabledAt != null || effectiveAccountStatus == 'banned';
+
+  bool get mayEnable => canEnable;
+
   String? get disableBlockedMessage => marketplaceDisableBlockedMessage(
     role: role,
     accountStatus: accountStatus,
     trustLevel: trustLevel,
+  );
+
+  String? get enableBlockedMessage => marketplaceEnableBlockedMessage(
+    role: role,
+    accountStatus: accountStatus,
+    trustLevel: trustLevel,
+    permanentlySanctioned: isPermanentlySanctioned,
   );
 
   factory MarketplaceUserRow.fromJson(Map<String, dynamic> json) {
@@ -127,6 +141,8 @@ class MarketplaceUserRow {
     final trustLevel = _nullableText(json['trust_level']);
     final trustScoreRaw = json['trust_score'];
     final serverCanDisable = json['can_disable'] == true;
+    final serverCanEnable = json['can_enable'] == true;
+    final permanentlyDisabledAt = _time(json['permanently_disabled_at']);
     final displayStatus = _nullableText(json['display_account_status']);
     return MarketplaceUserRow(
       userId: json['user_id']?.toString() ?? '',
@@ -149,11 +165,25 @@ class MarketplaceUserRow {
             accountStatus: status,
             trustLevel: trustLevel,
           ),
+      canEnable:
+          serverCanEnable &&
+          canEnableMarketplaceAccount(
+            role: role,
+            accountStatus: status,
+            trustLevel: trustLevel,
+            permanentlySanctioned:
+                permanentlyDisabledAt != null ||
+                marketplaceEffectiveAccountStatus(
+                      accountStatus: status,
+                      trustLevel: trustLevel,
+                    ) ==
+                    'banned',
+          ),
       trustLevel: trustLevel,
       trustScore: trustScoreRaw is num ? trustScoreRaw.toInt() : null,
       displayAccountStatus: displayStatus,
       sanctionReason: _nullableText(json['sanction_reason']),
-      permanentlyDisabledAt: _time(json['permanently_disabled_at']),
+      permanentlyDisabledAt: permanentlyDisabledAt,
       restrictedUntil: _time(json['restricted_until']),
       strikeCount: (json['strike_count'] as num?)?.toInt(),
       adminDisableReason: _nullableText(json['admin_disable_reason']),
@@ -177,6 +207,14 @@ class MarketplaceUsersPage {
 
 class MarketplaceDisableResult {
   const MarketplaceDisableResult({required this.ok, this.code, this.message});
+
+  final bool ok;
+  final String? code;
+  final String? message;
+}
+
+class MarketplaceEnableResult {
+  const MarketplaceEnableResult({required this.ok, this.code, this.message});
 
   final bool ok;
   final String? code;
@@ -224,10 +262,9 @@ class AdminUsersService {
   }
 
   Future<MarketplaceUserRow?> detail(String userId) async {
-    final raw = await (await resolveAdminClient(_supabase)).rpc(
-      'get_marketplace_user',
-      params: {'p_user_id': userId},
-    );
+    final raw = await (await resolveAdminClient(
+      _supabase,
+    )).rpc('get_marketplace_user', params: {'p_user_id': userId});
     final map = supabaseRpcMap(raw);
     if (map == null || map['success'] != true) return null;
     final user = supabaseRpcMap(map['user']);
@@ -289,6 +326,81 @@ class AdminUsersService {
         message: 'Could not disable this account. Nothing was changed.',
       );
     }
+  }
+
+  Future<MarketplaceEnableResult> enable({
+    required String userId,
+    String notes = '',
+  }) async {
+    try {
+      final raw = await (await resolveAdminClient(_supabase)).rpc(
+        'enable_marketplace_account',
+        params: {'p_user_id': userId, 'p_notes': notes.trim()},
+      );
+      final map = supabaseRpcMap(raw);
+      if (map?['success'] == true) {
+        return const MarketplaceEnableResult(ok: true);
+      }
+      return MarketplaceEnableResult(
+        ok: false,
+        code: map?['code']?.toString(),
+        message: _enableMessage(
+          map?['code']?.toString(),
+          map?['error']?.toString(),
+        ),
+      );
+    } on PostgrestException catch (e) {
+      debugPrint('enable_marketplace_account error: ${e.message}');
+      final text = e.message.toLowerCase();
+      if (text.contains('admin access')) {
+        return const MarketplaceEnableResult(
+          ok: false,
+          code: 'unauthorized',
+          message: 'You do not have permission to manage marketplace accounts.',
+        );
+      }
+      if (text.contains('banned accounts cannot be reactivated')) {
+        return const MarketplaceEnableResult(
+          ok: false,
+          code: 'banned',
+          message:
+              'Account banned. Reactivation is not available through User Management.',
+        );
+      }
+      return const MarketplaceEnableResult(
+        ok: false,
+        message: 'Could not re-enable this account. Nothing was changed.',
+      );
+    } catch (e) {
+      debugPrint('enable_marketplace_account error: $e');
+      return const MarketplaceEnableResult(
+        ok: false,
+        message: 'Could not re-enable this account. Nothing was changed.',
+      );
+    }
+  }
+}
+
+String _enableMessage(String? code, String? serverMessage) {
+  switch (code) {
+    case 'banned':
+      return 'Account banned. Reactivation is not available through User Management.';
+    case 'not_disabled':
+      return 'Only temporarily disabled accounts can be re-enabled here.';
+    case 'not_marketplace_account':
+      return 'Administrator accounts are managed separately.';
+    case 'notes_too_long':
+      return 'Keep additional notes under 1,000 characters.';
+    case 'not_found':
+      return 'That account was not found.';
+    case 'unauthorized':
+      return 'You do not have permission to manage marketplace accounts.';
+    default:
+      final text = serverMessage?.trim() ?? '';
+      if (text.isEmpty) {
+        return 'Could not re-enable this account. Nothing was changed.';
+      }
+      return text;
   }
 }
 

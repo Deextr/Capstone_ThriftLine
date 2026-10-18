@@ -41,7 +41,7 @@ void main() {
     );
 
     expect(find.text('Order #TL-10231'), findsOneWidget);
-    expect(find.text('To Ship'), findsOneWidget);
+    expect(find.byType(SellerStatusChip), findsOneWidget);
     expect(find.text('Vintage Lacoste Polo'), findsOneWidget);
     expect(find.text('Qty 1'), findsOneWidget);
     expect(find.text('Dexter R.'), findsOneWidget);

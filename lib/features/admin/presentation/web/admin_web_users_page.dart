@@ -99,6 +99,7 @@ class _AdminWebUsersPageState extends State<AdminWebUsersPage> {
               controller: controller,
               onView: _view,
               onDisable: _disable,
+              onEnable: _enable,
             )
           else
             AdminDataTable(
@@ -151,7 +152,11 @@ class _AdminWebUsersPageState extends State<AdminWebUsersPage> {
                       style: AppTypography.tableBody,
                     ),
                     AdminTableActionCell(
-                      child: _DisableAction(user: user, onDisable: _disable),
+                      child: _AccountActions(
+                        user: user,
+                        onDisable: _disable,
+                        onEnable: _enable,
+                      ),
                     ),
                   ],
               ],
@@ -193,6 +198,42 @@ class _AdminWebUsersPageState extends State<AdminWebUsersPage> {
       ),
     );
   }
+
+  Future<void> _enable(MarketplaceUserRow user) {
+    if (!user.mayEnable) return Future.value();
+    final controller = context.read<AdminUsersController>();
+    return showEnableMarketplaceAccountDialog(
+      context: context,
+      user: user,
+      onConfirm: (notes) =>
+          controller.enableAccount(userId: user.userId, notes: notes),
+    );
+  }
+}
+
+class _AccountActions extends StatelessWidget {
+  const _AccountActions({
+    required this.user,
+    required this.onDisable,
+    required this.onEnable,
+  });
+
+  final MarketplaceUserRow user;
+  final ValueChanged<MarketplaceUserRow> onDisable;
+  final ValueChanged<MarketplaceUserRow> onEnable;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _DisableAction(user: user, onDisable: onDisable),
+        _EnableAction(user: user, onEnable: onEnable),
+      ],
+    );
+  }
 }
 
 class _DisableAction extends StatelessWidget {
@@ -215,17 +256,58 @@ class _DisableAction extends StatelessWidget {
         child: const Text('Disable account'),
       );
     }
-    return Tooltip(
-      message: blocked ?? 'This account cannot be disabled.',
-      child: Text(
-        'Disable unavailable',
-        style: TextStyle(
-          color: AppColors.textHint,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
+    if (user.effectiveAccountStatus == 'active') {
+      return Tooltip(
+        message: blocked ?? 'This account cannot be disabled.',
+        child: Text(
+          'Disable unavailable',
+          style: TextStyle(
+            color: AppColors.textHint,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-      ),
-    );
+      );
+    }
+    return const SizedBox.shrink();
+  }
+}
+
+class _EnableAction extends StatelessWidget {
+  const _EnableAction({required this.user, required this.onEnable});
+
+  final MarketplaceUserRow user;
+  final ValueChanged<MarketplaceUserRow> onEnable;
+
+  @override
+  Widget build(BuildContext context) {
+    if (user.mayEnable) {
+      return TextButton(
+        onPressed: () => onEnable(user),
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.primaryDark,
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+        ),
+        child: const Text('Re-enable account'),
+      );
+    }
+    if (user.effectiveAccountStatus == 'banned') {
+      return Tooltip(
+        message:
+            user.enableBlockedMessage ??
+            'Account banned. Reactivation is not available through User Management.',
+        child: Text(
+          'Re-enable unavailable',
+          style: TextStyle(
+            color: AppColors.textHint,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 }
 
@@ -234,11 +316,13 @@ class _UserCards extends StatelessWidget {
     required this.controller,
     required this.onView,
     required this.onDisable,
+    required this.onEnable,
   });
 
   final AdminUsersController controller;
   final ValueChanged<MarketplaceUserRow> onView;
   final ValueChanged<MarketplaceUserRow> onDisable;
+  final ValueChanged<MarketplaceUserRow> onEnable;
 
   @override
   Widget build(BuildContext context) {
@@ -266,6 +350,7 @@ class _UserCards extends StatelessWidget {
             user: user,
             onView: () => onView(user),
             onDisable: () => onDisable(user),
+            onEnable: () => onEnable(user),
           ),
       ],
     );
@@ -277,11 +362,13 @@ class _UserCard extends StatefulWidget {
     required this.user,
     required this.onView,
     required this.onDisable,
+    required this.onEnable,
   });
 
   final MarketplaceUserRow user;
   final VoidCallback onView;
   final VoidCallback onDisable;
+  final VoidCallback onEnable;
 
   @override
   State<_UserCard> createState() => _UserCardState();
@@ -338,9 +425,10 @@ class _UserCardState extends State<_UserCard> {
               ),
               const SizedBox(height: 8),
               AdminTableActionCell(
-                child: _DisableAction(
+                child: _AccountActions(
                   user: user,
                   onDisable: (_) => widget.onDisable(),
+                  onEnable: (_) => widget.onEnable(),
                 ),
               ),
             ],

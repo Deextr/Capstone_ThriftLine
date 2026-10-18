@@ -71,14 +71,14 @@ class _SellerShellScreenState extends State<SellerShellScreen> {
   }
 
   int? _tabIndexFromQuery(String? tab) => switch (tab) {
-        'dashboard' => 0,
-        'listings' => SellerTabScope.listings,
-        'looking' => SellerTabScope.looking,
-        'orders' => SellerTabScope.orders,
-        'messages' => SellerTabScope.messages,
-        'profile' => 5,
-        _ => null,
-      };
+    'dashboard' => 0,
+    'listings' => SellerTabScope.listings,
+    'looking' => SellerTabScope.looking,
+    'orders' => SellerTabScope.orders,
+    'messages' => SellerTabScope.messages,
+    'profile' => 5,
+    _ => null,
+  };
 
   void _syncTabFromRoute() {
     if (!mounted) return;
@@ -189,10 +189,7 @@ class _SellerShellScreenState extends State<SellerShellScreen> {
           transitionBuilder: (child, animation) {
             return FadeTransition(opacity: animation, child: child);
           },
-          child: KeyedSubtree(
-            key: ValueKey<int>(_index),
-            child: _page(_index),
-          ),
+          child: KeyedSubtree(key: ValueKey<int>(_index), child: _page(_index)),
         ),
         bottomNavigationBar: CurvedNavigationBar(
           selectedIndex: _index,

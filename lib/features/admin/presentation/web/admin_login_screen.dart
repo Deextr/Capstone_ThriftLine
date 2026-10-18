@@ -135,11 +135,17 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     });
 
     final auth = context.read<AuthProvider>();
+    final portalSession = context.read<AdminPortalSessionController>();
     try {
       if (auth.isAuthenticated &&
           !auth.canUseAdminPortal &&
           !auth.isEmailOtpPending) {
-        await auth.logout();
+        portalSession.beginManualSignOut();
+        try {
+          await auth.logout();
+        } finally {
+          portalSession.endManualSignOut();
+        }
         if (!mounted) return;
       }
 
@@ -186,6 +192,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         }
         return;
       }
+      await context.read<AdminPortalSessionController>().activateAfterSignIn();
       if (!mounted) return;
       final redirect = GoRouterState.of(
         context,

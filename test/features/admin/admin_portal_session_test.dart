@@ -61,5 +61,19 @@ void main() {
         999,
       );
     });
+
+    test('does not reuse an expired stored clock', () {
+      const stored = 100;
+      final now =
+          stored + adminPortalInactivityTimeout.inMilliseconds + 1;
+      expect(
+        resolveAdminPortalMonitorStartMs(
+          storedActivityMs: stored,
+          nowMs: now,
+          reuseStoredActivity: true,
+        ),
+        now,
+      );
+    });
   });
 }

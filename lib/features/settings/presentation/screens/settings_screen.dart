@@ -45,6 +45,7 @@ class SettingsScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: EdgeInsets.fromLTRB(
             AppConstants.spacingMd,
             AppConstants.spacingSm,
@@ -53,13 +54,17 @@ class SettingsScreen extends StatelessWidget {
           ),
           children: [
             _buildSection(
-              title: 'Preferences',
-              children: [
+              title: 'Notifications',
+              children: _withDividers([
                 PushNotificationPreferences(mode: mode),
                 SwitchListTile(
-                  title: Text('Email Notifications', style: AppTypography.body),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 2,
+                  ),
+                  title: Text('Email updates', style: AppTypography.body),
                   subtitle: Text(
-                    'Optional updates only — security emails still send',
+                    'Optional marketplace updates. Security emails still send.',
                     style: AppTypography.caption,
                   ),
                   value: settingsProvider.emailFor(mode),
@@ -79,81 +84,43 @@ class SettingsScreen extends StatelessWidget {
                           }
                         },
                 ),
-              ],
+              ]),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             _buildSection(
-              title: 'Support',
-              children: [
-                ListTile(
-                  leading: Icon(
-                    Icons.help_outline_rounded,
-                    color: AppColors.textPrimary,
-                    size: 22,
-                  ),
-                  title: Text('Help & FAQ', style: AppTypography.body),
-                  trailing: Icon(
-                    Icons.chevron_right,
-                    size: 20,
-                    color: AppColors.textHint,
-                  ),
+              title: 'Help & legal',
+              children: _withDividers([
+                _SettingsNavTile(
+                  icon: Icons.help_outline_rounded,
+                  label: 'Help & FAQ',
                   onTap: () => context.push(
                     RouteNames.legalDocument(LegalDocumentType.faq),
                   ),
                 ),
-                ListTile(
-                  leading: Icon(
-                    Icons.description_outlined,
-                    color: AppColors.textPrimary,
-                    size: 22,
-                  ),
-                  title: Text(
-                    'Terms and Conditions',
-                    style: AppTypography.body,
-                  ),
-                  trailing: Icon(
-                    Icons.chevron_right,
-                    size: 20,
-                    color: AppColors.textHint,
-                  ),
+                _SettingsNavTile(
+                  icon: Icons.description_outlined,
+                  label: 'Terms and Conditions',
                   onTap: () => context.push(
                     RouteNames.legalDocument(LegalDocumentType.terms),
                   ),
                 ),
-                ListTile(
-                  leading: Icon(
-                    Icons.privacy_tip_outlined,
-                    color: AppColors.textPrimary,
-                    size: 22,
-                  ),
-                  title: Text('Privacy Policy', style: AppTypography.body),
-                  trailing: Icon(
-                    Icons.chevron_right,
-                    size: 20,
-                    color: AppColors.textHint,
-                  ),
+                _SettingsNavTile(
+                  icon: Icons.privacy_tip_outlined,
+                  label: 'Privacy Policy',
                   onTap: () => context.push(
                     RouteNames.legalDocument(LegalDocumentType.privacy),
                   ),
                 ),
-              ],
+              ]),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             _buildSection(
               title: 'About',
               children: [
-                ListTile(
-                  leading: Icon(
-                    Icons.info_outline_rounded,
-                    color: AppColors.textPrimary,
-                    size: 22,
-                  ),
-                  title: Text('About ThriftLine', style: AppTypography.body),
-                  trailing: Icon(
-                    Icons.chevron_right,
-                    size: 20,
-                    color: AppColors.textHint,
-                  ),
+                _SettingsNavTile(
+                  icon: Icons.info_outline_rounded,
+                  label: 'About ThriftLine',
+                  subtitle: 'Learn what we do and how we keep buyers safe',
                   onTap: () => context.push(
                     RouteNames.legalDocument(LegalDocumentType.about),
                   ),
@@ -176,6 +143,18 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  static List<Widget> _withDividers(List<Widget> children) {
+    if (children.length <= 1) return children;
+    final out = <Widget>[];
+    for (var i = 0; i < children.length; i++) {
+      out.add(children[i]);
+      if (i < children.length - 1) {
+        out.add(const Divider(height: 1, indent: 16, endIndent: 16));
+      }
+    }
+    return out;
+  }
+
   Widget _buildSection({
     required String title,
     required List<Widget> children,
@@ -184,10 +163,14 @@ class SettingsScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          padding: const EdgeInsets.only(left: 8, bottom: 8),
           child: Text(
             title,
-            style: AppTypography.subheading.copyWith(fontSize: 14),
+            style: AppTypography.subheading.copyWith(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              letterSpacing: 0.2,
+            ),
           ),
         ),
         Container(
@@ -209,6 +192,38 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SettingsNavTile extends StatelessWidget {
+  const _SettingsNavTile({
+    required this.icon,
+    required this.label,
+    this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Icon(icon, color: AppColors.textPrimary, size: 22),
+      title: Text(label, style: AppTypography.body),
+      subtitle: subtitle != null
+          ? Text(subtitle!, style: AppTypography.caption)
+          : null,
+      trailing: Icon(
+        Icons.chevron_right_rounded,
+        size: 22,
+        color: AppColors.textHint,
+      ),
+      onTap: onTap,
     );
   }
 }

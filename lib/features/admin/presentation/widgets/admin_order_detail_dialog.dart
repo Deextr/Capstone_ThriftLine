@@ -201,7 +201,7 @@ class _OrderModalHeader extends StatelessWidget {
                   runSpacing: 6,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    AdminOrderTypeBadge(label: adminOrderKindLabel(kind)),
+                    AdminOrderTypeBadge.forKind(kind, compact: false),
                   ],
                 ),
                 SizedBox(height: 6),
@@ -881,9 +881,8 @@ class _PaymentBreakdownBlock extends StatelessWidget {
         _KVRow(label: 'Items subtotal', value: formatCurrency(order.amount)),
         _KVRow(label: 'Shipping fee', value: formatCurrency(order.shippingFee)),
         _KVRow(
-          label: 'Platform fee',
+          label: 'Buyer PayMongo fee (2%)',
           value: formatCurrency(order.platformFee),
-          valueColor: AppColors.primary,
         ),
         Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
@@ -895,7 +894,21 @@ class _PaymentBreakdownBlock extends StatelessWidget {
           emphasize: true,
         ),
         _KVRow(
-          label: 'Seller allocation',
+          label: 'Commission rate',
+          value:
+              '${(order.sellerCommissionRate * 100).toStringAsFixed(0)}% of product subtotal',
+        ),
+        _KVRow(
+          label: 'ThriftLine commission',
+          value: formatCurrency(order.sellerCommissionAmount),
+          valueColor: AppColors.primary,
+        ),
+        _KVRow(
+          label: 'Commission status',
+          value: _commissionStatusLabel(order.sellerCommissionStatus),
+        ),
+        _KVRow(
+          label: 'Seller net earnings',
           value: formatCurrency(detail.sellerAllocation),
         ),
         if (payment != null &&
@@ -928,6 +941,15 @@ class _PaymentBreakdownBlock extends StatelessWidget {
         if (ref != null) _KVRow(label: 'Payment reference', value: ref),
       ],
     );
+  }
+
+  String _commissionStatusLabel(String status) {
+    return switch (status.trim().toLowerCase()) {
+      'earned' => 'Earned',
+      'reversed' => 'Reversed after refund',
+      'void' => 'Not earned',
+      _ => 'Not yet earned',
+    };
   }
 
   String? _shortPaymongoRef(Map<String, dynamic> payment) {

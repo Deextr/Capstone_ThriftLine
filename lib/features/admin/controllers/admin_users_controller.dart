@@ -26,6 +26,7 @@ class AdminUsersController extends ChangeNotifier {
   int _pageSize = 10;
   bool _loading = true;
   bool _disabling = false;
+  bool _enabling = false;
   String? _error;
   String? _notice;
   String _search = '';
@@ -41,6 +42,8 @@ class AdminUsersController extends ChangeNotifier {
   int get pageSize => _pageSize;
   bool get isLoading => _loading;
   bool get isDisabling => _disabling;
+  bool get isEnabling => _enabling;
+  bool get isChangingAccountStatus => _disabling || _enabling;
   String? get errorMessage => _error;
   String? get noticeMessage => _notice;
   String get search => _search;
@@ -89,6 +92,34 @@ class AdminUsersController extends ChangeNotifier {
 
   /// Returns an error message when the backend rejects the disable.
   /// A null return means the account was updated and the table was refreshed.
+  /// Returns an error message when the backend rejects re-enable.
+  /// A null return means the account was updated and the table was refreshed.
+  Future<String?> enableAccount({
+    required String userId,
+    String notes = '',
+  }) async {
+    if (_enabling) return 'A re-enable request is already in progress.';
+    _enabling = true;
+    _notice = null;
+    notifyListeners();
+    try {
+      final result = await _service.enable(userId: userId, notes: notes);
+      if (!result.ok) {
+        return result.message ??
+            'Could not re-enable this account. Nothing was changed.';
+      }
+      _notice = 'Account re-enabled.';
+      await load();
+      if (_error != null) {
+        return 'Account re-enabled, but the list could not be refreshed.';
+      }
+      return null;
+    } finally {
+      _enabling = false;
+      notifyListeners();
+    }
+  }
+
   Future<String?> disableAccount({
     required String userId,
     required String reason,

@@ -23,6 +23,8 @@ class AdminOrderRow {
     required this.unifiedStatus,
     this.paidAt,
     this.fulfillmentOverdue = false,
+    this.commissionAmount = 0,
+    this.commissionStatus = 'pending',
   });
 
   final String orderId;
@@ -37,6 +39,8 @@ class AdminOrderRow {
   final AdminUnifiedOrderStatus unifiedStatus;
   final DateTime? paidAt;
   final bool fulfillmentOverdue;
+  final double commissionAmount;
+  final String commissionStatus;
 
   bool get isFulfillmentDelayed => fulfillmentOverdue;
 
@@ -75,6 +79,13 @@ class AdminOrderRow {
       fulfillmentOverdue: adminOrderFulfillmentOverdueFromSlaFlags(
         adminOrderSlaFlagsFromRow(json),
       ),
+      commissionAmount:
+          (json['seller_commission_amount'] as num?)?.toDouble() ?? 0,
+      commissionStatus:
+          (json['seller_commission_status'] as String?)?.trim().isNotEmpty ==
+              true
+          ? (json['seller_commission_status'] as String).trim()
+          : 'pending',
     );
   }
 
@@ -207,10 +218,7 @@ class AdminOrderDetailBundle {
   double get itemsSubtotal => order.amount;
 
   double get sellerAllocation =>
-      (order.amount + order.shippingFee - order.platformFee).clamp(
-        0,
-        double.infinity,
-      );
+      order.sellerTotalEarnings.clamp(0, double.infinity);
 
   Map<String, dynamic>? get primaryPayment {
     if (payments.isEmpty) return null;
@@ -238,34 +246,47 @@ class AdminOrdersService {
         '(payment_status, created_at, updated_at)';
     final buyerSeller =
         'buyer:buyer_id(full_name), seller:seller_id(full_name)';
-    final base =
+    final baseWithCommission =
         'order_id, order_number, order_type, auction_id, total_amount, '
-        'order_status, created_at, $buyerSeller, $payments';
+        'subtotal, shipping_fee, platform_fee, seller_commission_amount, '
+        'seller_commission_status, order_status, created_at, $buyerSeller, $payments';
+    final baseWithoutCommission =
+        'order_id, order_number, order_type, auction_id, total_amount, '
+        'subtotal, shipping_fee, platform_fee, order_status, created_at, '
+        '$buyerSeller, $payments';
+    final base = switch (embedProfile) {
+      _OrdersListEmbedProfile.minimalNoCommission => baseWithoutCommission,
+      _ => baseWithCommission,
+    };
 
     return switch (embedProfile) {
       _OrdersListEmbedProfile.full =>
         '$base, escrow(status, refund_state), '
-        'admin_order_sla_flags${slaFlagsInner ? '!inner' : ''}'
-        '(fulfillment_overdue, refund_needs_action, refund_completed)',
+            'admin_order_sla_flags${slaFlagsInner ? '!inner' : ''}'
+            '(fulfillment_overdue, refund_needs_action, refund_completed)',
       _OrdersListEmbedProfile.noEscrowRefundState =>
         '$base, escrow(status), '
-        'admin_order_sla_flags${slaFlagsInner ? '!inner' : ''}'
-        '(fulfillment_overdue, refund_needs_action, refund_completed)',
+            'admin_order_sla_flags${slaFlagsInner ? '!inner' : ''}'
+            '(fulfillment_overdue, refund_needs_action, refund_completed)',
       _OrdersListEmbedProfile.noSlaFlags =>
         '$base, escrow(status, refund_state)',
       _OrdersListEmbedProfile.minimal => base,
+      _OrdersListEmbedProfile.minimalNoCommission => base,
     };
   }
 
   static bool _postgrestEmbedRecoverable(PostgrestException error) {
     final code = error.code?.trim() ?? '';
     if (code == 'PGRST200' || code == 'PGRST201') return true;
+    if (code == '42703') return true;
     final message = error.message.toLowerCase();
     return message.contains('relationship') ||
         message.contains('admin_order_sla_flags') ||
         message.contains('refund_state') ||
+        message.contains('seller_commission') ||
         message.contains('schema cache') ||
-        message.contains('could not embed');
+        message.contains('could not embed') ||
+        message.contains('does not exist');
   }
 
   Future<AdminOrdersPage> list({
@@ -297,6 +318,7 @@ class AdminOrdersService {
       _OrdersListEmbedProfile.noEscrowRefundState,
       _OrdersListEmbedProfile.noSlaFlags,
       _OrdersListEmbedProfile.minimal,
+      _OrdersListEmbedProfile.minimalNoCommission,
     ];
 
     PostgrestException? lastEmbedError;
@@ -365,11 +387,13 @@ class AdminOrdersService {
 
     filter =
         _applyUnifiedStatusFilter(
-          filter,
-          unifiedStatus,
-          allowSlaEmbed: embedProfile == _OrdersListEmbedProfile.full ||
-              embedProfile == _OrdersListEmbedProfile.noEscrowRefundState,
-        ) as PostgrestFilterBuilder<PostgrestList>;
+              filter,
+              unifiedStatus,
+              allowSlaEmbed:
+                  embedProfile == _OrdersListEmbedProfile.full ||
+                  embedProfile == _OrdersListEmbedProfile.noEscrowRefundState,
+            )
+            as PostgrestFilterBuilder<PostgrestList>;
 
     final term = search.trim();
     if (term.isNotEmpty) {
@@ -583,11 +607,9 @@ class AdminOrdersService {
   }
 
   Future<Map<String, dynamic>?> _loadEscrowRow(String orderId) async {
-    final row = await (await resolveAdminClient(_supabase))
-        .from('escrow')
-        .select('*')
-        .eq('order_id', orderId)
-        .maybeSingle();
+    final row = await (await resolveAdminClient(
+      _supabase,
+    )).from('escrow').select('*').eq('order_id', orderId).maybeSingle();
     if (row == null) return null;
     return Map<String, dynamic>.from(row);
   }
@@ -695,4 +717,5 @@ enum _OrdersListEmbedProfile {
   noEscrowRefundState,
   noSlaFlags,
   minimal,
+  minimalNoCommission,
 }

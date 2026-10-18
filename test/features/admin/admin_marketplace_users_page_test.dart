@@ -10,6 +10,7 @@ class _Directory extends AdminUsersService {
   _Directory() : super(SupabaseService());
 
   int disableCalls = 0;
+  int enableCalls = 0;
   String? lastReason;
 
   static final buyer = MarketplaceUserRow(
@@ -23,6 +24,20 @@ class _Directory extends AdminUsersService {
     createdAt: DateTime.utc(2026, 1, 2),
     sellerApproved: false,
     canDisable: true,
+  );
+
+  static final disabledBuyer = MarketplaceUserRow(
+    userId: 'buyer-2',
+    fullName: 'Jordan Lee',
+    email: 'jordan@example.com',
+    username: 'jordan',
+    role: 'buyer',
+    accountStatus: 'suspended',
+    accountType: 'buyer',
+    createdAt: DateTime.utc(2026, 3, 4),
+    sellerApproved: false,
+    canEnable: true,
+    adminDisableReason: 'Account security concerns',
   );
 
   static final seller = MarketplaceUserRow(
@@ -50,8 +65,8 @@ class _Directory extends AdminUsersService {
     String? status,
   }) async {
     return MarketplaceUsersPage(
-      rows: [buyer, seller],
-      total: 2,
+      rows: [buyer, disabledBuyer, seller],
+      total: 3,
       counts: const MarketplaceUserCounts(
         total: 21,
         active: 21,
@@ -65,6 +80,16 @@ class _Directory extends AdminUsersService {
   Future<MarketplaceUserRow?> detail(String userId) async {
     if (userId == seller.userId) return seller;
     return buyer;
+  }
+
+  @override
+  @override
+  Future<MarketplaceEnableResult> enable({
+    required String userId,
+    String notes = '',
+  }) async {
+    enableCalls += 1;
+    return const MarketplaceEnableResult(ok: true);
   }
 
   @override
@@ -116,23 +141,39 @@ void main() {
       expect(find.text('Active'), findsWidgets);
       expect(find.text('Banned'), findsWidgets);
       expect(find.text('Disable account'), findsOneWidget);
-      expect(find.text('Disable unavailable'), findsOneWidget);
+      expect(find.text('Disable unavailable'), findsNothing);
+      expect(find.text('Re-enable unavailable'), findsOneWidget);
+      expect(find.text('Re-enable account'), findsOneWidget);
       expect(find.text('View details'), findsNothing);
     },
   );
+
+  testWidgets('re-enable confirms and refreshes the directory', (tester) async {
+    final directory = _Directory();
+    await _pump(tester, directory);
+
+    await tester.tap(find.text('Re-enable account'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confirm re-enable'), findsOneWidget);
+    await tester.tap(find.text('Confirm re-enable'));
+    await tester.pumpAndSettle();
+
+    expect(directory.enableCalls, 1);
+    expect(find.text('Account re-enabled.'), findsOneWidget);
+  });
 
   testWidgets('cancel leaves the account unchanged', (tester) async {
     final directory = _Directory();
     await _pump(tester, directory);
 
-    await tester.tap(find.text('Disable account'));
+    await tester.tap(find.text('Disable account').first);
     await tester.pumpAndSettle();
 
     expect(find.text('Maya Cruz'), findsWidgets);
-    expect(
-      find.textContaining('This is a disable, not a permanent ban.'),
-      findsOneWidget,
-    );
+    expect(find.text('Temporarily disable account'), findsOneWidget);
+    expect(find.textContaining('not a permanent ban'), findsOneWidget);
+    expect(find.text('Guidelines violation'), findsOneWidget);
 
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -186,6 +227,6 @@ void main() {
 
     expect(find.text('leo@example.com'), findsOneWidget);
     expect(find.text('Disable account'), findsOneWidget);
-    expect(find.text('Disable unavailable'), findsOneWidget);
+    expect(find.text('Re-enable unavailable'), findsOneWidget);
   });
 }

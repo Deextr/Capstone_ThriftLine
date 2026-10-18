@@ -186,6 +186,13 @@ abstract final class RouteNames {
 
   static const String myShop = '/my-shop';
   static const String sellerAnalytics = '/seller-analytics';
+  static const String sellerShopRatings = '/seller/shop-ratings';
+  static const String sellerProductRatings = '/seller/product-ratings';
+  static const String sellerProductRatingDetail =
+      '/seller/product-ratings/:productId';
+
+  static String sellerProductRatingDetailFor(String productId) =>
+      '/seller/product-ratings/$productId';
 
   /// Mobile-only: shown when an admin signs into the buyer/seller app.
   static const String adminPortalRequired = '/admin-portal-required';

@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/services/push_notification_service.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../auth/domain/account_mode.dart';
 import '../../../../widgets/thrift_widgets.dart' show showThriftSnackBar;
+import '../../domain/push_notification_status_copy.dart';
 
 class PushNotificationPreferences extends StatefulWidget {
   const PushNotificationPreferences({super.key, required this.mode});
@@ -19,7 +21,8 @@ class PushNotificationPreferences extends StatefulWidget {
       _PushNotificationPreferencesState();
 }
 
-class _PushNotificationPreferencesState extends State<PushNotificationPreferences> {
+class _PushNotificationPreferencesState
+    extends State<PushNotificationPreferences> {
   NotificationPermissionSnapshot? _permission;
   PushRegistrationDiagnostics? _registration;
   bool _loadingPermission = true;
@@ -34,7 +37,9 @@ class _PushNotificationPreferencesState extends State<PushNotificationPreference
     final push = context.read<PushNotificationService>();
     final settings = context.read<SettingsProvider>();
     final snap = await push.permissionSnapshot();
-    final reg = await push.diagnostics(appPushEnabled: settings.pushFor(widget.mode));
+    final reg = await push.diagnostics(
+      appPushEnabled: settings.pushFor(widget.mode),
+    );
     if (!mounted) return;
     setState(() {
       _permission = snap;
@@ -48,7 +53,7 @@ class _PushNotificationPreferencesState extends State<PushNotificationPreference
     final push = context.read<PushNotificationService>();
     final auth = context.read<AuthProvider>();
     final ok = await settings.setPushNotifications(value, mode: widget.mode);
-    if (!context.mounted) return;
+    if (!mounted) return;
     if (!ok) {
       showThriftSnackBar(
         context,
@@ -62,6 +67,7 @@ class _PushNotificationPreferencesState extends State<PushNotificationPreference
     } else {
       await push.revokeCurrentDeviceToken();
     }
+    if (!mounted) return;
     await _refreshStatus();
   }
 
@@ -69,13 +75,17 @@ class _PushNotificationPreferencesState extends State<PushNotificationPreference
     final push = context.read<PushNotificationService>();
     final auth = context.read<AuthProvider>();
     final ok = await push.syncRegistrationForUser(auth.user?.id);
+    if (!mounted) return;
     await _refreshStatus();
-    if (!context.mounted) return;
+    if (!mounted) return;
+    final failureMessage = userFacingPushRegisterError(push.lastRegisterError);
     showThriftSnackBar(
       context,
       ok
-          ? 'This device is registered for push alerts.'
-          : push.lastRegisterError ?? 'Could not register this device.',
+          ? 'This device is set up for push alerts.'
+          : failureMessage.isNotEmpty
+              ? failureMessage
+              : 'Could not set up push alerts on this device.',
       isError: !ok,
     );
   }
@@ -84,13 +94,15 @@ class _PushNotificationPreferencesState extends State<PushNotificationPreference
     final push = context.read<PushNotificationService>();
     final auth = context.read<AuthProvider>();
     final granted = await push.requestOsPermission(showRationale: true);
+    if (!mounted) return;
     await _refreshStatus();
-    if (!context.mounted) return;
+    if (!mounted) return;
     if (granted && context.read<SettingsProvider>().pushFor(widget.mode)) {
       await push.syncRegistrationForUser(auth.user?.id);
+      if (!mounted) return;
       await _refreshStatus();
     }
-    if (!granted) {
+    if (!granted && mounted) {
       showThriftSnackBar(
         context,
         'Notifications are off in your device settings. Enable them there to receive alerts.',
@@ -107,116 +119,164 @@ class _PushNotificationPreferencesState extends State<PushNotificationPreference
     final reg = _registration;
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SwitchListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 2,
+          ),
           title: Text('Push notifications', style: AppTypography.body),
           subtitle: Text(
             widget.mode == AccountMode.seller
-                ? 'Seller workspace alerts on this device'
-                : 'Buyer workspace alerts on this device',
+                ? 'Order and shop alerts on this device'
+                : 'Bids, orders, and messages on this device',
             style: AppTypography.caption,
           ),
           value: appEnabled,
           activeThumbColor: AppColors.primary,
           onChanged: settings.isSavingPush ? null : _onAppToggle,
         ),
-        if (_loadingPermission)
-          const ListTile(
-            dense: true,
-            title: Text('Checking device permission…'),
-          )
-        else if (perm != null && !perm.unavailable) ...[
-          ListTile(
-            dense: true,
-            title: Text(
-              'Device permission',
-              style: AppTypography.caption.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            subtitle: Text(
-              perm.osGranted
-                  ? 'Allowed — ThriftLine can show alerts on this device.'
-                  : 'Not allowed — the app cannot show system alerts until you enable them.',
-              style: AppTypography.caption,
-            ),
-            trailing: perm.osGranted
-                ? Icon(Icons.check_circle, color: AppColors.success, size: 20)
-                : Icon(Icons.notifications_off_outlined, color: AppColors.warning),
-          ),
-          if (!perm.osGranted)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  onPressed: perm.canRequestAgain
-                      ? _requestOsPermission
-                      : () => push.openOsAppSettings(),
-                  child: Text(
-                    perm.canRequestAgain
-                        ? 'Allow notifications'
-                        : 'Open device settings',
+        if (appEnabled) ...[
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          if (_loadingPermission)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                ),
+                  SizedBox(width: 12),
+                  Text('Checking alert setup…'),
+                ],
               ),
-            ),
-        ],
-        if (reg != null) ...[
-          ListTile(
-            dense: true,
-            title: Text(
-              'Push setup on this device',
-              style: AppTypography.caption.copyWith(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              _registrationSummary(reg),
-              style: AppTypography.caption.copyWith(height: 1.35),
-            ),
-          ),
-          if (!reg.readyForPush)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  onPressed: _retryRegistration,
-                  child: const Text('Register this device again'),
-                ),
-              ),
+            )
+          else if (reg != null)
+            _PushDeliveryStatus(
+              registration: reg,
+              permission: perm,
+              onAllowNotifications: _requestOsPermission,
+              onOpenDeviceSettings: push.openOsAppSettings,
+              onRetryRegistration: _retryRegistration,
             ),
         ],
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: Text(
-            'In-app notifications always appear in the Notifications screen. '
-            'Push alerts respect this toggle and your device permission.',
-            style: AppTypography.caption.copyWith(color: AppColors.textHint),
+            'In-app notifications always appear in your Notifications tab. '
+            'Push alerts follow the toggle above and your phone’s notification settings.',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textHint,
+              height: 1.35,
+            ),
           ),
         ),
       ],
     );
   }
+}
 
-  String _registrationSummary(PushRegistrationDiagnostics reg) {
-    if (!reg.firebaseConfigured) {
-      return 'Firebase is not configured. Add FIREBASE_* keys to .env and restart the app.';
-    }
-    if (!reg.firebaseInitialized) {
-      return 'Firebase failed to start. Check .env values and google-services.json.';
-    }
-    if (!reg.appPushEnabled) {
-      return 'Push is off for this workspace. Turn on the toggle above.';
-    }
-    if (!reg.osPermissionGranted) {
-      return 'Waiting for device notification permission.';
-    }
-    if (reg.hasDeviceToken) {
-      final suffix = reg.tokenSuffix;
-      return suffix == null
-          ? 'Device registered for push.'
-          : 'Device registered (token …$suffix).';
-    }
-    return reg.lastError ?? 'Not registered yet. Tap Register this device again.';
+class _PushDeliveryStatus extends StatelessWidget {
+  const _PushDeliveryStatus({
+    required this.registration,
+    required this.permission,
+    required this.onAllowNotifications,
+    required this.onOpenDeviceSettings,
+    required this.onRetryRegistration,
+  });
+
+  final PushRegistrationDiagnostics registration;
+  final NotificationPermissionSnapshot? permission;
+  final VoidCallback onAllowNotifications;
+  final VoidCallback onOpenDeviceSettings;
+  final VoidCallback onRetryRegistration;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = pushDeliveryStatusTitle(registration);
+    final message = pushRegistrationStatusMessage(registration);
+    final perm = permission;
+    final needsOsPermission =
+        perm != null && !perm.unavailable && !perm.osGranted;
+    final needsRegistrationRetry =
+        registration.appPushEnabled &&
+        registration.osPermissionGranted &&
+        !registration.readyForPush &&
+        registration.firebaseInitialized;
+
+    final (IconData icon, Color iconColor) = switch (true) {
+      _ when registration.readyForPush => (
+        Icons.check_circle_rounded,
+        AppColors.success,
+      ),
+      _ when needsOsPermission => (
+        Icons.notifications_off_outlined,
+        AppColors.warning,
+      ),
+      _ => (Icons.info_outline_rounded, AppColors.textSecondary),
+    };
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 22, color: iconColor),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      message,
+                      style: AppTypography.caption.copyWith(height: 1.35),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (needsOsPermission) ...[
+            const SizedBox(height: AppConstants.spacingSm),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: perm.canRequestAgain
+                    ? onAllowNotifications
+                    : onOpenDeviceSettings,
+                child: Text(
+                  perm.canRequestAgain
+                      ? 'Allow notifications'
+                      : 'Open phone settings',
+                ),
+              ),
+            ),
+          ] else if (needsRegistrationRetry) ...[
+            const SizedBox(height: AppConstants.spacingSm),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: onRetryRegistration,
+                child: const Text('Try again'),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }

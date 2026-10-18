@@ -299,7 +299,9 @@ class _SellerListingsTabState extends State<SellerListingsTab>
               row,
               order: () {
                 final auctionOrder =
-                    ordersByAuction[_auctionMap(row['auctions'])?['auction_id']];
+                    ordersByAuction[_auctionMap(
+                      row['auctions'],
+                    )?['auction_id']];
                 if (auctionOrder != null) return auctionOrder;
                 final productId = row['product_id'] as String?;
                 if (productId == null) return null;

@@ -209,6 +209,26 @@ void main() {
     });
   });
 
+  group('adminOrderKind labels', () {
+    test('table labels stay compact and readable', () {
+      expect(
+        adminOrderKindTableLabel(AdminOrderKind.fixedPrice),
+        'Fixed price',
+      );
+      expect(adminOrderKindTableLabel(AdminOrderKind.auction), 'Auction');
+      expect(
+        adminOrderKindLabel(AdminOrderKind.fixedPrice),
+        'Fixed Price',
+      );
+    });
+
+    test('commission status labels cover pending and earned', () {
+      expect(adminOrderCommissionStatusLabel('earned'), 'Earned');
+      expect(adminOrderCommissionStatusLabel('pending'), 'Not yet earned');
+      expect(adminOrderCommissionStatusLabel(null), 'Not yet earned');
+    });
+  });
+
   group('buildAdminOrderTimeline', () {
     test('includes payment and escrow timestamps only', () {
       final events = buildAdminOrderTimeline(

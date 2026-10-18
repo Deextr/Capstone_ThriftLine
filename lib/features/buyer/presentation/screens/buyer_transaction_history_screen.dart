@@ -6,7 +6,9 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/transaction_history_format.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../../widgets/transaction_history_widgets.dart';
 import '../../controllers/buyer_transaction_history_controller.dart';
 import '../../data/buyer_transaction.dart';
 import '../widgets/buyer_refund_status_section.dart';
@@ -46,37 +48,20 @@ class _BuyerTransactionHistoryScreenState
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Buyer transaction history'),
+        title: const Text('Transaction History'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.pop(),
         ),
         actions: [
           if (controller.hasAnyTransactions)
-            PopupMenuButton<BuyerTransactionSort>(
-              tooltip: 'Sort',
-              onSelected: (value) {
-                context.read<BuyerTransactionHistoryController>().setSort(
-                  value,
-                );
-                _scrollToTop();
-              },
-              itemBuilder: (context) => [
-                for (final option in BuyerTransactionSort.values)
-                  CheckedPopupMenuItem<BuyerTransactionSort>(
-                    value: option,
-                    checked: controller.sort == option,
-                    child: Text(option.menuLabel),
-                  ),
-              ],
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  'Sort',
-                  style: AppTypography.body.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
+            TextButton(
+              onPressed: () => _openSortSheet(context),
+              child: Text(
+                controller.hasDateFilter ? 'Sort · Date' : 'Sort',
+                style: AppTypography.body.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -101,7 +86,7 @@ class _BuyerTransactionHistoryScreenState
                   !controller.hasAnyTransactions)
                 SliverFillRemaining(
                   hasScrollBody: false,
-                  child: _ErrorState(
+                  child: TransactionHistoryErrorState(
                     message: controller.errorMessage!,
                     onRetry: controller.load,
                   ),
@@ -109,12 +94,41 @@ class _BuyerTransactionHistoryScreenState
               else if (!controller.hasAnyTransactions)
                 const SliverFillRemaining(
                   hasScrollBody: false,
-                  child: _EmptyHistoryState(),
+                  child: TransactionHistoryEmptyState(
+                    title: 'No transactions yet',
+                    message:
+                        'Completed payments and refunds will appear here.',
+                  ),
                 )
               else ...[
                 SliverToBoxAdapter(
-                  child: _HistoryHeader(controller: controller),
+                  child: TransactionHistoryFilterBar(
+                    selected: controller.filter,
+                    onSelected: (value) => context
+                        .read<BuyerTransactionHistoryController>()
+                        .setFilter(value),
+                    options: [
+                      for (final filter in BuyerTransactionFilter.values)
+                        (
+                          filter,
+                          filter.buyerHistoryLabel,
+                          controller.countForFilter(filter),
+                        ),
+                    ],
+                  ),
                 ),
+                if (controller.hasDateFilter)
+                  SliverToBoxAdapter(
+                    child: TransactionHistoryActiveDateChip(
+                      label: controller.dateFilterSummary,
+                      onClear: () {
+                        context
+                            .read<BuyerTransactionHistoryController>()
+                            .clearDateFilter();
+                        _scrollToTop();
+                      },
+                    ),
+                  ),
                 if (controller.isLoading)
                   SliverToBoxAdapter(
                     child: LinearProgressIndicator(
@@ -126,8 +140,11 @@ class _BuyerTransactionHistoryScreenState
                 if (controller.visibleTransactions.isEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,
-                    child: _EmptyFilterState(
-                      filter: controller.filter,
+                    child: TransactionHistoryEmptyFilterState(
+                      message: _emptyFilterMessage(controller),
+                      showClear:
+                          controller.filter != BuyerTransactionFilter.all ||
+                          controller.hasDateFilter,
                       onClear: () {
                         controller.resetFilters();
                         _scrollToTop();
@@ -142,15 +159,11 @@ class _BuyerTransactionHistoryScreenState
                       AppConstants.spacingMd,
                       32,
                     ),
-                    sliver: SliverList.separated(
-                      itemCount: controller.visibleTransactions.length,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        return _TransactionCard(
-                          transaction: controller.visibleTransactions[index],
-                        );
-                      },
+                    sliver: GroupedTransactionHistorySliver(
+                      transactions: controller.visibleTransactions,
+                      dateFor: (t) => _displayDate(t) ?? t.sortDate,
+                      tileBuilder: (transaction) =>
+                          _BuyerTransactionTile(transaction: transaction),
                     ),
                   ),
               ],
@@ -160,102 +173,65 @@ class _BuyerTransactionHistoryScreenState
       ),
     );
   }
-}
 
-class _HistoryHeader extends StatelessWidget {
-  const _HistoryHeader({required this.controller});
-
-  final BuyerTransactionHistoryController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppConstants.spacingMd,
-        12,
-        AppConstants.spacingMd,
-        16,
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (var i = 0; i < BuyerTransactionFilter.values.length; i++) ...[
-              if (i > 0) const SizedBox(width: 8),
-              _FilterChip(
-                label: BuyerTransactionFilter.values[i].label,
-                count: controller.countForFilter(
-                  BuyerTransactionFilter.values[i],
-                ),
-                selected: controller.filter == BuyerTransactionFilter.values[i],
-                onTap: () => context
-                    .read<BuyerTransactionHistoryController>()
-                    .setFilter(BuyerTransactionFilter.values[i]),
-              ),
-            ],
-          ],
-        ),
-      ),
+  void _openSortSheet(BuildContext context) {
+    final controller = context.read<BuyerTransactionHistoryController>();
+    showBuyerTransactionHistorySortSheet(
+      context: context,
+      sort: controller.sort,
+      hasDateFilter: controller.hasDateFilter,
+      onSort: (value) {
+        context.read<BuyerTransactionHistoryController>().setSort(value);
+        _scrollToTop();
+      },
+      onPickSingleDate: (day) async {
+        context
+            .read<BuyerTransactionHistoryController>()
+            .setDateFilterSingleDay(day);
+        _scrollToTop();
+      },
+      onPickDateRange: (start, end) async {
+        context.read<BuyerTransactionHistoryController>().setDateFilterRange(
+          start,
+          end,
+        );
+        _scrollToTop();
+      },
+      onClearDateFilter: () {
+        context.read<BuyerTransactionHistoryController>().clearDateFilter();
+        _scrollToTop();
+      },
     );
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.count,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final int count;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected
-          ? AppColors.primary.withValues(alpha: 0.12)
-          : AppColors.surface,
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
-            ),
-          ),
-          child: Text(
-            count > 0 ? '$label ($count)' : label,
-            style: AppTypography.caption.copyWith(
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? AppColors.primaryDark : AppColors.textPrimary,
-            ),
-          ),
-        ),
-      ),
-    );
+String _emptyFilterMessage(BuyerTransactionHistoryController controller) {
+  if (controller.hasDateFilter) {
+    return 'No transactions for ${controller.dateFilterSummary}.';
   }
+  return switch (controller.filter) {
+    BuyerTransactionFilter.successful =>
+      'No paid orders match this filter.',
+    BuyerTransactionFilter.refunded => 'No refunds yet.',
+    BuyerTransactionFilter.all => 'No transactions to show.',
+  };
 }
 
-class _TransactionCard extends StatelessWidget {
-  const _TransactionCard({required this.transaction});
+DateTime? _displayDate(BuyerTransaction transaction) {
+  final refunded = transaction.status != BuyerTransactionStatus.successful;
+  if (refunded && transaction.refundedAt != null) {
+    return transaction.refundedAt;
+  }
+  return transaction.paidAt;
+}
+
+class _BuyerTransactionTile extends StatelessWidget {
+  const _BuyerTransactionTile({required this.transaction});
 
   final BuyerTransaction transaction;
 
   @override
   Widget build(BuildContext context) {
-    final refunded = transaction.status != BuyerTransactionStatus.successful;
-    final statusVariant = _statusVariant(transaction.status);
-    final displayDate = refunded && transaction.refundedAt != null
-        ? transaction.refundedAt!
-        : transaction.paidAt;
     final refundState = transaction.refundState;
     final refundLine =
         transaction.status == BuyerTransactionStatus.refundInProgress &&
@@ -268,217 +244,27 @@ class _TransactionCard extends StatelessWidget {
     final refundNeedsAction =
         refundState == BuyerRefundState.awaitingBuyerClaim ||
         transaction.needsGcashDetails;
+    final displayDate = _displayDate(transaction);
+    final isRefundFlow =
+        transaction.status != BuyerTransactionStatus.successful;
 
-    return Semantics(
-      button: true,
-      label:
-          '${transaction.productTitle}, ${buyerTransactionStatusLabel(transaction.status)}, ${formatCentavos(transaction.amountCentavos)}',
-      child: ThriftCard(
-        onTap: () => _showDetails(context, transaction),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    transaction.productTitle,
-                    style: AppTypography.body.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  formatCentavos(transaction.amountCentavos),
-                  style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 17,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-            if (refunded &&
-                transaction.refundAmountCentavos != null &&
-                transaction.refundAmountCentavos !=
-                    transaction.amountCentavos) ...[
-              const SizedBox(height: 4),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  transaction.status == BuyerTransactionStatus.refunded
-                      ? 'Refunded ${formatCentavos(transaction.refundAmountCentavos!)}'
-                      : 'Refund ${formatCentavos(transaction.refundAmountCentavos!)}',
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.warning,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-            if (refundLine != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                refundNeedsAction
-                    ? '$refundLine. Tap to continue.'
-                    : refundLine,
-                style: AppTypography.caption.copyWith(
-                  color: refundNeedsAction
-                      ? AppColors.warning
-                      : AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                ThriftBadge(
-                  label: buyerTransactionStatusLabel(transaction.status),
-                  variant: statusVariant,
-                ),
-                if (transaction.orderNumber.isNotEmpty)
-                  Text(
-                    transaction.orderNumber,
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                if (displayDate != null)
-                  Text(
-                    formatFullDate(displayDate),
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                Text(
-                  transaction.methodLabel,
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+    return TransactionHistoryListTile(
+      productImageUrl: transaction.productImageUrl,
+      title: transaction.productTitle,
+      subtitle: buyerTransactionTypeSubtitle(transaction),
+      amount: formatCentavos(transaction.amountCentavos),
+      amountCaption: isRefundFlow ? 'Order total' : 'Paid',
+      amountColor: AppColors.textPrimary,
+      statusLabel: buyerTransactionStatusLabel(transaction.status),
+      statusVariant: transactionHistoryStatusVariant(transaction.status),
+      orderNumber: transaction.orderNumber,
+      displayDate: displayDate,
+      notice: refundLine,
+      noticeIsAction: refundNeedsAction,
+      onTap: () => _showDetails(context, transaction),
     );
   }
 }
-
-class _EmptyHistoryState extends StatelessWidget {
-  const _EmptyHistoryState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppConstants.spacingMd),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            'No transactions yet',
-            style: AppTypography.subheading,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Completed and refunded payments will appear here.',
-            style: AppTypography.body.copyWith(color: AppColors.textSecondary),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyFilterState extends StatelessWidget {
-  const _EmptyFilterState({required this.filter, required this.onClear});
-
-  final BuyerTransactionFilter filter;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    final message = switch (filter) {
-      BuyerTransactionFilter.successful =>
-        'No successful payments match this filter.',
-      BuyerTransactionFilter.refunded => 'No refunds yet.',
-      BuyerTransactionFilter.all => 'No transactions to show.',
-    };
-    return Padding(
-      padding: const EdgeInsets.all(AppConstants.spacingMd),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            message,
-            style: AppTypography.body.copyWith(color: AppColors.textSecondary),
-            textAlign: TextAlign.center,
-          ),
-          if (filter != BuyerTransactionFilter.all) ...[
-            const SizedBox(height: 16),
-            ThriftButton(
-              label: 'Show all transactions',
-              variant: ThriftButtonVariant.outline,
-              onPressed: onClear,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppConstants.spacingMd),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            'Couldn\'t load transactions',
-            style: AppTypography.subheading,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            style: AppTypography.body.copyWith(color: AppColors.textSecondary),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
-          ThriftButton(
-            label: 'Try again',
-            variant: ThriftButtonVariant.outline,
-            onPressed: onRetry,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-BadgeVariant _statusVariant(BuyerTransactionStatus status) => switch (status) {
-  BuyerTransactionStatus.successful => BadgeVariant.success,
-  BuyerTransactionStatus.refundInProgress => BadgeVariant.primary,
-  BuyerTransactionStatus.refunded => BadgeVariant.warning,
-};
 
 void _showDetails(BuildContext context, BuyerTransaction transaction) {
   final controller = context.read<BuyerTransactionHistoryController>();
@@ -518,6 +304,7 @@ class _TransactionDetailsSheet extends StatelessWidget {
     final refunded = transaction.status != BuyerTransactionStatus.successful;
     final refundComplete =
         transaction.status == BuyerTransactionStatus.refunded;
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
@@ -536,86 +323,66 @@ class _TransactionDetailsSheet extends StatelessWidget {
               transaction.productTitle,
               style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerLeft,
               child: ThriftBadge(
                 label: buyerTransactionStatusLabel(transaction.status),
-                variant: _statusVariant(transaction.status),
+                variant: transactionHistoryStatusVariant(transaction.status),
               ),
             ),
             if (transaction.hasRefund) ...[
               const SizedBox(height: 14),
               BuyerRefundStatusSection(transaction: transaction),
             ],
-            const SizedBox(height: 16),
-            _DetailRow(
+            const SizedBox(height: 20),
+            const TransactionHistorySectionTitle(title: 'AMOUNT'),
+            TransactionHistoryDetailRow(
               label: 'Amount paid',
               value: formatCentavos(transaction.amountCentavos),
+              emphasis: true,
             ),
             if (refunded)
-              _DetailRow(
+              TransactionHistoryDetailRow(
                 label: refundComplete ? 'Amount refunded' : 'Refund amount',
                 value: formatCentavos(
                   transaction.refundAmountCentavos ??
                       transaction.amountCentavos,
                 ),
+                valueColor: AppColors.warning,
+              ),
+            const SizedBox(height: 8),
+            const TransactionHistorySectionTitle(title: 'ORDER'),
+            if (transaction.orderNumber.isNotEmpty)
+              TransactionHistoryDetailRow(
+                label: 'Order ID',
+                value: formatTransactionOrderReference(
+                  transaction.orderNumber,
+                ),
               ),
             if (transaction.paidAt != null)
-              _DetailRow(
+              TransactionHistoryDetailRow(
                 label: 'Paid on',
-                value: formatFullDate(transaction.paidAt!),
+                value:
+                    '${formatFullDate(transaction.paidAt!)} · ${formatTimeOfDay(transaction.paidAt!)}',
               ),
             if (refunded && transaction.refundedAt != null)
-              _DetailRow(
+              TransactionHistoryDetailRow(
                 label: 'Refund started',
-                value: formatFullDate(transaction.refundedAt!),
+                value:
+                    '${formatFullDate(transaction.refundedAt!)} · ${formatTimeOfDay(transaction.refundedAt!)}',
               ),
-            if (transaction.orderNumber.isNotEmpty)
-              _DetailRow(label: 'Order', value: transaction.orderNumber),
-            _DetailRow(label: 'Method', value: transaction.methodLabel),
+            TransactionHistoryDetailRow(
+              label: 'Payment method',
+              value: transaction.methodLabel,
+            ),
             if ((transaction.transactionReference ?? '').isNotEmpty)
-              _DetailRow(
+              TransactionHistoryDetailRow(
                 label: 'Reference',
                 value: transaction.transactionReference!,
               ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: AppTypography.caption.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: AppTypography.body,
-              textAlign: TextAlign.end,
-            ),
-          ),
-        ],
       ),
     );
   }

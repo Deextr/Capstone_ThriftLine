@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +11,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../controllers/admin_portal_session_controller.dart';
 
 class AdminVerifyEmailOtpScreen extends StatefulWidget {
   const AdminVerifyEmailOtpScreen({super.key});
@@ -68,6 +71,10 @@ class _AdminVerifyEmailOtpScreenState extends State<AdminVerifyEmailOtpScreen> {
         showThriftSnackBar(context, error, isError: true);
         return;
       }
+      await context
+          .read<AdminPortalSessionController>()
+          .activateAfterSignIn();
+      if (!mounted) return;
       context.go(RouteNames.adminDashboard);
     } catch (_) {
       if (!mounted) return;

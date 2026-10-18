@@ -127,22 +127,38 @@ class AdminVerificationService {
   final SupabaseService _supabase;
 
   Future<SellerApplication?> getById(String verificationId) async {
-    final row = await (await resolveAdminClient(_supabase))
-        .from('user_verifications')
-        .select()
-        .eq('verification_id', verificationId)
-        .maybeSingle();
+    Map<String, dynamic>? row;
+    try {
+      row = await (await resolveAdminClient(_supabase))
+          .from('user_verifications')
+          .select('*, users(full_name, email, username)')
+          .eq('verification_id', verificationId)
+          .maybeSingle();
+    } catch (e, st) {
+      debugPrint(
+        'AdminVerificationService.getById embed query failed: $e\n$st',
+      );
+      row = await (await resolveAdminClient(_supabase))
+          .from('user_verifications')
+          .select()
+          .eq('verification_id', verificationId)
+          .maybeSingle();
+    }
     if (row == null) return null;
     var application = SellerApplication.fromJson(row);
+    if (application.applicantEmail?.trim().isNotEmpty ?? false) {
+      return application;
+    }
     try {
       final profile = await (await resolveAdminClient(_supabase))
-          .from('user_public_profiles')
-          .select('full_name, username')
+          .from('users')
+          .select('full_name, email, username')
           .eq('user_id', application.userId)
           .maybeSingle();
       if (profile != null) {
         application = application.withApplicantProfile(
           name: profile['full_name'] as String?,
+          email: profile['email'] as String?,
           username: profile['username'] as String?,
         );
       }

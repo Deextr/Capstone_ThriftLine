@@ -732,7 +732,7 @@ class MarketplaceReportExporter {
     sheet
         .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: r++))
         .value = TextCellValue(
-      'Platform revenue is ThriftLine platform fees on paid, non-refunded orders — not total buyer payments.',
+      'Platform revenue is ThriftLine’s 5% seller-order commission on completed orders (product subtotal only). Buyer PayMongo fees are tracked separately and are not ThriftLine commission.',
     );
     sheet
         .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: r++))

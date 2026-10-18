@@ -70,13 +70,17 @@ class ListingShippingSection extends StatelessWidget {
               ? 'Winner pays no shipping fee'
               : 'Buyer pays ₱0 shipping for this shop order',
           selected: shippingMode == ListingShippingMode.free,
-          onTap: readOnly ? null : () => onModeChanged(ListingShippingMode.free),
+          onTap: readOnly
+              ? null
+              : () => onModeChanged(ListingShippingMode.free),
         ),
         _ShippingChoice(
           label: 'Fixed shipping fee',
           hint: 'One fee per seller order at checkout',
           selected: shippingMode == ListingShippingMode.fixedFee,
-          onTap: readOnly ? null : () => onModeChanged(ListingShippingMode.fixedFee),
+          onTap: readOnly
+              ? null
+              : () => onModeChanged(ListingShippingMode.fixedFee),
         ),
         if (!_isAuction)
           _ShippingChoice(
@@ -178,9 +182,7 @@ class _ShippingChoice extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                selected
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_off,
+                selected ? Icons.radio_button_checked : Icons.radio_button_off,
                 color: selected ? AppColors.primary : AppColors.textSecondary,
                 size: 20,
               ),

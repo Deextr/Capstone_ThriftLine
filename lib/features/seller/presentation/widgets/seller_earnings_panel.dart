@@ -20,12 +20,14 @@ class SellerEarningsPanel extends StatelessWidget {
     required this.ratingLabel,
     this.onListings,
     this.onPending,
+    this.onRatingTap,
   });
 
   final String pendingLabel;
   final String ratingLabel;
   final VoidCallback? onListings;
   final VoidCallback? onPending;
+  final VoidCallback? onRatingTap;
 
   @override
   Widget build(BuildContext context) {
@@ -51,16 +53,12 @@ class SellerEarningsPanel extends StatelessWidget {
       onRetry: context.read<SellerEarningsController>().load,
       onListings: onListings,
       onPending: onPending,
+      onRatingTap: onRatingTap,
     );
   }
 
   String _availableStatus(SellerEarningsSnapshot snapshot) {
-    final open = snapshot.openPayout;
-    if (open != null) {
-      return 'Payout of ${formatCentavos(open.amountCentavos)} waiting for admin';
-    }
-    if (snapshot.availableCentavos > 0) return 'Ready for payout';
-    return 'No earnings available yet';
+    return '';
   }
 
   Future<void> _confirmPayout(BuildContext context, int amountCentavos) async {

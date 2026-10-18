@@ -79,6 +79,8 @@ class SellerDashboardTab extends StatelessWidget {
                       SellerTabScope.orders,
                       ordersBucket: SellerOrderBucket.toShip,
                     ),
+                    onRatingTap: () =>
+                        context.push(RouteNames.sellerShopRatings),
                   ),
                 ),
               ),
@@ -99,15 +101,10 @@ class SellerDashboardTab extends StatelessWidget {
                 child: _YourShopSection(
                   listingCount: listingsCount,
                   ratingSummary: _ratingSummary(user),
-                  onRatingTap:
-                      user?.username != null && user!.username.isNotEmpty
-                          ? () => context.push(
-                                RouteNames.sellerProfile.replaceFirst(
-                                  ':username',
-                                  user.username,
-                                ),
-                              )
-                          : null,
+                  onShopRatingTap: () =>
+                      context.push(RouteNames.sellerShopRatings),
+                  onProductRatingsTap: () =>
+                      context.push(RouteNames.sellerProductRatings),
                 ),
               ),
               SliverToBoxAdapter(
@@ -461,12 +458,14 @@ class _YourShopSection extends StatelessWidget {
   const _YourShopSection({
     required this.listingCount,
     required this.ratingSummary,
-    this.onRatingTap,
+    this.onShopRatingTap,
+    this.onProductRatingsTap,
   });
 
   final String listingCount;
   final String ratingSummary;
-  final VoidCallback? onRatingTap;
+  final VoidCallback? onShopRatingTap;
+  final VoidCallback? onProductRatingsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -513,9 +512,17 @@ class _YourShopSection extends StatelessWidget {
                 _ShopInfoLine(
                   icon: Icons.star_rounded,
                   iconColor: AppColors.warning,
-                  label: 'Seller rating',
+                  label: 'Shop rating',
                   value: ratingSummary,
-                  onTap: onRatingTap,
+                  onTap: onShopRatingTap,
+                ),
+                Divider(height: 1, color: AppColors.border),
+                _ShopInfoLine(
+                  icon: Icons.inventory_2_outlined,
+                  iconColor: AppColors.primary,
+                  label: 'Product ratings',
+                  value: 'View by item',
+                  onTap: onProductRatingsTap,
                 ),
               ],
             ),

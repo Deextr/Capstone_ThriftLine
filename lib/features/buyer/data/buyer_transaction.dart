@@ -1,3 +1,6 @@
+import '../../../core/utils/formatters.dart';
+import '../../../core/utils/transaction_history_format.dart';
+
 enum BuyerTransactionStatus { successful, refundInProgress, refunded }
 
 enum BuyerTransactionFilter { all, successful, refunded }
@@ -34,6 +37,13 @@ extension BuyerTransactionFilterLabel on BuyerTransactionFilter {
     BuyerTransactionFilter.successful => 'Successful payments',
     BuyerTransactionFilter.refunded => 'Refunds',
   };
+
+  /// Shorter chip labels on the buyer transaction history screen.
+  String get buyerHistoryLabel => switch (this) {
+    BuyerTransactionFilter.all => 'All',
+    BuyerTransactionFilter.successful => 'Paid',
+    BuyerTransactionFilter.refunded => 'Refunds',
+  };
 }
 
 extension BuyerTransactionSortLabel on BuyerTransactionSort {
@@ -41,6 +51,47 @@ extension BuyerTransactionSortLabel on BuyerTransactionSort {
     BuyerTransactionSort.newest => 'Newest to oldest',
     BuyerTransactionSort.oldest => 'Oldest to newest',
   };
+}
+
+DateTime _localCalendarDay(DateTime value) {
+  final local = value.toLocal();
+  return DateTime(local.year, local.month, local.day);
+}
+
+/// Inclusive local-date range filter (start/end normalized to calendar days).
+bool buyerTransactionMatchesDateRange(
+  BuyerTransaction t, {
+  DateTime? from,
+  DateTime? to,
+}) {
+  if (from == null && to == null) return true;
+  final eventDay = _localCalendarDay(t.sortDate);
+  if (from != null) {
+    final start = _localCalendarDay(from);
+    if (eventDay.isBefore(start)) return false;
+  }
+  if (to != null) {
+    final end = _localCalendarDay(to);
+    if (eventDay.isAfter(end)) return false;
+  }
+  return true;
+}
+
+String buyerTransactionDateFilterSummary({
+  required DateTime? from,
+  required DateTime? to,
+}) {
+  if (from == null && to == null) return '';
+  final start = from != null ? _localCalendarDay(from) : null;
+  final end = to != null ? _localCalendarDay(to) : null;
+  if (start != null && end != null && start == end) {
+    return formatFullDate(start);
+  }
+  if (start != null && end != null) {
+    return '${formatFullDate(start)} – ${formatFullDate(end)}';
+  }
+  if (start != null) return 'From ${formatFullDate(start)}';
+  return 'Until ${formatFullDate(end!)}';
 }
 
 bool buyerTransactionMatchesFilter(
@@ -61,9 +112,18 @@ List<BuyerTransaction> visibleBuyerTransactions({
   required List<BuyerTransaction> source,
   required BuyerTransactionFilter filter,
   required BuyerTransactionSort sort,
+  DateTime? dateFrom,
+  DateTime? dateTo,
 }) {
   final list = source
       .where((t) => buyerTransactionMatchesFilter(t, filter))
+      .where(
+        (t) => buyerTransactionMatchesDateRange(
+          t,
+          from: dateFrom,
+          to: dateTo,
+        ),
+      )
       .toList();
   list.sort((a, b) {
     final cmp = a.sortDate.compareTo(b.sortDate);
@@ -102,6 +162,15 @@ String buyerTransactionStatusLabel(BuyerTransactionStatus status) {
     BuyerTransactionStatus.successful => 'Successful',
     BuyerTransactionStatus.refundInProgress => 'Refund in progress',
     BuyerTransactionStatus.refunded => 'Refunded',
+  };
+}
+
+String buyerTransactionTypeSubtitle(BuyerTransaction transaction) {
+  final method = transaction.methodLabel;
+  return switch (transaction.status) {
+    BuyerTransactionStatus.successful => 'Payment · $method',
+    BuyerTransactionStatus.refundInProgress => 'Refund · $method',
+    BuyerTransactionStatus.refunded => 'Refund · $method',
   };
 }
 
@@ -178,6 +247,7 @@ class BuyerTransaction {
     required this.orderId,
     required this.orderNumber,
     required this.productTitle,
+    this.productImageUrl,
     required this.status,
     required this.amountCentavos,
     this.paidAt,
@@ -200,6 +270,7 @@ class BuyerTransaction {
   final String orderId;
   final String orderNumber;
   final String productTitle;
+  final String? productImageUrl;
   final BuyerTransactionStatus status;
   final int amountCentavos;
   final DateTime? paidAt;
@@ -257,6 +328,9 @@ class BuyerTransaction {
           (json['product_title'] as String?)?.trim().isNotEmpty == true
           ? (json['product_title'] as String).trim()
           : 'Order',
+      productImageUrl: sanitizeTransactionProductImageUrl(
+        json['product_image_url'] as String?,
+      ),
       status: status,
       amountCentavos: (json['amount_centavos'] as num?)?.toInt() ?? 0,
       paidAt: DateTime.tryParse(json['paid_at'] as String? ?? ''),

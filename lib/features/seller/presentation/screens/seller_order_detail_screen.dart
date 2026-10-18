@@ -7,21 +7,60 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../features/auth/domain/account_mode.dart';
 import '../../../../models/enums.dart';
 import '../../../../models/order_model.dart';
+import '../../../../providers/auth_provider.dart';
+import '../../../../providers/notifications_provider.dart';
 import '../../../../widgets/delivery_timeline.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../../trust_safety/presentation/widgets/order_review_cta.dart';
 import '../../controllers/seller_orders_controller.dart';
+import '../../data/seller_order_buckets.dart';
+import '../../data/seller_order_tab_notifications.dart';
+import '../../data/seller_transaction.dart';
 import '../widgets/fulfillment_deadline_banner.dart';
 import '../../../buyer/presentation/widgets/item_return_panel.dart';
 import '../widgets/delivery_pin_entry.dart';
 import '../widgets/record_delivery_problem_sheet.dart';
 
-class SellerOrderDetailScreen extends StatelessWidget {
+class SellerOrderDetailScreen extends StatefulWidget {
   const SellerOrderDetailScreen({super.key, required this.orderId});
 
   final String orderId;
+
+  @override
+  State<SellerOrderDetailScreen> createState() =>
+      _SellerOrderDetailScreenState();
+}
+
+class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
+  final Set<String> _markedReadKeys = {};
+
+  void _markTabNotificationsReadIfNeeded(OrderModel order) {
+    final bucket = sellerOrderBucketFor(order);
+    if (bucket == null || !sellerOrderNotificationTabs.contains(bucket)) {
+      return;
+    }
+
+    final key = '${bucket.name}:${order.id}';
+    if (_markedReadKeys.contains(key)) return;
+
+    final auth = context.read<AuthProvider>();
+    final notifications = context.read<NotificationsProvider>();
+    final ids = unreadSellerOrderTabNotificationIdsForOrder(
+      items: notifications.items,
+      bucket: bucket,
+      orderId: order.id,
+      accountMode: AccountMode.seller,
+      hasSellerAccess: auth.user?.hasSellerAccess ?? false,
+      sellerUserId: auth.user?.id,
+    );
+    if (ids.isEmpty) return;
+
+    _markedReadKeys.add(key);
+    notifications.markReadIds(ids);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +79,8 @@ class SellerOrderDetailScreen extends StatelessWidget {
         body: Center(child: Text(controller.errorMessage ?? 'Not found')),
       );
     }
+
+    _markTabNotificationsReadIfNeeded(order);
 
     return Scaffold(
       appBar: AppBar(
@@ -103,10 +144,26 @@ class SellerOrderDetailScreen extends StatelessWidget {
                         ),
                       ),
                   const Divider(),
-                  _row('Subtotal', formatCurrency(order.amount)),
+                  _row('Product subtotal', formatCurrency(order.amount)),
                   _row('Shipping', formatCurrency(order.shippingFee)),
-                  _row('Platform fee', formatCurrency(order.platformFee)),
-                  _row('Total', formatCurrency(order.total), bold: true),
+                  _row(
+                    'ThriftLine Commission (5%)',
+                    '−${formatCurrency(order.sellerCommissionAmount)}',
+                  ),
+                  _row(
+                    'Your earnings',
+                    formatCurrency(order.sellerTotalEarnings),
+                    bold: true,
+                  ),
+                  _row(
+                    'Commission status',
+                    sellerCommissionStatusLabel(order.sellerCommissionStatus),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'The buyer also pays a 2% checkout fee that covers payment processing. That fee is not deducted from your earnings.',
+                    style: AppTypography.caption,
+                  ),
                 ],
               ),
             ),

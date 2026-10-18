@@ -187,6 +187,49 @@ void main() {
       },
     );
 
+    test(
+      'a temporarily disabled account can be re-enabled but not if banned',
+      () {
+        expect(
+          canEnableMarketplaceAccount(
+            role: 'buyer',
+            accountStatus: 'suspended',
+          ),
+          isTrue,
+        );
+        expect(
+          marketplaceEnableBlockedMessage(
+            role: 'seller',
+            accountStatus: 'suspended',
+          ),
+          isNull,
+        );
+        expect(
+          canEnableMarketplaceAccount(role: 'buyer', accountStatus: 'active'),
+          isFalse,
+        );
+        expect(
+          canEnableMarketplaceAccount(role: 'buyer', accountStatus: 'banned'),
+          isFalse,
+        );
+        expect(
+          marketplaceEnableBlockedMessage(
+            role: 'buyer',
+            accountStatus: 'banned',
+          ),
+          'Account banned. Reactivation is not available through User Management.',
+        );
+        expect(
+          canEnableMarketplaceAccount(
+            role: 'seller',
+            accountStatus: 'suspended',
+            trustLevel: 'Banned',
+          ),
+          isFalse,
+        );
+      },
+    );
+
     test('only the predefined reasons are accepted', () {
       expect(
         marketplaceDisableReasonAllowed('Fraudulent or suspicious activity'),
