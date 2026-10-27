@@ -334,8 +334,8 @@ class _FormatCard extends StatelessWidget {
             color: isSelected
                 ? AppColors.primaryLight
                 : (readOnly
-                    ? AppColors.surfaceVariant.withValues(alpha: 0.5)
-                    : AppColors.surface),
+                      ? AppColors.surfaceVariant.withValues(alpha: 0.5)
+                      : AppColors.surface),
             borderRadius: BorderRadius.circular(AppConstants.radiusMd),
             border: Border.all(
               color: isSelected ? AppColors.primary : AppColors.border,
@@ -353,8 +353,8 @@ class _FormatCard extends StatelessWidget {
                     color: isSelected
                         ? AppColors.primary
                         : (readOnly
-                            ? AppColors.textHint
-                            : AppColors.textSecondary),
+                              ? AppColors.textHint
+                              : AppColors.textSecondary),
                     size: 22,
                   ),
                   if (readOnly && isSelected) ...[
@@ -418,8 +418,8 @@ class _DurationOptionTile extends StatelessWidget {
             color: selected
                 ? AppColors.primaryLight
                 : (readOnly
-                    ? AppColors.surfaceVariant.withValues(alpha: 0.5)
-                    : AppColors.surface),
+                      ? AppColors.surfaceVariant.withValues(alpha: 0.5)
+                      : AppColors.surface),
             borderRadius: BorderRadius.circular(AppConstants.radiusMd),
             border: Border.all(
               color: selected ? AppColors.primary : AppColors.border,
@@ -433,8 +433,8 @@ class _DurationOptionTile extends StatelessWidget {
                     color: selected
                         ? AppColors.primaryDark
                         : (readOnly
-                            ? AppColors.textHint
-                            : AppColors.textPrimary),
+                              ? AppColors.textHint
+                              : AppColors.textPrimary),
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                   ),
                   textAlign: TextAlign.center,
@@ -448,10 +448,11 @@ class _DurationOptionTile extends StatelessWidget {
                           color: selected
                               ? AppColors.primaryDark
                               : (readOnly
-                                  ? AppColors.textHint
-                                  : AppColors.textPrimary),
-                          fontWeight:
-                              selected ? FontWeight.w600 : FontWeight.w500,
+                                    ? AppColors.textHint
+                                    : AppColors.textPrimary),
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w500,
                         ),
                       ),
                     ),

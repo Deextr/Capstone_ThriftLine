@@ -68,10 +68,19 @@ class AdminPortalDataAccess {
     }
 
     if (status['portal_session_live'] != true) {
-      throw AdminPortalAccessException(
-        'Your admin session expired. Sign in again.',
-        code: AdminPortalAccessException.sessionExpired,
-      );
+      await _syncPortalSession();
+      final retry = await _readAccessStatus();
+      if (retry?['is_admin'] == true) return;
+      if (retry?['portal_session_live'] == true) return;
+
+      // Do not sign the user out client-side. A missing or idle portal row
+      // should surface as a data error, not a forced return to login.
+      if (retry?['active_admin'] == true && retry?['email_gate'] == true) {
+        debugPrint(
+          'AdminPortalDataAccess: portal idle row not live; continuing on JWT.',
+        );
+        return;
+      }
     }
 
     throw AdminPortalAccessException(
@@ -99,7 +108,20 @@ class AdminPortalDataAccess {
       );
       if (begin?['success'] == true) return;
 
-      await _supabase.client.rpc('admin_portal_session_touch');
+      final touch = supabaseRpcMap(
+        await _supabase.client.rpc('admin_portal_session_touch'),
+      );
+      if (touch?['success'] == true) return;
+
+      final retryBegin = supabaseRpcMap(
+        await _supabase.client.rpc('admin_portal_session_begin'),
+      );
+      if (retryBegin?['success'] != true) {
+        debugPrint(
+          'AdminPortalDataAccess portal session sync did not activate: '
+          '${retryBegin?['error'] ?? touch?['error'] ?? 'unknown'}',
+        );
+      }
     } catch (e) {
       debugPrint('AdminPortalDataAccess portal session sync: $e');
     }

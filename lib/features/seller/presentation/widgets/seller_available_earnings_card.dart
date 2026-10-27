@@ -23,6 +23,7 @@ class SellerAvailableEarningsCard extends StatelessWidget {
     this.onRetry,
     this.onListings,
     this.onPending,
+    this.onRatingTap,
   });
 
   final String? amountLabel;
@@ -38,6 +39,7 @@ class SellerAvailableEarningsCard extends StatelessWidget {
   final VoidCallback? onRetry;
   final VoidCallback? onListings;
   final VoidCallback? onPending;
+  final VoidCallback? onRatingTap;
 
   @override
   Widget build(BuildContext context) {
@@ -81,6 +83,7 @@ class SellerAvailableEarningsCard extends StatelessWidget {
                       onRequestPayout: onRequestPayout,
                       onListings: onListings,
                       onPending: onPending,
+                      onRatingTap: onRatingTap,
                     ),
             ),
           ],
@@ -145,6 +148,7 @@ class _LoadedBody extends StatelessWidget {
     this.onRequestPayout,
     this.onListings,
     this.onPending,
+    this.onRatingTap,
   });
 
   final String amountLabel;
@@ -157,6 +161,7 @@ class _LoadedBody extends StatelessWidget {
   final VoidCallback? onRequestPayout;
   final VoidCallback? onListings;
   final VoidCallback? onPending;
+  final VoidCallback? onRatingTap;
 
   @override
   Widget build(BuildContext context) {
@@ -189,36 +194,32 @@ class _LoadedBody extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            if (statusLine.isNotEmpty) _StatusPill(label: statusLine),
-            if (showPayout)
-              TextButton(
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primaryDark,
-                  backgroundColor: Colors.white,
-                  minimumSize: const Size(44, 36),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                onPressed: isRequesting ? null : onRequestPayout,
-                child: Text(
-                  isRequesting ? 'Requesting…' : 'Request payout',
-                  style: AppTypography.label.copyWith(
-                    color: AppColors.primaryDark,
-                    fontWeight: FontWeight.w700,
-                  ),
+        if (showPayout) ...[
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primaryDark,
+                backgroundColor: Colors.white,
+                minimumSize: const Size(44, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
                 ),
               ),
-          ],
-        ),
+              onPressed: isRequesting ? null : onRequestPayout,
+              child: Text(
+                isRequesting ? 'Requesting…' : 'Request payout',
+                style: AppTypography.label.copyWith(
+                  color: AppColors.primaryDark,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 18),
         Container(height: 1, color: Colors.white.withValues(alpha: 0.15)),
         const SizedBox(height: 14),
@@ -242,34 +243,11 @@ class _LoadedBody extends StatelessWidget {
               label: 'Rating',
               value: ratingLabel,
               icon: Icons.star_rounded,
+              onTap: onRatingTap,
             ),
           ],
         ),
       ],
-    );
-  }
-}
-
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: AppTypography.caption.copyWith(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
     );
   }
 }

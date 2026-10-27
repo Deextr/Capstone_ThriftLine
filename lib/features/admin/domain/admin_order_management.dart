@@ -64,6 +64,22 @@ String adminOrderKindLabel(AdminOrderKind kind) => switch (kind) {
   AdminOrderKind.auction => 'Auction',
 };
 
+/// Compact label for dense admin tables (tooltip shows [adminOrderKindLabel]).
+String adminOrderKindTableLabel(AdminOrderKind kind) => switch (kind) {
+  AdminOrderKind.fixedPrice => 'Fixed price',
+  AdminOrderKind.auction => 'Auction',
+};
+
+String adminOrderCommissionStatusLabel(String? status) {
+  return switch ((status ?? '').trim().toLowerCase()) {
+    'earned' => 'Earned',
+    'reversed' => 'Reversed',
+    'void' => 'Not earned',
+    'pending' => 'Not yet earned',
+    _ => 'Not yet earned',
+  };
+}
+
 /// Authoritative order kind from persisted order row fields.
 AdminOrderKind adminOrderKindFromRow({
   required String? orderType,

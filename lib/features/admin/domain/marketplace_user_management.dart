@@ -11,6 +11,53 @@ const List<String> marketplaceDisableReasons = [
   'Other policy violation',
 ];
 
+/// Admin UI copy for [marketplaceDisableReasons]. API / audit values stay in
+/// [MarketplaceDisableReasonOption.value].
+class MarketplaceDisableReasonOption {
+  const MarketplaceDisableReasonOption({
+    required this.value,
+    required this.title,
+    required this.description,
+  });
+
+  final String value;
+  final String title;
+  final String description;
+}
+
+const List<MarketplaceDisableReasonOption> marketplaceDisableReasonOptions = [
+  MarketplaceDisableReasonOption(
+    value: 'Violation of marketplace guidelines',
+    title: 'Guidelines violation',
+    description: 'Listings, bids, or messages broke marketplace rules.',
+  ),
+  MarketplaceDisableReasonOption(
+    value: 'Fraudulent or suspicious activity',
+    title: 'Fraud or suspicious activity',
+    description: 'Payment, identity, or listing patterns look high-risk.',
+  ),
+  MarketplaceDisableReasonOption(
+    value: 'Repeated abusive behavior',
+    title: 'Repeated abuse',
+    description: 'Harassment, threats, or hostile conduct toward others.',
+  ),
+  MarketplaceDisableReasonOption(
+    value: 'Multiple confirmed reports',
+    title: 'Confirmed reports',
+    description: 'Several community or order reports were upheld.',
+  ),
+  MarketplaceDisableReasonOption(
+    value: 'Account security concerns',
+    title: 'Security concern',
+    description: 'Possible compromise, takeover, or unsafe account access.',
+  ),
+  MarketplaceDisableReasonOption(
+    value: 'Other policy violation',
+    title: 'Other policy issue',
+    description: 'Another rule breach that does not fit the categories above.',
+  ),
+];
+
 /// Roles returned by `list_marketplace_users`. Administrators are excluded
 /// in that function and must not be treated as marketplace accounts here.
 bool marketplaceRoleIsListed(String role) {
@@ -56,6 +103,8 @@ String marketplaceAccountStatusLabel(String status) {
       return 'Active';
     case 'suspended':
       return 'Disabled';
+    case 'invited':
+      return 'Invited';
     case 'banned':
       return 'Banned';
     case 'deactivated':
@@ -93,6 +142,19 @@ bool canDisableMarketplaceAccount({
   return accountStatus.trim().toLowerCase() == 'active';
 }
 
+bool canEnableMarketplaceAccount({
+  required String role,
+  required String accountStatus,
+  String? trustLevel,
+  bool permanentlySanctioned = false,
+}) {
+  if (!marketplaceRoleIsListed(role)) return false;
+  if (permanentlySanctioned) return false;
+  if (trustLevel?.trim() == 'Banned') return false;
+  if (accountStatus.trim().toLowerCase() == 'banned') return false;
+  return accountStatus.trim().toLowerCase() == 'suspended';
+}
+
 /// Why Disable is unavailable. Null when the account can be disabled.
 String? marketplaceDisableBlockedMessage({
   required String role,
@@ -116,6 +178,33 @@ String? marketplaceDisableBlockedMessage({
       return 'This account is deactivated. No further disabling action is available.';
     default:
       return 'This account is already restricted.';
+  }
+}
+
+/// Why Enable is unavailable. Null when the account can be re-enabled.
+String? marketplaceEnableBlockedMessage({
+  required String role,
+  required String accountStatus,
+  String? trustLevel,
+  bool permanentlySanctioned = false,
+}) {
+  if (!marketplaceRoleIsListed(role)) {
+    return 'Administrator accounts are managed separately.';
+  }
+  if (accountStatus.trim().toLowerCase() == 'banned' ||
+      trustLevel?.trim() == 'Banned' ||
+      permanentlySanctioned) {
+    return 'Account banned. Reactivation is not available through User Management.';
+  }
+  switch (accountStatus.trim().toLowerCase()) {
+    case 'suspended':
+      return null;
+    case 'active':
+      return 'This account is already active.';
+    case 'deactivated':
+      return 'This account is deactivated and cannot be re-enabled here.';
+    default:
+      return 'This account cannot be re-enabled through User Management.';
   }
 }
 

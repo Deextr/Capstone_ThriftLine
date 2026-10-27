@@ -40,8 +40,28 @@ class AdminPortalSessionController extends ChangeNotifier {
   bool _expiring = false;
   bool _externalSignOutInProgress = false;
   bool _sawAuthenticatedSession = false;
+  bool _serverSessionReady = false;
+  int _postSignInGraceUntilMs = 0;
 
   bool get isMonitoring => _monitoring;
+
+  /// Refreshes the local idle clock and opens the server portal session row.
+  ///
+  /// Never signs the administrator out. Failed RPCs are retried on activity.
+  Future<void> activateAfterSignIn() async {
+    if (!shouldMonitorAdminPortalSession(_auth)) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    _postSignInGraceUntilMs =
+        now + adminPortalPostSignInGracePeriod.inMilliseconds;
+    if (!_monitoring) {
+      _startMonitoring(reuseStoredActivity: false);
+    } else {
+      _lastPersistedActivityMs = now;
+      await _prefs.setAdminPortalLastActivityMs(now);
+      _scheduleDeadlineFrom(now);
+    }
+    await _ensureServerSessionLive(forceBegin: true);
+  }
 
   void init() {
     _lastSeenLogoutNonce = _prefs.adminPortalLogoutNonce;
@@ -138,6 +158,7 @@ class AdminPortalSessionController extends ChangeNotifier {
 
   void _stopMonitoring({required bool clearClock}) {
     _monitoring = false;
+    _serverSessionReady = false;
     _timerGeneration++;
     _deadlineTimer?.cancel();
     _deadlineTimer = null;
@@ -166,13 +187,15 @@ class AdminPortalSessionController extends ChangeNotifier {
 
   Future<void> _expireSession({required String notice}) async {
     if (_expiring || !shouldMonitorAdminPortalSession(_auth)) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now < _postSignInGraceUntilMs) return;
     _expiring = true;
     _stopMonitoring(clearClock: true);
     try {
       await _prefs.setAdminPortalLoginNotice(notice);
-      await _portalSession?.revoke(reason: 'idle');
       await publishSignedOutToOtherTabs();
       await _auth.logout();
+      unawaited(_portalSession?.revoke(reason: 'idle'));
     } finally {
       _expiring = false;
     }
@@ -216,22 +239,39 @@ class AdminPortalSessionController extends ChangeNotifier {
   }) async {
     final portal = _portalSession;
     if (portal == null) return;
-    var ok = reuseStoredActivity ? await portal.touch() : await portal.begin();
-    if (!ok &&
-        reuseStoredActivity &&
-        adminPortalRemainingMs(
-              lastActivityMs: _lastPersistedActivityMs,
-              nowMs: DateTime.now().millisecondsSinceEpoch,
-              timeout: _inactivityTimeout,
-            ) >
-            0) {
-      ok = await portal.begin();
+    if (!reuseStoredActivity) {
+      final began = await portal.begin();
+      if (began) {
+        _serverSessionReady = true;
+        _lastServerTouchMs = DateTime.now().millisecondsSinceEpoch;
+        return;
+      }
     }
-    if (!ok && _monitoring && shouldMonitorAdminPortalSession(_auth)) {
-      await _expireSession(notice: adminPortalInactivityLogoutMessage);
-    } else if (ok) {
+    await _ensureServerSessionLive(forceBegin: false);
+  }
+
+  Future<void> _ensureServerSessionLive({required bool forceBegin}) async {
+    final portal = _portalSession;
+    if (portal == null || !_monitoring) return;
+
+    if (forceBegin) {
+      final began = await portal.begin();
+      if (began) {
+        _serverSessionReady = true;
+        _lastServerTouchMs = DateTime.now().millisecondsSinceEpoch;
+        return;
+      }
+    }
+
+    final sync = await portal.ensureLive();
+    if (sync.ok) {
+      _serverSessionReady = true;
       _lastServerTouchMs = DateTime.now().millisecondsSinceEpoch;
+      return;
     }
+    // Keep the signed-in admin in the portal. Only the local idle timer
+    // (expireDueToInactivity) may sign them out. A missing, revoked, or
+    // not-yet-created server row must not bounce them to login.
   }
 
   void _syncServerActivity(int activityMs) {
@@ -242,12 +282,7 @@ class AdminPortalSessionController extends ChangeNotifier {
       return;
     }
     _lastServerTouchMs = activityMs;
-    unawaited(() async {
-      final ok = await portal.touch();
-      if (!ok && _monitoring && shouldMonitorAdminPortalSession(_auth)) {
-        await _expireSession(notice: adminPortalInactivityLogoutMessage);
-      }
-    }());
+    unawaited(_ensureServerSessionLive(forceBegin: !_serverSessionReady));
   }
 }
 

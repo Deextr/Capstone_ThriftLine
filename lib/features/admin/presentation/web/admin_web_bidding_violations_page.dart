@@ -180,9 +180,11 @@ class _AdminWebBiddingViolationsPageState
                 'Violations',
                 'Latest violation',
                 'Account status',
-                'Action',
               ],
-              columnFlex: const [3, 2, 2, 2, 2],
+              columnFlex: const [3, 2, 2, 2],
+              onRowTap: [
+                for (final row in controller.rows) () => _openDetails(row),
+              ],
               rows: [
                 for (final row in controller.rows)
                   [
@@ -206,10 +208,6 @@ class _AdminWebBiddingViolationsPageState
                     Align(
                       alignment: Alignment.centerLeft,
                       child: _StatusCell(summary: row),
-                    ),
-                    TextButton(
-                      onPressed: () => _openDetails(row),
-                      child: const Text('View details'),
                     ),
                   ],
               ],
@@ -313,14 +311,15 @@ class _MobileList extends StatelessWidget {
           Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
+              onTap: () => onViewDetails(row),
               title: Text(row.displayName),
               subtitle: Text(
                 '${formatOrdinalViolationCount(row.violationCount)} · '
                 '${row.latestViolationAt == null ? '—' : formatAdminTableDate(row.latestViolationAt!)}',
               ),
-              trailing: TextButton(
-                onPressed: () => onViewDetails(row),
-                child: const Text('Details'),
+              trailing: Icon(
+                Icons.chevron_right,
+                color: AppColors.textHint,
               ),
             ),
           ),

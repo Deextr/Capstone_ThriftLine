@@ -113,37 +113,70 @@ Future<List<ReviewModel>> fetchReviewsForUser(
           .limit(limit);
     });
 
-    final reviews = (rows as List<dynamic>)
-        .map(
-          (raw) => _withPhotoUrls(
-            supabase,
-            ReviewModel.fromSupabase(raw as Map<String, dynamic>),
-          ),
-        )
-        .toList();
-
-    final reviewerIds = reviews.map((review) => review.reviewerId).toSet();
-    final profiles = await loadPublicProfiles(supabase, reviewerIds);
-
-    return reviews.map((review) {
-      final profile = profiles[review.reviewerId];
-      if (profile == null) return review;
-      return ReviewModel.fromSupabase({
-        'review_id': review.id,
-        'order_id': review.orderId,
-        'reviewer_id': review.reviewerId,
-        'reviewed_user_id': review.reviewedUserId,
-        'rating': review.rating,
-        'review_text': review.comment,
-        'review_type': review.reviewType,
-        'created_at': review.createdAt.toIso8601String(),
-        'reviewer': profile,
-      });
-    }).toList();
+    return _parseReviewRows(supabase, rows);
   } catch (e) {
     debugPrint('fetchReviewsForUser error: $e');
     return [];
   }
+}
+
+/// Buyer → seller shop reviews for the authenticated seller's user id.
+Future<List<ReviewModel>> fetchShopReviewsForSeller(
+  SupabaseService supabase,
+  String sellerUserId, {
+  int limit = 100,
+}) async {
+  if (sellerUserId.isEmpty) return [];
+
+  try {
+    final rows = await runReviewSelect((select) {
+      return supabase.client
+          .from('reviews')
+          .select(select)
+          .eq('reviewed_user_id', sellerUserId)
+          .eq('review_type', 'buyer_to_seller')
+          .order('created_at', ascending: false)
+          .limit(limit);
+    });
+
+    return _parseReviewRows(supabase, rows);
+  } catch (e) {
+    debugPrint('fetchShopReviewsForSeller error: $e');
+    return [];
+  }
+}
+
+Future<List<ReviewModel>> _parseReviewRows(
+  SupabaseService supabase,
+  dynamic rows,
+) async {
+  final reviews = (rows as List<dynamic>)
+      .map(
+        (raw) => _withPhotoUrls(
+          supabase,
+          ReviewModel.fromSupabase(raw as Map<String, dynamic>),
+        ),
+      )
+      .toList();
+
+  final reviewerIds = reviews.map((review) => review.reviewerId).toSet();
+  final profiles = await loadPublicProfiles(supabase, reviewerIds);
+
+  return reviews.map((review) {
+    final profile = profiles[review.reviewerId];
+    if (profile == null) return review;
+    return ReviewModel.fromSupabase({
+      'review_id': review.id,
+      'order_id': review.orderId,
+      'reviewer_id': review.reviewerId,
+      'reviewed_user_id': review.reviewedUserId,
+      'rating': review.rating,
+      'review_text': review.comment,
+      'review_type': review.reviewType,
+      'created_at': review.createdAt.toIso8601String(),
+      'reviewer': profile,
+    });
+  }).toList();
 }
 
 ReviewModel _withPhotoUrls(SupabaseService supabase, ReviewModel review) {

@@ -14,6 +14,7 @@ class AdminWideCaseDetailPage extends StatelessWidget {
     this.maxWidth = 1280,
     this.sidebarWidth = 300,
     this.twoColumnBreakpoint = 960,
+    this.sidebarFirstWhenNarrow = false,
   });
 
   final String backLabel;
@@ -24,6 +25,7 @@ class AdminWideCaseDetailPage extends StatelessWidget {
   final double maxWidth;
   final double sidebarWidth;
   final double twoColumnBreakpoint;
+  final bool sidebarFirstWhenNarrow;
 
   @override
   Widget build(BuildContext context) {
@@ -81,11 +83,17 @@ class AdminWideCaseDetailPage extends StatelessWidget {
                               )
                             : Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  main,
-                                  const SizedBox(height: 28),
-                                  sidebar,
-                                ],
+                                children: sidebarFirstWhenNarrow
+                                    ? [
+                                        sidebar,
+                                        const SizedBox(height: 28),
+                                        main,
+                                      ]
+                                    : [
+                                        main,
+                                        const SizedBox(height: 28),
+                                        sidebar,
+                                      ],
                               ),
                       ),
                     ),

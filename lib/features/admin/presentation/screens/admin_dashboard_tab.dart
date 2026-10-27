@@ -187,7 +187,7 @@ class _KpiRow extends StatelessWidget {
       AdminKpiTile(
         label: 'Platform revenue',
         value: formatDashboardPeso(kpis.platformRevenue),
-        caption: 'Fees earned, not buyer payments',
+        caption: '5% seller-order commission, earned on completed orders',
         delta: formatAdminPeriodDelta(
           current: kpis.platformRevenue,
           previous: kpis.platformRevenuePrevious,

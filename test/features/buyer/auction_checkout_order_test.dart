@@ -27,12 +27,13 @@ void main() {
       final result = AuctionCheckoutOrderResult.fromRpc({
         'success': false,
         'code': 'order_not_ready',
-        'error': 'We could not prepare your order yet. Please try again in a moment.',
+        'error':
+            'Your pending order is not ready yet. We are still preparing it — please wait a moment and try again.',
       });
       expect(result.code, 'order_not_ready');
       expect(
         buyerFacingAuctionOrderError(result),
-        contains('prepare your order'),
+        contains('pending order is not ready'),
       );
     });
   });

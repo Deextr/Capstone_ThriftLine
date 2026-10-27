@@ -167,7 +167,7 @@ class AdminWebAnalyticsReportsPage extends StatelessWidget {
             _ReportSection(
               title: 'Platform revenue',
               subtitle:
-                  'Gross marketplace value (buyer-paid subtotal + shipping on paid orders) is separate from ThriftLine platform-fee revenue.',
+                  'Gross marketplace value is buyer-paid subtotal plus shipping. Platform revenue is ThriftLine’s 5% seller-order commission on completed orders, not the buyer PayMongo fee.',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -182,7 +182,7 @@ class AdminWebAnalyticsReportsPage extends StatelessWidget {
                     isCurrency: true,
                   ),
                   _MetricComparisonRow(
-                    label: 'ThriftLine platform-fee revenue',
+                    label: 'ThriftLine commission revenue',
                     current: snapshot.counts.platformRevenue.round(),
                     previous: previous?.counts.platformRevenue.round(),
                     percent: comparison?.percentChange(
@@ -193,7 +193,7 @@ class AdminWebAnalyticsReportsPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   AdminTrendChart(
-                    title: 'Paid sales vs platform fees',
+                    title: 'Paid sales vs ThriftLine commission',
                     points: [
                       for (final point in snapshot.salesRevenueSeries)
                         AdminDashboardPoint(
@@ -206,7 +206,7 @@ class AdminWebAnalyticsReportsPage extends StatelessWidget {
                   const SizedBox(height: 16),
                   _BreakdownTable(
                     title: 'Revenue breakdown by period bucket',
-                    headers: const ['Period', 'GMV (paid)', 'Platform fee'],
+                    headers: const ['Period', 'GMV (paid)', 'Commission'],
                     rows: [
                       for (final point in snapshot.salesRevenueSeries)
                         [

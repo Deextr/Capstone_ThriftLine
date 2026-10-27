@@ -10,10 +10,16 @@ import '../../../../widgets/thrift_widgets.dart';
 import '../../data/seller_order_buckets.dart';
 
 class SellerOrderCard extends StatelessWidget {
-  const SellerOrderCard({super.key, required this.order, required this.onTap});
+  const SellerOrderCard({
+    super.key,
+    required this.order,
+    required this.onTap,
+    this.hasUnreadNotification = false,
+  });
 
   final OrderModel order;
   final VoidCallback onTap;
+  final bool hasUnreadNotification;
 
   @override
   Widget build(BuildContext context) {
@@ -22,26 +28,59 @@ class SellerOrderCard extends StatelessWidget {
     return Semantics(
       button: true,
       label:
-          'View order ${order.orderNumber}, ${chip.label}, $buyer, ${formatCurrency(order.total)}',
-      child: ThriftCard(
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Order #${order.orderNumber}',
-                    style: AppTypography.caption,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SellerStatusChip(label: chip.label, variant: chip.variant),
-              ],
+          'View order ${order.orderNumber}, ${chip.label}, $buyer, ${formatCurrency(order.total)}'
+          '${hasUnreadNotification ? ', unread notification' : ''}',
+      child: Material(
+        color: hasUnreadNotification
+            ? AppColors.primary.withValues(alpha: 0.04)
+            : AppColors.surface,
+        borderRadius: BorderRadius.circular(AppConstants.radiusLg),
+        elevation: 2,
+        shadowColor: Colors.black.withValues(alpha: 0.06),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppConstants.radiusLg),
+          child: Container(
+            padding: const EdgeInsets.all(AppConstants.spacingMd),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppConstants.radiusLg),
+              border: Border.all(
+                color: hasUnreadNotification
+                    ? AppColors.primary.withValues(alpha: 0.22)
+                    : AppColors.border.withValues(alpha: 0.5),
+              ),
             ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Order #${order.orderNumber}',
+                        style: AppTypography.caption.copyWith(
+                          fontWeight: hasUnreadNotification
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (hasUnreadNotification) ...[
+                      Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                    SellerStatusChip(label: chip.label, variant: chip.variant),
+                  ],
+                ),
             const SizedBox(height: 10),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,7 +94,9 @@ class SellerOrderCard extends StatelessWidget {
                       Text(
                         order.productTitle,
                         style: AppTypography.body.copyWith(
-                          fontWeight: FontWeight.w600,
+                          fontWeight: hasUnreadNotification
+                              ? FontWeight.w700
+                              : FontWeight.w600,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -123,7 +164,9 @@ class SellerOrderCard extends StatelessWidget {
                 ),
               ],
             ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -148,7 +191,7 @@ String _dateLine(OrderModel order) {
     SellerOrderBucket.shipped => 'Shipped $date',
     SellerOrderBucket.completed => 'Completed $date',
     SellerOrderBucket.cancelled => 'Cancelled $date',
-    null => formatCompactDate(order.createdAt),
+    null || SellerOrderBucket.all => formatCompactDate(order.createdAt),
   };
 }
 

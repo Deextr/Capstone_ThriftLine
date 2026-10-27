@@ -70,5 +70,57 @@ void main() {
         ['p1', 'p2'],
       );
     });
+
+    test('maps per-order commission, not per-product deductions', () {
+      final sale = SellerTransaction.fromJson({
+        'payment_id': 'p3',
+        'order_id': 'o3',
+        'order_number': 'TL-3',
+        'product_title': 'Two items',
+        'payment_status': 'paid',
+        'amount_centavos': 76400,
+        'seller_amount_centavos': 71500,
+        'subtotal_centavos': 70000,
+        'shipping_fee_centavos': 5000,
+        'commission_rate': 0.05,
+        'commission_amount_centavos': 3500,
+        'commission_status': 'earned',
+        'escrow_status': 'released',
+      });
+      expect(sale.commissionAmountCentavos, 3500);
+      expect(sale.netProductEarningsCentavos, 66500);
+      expect(sellerCommissionStatusLabel(sale.commissionStatus), 'Earned');
+    });
+
+    test('pending commission is labelled not yet earned', () {
+      expect(sellerCommissionStatusLabel('pending'), 'Not yet earned');
+    });
+
+    test('commission reversed uses plain seller wording', () {
+      final label = sellerCommissionStatusLabel('reversed');
+      expect(label.toLowerCase(), isNot(contains('revers')));
+      expect(label, 'Waived after refund');
+    });
+
+    test('seller status and refund hints avoid reversal terminology', () {
+      final refunded = SellerTransaction.fromJson({
+        'payment_id': 'p4',
+        'order_id': 'o4',
+        'order_number': 'TL-4',
+        'product_title': 'Shirt',
+        'payment_status': 'refunded',
+        'amount_centavos': 1000,
+        'seller_amount_centavos': 900,
+        'refund_amount_centavos': 900,
+        'refunded_at': '2026-10-12T04:00:00.000Z',
+      });
+      expect(
+        sellerTransactionStatusLabel(refunded.status).toLowerCase(),
+        isNot(contains('revers')),
+      );
+      final hint = sellerRefundEarningsListHint(refunded)!;
+      expect(hint.toLowerCase(), isNot(contains('revers')));
+      expect(hint, contains('returned to buyer'));
+    });
   });
 }

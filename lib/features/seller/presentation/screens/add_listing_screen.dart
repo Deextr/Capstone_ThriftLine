@@ -61,7 +61,8 @@ class AddListingScreen extends StatelessWidget {
                   delegate: SliverChildListDelegate([
                     ListingFormSection(
                       title: 'Product photos',
-                      subtitle: 'Add up to 3 clear photos. The first is the cover.',
+                      subtitle:
+                          'Add up to 3 clear photos. The first is the cover.',
                       child: _PhotosSection(controller: controller),
                     ),
                     ListingFormSection(
@@ -92,8 +93,9 @@ class AddListingScreen extends StatelessWidget {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: AppColors.surface,
-                          borderRadius:
-                              BorderRadius.circular(AppConstants.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            AppConstants.radiusMd,
+                          ),
                           border: Border.all(color: AppColors.border),
                         ),
                         child: Column(
@@ -119,7 +121,8 @@ class AddListingScreen extends StatelessWidget {
                     ),
                     ListingFormSection(
                       title: 'Listing type',
-                      subtitle: 'Fixed price sells immediately. Auction accepts bids.',
+                      subtitle:
+                          'Fixed price sells immediately. Auction accepts bids.',
                       child: _ListingTypeSection(controller: controller),
                     ),
                     ListingFormSection(
@@ -322,10 +325,7 @@ class _CategoryField extends StatelessWidget {
                           ),
                         ),
                 ),
-                Icon(
-                  Icons.arrow_drop_down,
-                  color: AppColors.textSecondary,
-                ),
+                Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
               ],
             ),
           ),
@@ -482,20 +482,20 @@ class _PhotosSection extends StatelessWidget {
               onReorder: (oldIndex, newIndex) =>
                   controller.reorderImages(oldIndex, newIndex),
               itemBuilder: (context, index) {
-              final isFilled = index < controller.images.length;
-              return ReorderableDragStartListener(
-                key: ValueKey('slot_$index'),
-                index: index,
-                child: GestureDetector(
-                  onTap: () => isFilled
-                      ? _showSlotOptions(context, index)
-                      : controller.pickImage(index),
-                  child: _ImageSlot(
-                    index: index,
-                    image: isFilled ? controller.images[index] : null,
+                final isFilled = index < controller.images.length;
+                return ReorderableDragStartListener(
+                  key: ValueKey('slot_$index'),
+                  index: index,
+                  child: GestureDetector(
+                    onTap: () => isFilled
+                        ? _showSlotOptions(context, index)
+                        : controller.pickImage(index),
+                    child: _ImageSlot(
+                      index: index,
+                      image: isFilled ? controller.images[index] : null,
+                    ),
                   ),
-                ),
-              );
+                );
               },
             ),
           ),
@@ -667,10 +667,7 @@ class _PricingSection extends StatelessWidget {
 }
 
 class _FixedPricePricingFields extends StatelessWidget {
-  const _FixedPricePricingFields({
-    super.key,
-    required this.controller,
-  });
+  const _FixedPricePricingFields({super.key, required this.controller});
 
   final AddListingController controller;
 
@@ -703,10 +700,7 @@ class _FixedPricePricingFields extends StatelessWidget {
 }
 
 class _AuctionPricingFields extends StatelessWidget {
-  const _AuctionPricingFields({
-    super.key,
-    required this.controller,
-  });
+  const _AuctionPricingFields({super.key, required this.controller});
 
   final AddListingController controller;
 
@@ -746,4 +740,3 @@ class _AuctionPricingFields extends StatelessWidget {
     );
   }
 }
-

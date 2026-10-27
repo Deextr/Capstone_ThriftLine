@@ -46,6 +46,11 @@ import '../../features/seller/presentation/screens/seller_saved_rider_editor_scr
 import '../../features/seller/presentation/screens/seller_saved_riders_screen.dart';
 import '../../features/seller/controllers/seller_earnings_controller.dart';
 import '../../features/seller/controllers/seller_orders_controller.dart';
+import '../../features/seller/controllers/seller_product_ratings_controller.dart';
+import '../../features/seller/controllers/seller_shop_ratings_controller.dart';
+import '../../features/seller/presentation/screens/seller_product_rating_detail_screen.dart';
+import '../../features/seller/presentation/screens/seller_product_ratings_screen.dart';
+import '../../features/seller/presentation/screens/seller_shop_ratings_screen.dart';
 import '../../providers/cart_provider.dart';
 import '../../features/buyer/presentation/screens/product_detail_screen.dart';
 import '../../features/buyer/data/buyer_purchase_category.dart';
@@ -676,6 +681,38 @@ GoRouter createMobileAppRouter({
             service: SellerAnalyticsService(context.read<SupabaseService>()),
           ),
           child: const SellerAnalyticsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.sellerShopRatings,
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => SellerShopRatingsController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+          ),
+          child: const SellerShopRatingsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.sellerProductRatings,
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => SellerProductRatingsController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+          ),
+          child: const SellerProductRatingsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.sellerProductRatingDetail,
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => SellerProductRatingsController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+          ),
+          child: SellerProductRatingDetailScreen(
+            productId: state.pathParameters['productId']!,
+          ),
         ),
       ),
       GoRoute(

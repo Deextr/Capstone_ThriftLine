@@ -1,6 +1,7 @@
 /// Server and Flutter preview share these checkout numbers.
 const double kCheckoutShippingPerSeller = 80;
 const double kCheckoutPlatformFeeRate = 0.02;
+const double kSellerCommissionRate = 0.05;
 
 int checkoutSellerCount(Iterable<String?> sellerIds) {
   return sellerIds
@@ -42,4 +43,32 @@ double checkoutTotal({
   required double platformFee,
 }) {
   return checkoutRoundCurrency(subtotal + shippingFee + platformFee);
+}
+
+/// 5% of the seller-order product subtotal. Shipping is excluded.
+double sellerOrderCommission(
+  double productSubtotal, {
+  double rate = kSellerCommissionRate,
+}) {
+  if (productSubtotal <= 0) return 0;
+  return checkoutRoundCurrency(productSubtotal * rate);
+}
+
+double sellerNetProductEarnings(
+  double productSubtotal, {
+  double rate = kSellerCommissionRate,
+}) {
+  return checkoutRoundCurrency(
+    productSubtotal - sellerOrderCommission(productSubtotal, rate: rate),
+  );
+}
+
+double sellerTotalEarnings({
+  required double productSubtotal,
+  required double shippingFee,
+  double rate = kSellerCommissionRate,
+}) {
+  return checkoutRoundCurrency(
+    sellerNetProductEarnings(productSubtotal, rate: rate) + shippingFee,
+  );
 }

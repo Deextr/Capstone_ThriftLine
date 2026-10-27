@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:thriftline/features/admin/data/admin_delivery_dispute.dart';
+import 'package:thriftline/features/admin/data/admin_verification_service.dart';
 import 'package:thriftline/features/admin/data/admin_review_rules.dart';
 import 'package:thriftline/features/admin/data/seller_application_rejection_reasons.dart';
 import 'package:thriftline/features/trust_safety/data/report_reasons.dart';
@@ -303,6 +304,31 @@ void main() {
         ),
         'Shop photos are stock images.',
       );
+    });
+  });
+
+  group('seller application profile', () {
+    test('parses applicant email from embedded users row', () {
+      final app = SellerApplication.fromJson({
+        'verification_id': '11111111-1111-4111-8111-111111111111',
+        'user_id': '22222222-2222-4222-8222-222222222222',
+        'shop_name': 'Second Street',
+        'shop_address': '123 Main',
+        'barangay': 'Buhangin',
+        'city': 'Davao City',
+        'verification_status': 'pending',
+        'submitted_at': '2026-10-10T08:00:00Z',
+        'liveness_passed': true,
+        'liveness_result': const {},
+        'users': {
+          'full_name': 'Maria Santos',
+          'email': 'maria@example.com',
+          'username': 'marias',
+        },
+      });
+
+      expect(app.applicantEmail, 'maria@example.com');
+      expect(app.applicantName, 'Maria Santos');
     });
   });
 

@@ -61,6 +61,9 @@ GoRouter createAdminAppRouter({required AuthProvider authProvider}) {
     refreshListenable: authProvider,
     redirect: (context, state) {
       final location = state.matchedLocation;
+      if (!authProvider.isInitialized) {
+        return null;
+      }
       if (holdAdminLoginForTrustedDeviceCheck(
         resolvingTrustedDevice: authProvider.isResolvingTrustedDevice,
         location: location,

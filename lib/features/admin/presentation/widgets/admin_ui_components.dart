@@ -9,6 +9,7 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../widgets/skeleton_widgets.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../data/admin_dashboard_models.dart';
+import '../../domain/admin_order_management.dart';
 import 'admin_dashboard_widgets.dart';
 
 final _kNumberFormat = NumberFormat.decimalPattern();
@@ -1020,7 +1021,7 @@ class AdminDataTable extends StatelessWidget {
     this.minWidth = 720,
     this.columnFlex,
     this.columnAlignments,
-    this.columnSpacing = 0,
+    this.columnSpacing = 12,
     this.columnGapsAfter,
     this.onRowTap,
   });
@@ -1130,7 +1131,7 @@ class _AdminTableHeaderRow extends StatelessWidget {
     required this.columns,
     required this.flex,
     required this.alignments,
-    this.columnSpacing = 0,
+    this.columnSpacing = 12,
     this.columnGapsAfter,
   });
 
@@ -1229,7 +1230,7 @@ class _AdminTableDataRow extends StatefulWidget {
     required this.cells,
     required this.flex,
     required this.alignments,
-    this.columnSpacing = 0,
+    this.columnSpacing = 12,
     this.columnGapsAfter,
     this.onTap,
     this.showDivider = true,
@@ -1266,7 +1267,7 @@ class _AdminTableDataRowState extends State<_AdminTableDataRow> {
             : null,
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: _adminTableRowSegments(
           columnCount: widget.cells.length,
           flex: widget.flex,
@@ -1533,7 +1534,119 @@ class AdminTableDateCell extends StatelessWidget {
   }
 }
 
-/// Compact date + time for admin order tables (Philippine Time, UTC+8).
+/// Right-aligned currency for admin tables.
+class AdminTableMoneyCell extends StatelessWidget {
+  const AdminTableMoneyCell({
+    super.key,
+    required this.amount,
+    this.emphasize = false,
+    this.muted = false,
+  });
+
+  final double amount;
+  final bool emphasize;
+  final bool muted;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = emphasize
+        ? AppTypography.tableBodyMedium.copyWith(fontWeight: FontWeight.w600)
+        : AppTypography.tableBody;
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: Text(
+        formatCurrency(amount),
+        textAlign: TextAlign.right,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: muted ? style.copyWith(color: AppColors.textSecondary) : style,
+      ),
+    );
+  }
+}
+
+/// ThriftLine commission amount with optional status caption (no inline newlines).
+class AdminTableCommissionCell extends StatelessWidget {
+  const AdminTableCommissionCell({
+    super.key,
+    required this.amount,
+    this.statusLabel,
+    this.highlightAmount = true,
+  });
+
+  final double amount;
+  final String? statusLabel;
+  final bool highlightAmount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            formatCurrency(amount),
+            textAlign: TextAlign.right,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.tableBodyMedium.copyWith(
+              fontWeight: FontWeight.w600,
+              color: highlightAmount ? AppColors.primaryDark : null,
+            ),
+          ),
+          if (statusLabel != null && statusLabel!.trim().isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              statusLabel!,
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Unified order status plus optional fulfillment SLA badge.
+class AdminTableOrderStatusCell extends StatelessWidget {
+  const AdminTableOrderStatusCell({
+    super.key,
+    required this.badgeKey,
+    required this.label,
+    this.fulfillmentDelayed = false,
+  });
+
+  final String badgeKey;
+  final String label;
+  final bool fulfillmentDelayed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AdminStatusBadge(status: badgeKey, label: label),
+          if (fulfillmentDelayed) ...[
+            const SizedBox(height: 4),
+            const AdminStatusBadge(status: 'pending', label: 'Delayed 72h+'),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class AdminTablePhilippinesDateTimeCell extends StatelessWidget {
   const AdminTablePhilippinesDateTimeCell({super.key, required this.dateTime});
 
@@ -1565,31 +1678,79 @@ class AdminTablePhilippinesDateTimeCell extends StatelessWidget {
 }
 
 class AdminOrderTypeBadge extends StatelessWidget {
-  const AdminOrderTypeBadge({super.key, required this.label});
+  const AdminOrderTypeBadge({
+    super.key,
+    this.label,
+    this.kind,
+    this.compact = false,
+  }) : assert(label != null || kind != null);
 
-  final String label;
+  final String? label;
+  final AdminOrderKind? kind;
+  final bool compact;
+
+  factory AdminOrderTypeBadge.forKind(
+    AdminOrderKind kind, {
+    bool compact = true,
+  }) {
+    return AdminOrderTypeBadge(kind: kind, compact: compact);
+  }
+
+  String get _fullLabel {
+    if (kind != null) return adminOrderKindLabel(kind!);
+    return label!.trim();
+  }
+
+  String get _displayLabel {
+    if (kind != null) {
+      return compact
+          ? adminOrderKindTableLabel(kind!)
+          : adminOrderKindLabel(kind!);
+    }
+    return label!.trim();
+  }
+
+  bool get _isAuction {
+    if (kind != null) return kind == AdminOrderKind.auction;
+    return label!.toLowerCase().contains('auction');
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isAuction = label.toLowerCase().contains('auction');
-    final fg = isAuction ? AppColors.textSecondary : AppColors.primaryDark;
-    final bg = isAuction ? AppColors.neutralSoft : AppColors.primaryLight;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    final fg = _isAuction ? AppColors.textSecondary : AppColors.primaryDark;
+    final bg = _isAuction ? AppColors.neutralSoft : AppColors.primaryLight;
+    final display = _displayLabel.isEmpty ? 'Unknown' : _displayLabel;
+    final full = _fullLabel.isEmpty ? display : _fullLabel;
+
+    final badge = Container(
+      constraints: const BoxConstraints(maxWidth: 120),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: fg.withValues(alpha: 0.2)),
+        border: Border.all(color: fg.withValues(alpha: 0.22)),
       ),
       child: Text(
-        label,
+        display,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: AppTypography.badge.copyWith(
           color: fg,
           fontWeight: FontWeight.w600,
           fontSize: 11,
+          height: 1.2,
         ),
       ),
     );
+
+    if (compact && full != display) {
+      return Tooltip(
+        message: full,
+        waitDuration: const Duration(milliseconds: 400),
+        child: badge,
+      );
+    }
+    return badge;
   }
 }
 

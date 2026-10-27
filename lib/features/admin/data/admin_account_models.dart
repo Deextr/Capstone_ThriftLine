@@ -27,10 +27,12 @@ class AdminAccountRecord {
 
   bool get isSuperAdmin => role == 'super_admin';
 
+  /// Super Admins may disable regular Admin portal accounts (not other Super Admins).
   bool get canDeactivate =>
-      !isSuperAdmin && displayStatus == 'active' && userId.isNotEmpty;
+      role == 'admin' && displayStatus == 'active' && userId.isNotEmpty;
 
-  bool get canActivate => !isSuperAdmin && displayStatus == 'inactive';
+  bool get canActivate =>
+      role == 'admin' && displayStatus == 'inactive' && userId.isNotEmpty;
 
   bool get canResendInvite =>
       invitationId != null &&
@@ -41,9 +43,15 @@ class AdminAccountRecord {
 
   String get roleLabel => role == 'super_admin' ? 'Super Admin' : 'Admin';
 
+  /// Maps portal display status to shared admin status badge keys.
+  String get statusBadgeKey => switch (displayStatus) {
+    'inactive' => 'suspended',
+    _ => displayStatus,
+  };
+
   String get statusLabel => switch (displayStatus) {
     'active' => 'Active',
-    'inactive' => 'Inactive',
+    'inactive' => 'Disabled',
     'invited' => 'Invited',
     _ => displayStatus,
   };

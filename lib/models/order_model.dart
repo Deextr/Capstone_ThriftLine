@@ -1,4 +1,5 @@
 import '../core/utils/ph_phone.dart';
+import '../features/buyer/data/checkout_totals.dart';
 import 'enums.dart';
 import 'return_shipment.dart';
 import 'shipment_model.dart';
@@ -79,6 +80,12 @@ class OrderModel {
     this.checkoutGroupId,
     this.checkoutSource,
     this.paidAt,
+    this.sellerCommissionRate = kSellerCommissionRate,
+    this.sellerCommissionBase,
+    this.sellerCommissionAmount = 0,
+    this.sellerCommissionStatus = 'pending',
+    this.sellerCommissionRecognizedAt,
+    this.sellerCommissionReversedAt,
   });
 
   final String id;
@@ -122,6 +129,26 @@ class OrderModel {
 
   /// First successful payment time (`payments.updated_at` when paid).
   final DateTime? paidAt;
+
+  /// Persisted 5% seller-order commission (product subtotal only).
+  final double sellerCommissionRate;
+  final double? sellerCommissionBase;
+  final double sellerCommissionAmount;
+  final String sellerCommissionStatus;
+  final DateTime? sellerCommissionRecognizedAt;
+  final DateTime? sellerCommissionReversedAt;
+
+  double get commissionableSubtotal => sellerCommissionBase ?? amount;
+
+  double get sellerNetProductEarnings =>
+      checkoutRoundCurrency(commissionableSubtotal - sellerCommissionAmount);
+
+  double get sellerTotalEarnings =>
+      checkoutRoundCurrency(sellerNetProductEarnings + shippingFee);
+
+  bool get isCommissionEarned => sellerCommissionStatus == 'earned';
+
+  bool get isCommissionReversed => sellerCommissionStatus == 'reversed';
 
   bool get isBuyNowCheckout => checkoutSource == 'buy_now';
 
@@ -357,6 +384,25 @@ class OrderModel {
       checkoutGroupId: row['checkout_group_id'] as String?,
       checkoutSource: row['checkout_source'] as String?,
       paidAt: paidAtFromPaymentsRow(row),
+      sellerCommissionRate:
+          (row['seller_commission_rate'] as num?)?.toDouble() ??
+          kSellerCommissionRate,
+      sellerCommissionBase: (row['seller_commission_base'] as num?)?.toDouble(),
+      sellerCommissionAmount:
+          (row['seller_commission_amount'] as num?)?.toDouble() ??
+          sellerOrderCommission((row['subtotal'] as num?)?.toDouble() ?? 0),
+      sellerCommissionStatus:
+          (row['seller_commission_status'] as String?)?.trim().isNotEmpty ==
+              true
+          ? (row['seller_commission_status'] as String).trim()
+          : 'pending',
+      sellerCommissionRecognizedAt:
+          row['seller_commission_recognized_at'] != null
+          ? DateTime.tryParse(row['seller_commission_recognized_at'] as String)
+          : null,
+      sellerCommissionReversedAt: row['seller_commission_reversed_at'] != null
+          ? DateTime.tryParse(row['seller_commission_reversed_at'] as String)
+          : null,
     );
   }
 
@@ -399,6 +445,12 @@ class OrderModel {
     DateTime? paymentDueAt,
     String? checkoutGroupId,
     DateTime? paidAt,
+    double? sellerCommissionRate,
+    double? sellerCommissionBase,
+    double? sellerCommissionAmount,
+    String? sellerCommissionStatus,
+    DateTime? sellerCommissionRecognizedAt,
+    DateTime? sellerCommissionReversedAt,
   }) => OrderModel(
     id: id ?? this.id,
     orderNumber: orderNumber ?? this.orderNumber,
@@ -438,6 +490,16 @@ class OrderModel {
     paymentDueAt: paymentDueAt ?? this.paymentDueAt,
     checkoutGroupId: checkoutGroupId ?? this.checkoutGroupId,
     paidAt: paidAt ?? this.paidAt,
+    sellerCommissionRate: sellerCommissionRate ?? this.sellerCommissionRate,
+    sellerCommissionBase: sellerCommissionBase ?? this.sellerCommissionBase,
+    sellerCommissionAmount:
+        sellerCommissionAmount ?? this.sellerCommissionAmount,
+    sellerCommissionStatus:
+        sellerCommissionStatus ?? this.sellerCommissionStatus,
+    sellerCommissionRecognizedAt:
+        sellerCommissionRecognizedAt ?? this.sellerCommissionRecognizedAt,
+    sellerCommissionReversedAt:
+        sellerCommissionReversedAt ?? this.sellerCommissionReversedAt,
   );
 }
 

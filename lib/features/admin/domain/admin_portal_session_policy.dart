@@ -28,10 +28,17 @@ int resolveAdminPortalMonitorStartMs({
   required int storedActivityMs,
   required int nowMs,
   required bool reuseStoredActivity,
+  Duration timeout = adminPortalInactivityTimeout,
 }) {
-  if (reuseStoredActivity && storedActivityMs > 0) return storedActivityMs;
+  if (reuseStoredActivity && storedActivityMs > 0) {
+    final remaining = timeout.inMilliseconds - (nowMs - storedActivityMs);
+    if (remaining > 0) return storedActivityMs;
+  }
   return nowMs;
 }
 
 /// Minimum gap between persisting activity timestamps (cross-tab sync).
 const Duration adminPortalActivityPersistThrottle = Duration(seconds: 2);
+
+/// After sign-in, do not treat stale clocks or server sync gaps as idle logout.
+const Duration adminPortalPostSignInGracePeriod = Duration(minutes: 2);

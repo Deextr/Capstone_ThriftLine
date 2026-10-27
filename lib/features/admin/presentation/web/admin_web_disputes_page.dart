@@ -299,8 +299,8 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
             isLoading: controller.isLoading,
             minWidth: controller.isLookingForCategory ? 1020 : 840,
             columnFlex: controller.isLookingForCategory
-                ? const [4, 2, 2, 2, 2, 2, 1]
-                : const [2, 2, 3, 2, 2, 1],
+                ? const [4, 2, 2, 2, 2, 2]
+                : const [2, 2, 3, 2, 2],
             emptyTitle: 'No disputes found',
             emptyMessage:
                 'Try adjusting your search or filters. New disputes and reports appear here when submitted.',
@@ -318,7 +318,6 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
                     'Dispute',
                     'Post status',
                     'Reported',
-                    'Review',
                   ]
                 : const [
                     'Case',
@@ -326,7 +325,6 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
                     'Reporter',
                     'Date Submitted',
                     'Status',
-                    'Action',
                   ],
             rows: controller.isLookingForCategory
                 ? [
@@ -338,10 +336,6 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
                         AdminLookingForDisputeStatusCell(row: row),
                         AdminLookingForPostStatusCell(row: row),
                         AdminTableDateCell(dateTime: row.createdAt),
-                        AdminTableLinkAction(
-                          label: 'Review',
-                          onPressed: () => _openCase(row),
-                        ),
                       ],
                   ]
                 : [
@@ -371,10 +365,6 @@ class _AdminWebDisputesPageState extends State<AdminWebDisputesPage> {
                             source: row.source,
                             statusRaw: row.statusRaw,
                           ),
-                        ),
-                        AdminTableLinkAction(
-                          label: 'Review',
-                          onPressed: () => _openCase(row),
                         ),
                       ],
                   ],

@@ -7,11 +7,11 @@ void main() {
       'success': false,
       'code': 'order_not_ready',
       'error':
-          'We could not prepare your auction order yet. Please try again in a moment.',
+          'Your pending order is not ready yet. We are still preparing it — please wait a moment and try again.',
     });
     expect(
       buyerFacingAuctionOrderError(result),
-      contains('prepare your auction order'),
+      contains('pending order is not ready'),
     );
   });
 }

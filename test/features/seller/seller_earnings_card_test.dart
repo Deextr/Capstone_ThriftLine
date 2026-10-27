@@ -31,6 +31,18 @@ Future<void> _pumpCard(
 }
 
 void main() {
+  testWidgets('does not show ready for payout status pill', (tester) async {
+    await _pumpCard(
+      tester,
+      amount: '₱45,200.00',
+      status: '',
+      showPayout: true,
+    );
+
+    expect(find.text('Ready for payout'), findsNothing);
+    expect(find.text('Request payout'), findsOneWidget);
+  });
+
   testWidgets('large available earnings stay on one line', (tester) async {
     await _pumpCard(
       tester,

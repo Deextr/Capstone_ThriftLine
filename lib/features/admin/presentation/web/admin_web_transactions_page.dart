@@ -3,9 +3,20 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
-import '../../../../core/utils/formatters.dart';
 import '../../controllers/admin_transactions_controller.dart';
+import '../../domain/admin_order_management.dart';
 import '../widgets/admin_ui_components.dart';
+
+const kAdminPaymentsTransactionsColumnGaps = [
+  16.0,
+  16.0,
+  16.0,
+  16.0,
+  16.0,
+  36.0,
+  16.0,
+  16.0,
+];
 
 class AdminWebTransactionsPage extends StatelessWidget {
   const AdminWebTransactionsPage({super.key});
@@ -23,7 +34,7 @@ class AdminWebTransactionsPage extends StatelessWidget {
           AdminPageHeader(
             title: 'Transactions',
             subtitle:
-                'Monitor escrow payment receipts, platform commission fees, and seller payout amounts.',
+                'Monitor escrow payment receipts, the buyer PayMongo fee, ThriftLine’s 5% seller-order commission, and seller payout amounts.',
             actions: [
               OutlinedButton.icon(
                 onPressed: controller.isLoading
@@ -103,6 +114,20 @@ class AdminWebTransactionsPage extends StatelessWidget {
           // Data Table
           AdminDataTable(
             isLoading: controller.isLoading,
+            minWidth: 1160,
+            columnFlex: const [2, 2, 2, 2, 2, 2, 2, 2, 2],
+            columnGapsAfter: kAdminPaymentsTransactionsColumnGaps,
+            columnAlignments: const [
+              Alignment.centerLeft,
+              Alignment.centerLeft,
+              Alignment.centerLeft,
+              Alignment.centerRight,
+              Alignment.centerRight,
+              Alignment.centerRight,
+              Alignment.centerRight,
+              Alignment.centerLeft,
+              Alignment.centerLeft,
+            ],
             emptyTitle: 'No transactions found',
             emptyMessage: controller.hasActiveFilters
                 ? 'No payment records match this filter. Try selecting another status.'
@@ -115,7 +140,8 @@ class AdminWebTransactionsPage extends StatelessWidget {
               'Buyer',
               'Seller',
               'Gross Amount',
-              'Platform Fee',
+              'PayMongo fee',
+              'Commission',
               'Seller Payout',
               'Status',
               'Date',
@@ -123,30 +149,23 @@ class AdminWebTransactionsPage extends StatelessWidget {
             rows: [
               for (final row in controller.rows)
                 [
-                  Text(
-                    row.orderNumber.isNotEmpty ? row.orderNumber : '—',
-                    style: AppTypography.tableBodyMedium.copyWith(
+                  AdminTableCellText(
+                    primary: row.orderNumber.isNotEmpty ? row.orderNumber : '—',
+                    primaryStyle: AppTypography.tableBodyMedium.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  Text(row.buyerName, style: AppTypography.tableBody),
-                  Text(row.sellerName, style: AppTypography.tableBody),
-                  Text(
-                    formatCurrency(row.grossAmount),
-                    style: AppTypography.tableBodyMedium.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                  AdminTableCellText(primary: row.buyerName),
+                  AdminTableCellText(primary: row.sellerName),
+                  AdminTableMoneyCell(amount: row.grossAmount, emphasize: true),
+                  AdminTableMoneyCell(amount: row.platformFee, muted: true),
+                  AdminTableCommissionCell(
+                    amount: row.commissionAmount,
+                    statusLabel: row.commissionStatus == 'earned'
+                        ? null
+                        : adminOrderCommissionStatusLabel(row.commissionStatus),
                   ),
-                  Text(
-                    formatCurrency(row.platformFee),
-                    style: AppTypography.tableBody.copyWith(
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  Text(
-                    formatCurrency(row.sellerAmount),
-                    style: AppTypography.tableBody,
-                  ),
+                  AdminTableMoneyCell(amount: row.sellerAmount),
                   AdminStatusBadge(status: row.paymentStatus),
                   AdminTableDateCell(dateTime: row.createdAt),
                 ],

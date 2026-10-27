@@ -14,6 +14,8 @@ class AdminTransactionRow {
     required this.sellerName,
     required this.grossAmount,
     required this.platformFee,
+    required this.commissionAmount,
+    required this.commissionStatus,
     required this.sellerAmount,
     required this.paymentStatus,
     required this.createdAt,
@@ -27,6 +29,8 @@ class AdminTransactionRow {
   final String sellerName;
   final double grossAmount;
   final double platformFee;
+  final double commissionAmount;
+  final String commissionStatus;
   final double sellerAmount;
   final String paymentStatus;
   final DateTime createdAt;
@@ -50,6 +54,12 @@ class AdminTransactionRow {
     final platform = order is Map
         ? (order['platform_fee'] as num?)?.toDouble() ?? 0
         : 0;
+    final commission = order is Map
+        ? (order['seller_commission_amount'] as num?)?.toDouble() ?? 0
+        : 0;
+    final commissionStatus = order is Map
+        ? (order['seller_commission_status'] as String?)?.trim() ?? 'pending'
+        : 'pending';
     final amount = (json['amount_centavos'] as num?)?.toDouble() ?? 0;
 
     String nameFromProfile(String? id, Map? embedded, String fallback) {
@@ -79,7 +89,9 @@ class AdminTransactionRow {
       ),
       grossAmount: (subtotal + shipping).toDouble(),
       platformFee: platform.toDouble(),
-      sellerAmount: (subtotal + shipping - platform)
+      commissionAmount: commission.toDouble(),
+      commissionStatus: commissionStatus.isEmpty ? 'pending' : commissionStatus,
+      sellerAmount: (subtotal + shipping - commission)
           .clamp(0, double.infinity)
           .toDouble(),
       paymentStatus: (json['payment_status'] as String?)?.trim() ?? 'pending',
@@ -106,12 +118,14 @@ class AdminTransactionsService {
   static const _selectWithProfiles =
       'payment_id, payment_status, amount_centavos, created_at, '
       'orders(order_id, order_number, subtotal, shipping_fee, platform_fee, '
+      'seller_commission_amount, seller_commission_status, '
       'buyer_id, seller_id, '
       'buyer:buyer_id(full_name), seller:seller_id(full_name))';
 
   static const _selectOrderIdsOnly =
       'payment_id, payment_status, amount_centavos, created_at, '
       'orders(order_id, order_number, subtotal, shipping_fee, platform_fee, '
+      'seller_commission_amount, seller_commission_status, '
       'buyer_id, seller_id)';
 
   Future<AdminTransactionsPage> list({
@@ -159,9 +173,9 @@ class AdminTransactionsService {
     required String? paymentStatus,
     bool hydrateProfiles = false,
   }) async {
-    var filter = (await resolveAdminClient(_supabase))
-        .from('payments')
-        .select(select);
+    var filter = (await resolveAdminClient(
+      _supabase,
+    )).from('payments').select(select);
 
     if (paymentStatus != null && paymentStatus.isNotEmpty) {
       filter = filter.eq('payment_status', paymentStatus);

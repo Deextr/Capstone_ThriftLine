@@ -44,7 +44,7 @@ String buyerFacingAuctionOrderError(AuctionCheckoutOrderResult result) {
     case 'order_not_ready':
       return result.error?.isNotEmpty == true
           ? result.error!
-          : 'We could not prepare your order yet. Please try again.';
+          : 'Your pending order is not ready yet. Please wait a moment and try again.';
     default:
       return result.error?.isNotEmpty == true
           ? result.error!
@@ -64,7 +64,8 @@ Future<AuctionCheckoutOrderResult> ensureMyAuctionOrder(
     );
   }
   try {
-    for (var attempt = 0; attempt < 2; attempt++) {
+    const retryDelaysMs = [200, 400, 800, 1200];
+    for (var attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
       final raw = await supabase.client.rpc(
         'ensure_my_auction_order',
         params: {'p_auction_id': auctionId},
@@ -73,16 +74,18 @@ Future<AuctionCheckoutOrderResult> ensureMyAuctionOrder(
       if (result.success && result.orderId != null) {
         return result;
       }
-      if (result.code != 'order_not_ready' || attempt == 1) {
+      if (result.code != 'order_not_ready' || attempt >= retryDelaysMs.length) {
         return result;
       }
-      await Future<void>.delayed(const Duration(milliseconds: 400));
+      await Future<void>.delayed(
+        Duration(milliseconds: retryDelaysMs[attempt]),
+      );
     }
     return const AuctionCheckoutOrderResult(
       success: false,
       code: 'order_not_ready',
       error:
-          'We could not prepare your auction order yet. Please try again in a moment.',
+          'Your pending order is not ready yet. Please wait a moment and try again.',
     );
   } catch (e) {
     return AuctionCheckoutOrderResult(

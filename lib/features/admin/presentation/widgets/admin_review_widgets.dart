@@ -9,6 +9,7 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../data/admin_review_rules.dart';
+import '../../data/admin_verification_service.dart';
 
 class AdminStatusChip extends StatelessWidget {
   const AdminStatusChip({super.key, required this.status, this.label});
@@ -913,6 +914,283 @@ class AdminReportCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Desktop-first decision rail for seller verification review.
+class SellerVerificationDecisionPanel extends StatelessWidget {
+  const SellerVerificationDecisionPanel({
+    super.key,
+    required this.application,
+    required this.busy,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  final SellerApplication application;
+  final bool busy;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+
+  static const double _actionMinHeight = 42;
+
+  @override
+  Widget build(BuildContext context) {
+    final isPending = application.status == 'pending';
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isPending
+              ? AppColors.primary.withValues(alpha: 0.35)
+              : AppColors.border,
+          width: isPending ? 1.5 : 1,
+        ),
+        boxShadow: isPending
+            ? const [
+                BoxShadow(
+                  color: Color(0x08000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
+                ),
+              ]
+            : null,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'VERIFICATION DECISION',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (isPending)
+              _PendingDecisionBody(
+                busy: busy,
+                onApprove: onApprove,
+                onReject: onReject,
+              )
+            else
+              _CompletedDecisionBody(application: application),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PendingDecisionBody extends StatelessWidget {
+  const _PendingDecisionBody({
+    required this.busy,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  final bool busy;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Confirm the applicant profile, government ID, and liveness checks '
+          'before you approve or reject.',
+          style: AppTypography.body.copyWith(
+            color: AppColors.textSecondary,
+            fontSize: 13,
+            height: 1.45,
+          ),
+        ),
+        const SizedBox(height: 14),
+        const _VerificationReviewChecklist(),
+        const SizedBox(height: 18),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final reject = OutlinedButton(
+              onPressed: busy ? null : onReject,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                minimumSize: const Size(
+                  0,
+                  SellerVerificationDecisionPanel._actionMinHeight,
+                ),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: AppTypography.button.copyWith(
+                  color: AppColors.error,
+                ),
+              ),
+              child: const Text('Reject application'),
+            );
+            final approve = FilledButton(
+              onPressed: busy ? null : onApprove,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                minimumSize: const Size(
+                  0,
+                  SellerVerificationDecisionPanel._actionMinHeight,
+                ),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: AppTypography.button,
+              ),
+              child: const Text('Approve seller'),
+            );
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: reject),
+                const SizedBox(width: 10),
+                Expanded(child: approve),
+              ],
+            );
+          },
+        ),
+        if (busy) ...[
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Saving decision…',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _VerificationReviewChecklist extends StatelessWidget {
+  const _VerificationReviewChecklist();
+
+  @override
+  Widget build(BuildContext context) {
+    const items = [
+      'Applicant and store details match the submission',
+      'Government ID images are clear and readable',
+      'Selfie and liveness checks passed',
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final item in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 16,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    item,
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _CompletedDecisionBody extends StatelessWidget {
+  const _CompletedDecisionBody({required this.application});
+
+  final SellerApplication application;
+
+  @override
+  Widget build(BuildContext context) {
+    final approved = application.status == 'approved';
+    final tone = approved ? AppColors.success : AppColors.error;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+        border: Border.all(color: tone.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                approved ? Icons.check_circle : Icons.cancel,
+                color: tone,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  approved
+                      ? 'This seller was approved'
+                      : 'This application was rejected',
+                  style: AppTypography.cardTitle.copyWith(color: tone),
+                ),
+              ),
+            ],
+          ),
+          if (!approved &&
+              (application.rejectionReason?.trim().isNotEmpty ?? false)) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Rejection reason',
+              style: AppTypography.caption.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              application.rejectionReason!.trim(),
+              style: AppTypography.body.copyWith(height: 1.4),
+            ),
+          ],
+        ],
       ),
     );
   }

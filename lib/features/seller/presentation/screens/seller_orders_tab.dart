@@ -5,10 +5,14 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../features/auth/domain/account_mode.dart';
 import '../../../../models/order_model.dart';
+import '../../../../providers/auth_provider.dart';
+import '../../../../providers/notifications_provider.dart';
 import '../../../../widgets/empty_state.dart';
 import '../../controllers/seller_orders_controller.dart';
 import '../../data/seller_order_buckets.dart';
+import '../../data/seller_order_tab_notifications.dart';
 import '../widgets/seller_order_card.dart';
 
 class SellerOrdersTab extends StatefulWidget {
@@ -55,9 +59,37 @@ class _SellerOrdersTabState extends State<SellerOrdersTab>
     super.dispose();
   }
 
+  int? _tabBadgeCount(
+    SellerOrdersController controller,
+    NotificationsProvider notifications,
+    AuthProvider auth,
+    SellerOrderBucket bucket,
+  ) {
+    if (controller.isLoading && controller.orders.isEmpty) return null;
+    if (bucket == SellerOrderBucket.all) return null;
+
+    if (sellerOrderNotificationTabs.contains(bucket)) {
+      final orderIds = controller.ordersIn(bucket).map((o) => o.id).toSet();
+      final unread = sellerOrderTabUnreadCount(
+        items: notifications.items,
+        bucket: bucket,
+        orderIdsInBucket: orderIds,
+        accountMode: AccountMode.seller,
+        hasSellerAccess: auth.user?.hasSellerAccess ?? false,
+        sellerUserId: auth.user?.id,
+      );
+      return unread > 0 ? unread : null;
+    }
+
+    final count = controller.countIn(bucket);
+    return count > 0 ? count : null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<SellerOrdersController>();
+    final notifications = context.watch<NotificationsProvider>();
+    final auth = context.watch<AuthProvider>();
 
     return SafeArea(
       child: Column(
@@ -86,21 +118,34 @@ class _SellerOrdersTabState extends State<SellerOrdersTab>
                   height: 46,
                   child: _StatusTabLabel(
                     label: bucket.tabLabel,
-                    count: controller.isLoading && controller.orders.isEmpty
-                        ? null
-                        : controller.countIn(bucket),
+                    count: _tabBadgeCount(
+                      controller,
+                      notifications,
+                      auth,
+                      bucket,
+                    ),
+                    countSemanticsSuffix:
+                        sellerOrderNotificationTabs.contains(bucket)
+                        ? 'unread notifications'
+                        : 'orders',
                     selected: _tab.index == bucket.index,
                   ),
                 ),
             ],
           ),
-          Expanded(child: _body(controller)),
+          Expanded(
+            child: _body(controller, notifications, auth),
+          ),
         ],
       ),
     );
   }
 
-  Widget _body(SellerOrdersController controller) {
+  Widget _body(
+    SellerOrdersController controller,
+    NotificationsProvider notifications,
+    AuthProvider auth,
+  ) {
     if (controller.isLoading && controller.orders.isEmpty) {
       return const _OrdersLoadingView();
     }
@@ -119,6 +164,8 @@ class _SellerOrdersTabState extends State<SellerOrdersTab>
           _OrderBucketList(
             bucket: bucket,
             orders: controller.ordersIn(bucket),
+            notifications: notifications,
+            auth: auth,
             onRefresh: controller.load,
           ),
       ],
@@ -130,11 +177,13 @@ class _StatusTabLabel extends StatelessWidget {
   const _StatusTabLabel({
     required this.label,
     required this.count,
+    required this.countSemanticsSuffix,
     required this.selected,
   });
 
   final String label;
   final int? count;
+  final String countSemanticsSuffix;
   final bool selected;
 
   @override
@@ -142,7 +191,7 @@ class _StatusTabLabel extends StatelessWidget {
     final shown = count != null && count! > 0;
     return Semantics(
       selected: selected,
-      label: shown ? '$label, $count orders' : label,
+      label: shown ? '$label, $count $countSemanticsSuffix' : label,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -182,11 +231,15 @@ class _OrderBucketList extends StatelessWidget {
   const _OrderBucketList({
     required this.bucket,
     required this.orders,
+    required this.notifications,
+    required this.auth,
     required this.onRefresh,
   });
 
   final SellerOrderBucket bucket;
   final List<OrderModel> orders;
+  final NotificationsProvider notifications;
+  final AuthProvider auth;
   final Future<void> Function() onRefresh;
 
   @override
@@ -195,6 +248,8 @@ class _OrderBucketList extends StatelessWidget {
       return EmptyState(
         icon: bucket == SellerOrderBucket.toShip
             ? Icons.local_shipping_outlined
+            : bucket == SellerOrderBucket.all
+            ? Icons.receipt_long_outlined
             : Icons.inventory_2_outlined,
         title: bucket.emptyTitle,
         message: bucket.emptyMessage,
@@ -209,8 +264,19 @@ class _OrderBucketList extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(height: 12),
         itemBuilder: (_, i) {
           final order = orders[i];
+          final hasUnread = sellerOrderNotificationTabs.contains(bucket)
+              ? sellerOrderHasUnreadTabNotifications(
+                  items: notifications.items,
+                  bucket: bucket,
+                  orderId: order.id,
+                  accountMode: AccountMode.seller,
+                  hasSellerAccess: auth.user?.hasSellerAccess ?? false,
+                  sellerUserId: auth.user?.id,
+                )
+              : false;
           return SellerOrderCard(
             order: order,
+            hasUnreadNotification: hasUnread,
             onTap: () => context.push('/seller-order/${order.id}'),
           );
         },

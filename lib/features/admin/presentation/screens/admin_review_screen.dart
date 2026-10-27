@@ -18,6 +18,7 @@ import '../../data/admin_verification_service.dart';
 import '../../data/external_history_service.dart';
 import '../widgets/admin_review_widgets.dart';
 import '../widgets/admin_ui_components.dart';
+import '../widgets/admin_wide_case_layout.dart';
 import '../widgets/external_selling_history_section.dart';
 import '../widgets/seller_application_reject_dialog.dart';
 
@@ -293,8 +294,6 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
   @override
   Widget build(BuildContext context) {
     final app = _application;
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final isDesktop = screenWidth >= 1024;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -308,117 +307,42 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
                 title: 'Application not found',
                 message: 'This application is no longer available.',
               )
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
-                children: [
-                  // Breadcrumbs & Top Bar
-                  _buildBreadcrumbs(app),
-                  const SizedBox(height: 16),
-
-                  // Header banner
-                  _buildHeaderBanner(app),
-                  const SizedBox(height: 24),
-
-                  // Responsive 2-column or 1-column layout
-                  if (isDesktop)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Left Column: Applicant, Store, Identity, Liveness
-                        Expanded(
-                          flex: 3,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _buildApplicantCard(app),
-                              const SizedBox(height: 20),
-                              _buildStoreCard(app),
-                              const SizedBox(height: 20),
-                              _buildIdentityDocumentsCard(app),
-                              const SizedBox(height: 20),
-                              _buildLivenessCard(app),
-                              const SizedBox(height: 20),
-                              ExternalSellingHistorySection(
-                                claimedRange: app.claimedSellingRange,
-                                items: _history,
-                                busy: _busy,
-                                onReview: _reviewExternal,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 24),
-                        // Right Column: Decision card & Actions
-                        Expanded(
-                          flex: 2,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [_buildDecisionCard(app)],
-                          ),
-                        ),
-                      ],
-                    )
-                  else
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildDecisionCard(app),
-                        const SizedBox(height: 20),
-                        _buildApplicantCard(app),
-                        const SizedBox(height: 20),
-                        _buildStoreCard(app),
-                        const SizedBox(height: 20),
-                        _buildIdentityDocumentsCard(app),
-                        const SizedBox(height: 20),
-                        _buildLivenessCard(app),
-                        const SizedBox(height: 20),
-                        ExternalSellingHistorySection(
-                          claimedRange: app.claimedSellingRange,
-                          items: _history,
-                          busy: _busy,
-                          onReview: _reviewExternal,
-                        ),
-                      ],
-                    ),
-                ],
+            : AdminWideCaseDetailPage(
+                backLabel: 'Seller verifications',
+                onBack: () => context.go(RouteNames.adminVerifications),
+                header: _buildHeaderBanner(app),
+                twoColumnBreakpoint: 1024,
+                sidebarWidth: 400,
+                sidebarFirstWhenNarrow: true,
+                main: _buildEvidenceColumn(app),
+                sidebar: SellerVerificationDecisionPanel(
+                  application: app,
+                  busy: _busy,
+                  onApprove: _approve,
+                  onReject: _reject,
+                ),
               ),
       ),
     );
   }
 
-  Widget _buildBreadcrumbs(SellerApplication app) {
-    return Row(
+  Widget _buildEvidenceColumn(SellerApplication app) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        InkWell(
-          onTap: () => context.go(RouteNames.adminVerifications),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.arrow_back, size: 16, color: AppColors.primary),
-              SizedBox(width: 6),
-              Text(
-                'Seller Verifications',
-                style: AppTypography.label.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text('/', style: TextStyle(color: AppColors.textHint)),
-        SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            app.shopName,
-            style: AppTypography.label.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+        _buildApplicantCard(app),
+        const SizedBox(height: 20),
+        _buildStoreCard(app),
+        const SizedBox(height: 20),
+        _buildIdentityDocumentsCard(app),
+        const SizedBox(height: 20),
+        _buildLivenessCard(app),
+        const SizedBox(height: 20),
+        ExternalSellingHistorySection(
+          claimedRange: app.claimedSellingRange,
+          items: _history,
+          busy: _busy,
+          onReview: _reviewExternal,
         ),
       ],
     );
@@ -665,146 +589,6 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
           }).toList(),
         ),
       ],
-    );
-  }
-
-  Widget _buildDecisionCard(SellerApplication app) {
-    final isPending = app.status == 'pending';
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-        border: Border.all(
-          color: isPending
-              ? AppColors.primary.withValues(alpha: 0.4)
-              : AppColors.border,
-          width: isPending ? 1.5 : 1.0,
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x06000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.gavel_rounded,
-                size: 20,
-                color: isPending ? AppColors.primary : AppColors.textSecondary,
-              ),
-              SizedBox(width: 8),
-              Text('Verification Decision', style: AppTypography.sectionTitle),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (isPending) ...[
-            Text(
-              'Review the applicant credentials, government ID, and face verification above before taking action.',
-              style: AppTypography.body.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: _busy ? null : _approve,
-              icon: const Icon(Icons.check, size: 18),
-              label: const Text('Approve Seller Application'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                textStyle: AppTypography.button,
-              ),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: _busy ? null : _reject,
-              icon: const Icon(Icons.close, size: 18),
-              label: const Text('Reject Application'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.error,
-                side: const BorderSide(color: AppColors.error),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                textStyle: AppTypography.button.copyWith(
-                  color: AppColors.error,
-                ),
-              ),
-            ),
-          ] else ...[
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: app.status == 'approved'
-                    ? AppColors.success.withValues(alpha: 0.08)
-                    : AppColors.error.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(AppConstants.radiusSm),
-                border: Border.all(
-                  color: app.status == 'approved'
-                      ? AppColors.success.withValues(alpha: 0.25)
-                      : AppColors.error.withValues(alpha: 0.25),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        app.status == 'approved'
-                            ? Icons.check_circle
-                            : Icons.cancel,
-                        color: app.status == 'approved'
-                            ? AppColors.success
-                            : AppColors.error,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        app.status == 'approved'
-                            ? 'This seller was approved'
-                            : 'This application was rejected',
-                        style: AppTypography.cardTitle.copyWith(
-                          color: app.status == 'approved'
-                              ? AppColors.success
-                              : AppColors.error,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (app.status == 'rejected' &&
-                      (app.rejectionReason?.trim().isNotEmpty ?? false)) ...[
-                    SizedBox(height: 8),
-                    Text(
-                      'Rejection Reason:',
-                      style: AppTypography.caption.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      app.rejectionReason!.trim(),
-                      style: AppTypography.body.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 

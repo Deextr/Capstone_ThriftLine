@@ -260,6 +260,41 @@ void main() {
     });
   });
 
+  test('super admin can disable and enable regular admin accounts', () {
+    final activeAdmin = AdminAccountRecord(
+      userId: '11111111-1111-4111-8111-111111111111',
+      fullName: 'Portal Admin',
+      email: 'admin@example.com',
+      role: 'admin',
+      accountStatus: 'active',
+      displayStatus: 'active',
+      createdAt: DateTime.utc(2026, 1, 1),
+    );
+    final inactiveAdmin = AdminAccountRecord(
+      userId: activeAdmin.userId,
+      fullName: activeAdmin.fullName,
+      email: activeAdmin.email,
+      role: 'admin',
+      accountStatus: 'deactivated',
+      displayStatus: 'inactive',
+      createdAt: activeAdmin.createdAt,
+    );
+    final superAdmin = AdminAccountRecord(
+      userId: '22222222-2222-4222-8222-222222222222',
+      fullName: 'Super Admin',
+      email: 'super@example.com',
+      role: 'super_admin',
+      accountStatus: 'active',
+      displayStatus: 'active',
+      createdAt: DateTime.utc(2026, 1, 1),
+    );
+
+    expect(activeAdmin.canDeactivate, isTrue);
+    expect(inactiveAdmin.canActivate, isTrue);
+    expect(superAdmin.canDeactivate, isFalse);
+    expect(superAdmin.canActivate, isFalse);
+  });
+
   test('authorization failures are recognized for a session refresh', () {
     expect(
       isAdminAuthorizationFailure(Exception('super admin access required')),
