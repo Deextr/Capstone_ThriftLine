@@ -20,6 +20,7 @@ class ItemReturnPanel extends StatelessWidget {
     this.onConfirmReceived,
     this.returnPickupPin,
     this.returnPinExpiresAt,
+    this.hideProgressSteps = false,
   });
 
   final ReturnShipment itemReturn;
@@ -30,11 +31,12 @@ class ItemReturnPanel extends StatelessWidget {
   final VoidCallback? onConfirmReceived;
   final String? returnPickupPin;
   final DateTime? returnPinExpiresAt;
+  final bool hideProgressSteps;
 
   @override
   Widget build(BuildContext context) {
     final verifyPin = onVerifyPin;
-    final steps = itemReturn.returnRequired
+    final steps = !hideProgressSteps && itemReturn.returnRequired
         ? kReturnProgressSteps
         : const <String>[];
     final active = returnProgressIndex(itemReturn.status);

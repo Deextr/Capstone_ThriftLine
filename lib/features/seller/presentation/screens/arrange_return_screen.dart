@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/routes/route_names.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/ph_phone.dart';
 import '../../../../core/utils/validators.dart';
@@ -12,6 +13,10 @@ import '../../../../models/enums.dart';
 import '../../../../widgets/keyboard_safe.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/seller_orders_controller.dart';
+import '../../data/seller_saved_rider.dart';
+import '../../data/seller_saved_riders_service.dart';
+import '../widgets/saved_rider_form_fields.dart';
+import '../widgets/saved_rider_select_sheet.dart';
 
 class ArrangeReturnScreen extends StatefulWidget {
   const ArrangeReturnScreen({super.key, required this.orderId});
@@ -32,9 +37,27 @@ class _ArrangeReturnScreenState extends State<ArrangeReturnScreen> {
   String? _nameError;
   String? _phoneError;
 
+  List<SellerSavedRider> _savedRiders = const [];
+  bool _loadingRiders = true;
+  String? _loadRidersError;
+  String? _selectedSavedRiderId;
+
+  SellerSavedRider? get _selectedSavedRider {
+    if (_selectedSavedRiderId == null) return null;
+    for (final r in _savedRiders) {
+      if (r.id == _selectedSavedRiderId) return r;
+    }
+    return null;
+  }
+
+  late final SellerSavedRidersService _savedRidersService;
+
   @override
   void initState() {
     super.initState();
+    _savedRidersService = SellerSavedRidersService(
+      context.read<SupabaseService>(),
+    );
     final itemReturn = context.read<SellerOrdersController>().order?.itemReturn;
     if (itemReturn != null) {
       _name.text = itemReturn.riderName ?? '';
@@ -46,6 +69,78 @@ class _ArrangeReturnScreenState extends State<ArrangeReturnScreen> {
       }
       _pickup = itemReturn.pickupScheduledAt;
     }
+    _loadSavedRiders();
+  }
+
+  Future<void> _loadSavedRiders() async {
+    setState(() {
+      _loadingRiders = true;
+      _loadRidersError = null;
+    });
+    try {
+      final list = await _savedRidersService.listMine();
+      if (!mounted) return;
+      setState(() {
+        _savedRiders = list;
+        _loadingRiders = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingRiders = false;
+        _loadRidersError = 'Could not load your saved riders. You can still enter details below.';
+      });
+    }
+  }
+
+  void _applySavedRider(SellerSavedRider rider) {
+    setState(() {
+      _selectedSavedRiderId = rider.id;
+      _name.text = rider.riderName;
+      _phone.text = rider.riderPhone;
+      _plate.text = rider.plateNumber;
+      _vehicle = rider.vehicle;
+      _nameError = null;
+      _phoneError = null;
+      final defaultNotes = rider.defaultDeliveryNotes?.trim();
+      if (defaultNotes != null &&
+          defaultNotes.isNotEmpty &&
+          _notes.text.trim().isEmpty) {
+        _notes.text = defaultNotes;
+      }
+    });
+  }
+
+  Future<void> _openRiderPicker() async {
+    await _loadSavedRiders();
+    if (!mounted) return;
+    if (_loadRidersError != null) {
+      showThriftSnackBar(context, _loadRidersError!, isError: true);
+      return;
+    }
+    await showSavedRiderSelectSheet(
+      context: context,
+      riders: _savedRiders,
+      selectedId: _selectedSavedRiderId,
+      onSelected: (rider) {
+        _applySavedRider(rider);
+        if (!_savedRiders.any((r) => r.id == rider.id)) {
+          setState(() => _savedRiders = [..._savedRiders, rider]);
+        }
+      },
+    );
+  }
+
+  Future<void> _addRiderInline() async {
+    final created = await context.push<SellerSavedRider>(
+      RouteNames.sellerSavedRiderEditor,
+    );
+    if (created == null || !mounted) return;
+    setState(() {
+      _savedRiders = [..._savedRiders, created];
+      _loadRidersError = null;
+    });
+    _applySavedRider(created);
   }
 
   @override
@@ -113,6 +208,92 @@ class _ArrangeReturnScreenState extends State<ArrangeReturnScreen> {
     context.pop();
   }
 
+  Widget _buildSelectedRiderSection() {
+    final selected = _selectedSavedRider;
+    if (selected != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Selected rider', style: AppTypography.label),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.35),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(selected.riderName, style: AppTypography.subheading),
+                const SizedBox(height: 4),
+                Text(selected.maskedPhone, style: AppTypography.caption),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: _openRiderPicker,
+                    child: const Text('Change rider'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Select rider', style: AppTypography.label),
+        const SizedBox(height: 8),
+        if (_loadingRiders)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: LinearProgressIndicator(minHeight: 2),
+          )
+        else ...[
+          if (_loadRidersError != null) ...[
+            Text(
+              _loadRidersError!,
+              style: AppTypography.caption.copyWith(color: AppColors.error),
+            ),
+            const SizedBox(height: 8),
+            TextButton(onPressed: _loadSavedRiders, child: const Text('Retry')),
+            const SizedBox(height: 8),
+          ],
+          OutlinedButton(
+            onPressed: _savedRiders.isEmpty || _loadRidersError != null
+                ? null
+                : _openRiderPicker,
+            child: Text(
+              _savedRiders.isEmpty
+                  ? 'No saved riders yet'
+                  : 'Select saved rider',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _addRiderInline,
+            icon: const Icon(Icons.add),
+            label: const Text('Add new rider'),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Text(
+          'Or enter rider details below for this return only.',
+          style: AppTypography.caption,
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<SellerOrdersController>();
@@ -129,6 +310,12 @@ class _ArrangeReturnScreenState extends State<ArrangeReturnScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => context.push(RouteNames.sellerMyRiders),
+            child: const Text('My Riders'),
+          ),
+        ],
       ),
       body: KeyboardSafeForm(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
@@ -150,46 +337,19 @@ class _ArrangeReturnScreenState extends State<ArrangeReturnScreen> {
             style: AppTypography.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 20),
-          ThriftTextField(
-            label: 'Rider name',
-            hint: 'Juan Dela Cruz',
-            controller: _name,
-            error: _nameError,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(
-                Validators.fullNameInputCharacters,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ThriftTextField(
-            label: 'Phone number',
-            hint: '09171234567',
-            controller: _phone,
-            keyboardType: TextInputType.phone,
-            error: _phoneError,
-          ),
-          const SizedBox(height: 16),
-          Text('Vehicle', style: AppTypography.label),
+          _buildSelectedRiderSection(),
+          Text('Rider details', style: AppTypography.label),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final vehicle in DeliveryVehicleType.values)
-                ChoiceChip(
-                  label: Text(vehicle.label),
-                  selected: _vehicle == vehicle,
-                  selectedColor: AppColors.primaryLight,
-                  onSelected: (_) => setState(() => _vehicle = vehicle),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ThriftTextField(
-            label: 'Plate number (optional)',
-            hint: 'ABC 1234',
-            controller: _plate,
+          SavedRiderFormFields(
+            nameController: _name,
+            phoneController: _phone,
+            plateController: _plate,
+            notesController: _notes,
+            vehicle: _vehicle,
+            onVehicleChanged: (v) => setState(() => _vehicle = v),
+            nameError: _nameError,
+            phoneError: _phoneError,
+            showDefaultNotes: false,
           ),
           const SizedBox(height: 12),
           ThriftTextField(

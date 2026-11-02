@@ -6,13 +6,19 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/buyer_transaction_history_controller.dart';
+import '../../data/buyer_order_refund.dart';
 import '../../data/buyer_transaction.dart';
 
 /// Refund progress inside the transaction details sheet.
 class BuyerRefundStatusSection extends StatelessWidget {
-  const BuyerRefundStatusSection({super.key, required this.transaction});
+  const BuyerRefundStatusSection({
+    super.key,
+    required this.transaction,
+    this.gcashBindings,
+  });
 
   final BuyerTransaction transaction;
+  final RefundGcashFormBindings? gcashBindings;
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +70,17 @@ class BuyerRefundStatusSection extends StatelessWidget {
           ],
           if (transaction.needsGcashDetails) ...[
             const SizedBox(height: 14),
-            _RefundGcashForm(transaction: transaction),
+            _RefundGcashForm(transaction: transaction, bindings: gcashBindings),
+          ] else if (transaction.refundGcashSubmitted &&
+              transaction.refundState == BuyerRefundState.manualRequired) ...[
+            const SizedBox(height: 10),
+            Text(
+              'GCash details submitted. Our team will send your refund manually.',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
           ],
           if (state == BuyerRefundState.manualCompleted &&
               transaction.manualRefundReference != null) ...[
@@ -149,9 +165,10 @@ class _ClaimLinkAction extends StatelessWidget {
 }
 
 class _RefundGcashForm extends StatefulWidget {
-  const _RefundGcashForm({required this.transaction});
+  const _RefundGcashForm({required this.transaction, this.bindings});
 
   final BuyerTransaction transaction;
+  final RefundGcashFormBindings? bindings;
 
   @override
   State<_RefundGcashForm> createState() => _RefundGcashFormState();
@@ -176,13 +193,19 @@ class _RefundGcashFormState extends State<_RefundGcashForm> {
       _mobileError = validateGcashMobileNumber(_mobileController.text);
     });
     if (_nameError != null || _mobileError != null) return;
-    final ok = await context
-        .read<BuyerTransactionHistoryController>()
-        .submitRefundGcash(
-          transaction: widget.transaction,
-          accountName: _nameController.text,
-          mobileNumber: _mobileController.text,
-        );
+    final bindings = widget.bindings;
+    final ok = bindings != null
+        ? await bindings.submit(
+            accountName: _nameController.text,
+            mobileNumber: _mobileController.text,
+          )
+        : await context
+              .read<BuyerTransactionHistoryController>()
+              .submitRefundGcash(
+                transaction: widget.transaction,
+                accountName: _nameController.text,
+                mobileNumber: _mobileController.text,
+              );
     if (ok && mounted) {
       showThriftSnackBar(context, 'GCash details sent. We will update you.');
     }
@@ -190,8 +213,12 @@ class _RefundGcashFormState extends State<_RefundGcashForm> {
 
   @override
   Widget build(BuildContext context) {
-    final controller = context.watch<BuyerTransactionHistoryController>();
-    final busy = controller.isSubmittingGcash;
+    final bindings = widget.bindings;
+    final history = bindings == null
+        ? context.watch<BuyerTransactionHistoryController>()
+        : null;
+    final busy = bindings?.isSubmitting ?? history!.isSubmittingGcash;
+    final gcashError = bindings?.error ?? history?.gcashError;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -217,10 +244,10 @@ class _RefundGcashFormState extends State<_RefundGcashForm> {
             if (_mobileError != null) setState(() => _mobileError = null);
           },
         ),
-        if (controller.gcashError != null) ...[
+        if (gcashError != null) ...[
           const SizedBox(height: 8),
           Text(
-            controller.gcashError!,
+            gcashError,
             style: AppTypography.caption.copyWith(color: AppColors.error),
           ),
         ],

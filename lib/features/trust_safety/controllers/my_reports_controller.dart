@@ -8,6 +8,8 @@ import '../../../core/services/supabase_service.dart';
 import '../../../models/community_report_model.dart';
 import '../../../models/order_model.dart';
 import '../../../providers/auth_provider.dart';
+import '../../buyer/data/buyer_order_refund.dart';
+import '../../buyer/data/buyer_transaction.dart';
 import '../../buyer/data/order_query.dart';
 import '../controllers/report_user_controller.dart';
 import '../data/buyer_my_reports_query.dart';
@@ -45,6 +47,9 @@ class MyReportsController extends ChangeNotifier {
   int _pageIndex = 0;
   CommunityReportModel? _report;
   OrderModel? _linkedOrder;
+  BuyerOrderRefundInfo? _orderRefund;
+  bool _isSubmittingRefundGcash = false;
+  String? _refundGcashError;
   bool _isLoading = true;
   bool _isResubmitting = false;
   String? _errorMessage;
@@ -93,6 +98,16 @@ class MyReportsController extends ChangeNotifier {
 
   CommunityReportModel? get report => _report;
   OrderModel? get linkedOrder => _linkedOrder;
+  BuyerOrderRefundInfo? get orderRefund => _orderRefund;
+  BuyerTransaction? get orderRefundTransaction => _orderRefund?.transaction;
+  bool get isSubmittingRefundGcash => _isSubmittingRefundGcash;
+  String? get refundGcashError => _refundGcashError;
+  RefundGcashFormBindings get refundGcashBindings => RefundGcashFormBindings(
+    isSubmitting: _isSubmittingRefundGcash,
+    error: _refundGcashError,
+    clearError: clearRefundGcashError,
+    submit: _submitOrderRefundGcash,
+  );
   bool get isLoading => _isLoading;
   bool get isResubmitting => _isResubmitting;
   String? get errorMessage => _errorMessage;
@@ -107,6 +122,52 @@ class MyReportsController extends ChangeNotifier {
       ) &&
       _resubmitEvidence.length >= kReportEvidenceMinCount &&
       !_isResubmitting;
+
+  void clearRefundGcashError() {
+    if (_refundGcashError == null) return;
+    _refundGcashError = null;
+    notifyListeners();
+  }
+
+  Future<bool> _submitOrderRefundGcash({
+    required String accountName,
+    required String mobileNumber,
+  }) async {
+    final txn = _orderRefund?.transaction;
+    final escrowId = txn?.escrowId;
+    if (escrowId == null || txn == null || !txn.needsGcashDetails) {
+      _refundGcashError = 'GCash details are not needed for this refund.';
+      notifyListeners();
+      return false;
+    }
+    if (_isSubmittingRefundGcash) return false;
+    _isSubmittingRefundGcash = true;
+    _refundGcashError = null;
+    notifyListeners();
+    try {
+      _refundGcashError = await submitMyRefundGcash(
+        supabase: _supabase,
+        escrowId: escrowId,
+        accountName: accountName,
+        mobileNumber: mobileNumber,
+      );
+      if (_refundGcashError != null) return false;
+      await _loadOrderRefund();
+      return true;
+    } finally {
+      _isSubmittingRefundGcash = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _loadOrderRefund() async {
+    final order = _linkedOrder;
+    if (order == null || !order.isRefundedSale) {
+      _orderRefund = null;
+      return;
+    }
+    _orderRefund = await fetchMyOrderRefundStatus(_supabase, order.id);
+  }
 
   Future<void> load({bool showSpinner = true}) async {
     final myId = _auth.user?.id;
@@ -198,6 +259,7 @@ class MyReportsController extends ChangeNotifier {
     _reports = data.communityReports;
     _report = null;
     _linkedOrder = null;
+    _orderRefund = null;
     _syncPageIndex();
   }
 
@@ -248,11 +310,13 @@ class MyReportsController extends ChangeNotifier {
 
     _report = mapped.isEmpty ? null : mapped.first;
     _linkedOrder = null;
+    _orderRefund = null;
     if (_report == null) {
       _errorMessage = 'Report not found.';
     } else {
       _report = await _withSignedUrls(_report!);
       _linkedOrder = await _loadLinkedOrder(_report!);
+      await _loadOrderRefund();
     }
     _reports = mapped;
   }

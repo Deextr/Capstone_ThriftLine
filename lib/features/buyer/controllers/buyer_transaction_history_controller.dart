@@ -5,6 +5,7 @@ import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/supabase_errors.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../providers/auth_provider.dart';
+import '../data/buyer_order_refund.dart';
 import '../data/buyer_transaction.dart';
 
 class BuyerTransactionHistoryController extends ChangeNotifier {
@@ -100,22 +101,13 @@ class BuyerTransactionHistoryController extends ChangeNotifier {
     _gcashError = null;
     notifyListeners();
     try {
-      final raw = await _supabase.client.rpc(
-        'submit_my_refund_gcash',
-        params: {
-          'p_escrow_id': escrowId,
-          'p_account_name': accountName.trim(),
-          'p_mobile_number': normalizePhMobileNumber(mobileNumber),
-        },
+      _gcashError = await submitMyRefundGcash(
+        supabase: _supabase,
+        escrowId: escrowId,
+        accountName: accountName,
+        mobileNumber: mobileNumber,
       );
-      final map = supabaseRpcMap(raw);
-      if (map == null || map['success'] != true) {
-        _gcashError = supabaseRpcError(
-          map,
-          fallback: 'We could not save your GCash details. Try again.',
-        );
-        return false;
-      }
+      if (_gcashError != null) return false;
       await load();
       return true;
     } catch (e) {

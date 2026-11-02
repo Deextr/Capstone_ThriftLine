@@ -13,6 +13,7 @@ import '../../../../models/community_report_model.dart';
 import '../../../../models/enums.dart';
 import '../../../../models/order_model.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../buyer/presentation/widgets/buyer_refund_status_section.dart';
 import '../../controllers/my_reports_controller.dart';
 import '../../data/report_evidence_attempt_rules.dart';
 import '../../data/report_reasons.dart';
@@ -111,6 +112,18 @@ class ReportDetailScreen extends StatelessWidget {
                     ],
                     const SizedBox(height: 20),
                     _AdminResponseSection(report: report),
+                    if (controller.orderRefundTransaction != null) ...[
+                      const SizedBox(height: 20),
+                      _Section(
+                        title: 'Your refund',
+                        children: [
+                          BuyerRefundStatusSection(
+                            transaction: controller.orderRefundTransaction!,
+                            gcashBindings: controller.refundGcashBindings,
+                          ),
+                        ],
+                      ),
+                    ],
                     if (reportStatusAllowsResubmit(report.status)) ...[
                       const SizedBox(height: 20),
                       _ResubmitEvidenceSection(report: report),

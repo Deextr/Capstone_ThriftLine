@@ -19,6 +19,8 @@ import '../../trust_safety/data/report_query.dart';
 import '../../trust_safety/data/review_query.dart';
 import '../data/auction_checkout_order.dart';
 import '../data/checkout_payment_group.dart';
+import '../data/buyer_order_refund.dart';
+import '../data/buyer_transaction.dart';
 import '../data/order_query.dart';
 import '../data/paymongo_checkout.dart';
 
@@ -56,6 +58,9 @@ class BuyerOrdersController extends ChangeNotifier {
   String? _errorMessage;
   String? _unsuccessfulOutcome;
   String? _deliveryPin;
+  BuyerOrderRefundInfo? _orderRefund;
+  bool _isSubmittingRefundGcash = false;
+  String? _refundGcashError;
   RealtimeChannel? _channel;
   AppLifecycleListener? _lifecycle;
   int _returnGeneration = 0;
@@ -96,6 +101,55 @@ class BuyerOrdersController extends ChangeNotifier {
   bool get isUpdatingDelivery => _isUpdatingDelivery;
   String? get errorMessage => _errorMessage;
   String? get deliveryPin => _deliveryPin;
+  BuyerOrderRefundInfo? get orderRefund => _orderRefund;
+  BuyerTransaction? get orderRefundTransaction => _orderRefund?.transaction;
+  bool get isSubmittingRefundGcash => _isSubmittingRefundGcash;
+  String? get refundGcashError => _refundGcashError;
+
+  RefundGcashFormBindings get refundGcashBindings => RefundGcashFormBindings(
+    isSubmitting: _isSubmittingRefundGcash,
+    error: _refundGcashError,
+    clearError: clearRefundGcashError,
+    submit: _submitOrderRefundGcash,
+  );
+
+  void clearRefundGcashError() {
+    if (_refundGcashError == null) return;
+    _refundGcashError = null;
+    _notify();
+  }
+
+  Future<bool> _submitOrderRefundGcash({
+    required String accountName,
+    required String mobileNumber,
+  }) async {
+    final txn = _orderRefund?.transaction;
+    final escrowId = txn?.escrowId;
+    if (escrowId == null || txn == null || !txn.needsGcashDetails) {
+      _refundGcashError = 'GCash details are not needed for this refund.';
+      _notify();
+      return false;
+    }
+    if (_isSubmittingRefundGcash) return false;
+    _isSubmittingRefundGcash = true;
+    _refundGcashError = null;
+    _notify();
+    try {
+      _refundGcashError = await submitMyRefundGcash(
+        supabase: _supabase,
+        escrowId: escrowId,
+        accountName: accountName,
+        mobileNumber: mobileNumber,
+      );
+      if (_refundGcashError != null) return false;
+      await _loadOrderRefund();
+      return true;
+    } finally {
+      _isSubmittingRefundGcash = false;
+      _notify();
+    }
+  }
+
   bool get isExpiredPayment =>
       _unsuccessfulOutcome == 'expired' || (_order?.isExpiredCheckout ?? false);
 
@@ -227,6 +281,7 @@ class BuyerOrdersController extends ChangeNotifier {
           }
         }
         await _maybeLoadDeliveryPin();
+        await _loadOrderRefund();
       } else {
         _orders = await fetchOrdersForBuyer(_supabase, myId);
         if (generation != _loadGeneration) return;
@@ -776,6 +831,15 @@ class BuyerOrdersController extends ChangeNotifier {
     } catch (e) {
       debugPrint('process_fulfillment_sla error: $e');
     }
+  }
+
+  Future<void> _loadOrderRefund() async {
+    final current = _order;
+    if (current == null || !current.isRefundedSale) {
+      _orderRefund = null;
+      return;
+    }
+    _orderRefund = await fetchMyOrderRefundStatus(_supabase, current.id);
   }
 
   Future<void> _maybeLoadDeliveryPin() async {

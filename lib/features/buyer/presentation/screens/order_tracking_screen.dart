@@ -17,7 +17,10 @@ import '../../../../widgets/delivery_timeline.dart';
 import '../../../../widgets/empty_state.dart';
 import '../../../../widgets/rider_contact_card.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../widgets/buyer_refund_return_progress.dart';
+import '../widgets/buyer_refund_status_section.dart';
 import '../widgets/item_return_panel.dart';
+import '../../data/buyer_order_refund.dart';
 import '../../../trust_safety/presentation/widgets/order_community_report_panel.dart';
 import '../../../trust_safety/presentation/widgets/order_review_cta.dart';
 import '../../controllers/buyer_orders_controller.dart';
@@ -71,6 +74,9 @@ class OrderTrackingScreen extends StatelessWidget {
       return const Scaffold(body: _TrackingLoadingView());
     }
 
+    final refundTxn = controller.orderRefundTransaction;
+    final showUnifiedRefundProgress = orderShowsRefundReturnProgress(order);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Track Order'),
@@ -86,26 +92,52 @@ class OrderTrackingScreen extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.all(AppConstants.spacingMd),
             children: [
-              _StatusHero(order: order),
-              const SizedBox(height: 16),
-              ThriftCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Delivery Progress', style: AppTypography.subheading),
-                    const SizedBox(height: 12),
-                    DeliveryTimeline(order: order, compact: true),
-                    if (order.shipment == null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Tracking information will appear here once your order ships.',
-                        style: AppTypography.caption,
-                      ),
-                    ],
-                  ],
-                ),
+              _StatusHero(
+                order: order,
+                needsGcashAction: refundTxn?.needsGcashDetails ?? false,
               ),
               const SizedBox(height: 16),
+              if (showUnifiedRefundProgress) ...[
+                ThriftCard(
+                  child: BuyerRefundReturnProgress(
+                    refundState: refundTxn?.refundState,
+                    gcashSubmitted: refundTxn?.refundGcashSubmitted ?? false,
+                    itemReturn: order.itemReturn,
+                  ),
+                ),
+                if (refundTxn != null && refundTxn.hasRefund) ...[
+                  const SizedBox(height: 16),
+                  ThriftCard(
+                    child: BuyerRefundStatusSection(
+                      transaction: refundTxn,
+                      gcashBindings: controller.refundGcashBindings,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+              ] else ...[
+                ThriftCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Delivery Progress',
+                        style: AppTypography.subheading,
+                      ),
+                      const SizedBox(height: 12),
+                      DeliveryTimeline(order: order, compact: true),
+                      if (order.shipment == null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tracking information will appear here once your order ships.',
+                          style: AppTypography.caption,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               _ProductSummary(order: order),
               if (order.shipment?.isLocalRider == true &&
                   order.shipment?.shouldShowBuyerRiderInfo == true) ...[
@@ -182,6 +214,7 @@ class OrderTrackingScreen extends StatelessWidget {
                   child: ItemReturnPanel(
                     itemReturn: order.itemReturn!,
                     buyerView: true,
+                    hideProgressSteps: showUnifiedRefundProgress,
                     isBusy: controller.isUpdatingDelivery,
                     onVerifyPin: (pin) async {
                       final error = await context
@@ -338,13 +371,23 @@ class _TrackingLoadingView extends StatelessWidget {
 }
 
 class _StatusHero extends StatelessWidget {
-  const _StatusHero({required this.order});
+  const _StatusHero({required this.order, this.needsGcashAction = false});
 
   final OrderModel order;
+  final bool needsGcashAction;
 
   @override
   Widget build(BuildContext context) {
-    final status = buyerDeliveryStatus(order);
+    final status = order.isRefundedSale
+        ? BuyerDeliveryStatusView(
+            title: needsGcashAction ? 'Refund approved' : 'Refund in progress',
+            message: needsGcashAction
+                ? 'Add your GCash details so our team can send your refund.'
+                : 'We are processing your refund. See progress below.',
+            icon: Icons.account_balance_wallet_outlined,
+            color: AppColors.warning,
+          )
+        : buyerDeliveryStatus(order);
     return Container(
       padding: const EdgeInsets.all(AppConstants.spacingMd),
       decoration: BoxDecoration(
