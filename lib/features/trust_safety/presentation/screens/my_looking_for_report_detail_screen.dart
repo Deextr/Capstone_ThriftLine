@@ -207,13 +207,25 @@ class _ReportedPostSection extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(height: 10),
-        TextButton.icon(
-          onPressed: () =>
-              context.push(RouteNames.lookingForPost(report.postId)),
-          icon: const Icon(Icons.open_in_new_rounded, size: 18),
-          label: const Text('View request'),
-        ),
+        if (!report.livePostAvailable) ...[
+          const SizedBox(height: 10),
+          Text(
+            'This request is no longer publicly available. The snapshot above '
+            'is what was recorded when you submitted your report.',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+        ] else ...[
+          const SizedBox(height: 10),
+          TextButton.icon(
+            onPressed: () =>
+                context.push(RouteNames.lookingForPost(report.postId)),
+            icon: const Icon(Icons.open_in_new_rounded, size: 18),
+            label: const Text('View request'),
+          ),
+        ],
       ],
     );
   }

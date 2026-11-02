@@ -116,6 +116,64 @@ void main() {
       expect(order.isToShip, isFalse);
     });
 
+    test('refunded cancelled orders leave Shipped even if shipment is disputed', () {
+      final order = OrderModel.fromSupabase({
+        'order_id': 'refund-dispute',
+        'order_number': 'TL-1',
+        'buyer_id': 'buyer-1',
+        'seller_id': 'seller-1',
+        'order_status': 'cancelled',
+        'subtotal': 500,
+        'shipping_fee': 40,
+        'platform_fee': 10,
+        'total_amount': 550,
+        'created_at': '2026-09-13T02:00:00Z',
+        'payments': [
+          {'payment_status': 'refunded'},
+        ],
+        'shipment': {
+          'shipment_id': 'ship-1',
+          'delivery_status': 'disputed',
+        },
+      });
+      expect(order.isDisputed, isFalse);
+      expect(order.isShippedTab, isFalse);
+      expect(sellerOrderBucketFor(order), SellerOrderBucket.cancelled);
+      expect(sellerOrderChip(order).label, isNot('Disputed'));
+    });
+
+    test('open return on refunded order shows return chip not disputed', () {
+      final order = OrderModel.fromSupabase({
+        'order_id': 'refund-return',
+        'order_number': 'TL-2',
+        'buyer_id': 'buyer-1',
+        'seller_id': 'seller-1',
+        'order_status': 'cancelled',
+        'subtotal': 500,
+        'shipping_fee': 40,
+        'platform_fee': 10,
+        'total_amount': 550,
+        'created_at': '2026-09-13T02:00:00Z',
+        'payments': [
+          {'payment_status': 'refunded'},
+        ],
+        'shipment': {
+          'shipment_id': 'ship-2',
+          'delivery_status': 'disputed',
+        },
+        'item_return': {
+          'return_id': 'ret-1',
+          'dispute_id': 'disp-1',
+          'order_id': 'refund-return',
+          'return_required': true,
+          'status': 'waiting_for_rider',
+        },
+      });
+      expect(sellerOrderBucketFor(order), SellerOrderBucket.cancelled);
+      expect(sellerOrderChip(order).label, 'Return required');
+      expect(order.itemReturn?.needsRider, isTrue);
+    });
+
     test('paid preparing orders stay in To Ship, not Shipped', () {
       final order = _order(
         id: 'paid',

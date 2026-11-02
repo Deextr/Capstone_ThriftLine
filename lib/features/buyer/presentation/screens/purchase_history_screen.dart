@@ -9,6 +9,7 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../models/enums.dart';
 import '../../../trust_safety/data/review_rules.dart';
 import '../../controllers/buyer_orders_controller.dart';
+import '../../data/order_query.dart';
 import '../widgets/awaiting_payment_tile.dart';
 
 class PurchaseHistoryScreen extends StatelessWidget {
@@ -17,7 +18,7 @@ class PurchaseHistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<BuyerOrdersController>();
-    final awaiting = controller.awaitingPayment;
+    final awaiting = buyerPendingPayments(controller.orders);
     final orders = controller.orders
         .where((order) => order.showsInPurchaseHistory)
         .toList();
@@ -51,14 +52,14 @@ class PurchaseHistoryScreen extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                         child: Text(
-                          'Auction payment due',
+                          'Pending payments',
                           style: AppTypography.subheading,
                         ),
                       ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                         child: Text(
-                          'These auction wins still need payment before the deadline.',
+                          'Unpaid orders appear here until you pay or cancel.',
                           style: AppTypography.caption,
                         ),
                       ),
@@ -82,7 +83,7 @@ class PurchaseHistoryScreen extends StatelessWidget {
                           ),
                           subtitle: Text(
                             o.isCompleted
-                                ? '#${o.orderNumber} · ${reviewActionLabel(reviewActionKind(controller.reviewFor(o.id)), ratingBuyer: false)}'
+                                ? '#${o.orderNumber} · ${reviewActionLabel(reviewActionKind(controller.reviewFor(o.id)))}'
                                 : '#${o.orderNumber} · ${orderStatusLabel(o.status)}',
                           ),
                           trailing: Text(

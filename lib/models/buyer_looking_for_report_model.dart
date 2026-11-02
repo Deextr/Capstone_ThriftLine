@@ -22,6 +22,7 @@ class BuyerLookingForReportModel {
     this.snapshotTitle,
     this.snapshotDescription,
     this.snapshotImagePath,
+    this.livePostAvailable = false,
     this.evidence = const [],
   });
 
@@ -44,6 +45,7 @@ class BuyerLookingForReportModel {
   final String? snapshotTitle;
   final String? snapshotDescription;
   final String? snapshotImagePath;
+  final bool livePostAvailable;
   final List<ReportEvidenceItem> evidence;
 
   String get displayPostTitle {
@@ -61,9 +63,12 @@ class BuyerLookingForReportModel {
   factory BuyerLookingForReportModel.fromSupabase(
     Map<String, dynamic> row, {
     Map<String, dynamic>? reportedUser,
+    Map<String, dynamic>? livePost,
     List<ReportEvidenceItem> evidence = const [],
   }) {
-    final post = row['looking_for_posts'] as Map<String, dynamic>?;
+    final embedded = row['looking_for_posts'];
+    final post =
+        livePost ?? (embedded is Map<String, dynamic> ? embedded : null);
     final user = reportedUser ?? row['reported_user'] as Map<String, dynamic>?;
     final username = user?['username'] as String? ?? '';
     final display =
@@ -98,6 +103,7 @@ class BuyerLookingForReportModel {
       snapshotTitle: row['snapshot_title'] as String?,
       snapshotDescription: row['snapshot_description'] as String?,
       snapshotImagePath: row['snapshot_image_path'] as String?,
+      livePostAvailable: post != null,
       evidence: evidence,
     );
   }
@@ -123,6 +129,7 @@ class BuyerLookingForReportModel {
       snapshotTitle: snapshotTitle,
       snapshotDescription: snapshotDescription,
       snapshotImagePath: snapshotImagePath,
+      livePostAvailable: livePostAvailable,
       evidence: evidence ?? this.evidence,
     );
   }

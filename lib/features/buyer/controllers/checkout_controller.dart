@@ -57,7 +57,8 @@ class CheckoutController extends ChangeNotifier {
   List<AddressModel> get addressBook => _addressBook;
   AddressModel? get selectedAddress => _selectedAddress;
   List<OrderModel> get awaitingPayment => _awaitingPayment;
-  List<OrderModel> get pendingFixedPriceCheckouts => _pendingFixedPriceCheckouts;
+  List<OrderModel> get pendingFixedPriceCheckouts =>
+      _pendingFixedPriceCheckouts;
   bool get isLoading => _isLoading;
   bool get isSubmitting => _isSubmitting;
   bool get isContinuingToPayment => _isContinuingToPayment;
@@ -254,7 +255,9 @@ class CheckoutController extends ChangeNotifier {
       final orders = await fetchOrdersForBuyer(_supabase, buyerId);
       _awaitingPayment = buyerAwaitingPayment(orders);
       _pendingFixedPriceCheckouts = orders
-          .where((order) => order.needsBuyerPayment && !order.isAuctionObligation)
+          .where(
+            (order) => order.needsBuyerPayment && !order.isAuctionObligation,
+          )
           .toList();
     } catch (e) {
       debugPrint('CheckoutController awaiting payment error: $e');

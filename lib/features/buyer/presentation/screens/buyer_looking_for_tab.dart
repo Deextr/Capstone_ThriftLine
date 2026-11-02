@@ -192,9 +192,7 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
       ),
     );
     if (confirmed != true || !mounted) return;
-    final error = await context.read<LookingForController>().closePost(
-      post.id,
-    );
+    final error = await context.read<LookingForController>().closePost(post.id);
     if (!mounted) return;
     if (error != null) {
       showThriftSnackBar(context, error, isError: true);
@@ -298,11 +296,11 @@ class _BuyerLookingForTabState extends State<BuyerLookingForTab>
                       onSortChanged: (value) => setState(() => _sort = value),
                       onOpenFilters: () => _openFilters(
                         showInactiveStatus:
-                            !widget.sellerWorkspace &&
-                            (_tab?.index ?? 0) == 2,
+                            !widget.sellerWorkspace && (_tab?.index ?? 0) == 2,
                       ),
-                      onClearFilters: () =>
-                          setState(() => _filters = const LookingForFeedFilters()),
+                      onClearFilters: () => setState(
+                        () => _filters = const LookingForFeedFilters(),
+                      ),
                     ),
                   ),
                 ),
@@ -554,10 +552,7 @@ class _LookingForTabBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return ColoredBox(
-      color: AppColors.surface,
-      child: tabBar,
-    );
+    return ColoredBox(color: AppColors.surface, child: tabBar);
   }
 
   @override

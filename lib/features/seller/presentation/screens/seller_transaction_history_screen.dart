@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/data/financial_evidence_access.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
@@ -11,6 +13,7 @@ import '../../../../widgets/thrift_widgets.dart';
 import '../../../../widgets/transaction_history_widgets.dart';
 import '../../../buyer/data/buyer_transaction.dart';
 import '../../controllers/seller_transaction_history_controller.dart';
+import '../../data/seller_earnings.dart';
 import '../../data/seller_transaction.dart';
 
 class SellerTransactionHistoryScreen extends StatefulWidget {
@@ -43,7 +46,8 @@ class _SellerTransactionHistoryScreenState
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<SellerTransactionHistoryController>();
-    final initialLoad = controller.isLoading && !controller.hasAnyTransactions;
+    final initialLoad = controller.isLoading && !controller.hasAnyHistory;
+    final showSales = controller.mode == SellerTransactionHistoryMode.sales;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -54,7 +58,7 @@ class _SellerTransactionHistoryScreenState
           onPressed: () => context.pop(),
         ),
         actions: [
-          if (controller.hasAnyTransactions)
+          if (controller.hasAnyHistory && showSales)
             PopupMenuButton<BuyerTransactionSort>(
               tooltip: 'Sort',
               onSelected: (value) {
@@ -100,7 +104,7 @@ class _SellerTransactionHistoryScreenState
                   ),
                 )
               else if (controller.errorMessage != null &&
-                  !controller.hasAnyTransactions)
+                  !controller.hasAnyHistory)
                 SliverFillRemaining(
                   hasScrollBody: false,
                   child: TransactionHistoryErrorState(
@@ -108,7 +112,7 @@ class _SellerTransactionHistoryScreenState
                     onRetry: controller.load,
                   ),
                 )
-              else if (!controller.hasAnyTransactions)
+              else if (!controller.hasAnyHistory)
                 const SliverFillRemaining(
                   hasScrollBody: false,
                   child: TransactionHistoryEmptyState(
@@ -119,56 +123,98 @@ class _SellerTransactionHistoryScreenState
                 )
               else ...[
                 SliverToBoxAdapter(
-                  child: TransactionHistoryFilterBar(
-                    selected: controller.filter,
-                    onSelected: (value) => context
-                        .read<SellerTransactionHistoryController>()
-                        .setFilter(value),
-                    options: [
-                      for (final filter in BuyerTransactionFilter.values)
-                        (
-                          filter,
-                          filter.sellerHistoryLabel,
-                          controller.countForFilter(filter),
-                        ),
-                    ],
-                  ),
+                  child: _HistoryModeSwitcher(controller: controller),
                 ),
-                if (controller.isLoading)
+                if (showSales) ...[
                   SliverToBoxAdapter(
-                    child: LinearProgressIndicator(
-                      color: AppColors.primary,
-                      backgroundColor: AppColors.surfaceVariant,
-                      minHeight: 2,
+                    child: TransactionHistoryFilterBar(
+                      selected: controller.filter,
+                      onSelected: (value) => context
+                          .read<SellerTransactionHistoryController>()
+                          .setFilter(value),
+                      options: [
+                        for (final filter in BuyerTransactionFilter.values)
+                          (
+                            filter,
+                            filter.sellerHistoryLabel,
+                            controller.countForFilter(filter),
+                          ),
+                      ],
                     ),
                   ),
-                if (controller.visibleTransactions.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: TransactionHistoryEmptyFilterState(
-                      message: _emptyFilterMessage(controller.filter),
-                      showClear: controller.filter != BuyerTransactionFilter.all,
-                      onClear: () {
-                        controller.resetFilters();
-                        _scrollToTop();
-                      },
+                  if (controller.isLoading)
+                    SliverToBoxAdapter(
+                      child: LinearProgressIndicator(
+                        color: AppColors.primary,
+                        backgroundColor: AppColors.surfaceVariant,
+                        minHeight: 2,
+                      ),
                     ),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppConstants.spacingMd,
-                      0,
-                      AppConstants.spacingMd,
-                      32,
+                  if (controller.visibleTransactions.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: TransactionHistoryEmptyFilterState(
+                        message: _emptyFilterMessage(controller.filter),
+                        showClear:
+                            controller.filter != BuyerTransactionFilter.all,
+                        onClear: () {
+                          controller.resetFilters();
+                          _scrollToTop();
+                        },
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppConstants.spacingMd,
+                        0,
+                        AppConstants.spacingMd,
+                        32,
+                      ),
+                      sliver: GroupedTransactionHistorySliver(
+                        transactions: controller.visibleTransactions,
+                        dateFor: (t) => _displayDate(t) ?? t.sortDate,
+                        tileBuilder: (transaction) =>
+                            _SellerTransactionTile(transaction: transaction),
+                      ),
                     ),
-                    sliver: GroupedTransactionHistorySliver(
-                      transactions: controller.visibleTransactions,
-                      dateFor: (t) => _displayDate(t) ?? t.sortDate,
-                      tileBuilder: (transaction) =>
-                          _SellerTransactionTile(transaction: transaction),
+                ] else ...[
+                  if (controller.isLoading)
+                    SliverToBoxAdapter(
+                      child: LinearProgressIndicator(
+                        color: AppColors.primary,
+                        backgroundColor: AppColors.surfaceVariant,
+                        minHeight: 2,
+                      ),
                     ),
-                  ),
+                  if (!controller.hasAnyPayouts)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: TransactionHistoryEmptyState(
+                        title: 'No payouts yet',
+                        message:
+                            'When you request a payout and an admin sends it to your GCash, it will appear here.',
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppConstants.spacingMd,
+                        0,
+                        AppConstants.spacingMd,
+                        32,
+                      ),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final payout = controller.payouts[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _SellerPayoutTile(payout: payout),
+                          );
+                        }, childCount: controller.payouts.length),
+                      ),
+                    ),
+                ],
               ],
             ],
           ),
@@ -178,13 +224,11 @@ class _SellerTransactionHistoryScreenState
   }
 }
 
-String _emptyFilterMessage(BuyerTransactionFilter filter) =>
-    switch (filter) {
-      BuyerTransactionFilter.successful =>
-        'No completed sales match this filter.',
-      BuyerTransactionFilter.refunded => 'No buyer refunds yet.',
-      BuyerTransactionFilter.all => 'No transactions to show.',
-    };
+String _emptyFilterMessage(BuyerTransactionFilter filter) => switch (filter) {
+  BuyerTransactionFilter.successful => 'No completed sales match this filter.',
+  BuyerTransactionFilter.refunded => 'No buyer refunds yet.',
+  BuyerTransactionFilter.all => 'No transactions to show.',
+};
 
 DateTime? _displayDate(SellerTransaction transaction) {
   final refunded = transaction.status != BuyerTransactionStatus.successful;
@@ -209,9 +253,7 @@ class _SellerTransactionTile extends StatelessWidget {
     final refundHint = sellerRefundEarningsListHint(transaction);
     final notice = refundHint ?? earningsHint;
 
-    final amountColor = refunded
-        ? AppColors.textSecondary
-        : AppColors.success;
+    final amountColor = refunded ? AppColors.textSecondary : AppColors.success;
 
     return TransactionHistoryListTile(
       productImageUrl: transaction.productImageUrl,
@@ -359,9 +401,7 @@ class _TransactionDetailsSheet extends StatelessWidget {
             if (transaction.orderNumber.isNotEmpty)
               TransactionHistoryDetailRow(
                 label: 'Order ID',
-                value: formatTransactionOrderReference(
-                  transaction.orderNumber,
-                ),
+                value: formatTransactionOrderReference(transaction.orderNumber),
               ),
             if (transaction.paidAt != null)
               TransactionHistoryDetailRow(
@@ -384,6 +424,165 @@ class _TransactionDetailsSheet extends StatelessWidget {
                 label: 'Reference',
                 value: transaction.transactionReference!,
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryModeSwitcher extends StatelessWidget {
+  const _HistoryModeSwitcher({required this.controller});
+
+  final SellerTransactionHistoryController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppConstants.spacingMd,
+        8,
+        AppConstants.spacingMd,
+        4,
+      ),
+      child: SegmentedButton<SellerTransactionHistoryMode>(
+        segments: const [
+          ButtonSegment(
+            value: SellerTransactionHistoryMode.sales,
+            label: Text('Sales'),
+          ),
+          ButtonSegment(
+            value: SellerTransactionHistoryMode.payouts,
+            label: Text('Payouts'),
+          ),
+        ],
+        selected: {controller.mode},
+        onSelectionChanged: (selection) {
+          context.read<SellerTransactionHistoryController>().setMode(
+            selection.first,
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SellerPayoutTile extends StatelessWidget {
+  const _SellerPayoutTile({required this.payout});
+
+  final SellerPayoutRecord payout;
+
+  @override
+  Widget build(BuildContext context) {
+    final variant = switch (payout.status) {
+      SellerPayoutStatus.requested => BadgeVariant.primary,
+      SellerPayoutStatus.paid => BadgeVariant.success,
+      SellerPayoutStatus.rejected => BadgeVariant.error,
+      SellerPayoutStatus.cancelled => BadgeVariant.neutral,
+    };
+
+    return TransactionHistoryListTile(
+      title: 'GCash payout',
+      subtitle: payout.requestedAt != null
+          ? 'Requested ${formatFullDate(payout.requestedAt!)}'
+          : 'Payout request',
+      amount: formatCentavos(payout.amountCentavos),
+      amountCaption: 'Amount',
+      amountColor: AppColors.textPrimary,
+      statusLabel: sellerPayoutStatusLabel(payout.status),
+      statusVariant: variant,
+      displayDate: payout.transferredAt ?? payout.requestedAt,
+      onTap: () => _showPayoutDetails(context, payout),
+    );
+  }
+}
+
+void _showPayoutDetails(BuildContext context, SellerPayoutRecord payout) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: AppColors.surface,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (sheetContext) => _SellerPayoutDetailsSheet(payout: payout),
+  );
+}
+
+class _SellerPayoutDetailsSheet extends StatelessWidget {
+  const _SellerPayoutDetailsSheet({required this.payout});
+
+  final SellerPayoutRecord payout;
+
+  @override
+  Widget build(BuildContext context) {
+    final mobile = maskMobileNumber(payout.gcashMobileNumber);
+
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          24 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Payout details', style: AppTypography.subheading),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ThriftBadge(
+                label: sellerPayoutStatusLabel(payout.status),
+                variant: switch (payout.status) {
+                  SellerPayoutStatus.paid => BadgeVariant.success,
+                  SellerPayoutStatus.requested => BadgeVariant.primary,
+                  SellerPayoutStatus.rejected => BadgeVariant.error,
+                  SellerPayoutStatus.cancelled => BadgeVariant.neutral,
+                },
+              ),
+            ),
+            const SizedBox(height: 20),
+            const TransactionHistorySectionTitle(title: 'AMOUNT'),
+            TransactionHistoryDetailRow(
+              label: 'Payout amount',
+              value: formatCentavos(payout.amountCentavos),
+              emphasis: true,
+            ),
+            if (payout.transferredAmountCentavos != null)
+              TransactionHistoryDetailRow(
+                label: 'Amount sent',
+                value: formatCentavos(payout.transferredAmountCentavos!),
+              ),
+            const SizedBox(height: 8),
+            const TransactionHistorySectionTitle(title: 'DETAILS'),
+            if (payout.requestedAt != null)
+              TransactionHistoryDetailRow(
+                label: 'Requested',
+                value: formatFullDate(payout.requestedAt!),
+              ),
+            if (payout.transferredAt != null)
+              TransactionHistoryDetailRow(
+                label: 'Sent on',
+                value: formatFullDate(payout.transferredAt!),
+              ),
+            if (mobile.isNotEmpty)
+              TransactionHistoryDetailRow(label: 'GCash', value: mobile),
+            if (payout.gcashReference != null)
+              TransactionHistoryDetailRow(
+                label: 'GCash reference',
+                value: payout.gcashReference!,
+              ),
+            if (payout.status == SellerPayoutStatus.paid) ...[
+              const SizedBox(height: 12),
+              TransactionFinancialProofSection(
+                title: 'PAYOUT PROOF',
+                emptyMessage: 'No payout proof available.',
+                loadSignedUrl: () => loadPayoutProofSignedUrl(
+                  context.read<SupabaseService>(),
+                  payout.payoutId,
+                ),
+              ),
+            ],
           ],
         ),
       ),

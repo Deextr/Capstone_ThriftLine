@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
@@ -34,16 +35,21 @@ class LivenessCaptureScreen extends StatefulWidget {
   State<LivenessCaptureScreen> createState() => _LivenessCaptureScreenState();
 }
 
-class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
+class _LivenessCaptureScreenState extends State<LivenessCaptureScreen>
+    with SingleTickerProviderStateMixin {
   CameraController? _controller;
   FaceDetector? _detector;
   late final SelfieImageQualityAnalyzer _qualityAnalyzer;
   late final LiveCaptureStability _stability;
   late final LivenessChallengeSession _challenge;
+  late final AnimationController _preCaptureGlowController;
+  late final Animation<double> _preCaptureGlow;
   bool _busy = false;
   bool _ready = false;
   bool _checking = false;
   bool _capturing = false;
+  bool _preCaptureActive = false;
+  bool _preCaptureStillAligned = false;
   bool _permissionDenied = false;
   bool _holdingPose = false;
   String? _error;
@@ -69,7 +75,49 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
       hold: widget.autoCaptureHold,
       motionDelta: SelfieCaptureGuide.motionCoverageDelta,
     );
+    _preCaptureGlowController = AnimationController(
+      vsync: this,
+      duration: SelfieCaptureGuide.preCaptureGlowDuration,
+    )..addStatusListener(_onPreCaptureGlowStatus);
+    _preCaptureGlow = CurvedAnimation(
+      parent: _preCaptureGlowController,
+      curve: Curves.easeInOut,
+    );
     _start();
+  }
+
+  void _onPreCaptureGlowStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed) {
+      unawaited(_finishPreCaptureAndShoot());
+    }
+  }
+
+  Future<void> _finishPreCaptureAndShoot() async {
+    if (!_preCaptureActive || _capturing || _checking || !mounted) return;
+    if (!_preCaptureStillAligned) {
+      _cancelPreCapture();
+      return;
+    }
+    _preCaptureActive = false;
+    await _capture();
+  }
+
+  void _beginPreCapture() {
+    if (_preCaptureActive || _capturing || _checking || !_livenessComplete) {
+      return;
+    }
+    _stability.reset();
+    _preCaptureActive = true;
+    _preCaptureGlowController.forward(from: 0);
+    setState(() {});
+  }
+
+  void _cancelPreCapture() {
+    if (!_preCaptureActive) return;
+    _preCaptureActive = false;
+    _preCaptureGlowController.reset();
+    _stability.reset();
+    if (mounted) setState(() {});
   }
 
   Future<void> _start() async {
@@ -218,6 +266,14 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
       );
       _setLiveStatus(assessment.status);
 
+      if (_preCaptureActive) {
+        _preCaptureStillAligned = assessment.isAligned;
+        if (!assessment.isAligned) {
+          _cancelPreCapture();
+        }
+        return;
+      }
+
       final shouldCapture = _stability.observe(
         LiveIdAssessment(
           status: assessment.isAligned
@@ -227,8 +283,9 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
         ),
         now,
       );
-      if (shouldCapture) {
-        await _capture();
+      if (shouldCapture && assessment.isAligned) {
+        _preCaptureStillAligned = true;
+        _beginPreCapture();
       }
     } catch (_) {
       // Frame conversion can fail on some devices; keep streaming.
@@ -339,6 +396,8 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
       return;
     }
 
+    _preCaptureActive = false;
+    _preCaptureGlowController.stop();
     _capturing = true;
     _stability.reset();
     setState(() {
@@ -370,6 +429,8 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
 
       if (!quality.passed) {
         _capturing = false;
+        _preCaptureActive = false;
+        _preCaptureGlowController.reset();
         _stability.reset();
         setState(() {
           _checking = false;
@@ -395,6 +456,8 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
       await _deleteQuietly(capturePath);
       if (!mounted) return;
       _capturing = false;
+      _preCaptureActive = false;
+      _preCaptureGlowController.reset();
       _stability.reset();
       setState(() => _checking = false);
       showThriftSnackBar(
@@ -429,6 +492,7 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
   }
 
   String get _prompt {
+    if (_preCaptureActive) return 'Hold still…';
     if (_checking) return 'Checking selfie…';
     if (_isCoveringStatus(_liveStatus) ||
         _liveStatus == LiveSelfieStatus.noFace ||
@@ -449,6 +513,9 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
   }
 
   String? get _overlaySubtitle {
+    if (_preCaptureActive) {
+      return 'Frame lighting up for capture';
+    }
     if (_checking ||
         _isCoveringStatus(_liveStatus) ||
         _liveStatus == LiveSelfieStatus.noFace ||
@@ -478,6 +545,7 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
 
   @override
   void dispose() {
+    _preCaptureGlowController.dispose();
     final controller = _controller;
     _controller = null;
     _detector?.close();
@@ -532,7 +600,7 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
           children: [
             Icon(
               _permissionDenied
-                  ? Icons.lock_outline
+                  ? Icons.no_photography_outlined
                   : Icons.videocam_off_outlined,
               color: Colors.white,
               size: 48,
@@ -577,11 +645,18 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
                 )
               : const Center(child: CircularProgressIndicator()),
         ),
-        SelfieCaptureOverlay(
-          message: _prompt,
-          aligned: _livenessComplete && _liveStatus == LiveSelfieStatus.aligned,
-          capturing: _capturing || _checking,
-          subtitle: _overlaySubtitle,
+        AnimatedBuilder(
+          animation: _preCaptureGlow,
+          builder: (context, _) {
+            return SelfieCaptureOverlay(
+              message: _prompt,
+              aligned:
+                  _livenessComplete && _liveStatus == LiveSelfieStatus.aligned,
+              capturing: _capturing || _checking,
+              preCaptureGlow: _preCaptureGlow.value,
+              subtitle: _overlaySubtitle,
+            );
+          },
         ),
         SafeArea(
           child: Padding(
@@ -607,20 +682,40 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
                     IconButton(
                       tooltip: 'Help',
                       onPressed: _showHelp,
-                      icon: const Icon(Icons.help_outline, color: Colors.white),
+                      icon: const Icon(Icons.info_outline, color: Colors.white),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    _chip('Face', _shownDone['face'] == true),
-                    _chip('Right', _shownDone['lookRight'] == true),
-                    _chip('Left', _shownDone['lookLeft'] == true),
-                    _chip('Blink', _shownDone['blink'] == true),
-                  ],
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      _stepChip(
+                        label: 'Face',
+                        icon: Icons.face_outlined,
+                        done: _shownDone['face'] == true,
+                      ),
+                      _stepChip(
+                        label: 'Right',
+                        icon: Icons.arrow_forward_rounded,
+                        done: _shownDone['lookRight'] == true,
+                      ),
+                      _stepChip(
+                        label: 'Left',
+                        icon: Icons.arrow_back_rounded,
+                        done: _shownDone['lookLeft'] == true,
+                      ),
+                      _stepChip(
+                        label: 'Blink',
+                        icon: Icons.remove_red_eye_outlined,
+                        done: _shownDone['blink'] == true,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -630,20 +725,23 @@ class _LivenessCaptureScreenState extends State<LivenessCaptureScreen> {
     );
   }
 
-  Widget _chip(String label, bool done) {
+  Widget _stepChip({
+    required String label,
+    required IconData icon,
+    required bool done,
+  }) {
+    final color = done ? AppColors.success : Colors.white;
     return Chip(
       visualDensity: VisualDensity.compact,
       label: Text(
         label,
-        style: AppTypography.caption.copyWith(
-          color: done ? AppColors.success : Colors.white,
-        ),
+        style: AppTypography.caption.copyWith(color: color),
       ),
       backgroundColor: done
           ? AppColors.success.withValues(alpha: 0.2)
           : Colors.white.withValues(alpha: 0.12),
       avatar: Icon(
-        done ? Icons.check_circle : Icons.radio_button_unchecked,
+        done ? Icons.check_circle_outline : icon,
         size: 16,
         color: done ? AppColors.success : Colors.white70,
       ),

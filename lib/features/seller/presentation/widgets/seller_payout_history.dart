@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/data/financial_evidence_access.dart';
+import '../../../../core/services/supabase_service.dart';
+import '../../../../widgets/transaction_history_widgets.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
@@ -114,6 +117,18 @@ class _PayoutRow extends StatelessWidget {
               style: AppTypography.caption.copyWith(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          if (payout.status == SellerPayoutStatus.paid) ...[
+            const SizedBox(height: 12),
+            TransactionFinancialProofSection(
+              title: 'PAYOUT PROOF',
+              emptyMessage: 'No payout proof available.',
+              showWhenUnavailable: payout.payoutProofAvailable,
+              loadSignedUrl: () => loadPayoutProofSignedUrl(
+                context.read<SupabaseService>(),
+                payout.payoutId,
               ),
             ),
           ],

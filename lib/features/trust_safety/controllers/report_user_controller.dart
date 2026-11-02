@@ -38,12 +38,18 @@ class ReportUserController extends ChangeNotifier {
        _initialUsername = username?.trim(),
        _initialUserId = userId?.trim(),
        _picker = picker ?? ImagePicker() {
+    final following = _followingShops;
+    if (following != null) {
+      _followingShopsListener = () => notifyListeners();
+      following.addListener(_followingShopsListener!);
+    }
     load();
   }
 
   final SupabaseService _supabase;
   final AuthProvider _auth;
   final FollowingShopsProvider? _followingShops;
+  VoidCallback? _followingShopsListener;
   final String? _initialUsername;
   final String? _initialUserId;
   final ImagePicker _picker;
@@ -113,6 +119,12 @@ class ReportUserController extends ChangeNotifier {
 
   bool get isLoadingFollowedShops => _followingShops?.isLoading ?? false;
 
+  String? get followedShopsErrorMessage => _followingShops?.errorMessage;
+
+  Future<void> retryFollowedShops() async {
+    await _followingShops?.refresh();
+  }
+
   bool get detailsRequired => _selectedCategory == 'other';
 
   bool get canSubmit {
@@ -127,6 +139,11 @@ class ReportUserController extends ChangeNotifier {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    final following = _followingShops;
+    final listener = _followingShopsListener;
+    if (following != null && listener != null) {
+      following.removeListener(listener);
+    }
     super.dispose();
   }
 
@@ -135,7 +152,7 @@ class ReportUserController extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      unawaited(_followingShops?.refresh());
+      await _followingShops?.refresh();
       if (_initialUserId != null || _initialUsername != null) {
         final error = await _resolveTarget(
           username: _initialUsername,

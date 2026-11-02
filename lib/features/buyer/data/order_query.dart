@@ -168,7 +168,20 @@ Future<void> restoreAbandonedFixedPriceCheckouts(
 }
 
 List<OrderModel> buyerAwaitingPayment(Iterable<OrderModel> orders) {
-  return orders.where((order) => order.showsAsAwaitingPayment).toList();
+  return buyerPendingPayments(orders);
+}
+
+/// Unpaid checkouts (auction wins and fixed-price reservations) recoverable in UI.
+List<OrderModel> buyerPendingPayments(Iterable<OrderModel> orders) {
+  return orders.where((order) => order.showsAsAwaitingPayment).toList()
+    ..sort((a, b) {
+      final aDue = a.paymentDueAt ?? a.unpaidFixedPriceReservationExpiresAt;
+      final bDue = b.paymentDueAt ?? b.unpaidFixedPriceReservationExpiresAt;
+      if (aDue != null && bDue != null) return aDue.compareTo(bDue);
+      if (aDue != null) return -1;
+      if (bDue != null) return 1;
+      return b.createdAt.compareTo(a.createdAt);
+    });
 }
 
 Future<List<OrderModel>> fetchOrdersForCheckoutGroup(

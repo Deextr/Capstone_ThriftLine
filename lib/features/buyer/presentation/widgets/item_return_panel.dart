@@ -7,6 +7,7 @@ import '../../../../core/utils/ph_phone.dart';
 import '../../../../models/enums.dart';
 import '../../../../models/return_shipment.dart';
 import '../../../../widgets/thrift_widgets.dart';
+import '../../../seller/presentation/widgets/delivery_pin_entry.dart';
 
 class ItemReturnPanel extends StatelessWidget {
   const ItemReturnPanel({
@@ -15,19 +16,24 @@ class ItemReturnPanel extends StatelessWidget {
     required this.buyerView,
     required this.isBusy,
     this.onArrange,
-    this.onHandOff,
+    this.onVerifyPin,
     this.onConfirmReceived,
+    this.returnPickupPin,
+    this.returnPinExpiresAt,
   });
 
   final ReturnShipment itemReturn;
   final bool buyerView;
   final bool isBusy;
   final VoidCallback? onArrange;
-  final VoidCallback? onHandOff;
+  final Future<void> Function(String pin)? onVerifyPin;
   final VoidCallback? onConfirmReceived;
+  final String? returnPickupPin;
+  final DateTime? returnPinExpiresAt;
 
   @override
   Widget build(BuildContext context) {
+    final verifyPin = onVerifyPin;
     final steps = itemReturn.returnRequired
         ? kReturnProgressSteps
         : const <String>[];
@@ -109,6 +115,27 @@ class ItemReturnPanel extends StatelessWidget {
           if (itemReturn.notes?.trim().isNotEmpty == true)
             Text(itemReturn.notes!.trim(), style: AppTypography.caption),
         ],
+        if (!buyerView &&
+            itemReturn.status == 'rider_assigned' &&
+            returnPickupPin?.trim().isNotEmpty == true) ...[
+          const SizedBox(height: 16),
+          Text('Return pickup PIN', style: AppTypography.subheading),
+          const SizedBox(height: 8),
+          Text(
+            returnPickupPin!.trim(),
+            style: AppTypography.heading.copyWith(letterSpacing: 6),
+          ),
+          if (returnPinExpiresAt != null)
+            Text(
+              'Expires ${formatCompactDate(returnPinExpiresAt!)}',
+              style: AppTypography.caption,
+            ),
+          const SizedBox(height: 8),
+          Text(
+            'Share this PIN with your rider only. The buyer enters it when the rider picks up the item.',
+            style: AppTypography.caption,
+          ),
+        ],
         if (!buyerView && itemReturn.needsRider && onArrange != null) ...[
           const SizedBox(height: 16),
           ThriftButton(
@@ -119,12 +146,15 @@ class ItemReturnPanel extends StatelessWidget {
             onPressed: isBusy ? null : onArrange,
           ),
         ],
-        if (buyerView && itemReturn.canHandOff && onHandOff != null) ...[
+        if (buyerView && itemReturn.canHandOff && verifyPin != null) ...[
           const SizedBox(height: 16),
-          ThriftButton(
-            label: 'Item handed to rider',
+          DeliveryPinEntry(
+            title: 'Confirm pickup',
+            hint:
+                'Enter the six-digit pickup PIN from the rider when they collect the item.',
+            buttonLabel: 'Confirm handoff',
             isLoading: isBusy,
-            onPressed: isBusy ? null : onHandOff,
+            onSubmit: (pin) => verifyPin(pin),
           ),
         ],
         if (!buyerView &&
@@ -145,7 +175,8 @@ class ItemReturnPanel extends StatelessWidget {
 String _sellerHint(String status) => switch (status) {
   'waiting_for_rider' =>
     'Arrange a local rider. The buyer stays refunded even if you have not done this yet.',
-  'rider_assigned' => 'The buyer can see the rider. Wait for the handoff.',
+  'rider_assigned' =>
+    'Share the pickup PIN with your rider. The buyer confirms handoff with that PIN.',
   'picked_up' => 'Confirm when the item is back with you.',
   'returned' => 'This return is complete. The refund is unchanged.',
   'not_required' => 'No item needs to come back. The refund is unchanged.',

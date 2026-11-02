@@ -49,16 +49,8 @@ class PhoneVerificationController extends ChangeNotifier {
   bool get isChangingVerifiedPhone =>
       accountHasVerifiedPhone && !isVerifiedForEnteredPhone;
 
-  bool get isVerifiedForEnteredPhone {
-    final user = _auth.user;
-    if (user == null || !user.isPhoneVerified) return false;
-    final stored = normalizePhMobile(user.phone);
-    final entered = normalizePhMobile(phone);
-    return stored != null &&
-        entered != null &&
-        stored == entered &&
-        isPhMobile09Format(entered);
-  }
+  bool get isVerifiedForEnteredPhone =>
+      _auth.user?.verifiedPhoneMatchesField(phone) ?? false;
 
   String get maskedPhone => maskPhMobileForOtp(phone);
 

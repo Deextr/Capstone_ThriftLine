@@ -153,6 +153,32 @@ void main() {
     );
   });
 
+  group('AuthUser.verifiedPhoneMatchesField', () {
+    const base = AuthUser(
+      id: 'u1',
+      username: 'buyer',
+      name: 'Buyer',
+      email: 'b@test.com',
+      role: UserRole.buyer,
+      avatarUrl: '',
+      location: '',
+    );
+
+    test('requires verified account phone matching the field', () {
+      final verified = base.copyWith(
+        isPhoneVerified: true,
+        phone: '09171234567',
+      );
+      expect(verified.verifiedPhoneMatchesField('09171234567'), isTrue);
+      expect(verified.verifiedPhoneMatchesField('09171234568'), isFalse);
+      expect(
+        base.copyWith(isPhoneVerified: false, phone: '09171234567')
+            .verifiedPhoneMatchesField('09171234567'),
+        isFalse,
+      );
+    });
+  });
+
   group('AuthUser.hasVerifiedAccountPhone', () {
     const base = AuthUser(
       id: 'u1',

@@ -42,14 +42,7 @@ void main() {
 
     test('button labels change after a review exists', () {
       expect(reviewActionKind(null), ReviewActionKind.leave);
-      expect(
-        reviewActionLabel(ReviewActionKind.leave, ratingBuyer: false),
-        'Leave a Review',
-      );
-      expect(
-        reviewActionLabel(ReviewActionKind.leave, ratingBuyer: true),
-        'Rate Buyer',
-      );
+      expect(reviewActionLabel(ReviewActionKind.leave), 'Leave a Review');
 
       final review = ReviewModel.fromSupabase({
         'review_id': 'r1',
@@ -147,7 +140,10 @@ void main() {
       expect(kReportReasons.map((r) => r.slug), contains('other'));
       expect(reportReasonLabel('fake_item'), 'Counterfeit or Fake Items');
       expect(reportReasonLabel('fake_product'), 'Counterfeit or Fake Items');
-      expect(reportReasonLabel('abusive_behavior'), 'Harassment or Abusive Behavior');
+      expect(
+        reportReasonLabel('abusive_behavior'),
+        'Harassment or Abusive Behavior',
+      );
       expect(communityReportDetailsError('', 'scam_or_fraud'), isNull);
       expect(communityReportDetailsError('', 'other'), isNotNull);
       expect(buyerReportDetailsError('', requireDetails: false), isNull);

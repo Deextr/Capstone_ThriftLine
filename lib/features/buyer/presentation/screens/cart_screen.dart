@@ -24,7 +24,7 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  List<OrderModel> _awaiting = [];
+  List<OrderModel> _pendingPayments = [];
   bool _checkingOut = false;
 
   @override
@@ -45,16 +45,16 @@ class _CartScreenState extends State<CartScreen> {
     if (!mounted) return;
     final buyerId = context.read<AuthProvider>().user?.id;
     if (buyerId == null) {
-      setState(() => _awaiting = []);
+      setState(() => _pendingPayments = []);
       return;
     }
     try {
       final orders = await fetchOrdersForBuyer(supabase, buyerId);
       if (!mounted) return;
-      setState(() => _awaiting = buyerAwaitingPayment(orders));
+      setState(() => _pendingPayments = buyerPendingPayments(orders));
     } catch (_) {
       if (!mounted) return;
-      setState(() => _awaiting = []);
+      setState(() => _pendingPayments = []);
     }
   }
 
@@ -115,10 +115,7 @@ class _CartScreenState extends State<CartScreen> {
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: Icon(
-              Icons.arrow_back_rounded,
-              color: AppColors.textPrimary,
-            ),
+            icon: Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
             onPressed: _handleBack,
           ),
           title: Column(
@@ -143,15 +140,22 @@ class _CartScreenState extends State<CartScreen> {
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: [
-                          if (_awaiting.isNotEmpty) ...[
+                          if (_pendingPayments.isNotEmpty) ...[
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                               child: Text(
-                                'Auction payment due',
+                                'Pending payments',
                                 style: AppTypography.subheading,
                               ),
                             ),
-                            for (final order in _awaiting)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                              child: Text(
+                                'Finish payment or cancel to release reserved items.',
+                                style: AppTypography.caption,
+                              ),
+                            ),
+                            for (final order in _pendingPayments)
                               AwaitingPaymentTile(order: order),
                           ],
                           const SizedBox(height: 80),
@@ -173,13 +177,18 @@ class _CartScreenState extends State<CartScreen> {
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                         children: [
-                          if (_awaiting.isNotEmpty) ...[
+                          if (_pendingPayments.isNotEmpty) ...[
                             Text(
-                              'Auction payment due',
+                              'Pending payments',
                               style: AppTypography.subheading,
                             ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Finish payment or cancel to release reserved items.',
+                              style: AppTypography.caption,
+                            ),
                             const SizedBox(height: 8),
-                            for (final order in _awaiting)
+                            for (final order in _pendingPayments)
                               AwaitingPaymentTile(order: order),
                             const SizedBox(height: 12),
                           ],

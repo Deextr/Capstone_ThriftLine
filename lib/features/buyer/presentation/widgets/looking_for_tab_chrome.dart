@@ -97,10 +97,7 @@ class LookingForFeedToolbar extends StatelessWidget {
                 child: _SortButton(sort: sort, onSortChanged: onSortChanged),
               ),
               const SizedBox(width: 10),
-              _FilterButton(
-                activeCount: filterCount,
-                onPressed: onOpenFilters,
-              ),
+              _FilterButton(activeCount: filterCount, onPressed: onOpenFilters),
             ],
           ),
           if (filters.hasAnyFilter) ...[

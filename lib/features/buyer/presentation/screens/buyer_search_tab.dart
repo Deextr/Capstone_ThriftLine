@@ -226,10 +226,7 @@ class _BuyerSearchTabState extends State<BuyerSearchTab> {
         ...search.recentSearches.map(
           (s) => ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(
-              Icons.history_rounded,
-              color: AppColors.textHint,
-            ),
+            leading: Icon(Icons.history_rounded, color: AppColors.textHint),
             title: Text(s, style: AppTypography.body),
             trailing: IconButton(
               icon: const Icon(Icons.close_rounded, size: 18),

@@ -24,6 +24,7 @@ import '../../../../features/seller/presentation/screens/liveness_capture_screen
 import '../../../../features/seller/presentation/widgets/past_selling_step.dart';
 import '../../../../features/seller/presentation/widgets/davao_barangay_field.dart';
 import '../../../../features/seller/presentation/widgets/id_side_review_card.dart';
+import '../../../../features/seller/presentation/widgets/face_selfie_verification_step.dart';
 import '../../../../features/seller/presentation/widgets/seller_id_type_list.dart';
 import '../../../../features/seller/presentation/widgets/terms_acceptance_note.dart';
 import '../../../../providers/auth_provider.dart';
@@ -56,6 +57,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   SellerIdType? _selectedIdType;
 
   bool _selfieUploaded = false;
+  bool _livenessInProgress = false;
   bool _submitting = false;
   bool _addingHistory = false;
   int _currentStep = 0;
@@ -75,9 +77,17 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   @override
   void initState() {
     super.initState();
+    _phoneCtrl.addListener(_onPhoneFieldChanged);
     unawaited(DavaoBarangayService.prefetch());
     _loadBarangays();
   }
+
+  void _onPhoneFieldChanged() {
+    if (mounted) setState(() {});
+  }
+
+  bool _phoneStepReady(AuthUser? user) =>
+      user?.verifiedPhoneMatchesField(_phoneCtrl.text) ?? false;
 
   @override
   void didChangeDependencies() {
@@ -93,6 +103,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
   @override
   void dispose() {
+    _phoneCtrl.removeListener(_onPhoneFieldChanged);
     _phoneCtrl.dispose();
     _storeNameCtrl.dispose();
     _addressLine1Ctrl.dispose();
@@ -257,7 +268,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
   Widget _buildBottomActions(AuthProvider auth) {
     if (_currentStep == 0) {
-      final phoneReady = auth.user?.hasVerifiedAccountPhone ?? false;
+      final phoneReady = _phoneStepReady(auth.user);
       return ThriftButton(
         label: 'Continue to seller information',
         onPressed: phoneReady ? _continueFromPhone : null,
@@ -287,13 +298,11 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       );
     }
     if (_currentStep == 3) {
-      if (_liveness?.passed == true) {
-        return ThriftButton(
-          label: 'Continue',
-          onPressed: () => setState(() => _currentStep = 4),
-        );
-      }
-      return ThriftButton(label: 'Take a selfie', onPressed: _startLiveness);
+      return ThriftButton(
+        label: 'Take a selfie',
+        isLoading: _livenessInProgress,
+        onPressed: _livenessInProgress ? null : _startLiveness,
+      );
     }
     if (!_addingHistory) {
       return Column(
@@ -383,6 +392,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
       ),
       child: AccountPhoneVerificationSection(
         phoneController: _phoneCtrl,
+        lockVerifiedPhone: true,
         sendOtpButtonLabel: 'Send OTP',
         intro:
             'Verify your mobile number before we collect seller information. '
@@ -624,115 +634,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   }
 
   Widget _selfieStep() {
-    if (_selfieUploaded) {
-      return Column(
-        children: [
-          const Icon(
-            Icons.check_circle_outline,
-            color: AppColors.success,
-            size: 56,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Face check passed',
-            style: AppTypography.subheading.copyWith(color: AppColors.success),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Look left, look right, and a blink were completed. The selfie was captured automatically.',
-            style: AppTypography.body.copyWith(color: AppColors.textSecondary),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          TextButton.icon(
-            onPressed: _startLiveness,
-            icon: const Icon(Icons.refresh, size: 16),
-            label: const Text('Retake face check'),
-          ),
-        ],
-      );
-    }
-
-    return Column(
-      children: [
-        Text(
-          'Look at the camera, then look right, look left, and blink. '
-          'The selfie is taken automatically once your face is clear and still.',
-          style: AppTypography.body.copyWith(color: AppColors.textSecondary),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 28),
-        Icon(
-          Icons.account_circle_outlined,
-          size: 96,
-          color: AppColors.textHint.withValues(alpha: 0.8),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _bannedIcon(Icons.visibility_outlined),
-            const SizedBox(width: 20),
-            _bannedIcon(Icons.school_outlined),
-            const SizedBox(width: 20),
-            _bannedIcon(Icons.masks_outlined),
-          ],
-        ),
-        const SizedBox(height: 24),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceVariant,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _bullet('Look directly at the camera'),
-              _bullet('Remove glasses, hats and masks'),
-              _bullet('Make sure your face is well-lit'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        ThriftButton(label: 'Next', onPressed: _startLiveness),
-      ],
-    );
-  }
-
-  Widget _bannedIcon(IconData icon) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Icon(icon, size: 36, color: AppColors.textHint),
-        Positioned(
-          right: -6,
-          bottom: -4,
-          child: Container(
-            width: 16,
-            height: 16,
-            decoration: const BoxDecoration(
-              color: AppColors.error,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.close, size: 12, color: Colors.white),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _bullet(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('•  ', style: AppTypography.body),
-          Expanded(child: Text(text, style: AppTypography.body)),
-        ],
-      ),
+    return FaceSelfieVerificationStep(
+      completed: _selfieUploaded && _liveness?.passed == true,
+      onRetake: _startLiveness,
     );
   }
 
@@ -1126,7 +1030,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
   void _continueFromPhone() {
     final user = context.read<AuthProvider>().user;
-    if (user == null || !user.hasVerifiedAccountPhone) {
+    if (user == null || !_phoneStepReady(user)) {
       showThriftSnackBar(
         context,
         'Verify your mobile number before continuing.',
@@ -1139,7 +1043,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
 
   void _continueFromAddress() {
     final user = context.read<AuthProvider>().user;
-    if (user == null || !user.hasVerifiedAccountPhone) {
+    if (user == null || !_phoneStepReady(user)) {
       showThriftSnackBar(
         context,
         'Verify your mobile number before continuing.',
@@ -1218,9 +1122,17 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   }
 
   Future<void> _startLiveness() async {
-    final result = await Navigator.of(context).push<LivenessResult>(
-      MaterialPageRoute(builder: (_) => const LivenessCaptureScreen()),
-    );
+    setState(() => _livenessInProgress = true);
+    LivenessResult? result;
+    try {
+      result = await Navigator.of(context).push<LivenessResult>(
+        MaterialPageRoute(builder: (_) => const LivenessCaptureScreen()),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _livenessInProgress = false);
+      }
+    }
     if (!mounted || result == null) return;
     if (!result.livenessPassed) {
       showThriftSnackBar(
@@ -1241,7 +1153,9 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
     setState(() {
       _liveness = result;
       _selfieUploaded = true;
+      _currentStep = 4;
     });
+    showThriftSnackBar(context, 'Face verification complete.');
   }
 
   void _saveExternalTransaction(ExternalTransactionDraft draft) {
@@ -1264,7 +1178,7 @@ class _BecomeSellerScreenState extends State<BecomeSellerScreen> {
   }
 
   Future<void> _submit(AuthProvider auth, {bool skipHistory = false}) async {
-    if (!(auth.user?.hasVerifiedAccountPhone ?? false)) {
+    if (!_phoneStepReady(auth.user)) {
       showThriftSnackBar(
         context,
         'Verify your mobile number before submitting your application.',

@@ -345,7 +345,7 @@ class _OrderList extends StatelessWidget {
 
   String _emptyTitle(BuyerPurchaseCategory cat) => switch (cat) {
     BuyerPurchaseCategory.all => 'No purchases yet',
-    BuyerPurchaseCategory.toPay => 'Nothing to pay',
+    BuyerPurchaseCategory.toPay => 'No pending payments',
     BuyerPurchaseCategory.paymentConfirmed => 'No orders preparing',
     BuyerPurchaseCategory.toReceive => 'Nothing on the way',
     BuyerPurchaseCategory.cancelled => 'No cancelled wins',
@@ -361,7 +361,7 @@ class _OrderList extends StatelessWidget {
       BuyerPurchaseCategory.all =>
         'Orders in other stages appear when you shop.',
       BuyerPurchaseCategory.toPay =>
-        'Auction wins that need payment will appear in this tab.',
+        'Unpaid auction wins and checkout reservations appear here until you pay or cancel.',
       BuyerPurchaseCategory.paymentConfirmed =>
         'Paid orders being prepared show here until they are out for delivery.',
       BuyerPurchaseCategory.toReceive =>

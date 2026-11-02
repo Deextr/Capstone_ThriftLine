@@ -3,24 +3,27 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show FileOptions, StorageException;
 import 'package:uuid/uuid.dart';
 
 import '../../../core/routes/route_names.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/listing_shipping.dart';
+import '../../../core/utils/supabase_errors.dart';
 import '../../../core/utils/supabase_rpc.dart';
+import '../../../models/enums.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../widgets/thrift_widgets.dart';
 import '../data/listing_limit.dart';
 import '../data/seller_listings_refresh.dart';
 import '../domain/product_image_storage.dart';
 import '../domain/product_listing_validation.dart';
-import '../../../core/utils/listing_shipping.dart';
-import '../../../models/enums.dart';
-import '../../../providers/auth_provider.dart';
-import '../../../widgets/thrift_widgets.dart';
+import '../presentation/widgets/listing_publish_error_dialog.dart';
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Category model (fetched from DB)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 /// A category row fetched from the `categories` table.
 class CategoryItem {
@@ -30,13 +33,13 @@ class CategoryItem {
   final String name;
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Local models and enums
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 /// A device image that the seller has selected for this listing.
 ///
-/// [bytes] holds the raw image data â€” works on both mobile and web.
+/// [bytes] holds the raw image data — works on both mobile and web.
 /// [name] is the original filename, used to derive the MIME type.
 class SelectedImage {
   const SelectedImage({required this.bytes, required this.name});
@@ -48,13 +51,153 @@ class SelectedImage {
 /// The selling format the seller chooses for their listing.
 ///
 /// Maps to the `listing_type_enum` DB values:
-///   - [fixedPrice]  â†’ `'fixed_price'`
-///   - [auction]     â†’ `'auction'`
+///   - [fixedPrice]  → `'fixed_price'`
+///   - [auction]     → `'auction'`
 enum ListingFormat { fixedPrice, auction }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
+// Backend gateway (allows clean unit/widget testing without live Supabase)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Abstracts Supabase storage and database operations for [AddListingController].
+abstract class ListingPublishGateway {
+  Future<List<CategoryItem>> fetchActiveCategories();
+  Future<String?> fetchSellerBarangay(String sellerId);
+  Future<dynamic> fetchListingLimitStatus();
+  Future<String> uploadProductImage({
+    required String path,
+    required Uint8List bytes,
+    required String contentType,
+  });
+  Future<void> removeProductImages(List<String> paths);
+  Future<void> insertProduct(Map<String, dynamic> data);
+  Future<dynamic> ensureProductAuction({
+    required String productId,
+    required double startingPrice,
+    required double minimumIncrement,
+    required int durationDays,
+  });
+  Future<void> insertProductImages(List<Map<String, dynamic>> rows);
+  Future<void> deleteDraftProduct({
+    required String productId,
+    required String sellerId,
+  });
+}
+
+class _SupabaseListingPublishGateway implements ListingPublishGateway {
+  const _SupabaseListingPublishGateway(this._supabase);
+
+  final SupabaseService _supabase;
+
+  @override
+  Future<List<CategoryItem>> fetchActiveCategories() async {
+    final rows = await _supabase.client
+        .from('categories')
+        .select('category_id, category_name')
+        .eq('is_active', true)
+        .order('category_name');
+    return (rows as List)
+        .map(
+          (r) => CategoryItem(
+            id: r['category_id'] as String,
+            name: r['category_name'] as String,
+          ),
+        )
+        .toList();
+  }
+
+  @override
+  Future<String?> fetchSellerBarangay(String sellerId) async {
+    final row = await _supabase.client
+        .from('seller_profiles')
+        .select('barangay')
+        .eq('seller_id', sellerId)
+        .maybeSingle();
+    return (row?['barangay'] as String?)?.trim();
+  }
+
+  @override
+  Future<dynamic> fetchListingLimitStatus() {
+    return _supabase.client.rpc('seller_listing_limit_status');
+  }
+
+  @override
+  Future<String> uploadProductImage({
+    required String path,
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
+    await _supabase.client.storage
+        .from(productImagesBucket)
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: true),
+        );
+    return _supabase.client.storage
+        .from(productImagesBucket)
+        .getPublicUrl(path);
+  }
+
+  @override
+  Future<void> removeProductImages(List<String> paths) async {
+    if (paths.isEmpty) return;
+    await _supabase.client.storage.from(productImagesBucket).remove(paths);
+  }
+
+  @override
+  Future<void> insertProduct(Map<String, dynamic> data) async {
+    await _supabase.client.from('products').insert(data);
+  }
+
+  @override
+  Future<dynamic> ensureProductAuction({
+    required String productId,
+    required double startingPrice,
+    required double minimumIncrement,
+    required int durationDays,
+  }) {
+    return _supabase.client.rpc(
+      'ensure_product_auction',
+      params: {
+        'p_product_id': productId,
+        'p_starting_price': startingPrice,
+        'p_minimum_increment': minimumIncrement,
+        'p_duration_days': durationDays,
+      },
+    );
+  }
+
+  @override
+  Future<void> insertProductImages(List<Map<String, dynamic>> rows) async {
+    await _supabase.client.from('product_images').insert(rows);
+  }
+
+  @override
+  Future<void> deleteDraftProduct({
+    required String productId,
+    required String sellerId,
+  }) async {
+    try {
+      await _supabase.client
+          .from('products')
+          .delete()
+          .eq('product_id', productId)
+          .eq('seller_id', sellerId);
+    } catch (_) {
+      // Fallback: mark as removed so an incomplete product never stays active.
+      await _supabase.client
+          .from('products')
+          .update({'status': 'removed'})
+          .eq('product_id', productId)
+          .eq('seller_id', sellerId);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Enum mapping helpers (package-level for testability)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 /// Maps a [ProductCondition] to its corresponding DB string.
 String conditionToDbString(ProductCondition condition) => switch (condition) {
@@ -88,9 +231,9 @@ bool listingStockIsValid(
   return n != null && n >= min && n <= 9999;
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Controller
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 /// Owns all state, validation, image-picker interactions, and Supabase I/O for
 /// the "Add Listing" flow.
@@ -104,26 +247,27 @@ class AddListingController extends ChangeNotifier {
     required SupabaseService supabase,
     required AuthProvider auth,
     ImagePicker? imagePicker,
-  }) : _supabase = supabase,
-       _auth = auth,
-       _imagePicker = imagePicker ?? ImagePicker() {
+    ListingPublishGateway? gateway,
+  }) : _auth = auth,
+       _imagePicker = imagePicker ?? ImagePicker(),
+       _gateway = gateway ?? _SupabaseListingPublishGateway(supabase) {
     loadCategories();
     loadSellerShopLocation();
   }
 
-  // â”€â”€ Dependencies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Dependencies ──────────────────────────────────────────────────────────
 
-  final SupabaseService _supabase;
   final AuthProvider _auth;
   final ImagePicker _imagePicker;
+  final ListingPublishGateway _gateway;
 
-  // â”€â”€ Image state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Image state ───────────────────────────────────────────────────────────
 
-  /// Ordered list of images selected by the seller (max 8).
+  /// Ordered list of images selected by the seller (max 3).
   /// Index 0 is always the cover image.
   List<SelectedImage> images = [];
 
-  // â”€â”€ Text controllers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Text controllers ──────────────────────────────────────────────────────
 
   final TextEditingController nameCtrl = TextEditingController();
   final TextEditingController descCtrl = TextEditingController();
@@ -147,7 +291,7 @@ class AddListingController extends ChangeNotifier {
   ListingShippingMode shippingMode = ListingShippingMode.fixedFee;
   String? sellerBarangay;
 
-  // â”€â”€ Selection state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Selection state ───────────────────────────────────────────────────────
 
   /// Categories fetched from the `categories` table.
   List<CategoryItem> categories = [];
@@ -167,7 +311,7 @@ class AddListingController extends ChangeNotifier {
   /// Currently selected listing format; defaults to [ListingFormat.fixedPrice].
   ListingFormat selectedFormat = ListingFormat.fixedPrice;
 
-  // â”€â”€ Auction-specific state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Auction-specific state ────────────────────────────────────────────────
 
   /// Duration of the auction in days. Options: 1, 3, 5, 7.
   int auctionDurationDays = 3;
@@ -175,18 +319,18 @@ class AddListingController extends ChangeNotifier {
   /// Minimum bid increment amount (e.g. 10, 20, 50, 100).
   double bidIncrement = 10;
 
-  // â”€â”€ Async / progress state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Async / progress state ────────────────────────────────────────────────
 
   /// Whether a post-listing operation is in progress.
   bool isLoading = false;
 
   /// Human-readable status shown on the posting overlay while [isLoading]
-  /// is true (e.g. `"Uploading images (2/5)"`, `"Saving listing"`).
+  /// is true (e.g. `"Uploading images (2/3)"`, `"Saving listing…"`).
   String uploadStatusMessage = '';
 
   bool _disposed = false;
 
-  // â”€â”€ Validation state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Validation state ──────────────────────────────────────────────────────
 
   /// Field-level validation errors keyed by field name.
   ///
@@ -194,36 +338,36 @@ class AddListingController extends ChangeNotifier {
   /// `'condition'`, `'price'`, `'stock'`.
   Map<String, String> fieldErrors = {};
 
-  // â”€â”€ Field change handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Field change handlers ─────────────────────────────────────────────────
 
   /// Clears the `'name'` field error when the user edits the name field.
   void onNameChanged(String value) {
     fieldErrors.remove('name');
-    notifyListeners();
+    _safeNotify();
   }
 
   /// Clears the `'description'` field error when the user edits the description field.
   void onDescChanged(String value) {
     fieldErrors.remove('description');
-    notifyListeners();
+    _safeNotify();
   }
 
   /// Clears the `'price'` field error when the user edits the price field.
   void onPriceChanged(String value) {
     fieldErrors.remove('price');
-    notifyListeners();
+    _safeNotify();
   }
 
   /// Clears the `'price'` field error when the user edits the starting bid field.
   void onStartBidChanged(String value) {
     fieldErrors.remove('price');
-    notifyListeners();
+    _safeNotify();
   }
 
   /// Clears the `'stock'` field error when the user edits available quantity.
   void onStockChanged(String value) {
     fieldErrors.remove('stock');
-    notifyListeners();
+    _safeNotify();
   }
 
   /// Fetches the list of active categories from the `categories` table.
@@ -232,26 +376,14 @@ class AddListingController extends ChangeNotifier {
   /// in progress and notifies listeners on completion.
   Future<void> loadCategories() async {
     categoriesLoading = true;
-    notifyListeners();
+    _safeNotify();
     try {
-      final rows = await _supabase.client
-          .from('categories')
-          .select('category_id, category_name')
-          .eq('is_active', true)
-          .order('category_name');
-      categories = (rows as List)
-          .map(
-            (r) => CategoryItem(
-              id: r['category_id'] as String,
-              name: r['category_name'] as String,
-            ),
-          )
-          .toList();
+      categories = await _gateway.fetchActiveCategories();
     } catch (_) {
-      // Non-fatal â€” the picker will just show an empty list
+      // Non-fatal — the picker will just show an empty list
     } finally {
       categoriesLoading = false;
-      notifyListeners();
+      _safeNotify();
     }
   }
 
@@ -260,14 +392,14 @@ class AddListingController extends ChangeNotifier {
     selectedCategoryId = categoryId;
     selectedCategoryName = categoryName;
     fieldErrors.remove('category');
-    notifyListeners();
+    _safeNotify();
   }
 
   /// Sets [selectedCondition] and clears the `'condition'` field error.
   void selectCondition(ProductCondition condition) {
     selectedCondition = condition;
     fieldErrors.remove('condition');
-    notifyListeners();
+    _safeNotify();
   }
 
   /// Sets [selectedFormat] to the given [format].
@@ -283,19 +415,14 @@ class AddListingController extends ChangeNotifier {
         shippingMode == ListingShippingMode.bidThreshold) {
       shippingMode = ListingShippingMode.fixedFee;
     }
-    notifyListeners();
+    _safeNotify();
   }
 
   Future<void> loadSellerShopLocation() async {
     final sellerId = _auth.user?.id;
     if (sellerId == null) return;
     try {
-      final row = await _supabase.client
-          .from('seller_profiles')
-          .select('barangay')
-          .eq('seller_id', sellerId)
-          .maybeSingle();
-      sellerBarangay = (row?['barangay'] as String?)?.trim();
+      sellerBarangay = await _gateway.fetchSellerBarangay(sellerId);
       _safeNotify();
     } catch (_) {
       // Non-fatal — toggle stays disabled until shop address exists.
@@ -304,7 +431,7 @@ class AddListingController extends ChangeNotifier {
 
   void setShowItemLocation(bool value) {
     showItemLocation = value;
-    notifyListeners();
+    _safeNotify();
   }
 
   void setShippingMode(ListingShippingMode mode) {
@@ -312,7 +439,7 @@ class AddListingController extends ChangeNotifier {
     fieldErrors.remove('shippingFee');
     fieldErrors.remove('qtyThreshold');
     fieldErrors.remove('bidThreshold');
-    notifyListeners();
+    _safeNotify();
   }
 
   /// Preview when listing is published (`now()` + duration days on server).
@@ -323,69 +450,116 @@ class AddListingController extends ChangeNotifier {
   void selectAuctionDuration(int days) {
     auctionDurationDays = days;
     fieldErrors.remove('duration');
-    notifyListeners();
+    _safeNotify();
   }
 
   /// Sets [bidIncrement] to the given [increment].
   void selectBidIncrement(double increment) {
     bidIncrement = increment;
     fieldErrors.remove('increment');
-    notifyListeners();
+    _safeNotify();
   }
 
-  // â”€â”€ Post listing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Post listing ──────────────────────────────────────────────────────────
 
   /// Validates, uploads images, and inserts the listing into Supabase.
   ///
   /// Steps:
-  /// 1. Guards against unauthenticated users.
-  /// 2. Validates all required fields via [_validateForPost].
-  /// 3. Sets loading state and generates a new product UUID.
-  /// 4. Resolves the category ID from the `categories` table.
-  /// 5. Inserts the product row into `products`.
-  /// 6. Uploads images to Storage and inserts rows into `product_images`.
-  /// 7. Navigates to [RouteNames.sellerHome] on success.
-  ///
-  /// Satisfies Requirements 4.1â€“4.4, 8.1â€“8.4.
+  /// 1. Guards against concurrent submissions and unauthenticated users.
+  /// 2. Validates selected images (format & size) and all required fields.
+  /// 3. Synchronously sets [isLoading] before any async work to prevent double taps.
+  /// 4. Checks active listing limit via RPC.
+  /// 5. Uploads images to Storage (before any DB row is created).
+  /// 6. Inserts the product row, auction RPC when needed, then `product_images`.
+  /// 7. Rolls back storage and draft product rows if any step fails.
+  /// 8. Navigates to seller listings on confirmed database success.
   Future<void> postListing(BuildContext context) async {
     if (isLoading) return;
 
     // 1. Auth guard
     if (_auth.user?.id == null) {
-      showThriftSnackBar(
-        context,
-        'You must be logged in to post a listing.',
-        isError: true,
-      );
+      if (context.mounted) {
+        showThriftSnackBar(
+          context,
+          'You must be logged in to post a listing.',
+          isError: true,
+        );
+      }
       return;
     }
 
-    // 2. Validate
-    if (!_validateForPost()) return;
+    // 2. Check selected images for unsupported format or excessive size first
+    if (images.isNotEmpty) {
+      for (final img in images) {
+        final pickError = productListingImagePickError(
+          fileName: img.name,
+          byteLength: img.bytes.length,
+          bytes: img.bytes,
+        );
+        if (pickError != null) {
+          fieldErrors['images'] = pickError;
+          _safeNotify();
+          if (context.mounted) {
+            await _showImageValidationErrorDialog(context, pickError);
+          }
+          return;
+        }
+      }
+    }
 
-    final limitBlocked = await _ensureCanPublishActiveListing(context);
-    if (limitBlocked) return;
+    // 3. Validate required fields (handled via inline validation + snackbar)
+    if (!_validateForPost()) {
+      if (context.mounted) {
+        showThriftSnackBar(
+          context,
+          kListingMissingDetailsMessage,
+          isError: true,
+        );
+      }
+      return;
+    }
 
-    // 3. Set loading state
+    // 4. Lock submission synchronously BEFORE any await to prevent double taps
     isLoading = true;
     uploadStatusMessage = 'Preparing listing…';
     _safeNotify();
 
-    // 4. Generate product ID
+    // 5. Check active listing limit
+    final limitBlocked = await _ensureCanPublishActiveListing();
+    if (limitBlocked) {
+      isLoading = false;
+      uploadStatusMessage = '';
+      _safeNotify();
+      if (context.mounted) {
+        await _showListingLimitDialog(context, kListingLimitReachedMessage);
+      }
+      return;
+    }
+
+    // 6. Generate product ID
     final productId = const Uuid().v4();
     final sellerId = _auth.user!.id;
 
+    List<String>? uploadedImageUrls;
+    var productInserted = false;
+    var imagesUploaded = false;
+
     try {
-      // a. Use already-resolved category ID
       final categoryId = selectedCategoryId!;
-
-      // b. Determine price value
       final priceValue = selectedFormat == ListingFormat.auction
-          ? double.parse(startBidCtrl.text)
-          : double.parse(priceCtrl.text);
+          ? double.parse(startBidCtrl.text.trim())
+          : double.parse(priceCtrl.text.trim());
 
-      // c. Insert into products table
-      await _supabase.client.from('products').insert({
+      // a. Upload images before creating the listing row so a failed upload
+      //    never leaves an active product without photos.
+      uploadedImageUrls = await _uploadImages(sellerId, productId);
+      imagesUploaded = true;
+
+      uploadStatusMessage = 'Saving listing…';
+      _safeNotify();
+
+      // b. Insert into products table
+      await _gateway.insertProduct({
         'product_id': productId,
         'seller_id': sellerId,
         'name': nameCtrl.text.trim(),
@@ -399,9 +573,9 @@ class AddListingController extends ChangeNotifier {
           stockCtrl.text,
         ),
         'category_id': categoryId,
-        if (sizeCtrl.text.isNotEmpty) 'size': sizeCtrl.text,
-        if (brandCtrl.text.isNotEmpty) 'brand': brandCtrl.text,
-        if (colorCtrl.text.isNotEmpty) 'color': colorCtrl.text,
+        if (sizeCtrl.text.trim().isNotEmpty) 'size': sizeCtrl.text.trim(),
+        if (brandCtrl.text.trim().isNotEmpty) 'brand': brandCtrl.text.trim(),
+        if (colorCtrl.text.trim().isNotEmpty) 'color': colorCtrl.text.trim(),
         'show_item_location': showItemLocation,
         'shipping_mode': _resolvedShippingMode().dbValue,
         'shipping_fee': _resolvedShippingFee(),
@@ -411,87 +585,69 @@ class AddListingController extends ChangeNotifier {
           'free_shipping_bid_threshold': _resolvedBidThreshold(),
         'boosted': false,
       });
+      productInserted = true;
 
-      // c2. Auction row must be created in the same listing flow.
-      //     ensure_product_auction is SECURITY DEFINER so clients cannot
-      //     insert auctions directly after Phase 3 RLS.
+      // c. Auction row must be created in the same listing flow.
       if (selectedFormat == ListingFormat.auction) {
-        try {
-          final rpcRes = await _supabase.client.rpc(
-            'ensure_product_auction',
-            params: {
-              'p_product_id': productId,
-              'p_starting_price': priceValue,
-              'p_minimum_increment': bidIncrement,
-              'p_duration_days': auctionDurationDays,
-            },
+        final rpcRes = await _gateway.ensureProductAuction(
+          productId: productId,
+          startingPrice: priceValue,
+          minimumIncrement: bidIncrement,
+          durationDays: auctionDurationDays,
+        );
+        if (!supabaseRpcSuccess(rpcRes)) {
+          throw Exception(
+            supabaseRpcError(rpcRes, fallback: 'auction_setup_failed'),
           );
-          if (!supabaseRpcSuccess(rpcRes)) {
-            throw Exception(
-              supabaseRpcError(
-                rpcRes,
-                fallback: 'Failed to create the auction record.',
-              ),
-            );
-          }
-        } catch (e) {
-          await _supabase.client
-              .from('products')
-              .delete()
-              .eq('product_id', productId);
-          rethrow;
         }
       }
 
-      // d. Upload images (with cleanup on failure)
-      List<String> imageUrls;
-      try {
-        imageUrls = await _uploadImages(sellerId, productId);
-      } catch (e) {
-        await _cleanupImages(sellerId, productId, images.length);
-        if (context.mounted) {
-          showThriftSnackBar(
-            context,
-            'Image upload failed. Please try again.',
-            isError: true,
-          );
-        }
-        return;
-      }
-
-      // e. Update status message
-      uploadStatusMessage = 'Saving listing…';
-      _safeNotify();
-
-      // f. Insert product_images rows
-      await _supabase.client.from('product_images').insert([
-        for (var i = 0; i < imageUrls.length; i++)
+      // d. Insert product_images rows (requires product row for RLS).
+      await _gateway.insertProductImages([
+        for (var i = 0; i < uploadedImageUrls.length; i++)
           {
             'product_id': productId,
-            'image_url': imageUrls[i],
+            'image_url': uploadedImageUrls[i],
             'is_primary': i == 0,
             'display_order': i,
           },
       ]);
 
+      isLoading = false;
       uploadStatusMessage = '';
+      _safeNotify();
+
       SellerListingsRefresh.notify(sellerId);
       if (context.mounted) {
-        context.go(RouteNames.sellerHomeWithTab('listings'));
-        showThriftSnackBar(context, 'Listing published!');
+        ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+        final router = GoRouter.maybeOf(context);
+        if (router != null) {
+          router.go(RouteNames.sellerHomeWithTab('listings'));
+        }
+        showThriftSnackBar(context, kListingPublishedSuccessMessage);
       }
     } catch (e) {
       debugPrint('AddListingController.postListing error: $e');
+      if (productInserted) {
+        await _deleteDraftProduct(productId, sellerId);
+      }
+      if (uploadedImageUrls != null && uploadedImageUrls.isNotEmpty) {
+        await _cleanupImages(sellerId, productId, uploadedImageUrls.length);
+      }
+
+      // Clear loading overlay before presenting the error dialog.
+      isLoading = false;
+      uploadStatusMessage = '';
+      _safeNotify();
+
       if (context.mounted) {
-        final limitMessage = listingLimitMessageFromError(e);
-        if (limitMessage != null) {
-          await _showListingLimitDialog(context, limitMessage);
-        } else {
-          showThriftSnackBar(
-            context,
-            'Failed to post listing. Please try again.',
-            isError: true,
-          );
+        final shouldRetry = await _presentPublishErrorDialog(
+          context,
+          error: e,
+          imagesUploaded: imagesUploaded,
+        );
+        if (shouldRetry && context.mounted) {
+          await postListing(context);
         }
       }
     } finally {
@@ -507,17 +663,13 @@ class AddListingController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  Future<bool> _ensureCanPublishActiveListing(BuildContext context) async {
+  Future<bool> _ensureCanPublishActiveListing() async {
     try {
-      final rpcRes = await _supabase.client.rpc('seller_listing_limit_status');
+      final rpcRes = await _gateway.fetchListingLimitStatus();
       if (!supabaseRpcSuccess(rpcRes)) return false;
       final map = supabaseRpcMap(rpcRes);
       final canPublish = map?['can_publish'] == true;
-      if (canPublish) return false;
-      if (context.mounted) {
-        await _showListingLimitDialog(context, kListingLimitReachedMessage);
-      }
-      return true;
+      return !canPublish;
     } catch (e) {
       debugPrint('AddListingController listing limit check error: $e');
       return false;
@@ -528,22 +680,102 @@ class AddListingController extends ChangeNotifier {
     BuildContext context,
     String message,
   ) async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text(kListingLimitReachedTitle),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
+    await showListingPublishErrorDialog(
+      context,
+      title: kListingLimitReachedTitle,
+      message: message,
+      icon: Icons.info_outline_rounded,
+      canRetry: false,
+      primaryLabel: 'Okay',
     );
   }
 
-  // â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  Future<void> _showImageValidationErrorDialog(
+    BuildContext context,
+    String pickError,
+  ) async {
+    final isTooLarge = pickError == kProductListingImageTooLargeMessage;
+    await showListingPublishErrorDialog(
+      context,
+      title: isTooLarge ? 'Image too large' : 'Unsupported image format',
+      message: pickError,
+      icon: isTooLarge
+          ? Icons.photo_size_select_large_outlined
+          : Icons.broken_image_outlined,
+      canRetry: false,
+      primaryLabel: 'Okay',
+    );
+  }
+
+  Future<bool> _presentPublishErrorDialog(
+    BuildContext context, {
+    required Object error,
+    required bool imagesUploaded,
+  }) async {
+    final limitMessage = listingLimitMessageFromError(error);
+    if (limitMessage != null) {
+      await _showListingLimitDialog(context, limitMessage);
+      return false;
+    }
+
+    if (error is StorageException) {
+      if (isStoragePayloadTooLarge(error)) {
+        await _showImageValidationErrorDialog(
+          context,
+          kProductListingImageTooLargeMessage,
+        );
+        return false;
+      }
+      if (isStorageMimeTypeRejected(error)) {
+        await _showImageValidationErrorDialog(
+          context,
+          kProductListingImageUnsupportedFormatMessage,
+        );
+        return false;
+      }
+    }
+
+    if (isLikelyNetworkError(error)) {
+      return showListingPublishErrorDialog(
+        context,
+        title: 'No internet connection',
+        message: kListingPublishOfflineMessage,
+        icon: Icons.wifi_off_rounded,
+        canRetry: true,
+      );
+    }
+
+    if (!imagesUploaded) {
+      return showListingPublishErrorDialog(
+        context,
+        title: 'Couldn\'t upload photos',
+        message: userFacingListingImageUploadError(error),
+        icon: Icons.cloud_off_outlined,
+        canRetry: true,
+      );
+    }
+
+    return showListingPublishErrorDialog(
+      context,
+      title: 'Couldn\'t publish listing',
+      message: userFacingListingPublishError(error),
+      icon: Icons.error_outline_rounded,
+      canRetry: true,
+    );
+  }
+
+  Future<void> _deleteDraftProduct(String productId, String sellerId) async {
+    try {
+      await _gateway.deleteDraftProduct(
+        productId: productId,
+        sellerId: sellerId,
+      );
+    } catch (e) {
+      debugPrint('AddListingController._deleteDraftProduct error: $e');
+    }
+  }
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @override
   void dispose() {
@@ -562,7 +794,7 @@ class AddListingController extends ChangeNotifier {
     super.dispose();
   }
 
-  // â”€â”€ Image management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Image management ──────────────────────────────────────────────────────
 
   /// Removes the image at [slotIndex] from [images].
   ///
@@ -571,7 +803,8 @@ class AddListingController extends ChangeNotifier {
   void removeImage(int slotIndex) {
     if (slotIndex < images.length) {
       images = List<SelectedImage>.from(images)..removeAt(slotIndex);
-      notifyListeners();
+      fieldErrors.remove('images');
+      _safeNotify();
     }
   }
 
@@ -585,16 +818,16 @@ class AddListingController extends ChangeNotifier {
     final item = updated.removeAt(oldIndex);
     updated.insert(newIndex, item);
     images = updated;
-    notifyListeners();
+    _safeNotify();
   }
 
-  // â”€â”€ Image picker actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Image picker actions ──────────────────────────────────────────────────
 
   /// Opens the gallery and inserts a new image at [slotIndex].
   ///
   /// If [slotIndex] is beyond the current list length the image is appended.
   /// Satisfies Requirements 2.2, 2.3.
-  Future<void> pickImage(int slotIndex) async {
+  Future<void> pickImage(int slotIndex, BuildContext context) async {
     if (images.length >= 3) return; // max 3 photos
     final XFile? xfile = await _imagePicker.pickImage(
       source: ImageSource.gallery,
@@ -602,6 +835,22 @@ class AddListingController extends ChangeNotifier {
     if (xfile == null) return;
 
     final bytes = await xfile.readAsBytes();
+    final pickError = productListingImagePickError(
+      fileName: xfile.name,
+      byteLength: bytes.length,
+      bytes: bytes,
+    );
+    if (pickError != null) {
+      if (images.isEmpty) {
+        fieldErrors['images'] = pickError;
+        _safeNotify();
+      }
+      if (context.mounted) {
+        await _showImageValidationErrorDialog(context, pickError);
+      }
+      return;
+    }
+
     final selected = SelectedImage(bytes: bytes, name: xfile.name);
 
     if (slotIndex >= images.length) {
@@ -610,20 +859,33 @@ class AddListingController extends ChangeNotifier {
       images = List.of(images)..insert(slotIndex, selected);
     }
 
-    notifyListeners();
+    fieldErrors.remove('images');
+    _safeNotify();
   }
 
   /// Opens the gallery and replaces the image at [slotIndex].
   ///
   /// If [slotIndex] is out of range, the image is appended instead.
   /// Satisfies Requirements 2.2, 2.3.
-  Future<void> replaceImage(int slotIndex) async {
+  Future<void> replaceImage(int slotIndex, BuildContext context) async {
     final XFile? xfile = await _imagePicker.pickImage(
       source: ImageSource.gallery,
     );
     if (xfile == null) return;
 
     final bytes = await xfile.readAsBytes();
+    final pickError = productListingImagePickError(
+      fileName: xfile.name,
+      byteLength: bytes.length,
+      bytes: bytes,
+    );
+    if (pickError != null) {
+      if (context.mounted) {
+        await _showImageValidationErrorDialog(context, pickError);
+      }
+      return;
+    }
+
     final selected = SelectedImage(bytes: bytes, name: xfile.name);
 
     if (slotIndex < images.length) {
@@ -632,10 +894,11 @@ class AddListingController extends ChangeNotifier {
       images = List.of(images)..add(selected);
     }
 
-    notifyListeners();
+    fieldErrors.remove('images');
+    _safeNotify();
   }
 
-  // â”€â”€ Validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Validation ────────────────────────────────────────────────────────────
 
   /// Validates all required fields before posting a listing.
   ///
@@ -675,7 +938,7 @@ class AddListingController extends ChangeNotifier {
 
     // Price + stock
     if (selectedFormat == ListingFormat.fixedPrice) {
-      final price = double.tryParse(priceCtrl.text);
+      final price = double.tryParse(priceCtrl.text.trim());
       if (price == null || price <= 0) {
         fieldErrors['price'] = 'Please enter a valid price.';
       }
@@ -683,7 +946,7 @@ class AddListingController extends ChangeNotifier {
         fieldErrors['stock'] = 'Enter how many units you have (1 or more).';
       }
     } else if (selectedFormat == ListingFormat.auction) {
-      final startBid = double.tryParse(startBidCtrl.text);
+      final startBid = double.tryParse(startBidCtrl.text.trim());
       if (startBid == null || startBid <= 0) {
         fieldErrors['price'] = 'Please enter a valid starting price.';
       }
@@ -698,7 +961,7 @@ class AddListingController extends ChangeNotifier {
 
     _validateShippingFields();
 
-    notifyListeners();
+    _safeNotify();
     return fieldErrors.isEmpty;
   }
 
@@ -765,7 +1028,7 @@ class AddListingController extends ChangeNotifier {
     return double.tryParse(bidThresholdCtrl.text.trim());
   }
 
-  // â”€â”€ DB mapping helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── DB mapping helpers ────────────────────────────────────────────────────
 
   /// Maps a [ProductCondition] value to the corresponding DB string.
   String _conditionToDb(ProductCondition condition) =>
@@ -774,11 +1037,11 @@ class AddListingController extends ChangeNotifier {
   /// Maps a [ListingFormat] value to the corresponding DB string.
   String _formatToDb(ListingFormat format) => formatToDbString(format);
 
-  // â”€â”€ Image upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Image upload ──────────────────────────────────────────────────────────
 
   /// Uploads each image in [images] to the `product-images` Storage bucket.
   ///
-  /// Path pattern: `$sellerId/$productId/$index.jpg`
+  /// Path pattern: `$sellerId/$productId/$index$ext`
   /// Updates [uploadStatusMessage] before each upload and notifies listeners.
   /// Returns an ordered list of public URLs matching the image list.
   ///
@@ -786,36 +1049,44 @@ class AddListingController extends ChangeNotifier {
   Future<List<String>> _uploadImages(String sellerId, String productId) async {
     final urls = <String>[];
 
-    for (var i = 0; i < images.length; i++) {
-      uploadStatusMessage = 'Uploading images (${i + 1}/${images.length})';
-      _safeNotify();
+    try {
+      for (var i = 0; i < images.length; i++) {
+        uploadStatusMessage = 'Uploading images (${i + 1}/${images.length})';
+        _safeNotify();
 
-      final path = '$sellerId/$productId/$i.jpg';
-      await _supabase.client.storage
-          .from(productImagesBucket)
-          .uploadBinary(
-            path,
-            images[i].bytes,
-            fileOptions: FileOptions(contentType: 'image/jpeg'),
-          );
-
-      final url = _supabase.client.storage
-          .from(productImagesBucket)
-          .getPublicUrl(path);
-      urls.add(url);
+        final ext = productListingImageStorageExtension(
+          images[i].name,
+          bytes: images[i].bytes,
+        );
+        final path = '$sellerId/$productId/$i$ext';
+        final url = await _gateway.uploadProductImage(
+          path: path,
+          bytes: images[i].bytes,
+          contentType: productListingImageContentType(
+            images[i].name,
+            bytes: images[i].bytes,
+          ),
+        );
+        urls.add(url);
+      }
+    } catch (e) {
+      if (urls.isNotEmpty) {
+        await _cleanupImages(sellerId, productId, urls.length);
+      }
+      rethrow;
     }
 
     return urls;
   }
 
-  // â”€â”€ Image cleanup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Image cleanup ─────────────────────────────────────────────────────────
 
-  /// Removes already-uploaded images from Storage when an upload fails
-  /// mid-way through the sequence.
+  /// Removes already-uploaded images from Storage when an upload or subsequent
+  /// database write fails.
   ///
   /// Builds the list of storage paths for indices `0` to `uploadedCount - 1`
   /// under `product-images/$sellerId/$productId/` and calls `remove` on the
-  /// bucket. Any exception is swallowed â€” this is best-effort cleanup.
+  /// bucket. Any exception is swallowed — this is best-effort cleanup.
   ///
   /// Satisfies Requirement 2.8.
   Future<void> _cleanupImages(
@@ -824,12 +1095,13 @@ class AddListingController extends ChangeNotifier {
     int uploadedCount,
   ) async {
     final paths = [
-      for (var i = 0; i < uploadedCount; i++) '$sellerId/$productId/$i.jpg',
+      for (var i = 0; i < uploadedCount; i++)
+        '$sellerId/$productId/$i${productListingImageStorageExtension(images[i].name, bytes: images[i].bytes)}',
     ];
     try {
-      await _supabase.client.storage.from(productImagesBucket).remove(paths);
+      await _gateway.removeProductImages(paths);
     } catch (_) {
-      // Best-effort â€” ignore any errors during cleanup.
+      // Best-effort — ignore any errors during cleanup.
     }
   }
 }

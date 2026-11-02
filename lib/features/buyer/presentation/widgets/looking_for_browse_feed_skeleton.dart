@@ -89,9 +89,21 @@ class _FeedPostSkeleton extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
               child: Row(
                 children: const [
-                  Expanded(child: SkeletonBox(width: double.infinity, height: 40, radius: 8)),
+                  Expanded(
+                    child: SkeletonBox(
+                      width: double.infinity,
+                      height: 40,
+                      radius: 8,
+                    ),
+                  ),
                   SizedBox(width: 10),
-                  Expanded(child: SkeletonBox(width: double.infinity, height: 40, radius: 8)),
+                  Expanded(
+                    child: SkeletonBox(
+                      width: double.infinity,
+                      height: 40,
+                      radius: 8,
+                    ),
+                  ),
                 ],
               ),
             ),

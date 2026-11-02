@@ -115,6 +115,17 @@ class AuthUser {
     return normalized != null && isPhMobile09Format(normalized);
   }
 
+  /// Verified account phone matches the number shown in an OTP / seller step field.
+  bool verifiedPhoneMatchesField(String? fieldRaw) {
+    if (!hasVerifiedAccountPhone) return false;
+    final field = normalizePhMobile(fieldRaw);
+    final stored = normalizePhMobile(phone);
+    return field != null &&
+        stored != null &&
+        field == stored &&
+        isPhMobile09Format(field);
+  }
+
   String get displayName => role == UserRole.seller ? (shopName ?? name) : name;
   bool get isBuyer => role == UserRole.buyer;
   bool get isSeller => role == UserRole.seller;

@@ -183,14 +183,14 @@ class OrderTrackingScreen extends StatelessWidget {
                     itemReturn: order.itemReturn!,
                     buyerView: true,
                     isBusy: controller.isUpdatingDelivery,
-                    onHandOff: () async {
+                    onVerifyPin: (pin) async {
                       final error = await context
                           .read<BuyerOrdersController>()
-                          .confirmReturnHandedOff();
+                          .verifyReturnPickupPin(pin);
                       if (!context.mounted) return;
                       showThriftSnackBar(
                         context,
-                        error ?? 'Handoff recorded.',
+                        error ?? 'Pickup confirmed. Return is in transit.',
                         isError: error != null,
                       );
                     },
@@ -214,7 +214,6 @@ class OrderTrackingScreen extends StatelessWidget {
                 OrderReviewCta(
                   order: order,
                   existing: controller.reviewFor(order.id),
-                  ratingBuyer: false,
                   onReturned: () => context.read<BuyerOrdersController>().load(
                     showSpinner: false,
                   ),

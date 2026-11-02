@@ -299,7 +299,8 @@ class _FollowingShopsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (controller.isLoadingFollowedShops &&
-        controller.followedShopPreview.isEmpty) {
+        controller.followedShopPreview.isEmpty &&
+        controller.followedShopsErrorMessage == null) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
         child: Center(
@@ -315,11 +316,62 @@ class _FollowingShopsSection extends StatelessWidget {
       );
     }
 
+    if (controller.followedShopsErrorMessage != null &&
+        controller.followedShopPreview.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Couldn\'t load shops you follow.',
+              style: AppTypography.body.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              controller.followedShopsErrorMessage!,
+              style: AppTypography.caption.copyWith(color: AppColors.error),
+            ),
+            const SizedBox(height: 12),
+            ThriftButton(
+              label: 'Retry',
+              expand: false,
+              onPressed: () =>
+                  context.read<ReportUserController>().retryFollowedShops(),
+            ),
+          ],
+        ),
+      );
+    }
+
     final shops = controller.followedShopPreview;
     if (shops.isEmpty) {
-      return Text(
-        'You aren\'t following any shops yet.',
-        style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Shops you follow',
+              style: AppTypography.label.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You haven\'t followed any shops yet. Use the search field above '
+              'to find a seller to report.',
+              style: AppTypography.body.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.45,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
       );
     }
 

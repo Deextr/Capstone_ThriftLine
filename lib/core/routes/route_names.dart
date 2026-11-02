@@ -153,6 +153,9 @@ abstract final class RouteNames {
   static const String myLookingForReportDetail = '/my-reports/looking-for/:id';
   static const String reportDetail = '/my-reports/:id';
   static const String accountReview = '/account-review/:reportId';
+  static const String confirmedViolations = '/confirmed-violations';
+  static const String confirmedViolationDetail =
+      '/confirmed-violations/:source/:recordId';
   static const String leaveReview = '/leave-review/:orderId';
   static const String buyerToRate = '/buyer/to-rate';
 
@@ -168,6 +171,9 @@ abstract final class RouteNames {
 
   static String accountReviewFor(String reportId) =>
       '/account-review/$reportId';
+
+  static String confirmedViolationDetailFor(String source, String recordId) =>
+      '/confirmed-violations/$source/$recordId';
 
   static String reportUser({
     String? username,

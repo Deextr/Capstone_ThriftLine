@@ -16,7 +16,10 @@ class ReportEvidenceItem {
 
   factory ReportEvidenceItem.fromSupabase(Map<String, dynamic> row) {
     return ReportEvidenceItem(
-      id: row['report_evidence_id'] as String? ?? '',
+      id:
+          row['report_evidence_id'] as String? ??
+          row['evidence_id'] as String? ??
+          '',
       filePath: row['file_path'] as String? ?? '',
       signedUrl: row['signed_url'] as String?,
       createdAt:

@@ -211,8 +211,17 @@ class OrderModel {
       shippingAddress.trim().isNotEmpty &&
       isPhMobile09Format(deliveryPhone);
 
-  /// Auction wins require payment. Abandoned fixed-price checkouts do not.
-  bool get showsAsAwaitingPayment => needsBuyerPayment && isAuctionObligation;
+  /// Fixed-price reservation still within the 90-minute checkout hold.
+  bool get isFixedPriceReservationOpen {
+    if (isAuctionObligation || !needsBuyerPayment) return false;
+    final expires = unpaidFixedPriceReservationExpiresAt;
+    return expires == null || expires.isAfter(DateTime.now());
+  }
+
+  /// Unpaid orders the buyer can recover in To Pay / Pending Payments.
+  bool get showsAsAwaitingPayment =>
+      needsBuyerPayment &&
+      (isAuctionObligation ? isPaymentWindowOpen : isFixedPriceReservationOpen);
 
   /// Fixed-price reservations void after 90 minutes (`expire_unpaid_checkouts`).
   DateTime? get unpaidFixedPriceReservationExpiresAt {
@@ -245,14 +254,19 @@ class OrderModel {
 
   bool get isDeliveryFailed => shipment?.isFailed == true;
 
-  bool get isDisputed =>
-      status == OrderStatus.disputed || shipment?.isDisputed == true;
+  /// Open delivery dispute only — not after admin refund/cancel (return is separate).
+  bool get isDisputed {
+    if (status == OrderStatus.cancelled || isRefundedSale) return false;
+    return status == OrderStatus.disputed || shipment?.isDisputed == true;
+  }
 
   bool get isCompleted =>
       status == OrderStatus.completed || shipment?.isCompleted == true;
 
-  bool get isShippedTab =>
-      isInTransit || isInspecting || isDeliveryFailed || isDisputed;
+  bool get isShippedTab {
+    if (status == OrderStatus.cancelled || isRefundedSale) return false;
+    return isInTransit || isInspecting || isDeliveryFailed || isDisputed;
+  }
 
   bool get canArrangeDelivery =>
       !isFailedCheckout &&
@@ -272,6 +286,7 @@ class OrderModel {
       (showsInPurchaseHistory &&
           !isCompleted &&
           status != OrderStatus.cancelled &&
+          !isRefundedSale &&
           (isToShip ||
               isInTransit ||
               isInspecting ||

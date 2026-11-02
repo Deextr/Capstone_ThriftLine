@@ -87,8 +87,7 @@ Future<BuyerLookingForReportModel?> fetchBuyerLookingForReportById(
         'report_id, post_id, reporter_id, reported_user_id, reason, details, '
         'status, created_at, resolved_at, reporter_instruction, '
         'evidence_attempt_count, decision_outcome, snapshot_title, '
-        'snapshot_description, snapshot_image_path, '
-        'looking_for_posts ( title, description, reference_image_url )',
+        'snapshot_description, snapshot_image_path',
       )
       .eq('report_id', reportId)
       .eq('reporter_id', reporterId)
@@ -99,6 +98,11 @@ Future<BuyerLookingForReportModel?> fetchBuyerLookingForReportById(
   final profiles = reportedId == null
       ? <String, Map<String, dynamic>>{}
       : await loadPublicProfiles(supabase, {reportedId});
+
+  final postId = row['post_id'] as String?;
+  final livePost = postId == null || postId.isEmpty
+      ? null
+      : await _tryFetchBuyerVisibleLookingForPost(supabase, postId);
 
   final evidenceRows = await supabase.client
       .from('looking_for_report_evidence')
@@ -115,6 +119,7 @@ Future<BuyerLookingForReportModel?> fetchBuyerLookingForReportById(
   var report = BuyerLookingForReportModel.fromSupabase(
     row,
     reportedUser: reportedId == null ? null : profiles[reportedId],
+    livePost: livePost,
     evidence: evidence,
   );
   report = await _withLookingForEvidenceSignedUrls(supabase, report);
@@ -169,8 +174,7 @@ Future<List<BuyerLookingForReportModel>> _fetchLookingForReportRows(
       .from('looking_for_reports')
       .select(
         'report_id, post_id, reporter_id, reported_user_id, reason, details, '
-        'status, created_at, resolved_at, snapshot_title, '
-        'looking_for_posts ( title )',
+        'status, created_at, resolved_at, snapshot_title',
       )
       .eq('reporter_id', reporterId)
       .order('created_at', ascending: false);
@@ -257,6 +261,22 @@ Future<Map<String, String>> _loadOrderNumbers(
   } catch (e) {
     debugPrint('buyer_my_reports_query order numbers error: $e');
     return {};
+  }
+}
+
+Future<Map<String, dynamic>?> _tryFetchBuyerVisibleLookingForPost(
+  SupabaseService supabase,
+  String postId,
+) async {
+  try {
+    return await supabase.client
+        .from('looking_for_posts')
+        .select('title, description, reference_image_url')
+        .eq('post_id', postId)
+        .maybeSingle();
+  } catch (e) {
+    debugPrint('buyer_my_reports_query live post error: $e');
+    return null;
   }
 }
 

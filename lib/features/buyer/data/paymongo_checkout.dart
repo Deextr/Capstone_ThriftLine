@@ -260,8 +260,7 @@ Future<PaymongoCheckoutResult> createPaymongoCheckout(
       final map = _functionExceptionMap(e);
       return PaymongoCheckoutResult.fromMap({
         'success': false,
-        'error':
-            map?['error']?.toString() ?? 'Payment is already starting.',
+        'error': map?['error']?.toString() ?? 'Payment is already starting.',
       });
     }
     return PaymongoCheckoutResult.fromMap(_functionExceptionMap(e));

@@ -12,13 +12,11 @@ class OrderReviewCta extends StatelessWidget {
     super.key,
     required this.order,
     required this.existing,
-    required this.ratingBuyer,
     this.onReturned,
   });
 
   final OrderModel order;
   final ReviewModel? existing;
-  final bool ratingBuyer;
   final VoidCallback? onReturned;
 
   @override
@@ -27,7 +25,7 @@ class OrderReviewCta extends StatelessWidget {
 
     final kind = reviewActionKind(existing);
     return ThriftButton(
-      label: reviewActionLabel(kind, ratingBuyer: ratingBuyer),
+      label: reviewActionLabel(kind),
       variant: kind == ReviewActionKind.leave
           ? ThriftButtonVariant.primary
           : ThriftButtonVariant.outline,

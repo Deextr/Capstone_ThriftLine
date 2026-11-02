@@ -29,7 +29,6 @@ enum BuyerPurchaseCategory {
 /// Orders that should not appear anywhere in My Purchases (e.g. abandoned
 /// fixed-price checkouts restored to cart).
 bool orderIncludedInMyPurchases(OrderModel order) {
-  if (order.needsBuyerPayment && !order.isAuctionObligation) return false;
   if (order.isFailedCheckout && !order.isAuctionObligation) return false;
   if (order.showsAsAwaitingPayment) return true;
   if (isAuctionPaymentCancelled(order)) return true;

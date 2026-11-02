@@ -9,10 +9,16 @@ class DeliveryPinEntry extends StatefulWidget {
     super.key,
     required this.onSubmit,
     this.isLoading = false,
+    this.title = 'Verify delivery',
+    this.hint = 'Enter the Delivery PIN provided by the buyer.',
+    this.buttonLabel = 'Verify Delivery',
   });
 
   final Future<void> Function(String pin) onSubmit;
   final bool isLoading;
+  final String title;
+  final String hint;
+  final String buttonLabel;
 
   @override
   State<DeliveryPinEntry> createState() => _DeliveryPinEntryState();
@@ -32,12 +38,9 @@ class _DeliveryPinEntryState extends State<DeliveryPinEntry> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Verify delivery', style: AppTypography.subheading),
+        Text(widget.title, style: AppTypography.subheading),
         const SizedBox(height: 8),
-        Text(
-          'Enter the Delivery PIN provided by the buyer.',
-          style: AppTypography.caption,
-        ),
+        Text(widget.hint, style: AppTypography.caption),
         const SizedBox(height: 8),
         ThriftTextField(
           hint: '______',
@@ -50,7 +53,7 @@ class _DeliveryPinEntryState extends State<DeliveryPinEntry> {
         ),
         const SizedBox(height: 12),
         ThriftButton(
-          label: widget.isLoading ? 'Verifying…' : 'Verify Delivery',
+          label: widget.isLoading ? 'Verifying…' : widget.buttonLabel,
           onPressed: widget.isLoading
               ? null
               : () => widget.onSubmit(_pin.text.trim()),

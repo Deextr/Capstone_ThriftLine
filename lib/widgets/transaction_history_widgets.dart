@@ -251,9 +251,8 @@ class TransactionHistoryProductThumb extends StatelessWidget {
             : CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
-                placeholder: (_, _) => ColoredBox(
-                  color: AppColors.surfaceVariant,
-                ),
+                placeholder: (_, _) =>
+                    ColoredBox(color: AppColors.surfaceVariant),
                 errorWidget: (_, _, _) => ColoredBox(
                   color: AppColors.surfaceVariant,
                   child: Icon(
@@ -369,9 +368,7 @@ class TransactionHistoryListTile extends StatelessWidget {
                       if (notice != null && notice!.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Text(
-                          noticeIsAction
-                              ? '$notice Tap for details.'
-                              : notice!,
+                          noticeIsAction ? '$notice Tap for details.' : notice!,
                           style: AppTypography.caption.copyWith(
                             color: noticeIsAction
                                 ? AppColors.warning
@@ -451,7 +448,11 @@ class TransactionHistoryEmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(title, style: AppTypography.subheading, textAlign: TextAlign.center),
+          Text(
+            title,
+            style: AppTypography.subheading,
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 8),
           Text(
             message,
@@ -520,20 +521,17 @@ class GroupedTransactionHistorySliver<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final grouped = groupTransactionsByDay(transactions, dateFor);
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          final entry = grouped[index];
-          return switch (entry) {
-            TransactionHistorySectionHeaderEntry(:final label) =>
-              TransactionHistoryDateHeader(label: label),
-            TransactionHistoryTransactionEntry(:final transaction) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: tileBuilder(transaction),
-            ),
-          };
-        },
-        childCount: grouped.length,
-      ),
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final entry = grouped[index];
+        return switch (entry) {
+          TransactionHistorySectionHeaderEntry(:final label) =>
+            TransactionHistoryDateHeader(label: label),
+          TransactionHistoryTransactionEntry(:final transaction) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: tileBuilder(transaction),
+          ),
+        };
+      }, childCount: grouped.length),
     );
   }
 }
@@ -568,7 +566,10 @@ Future<void> showBuyerTransactionHistorySortSheet({
                   contentPadding: EdgeInsets.zero,
                   title: Text(option.menuLabel),
                   trailing: sort == option
-                      ? const Icon(Icons.check_rounded, color: AppColors.primary)
+                      ? const Icon(
+                          Icons.check_rounded,
+                          color: AppColors.primary,
+                        )
                       : null,
                   onTap: () {
                     onSort(option);
@@ -665,6 +666,221 @@ class TransactionHistoryActiveDateChip extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Refund or payout proof image (private bucket, signed URL).
+class TransactionFinancialProofSection extends StatefulWidget {
+  const TransactionFinancialProofSection({
+    super.key,
+    required this.title,
+    required this.emptyMessage,
+    required this.loadSignedUrl,
+    this.showWhenUnavailable = true,
+  });
+
+  final String title;
+  final String emptyMessage;
+  final Future<String?> Function() loadSignedUrl;
+
+  /// When false, hide the section entirely if no proof exists (skip empty state).
+  final bool showWhenUnavailable;
+
+  @override
+  State<TransactionFinancialProofSection> createState() =>
+      _TransactionFinancialProofSectionState();
+}
+
+class _TransactionFinancialProofSectionState
+    extends State<TransactionFinancialProofSection> {
+  String? _url;
+  bool _loading = true;
+  bool _loadFailed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _loadFailed = false;
+    });
+    try {
+      final url = await widget.loadSignedUrl();
+      if (!mounted) return;
+      setState(() {
+        _url = url;
+        _loading = false;
+        _loadFailed = url == null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadFailed = true;
+        _url = null;
+      });
+    }
+  }
+
+  void _openFullscreen(String url) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          child: Stack(
+            children: [
+              Center(
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4,
+                  child: CachedNetworkImage(imageUrl: url, fit: BoxFit.contain),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loading && _url == null && !widget.showWhenUnavailable) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TransactionHistorySectionTitle(title: widget.title),
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          )
+        else if (_url == null)
+          _ProofPlaceholder(
+            message: _loadFailed
+                ? 'Could not load proof image. Pull to refresh and try again.'
+                : widget.emptyMessage,
+            icon: Icons.receipt_long_outlined,
+          )
+        else
+          Material(
+            color: AppColors.surfaceVariant,
+            borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => _openFullscreen(_url!),
+              child: AspectRatio(
+                aspectRatio: 16 / 10,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CachedNetworkImage(
+                      imageUrl: _url!,
+                      fit: BoxFit.cover,
+                      placeholder: (_, _) =>
+                          ColoredBox(color: AppColors.surfaceVariant),
+                      errorWidget: (_, _, _) => _ProofPlaceholder(
+                        message: 'Could not load proof image.',
+                        icon: Icons.broken_image_outlined,
+                      ),
+                    ),
+                    Positioned(
+                      right: 8,
+                      bottom: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.fullscreen_rounded,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Tap to enlarge',
+                              style: AppTypography.caption.copyWith(
+                                color: Colors.white,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ProofPlaceholder extends StatelessWidget {
+  const _ProofPlaceholder({required this.message, required this.icon});
+
+  final String message;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 32, color: AppColors.textHint),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+        ],
       ),
     );
   }

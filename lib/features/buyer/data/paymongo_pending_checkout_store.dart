@@ -31,10 +31,7 @@ class PaymongoPendingCheckoutStore {
   static const _keyGroupId = AppConstants.keyPaymongoPendingCheckoutGroupId;
   static const _keyStartedAt = AppConstants.keyPaymongoPendingStartedAtMs;
 
-  Future<void> save({
-    required String orderId,
-    String? checkoutGroupId,
-  }) async {
+  Future<void> save({required String orderId, String? checkoutGroupId}) async {
     final id = orderId.trim();
     if (id.isEmpty) return;
     await _prefs.setString(_keyOrderId, id);
@@ -44,10 +41,7 @@ class PaymongoPendingCheckoutStore {
     } else {
       await _prefs.remove(_keyGroupId);
     }
-    await _prefs.setInt(
-      _keyStartedAt,
-      DateTime.now().millisecondsSinceEpoch,
-    );
+    await _prefs.setInt(_keyStartedAt, DateTime.now().millisecondsSinceEpoch);
   }
 
   Future<PaymongoPendingCheckout?> read() async {

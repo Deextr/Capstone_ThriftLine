@@ -50,9 +50,7 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
         backgroundColor: AppColors.background,
         resizeToAvoidBottomInset: true,
         appBar: AppBar(
-          title: Text(
-            controller.isSellerReviewingBuyer ? 'Rate Buyer' : 'Leave a Review',
-          ),
+          title: const Text('Leave a Review'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.pop(),
@@ -63,7 +61,7 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
               ? const Center(
                   child: CircularProgressIndicator(color: AppColors.primary),
                 )
-              : controller.order == null
+              : controller.order == null || controller.isSellerReviewingBuyer
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(AppConstants.spacingLg),
@@ -107,9 +105,7 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        reviewPrompt(
-                          ratingBuyer: controller.isSellerReviewingBuyer,
-                        ),
+                        reviewPrompt(),
                         style: AppTypography.body.copyWith(
                           color: AppColors.textSecondary,
                         ),
@@ -198,9 +194,8 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
                             style: AppTypography.body,
                             decoration: InputDecoration(
                               counterText: '',
-                              hintText: controller.isSellerReviewingBuyer
-                                  ? 'Share how smooth the transaction and communication was...'
-                                  : 'Share details of the item condition, packaging, and communication...',
+                              hintText:
+                                  'Share details of the item condition, packaging, and communication...',
                               hintStyle: AppTypography.body.copyWith(
                                 color: AppColors.textHint,
                               ),
@@ -211,17 +206,13 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
                                 borderRadius: BorderRadius.circular(
                                   AppConstants.radiusMd,
                                 ),
-                                borderSide: BorderSide(
-                                  color: AppColors.border,
-                                ),
+                                borderSide: BorderSide(color: AppColors.border),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(
                                   AppConstants.radiusMd,
                                 ),
-                                borderSide: BorderSide(
-                                  color: AppColors.border,
-                                ),
+                                borderSide: BorderSide(color: AppColors.border),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(
@@ -237,26 +228,24 @@ class _LeaveReviewScreenState extends State<LeaveReviewScreen> {
                           ),
                         ],
                       ),
-                      if (!controller.isSellerReviewingBuyer) ...[
-                        const SizedBox(height: 20),
-                        ReviewPhotoSection(
-                          existingPhotos: controller.existingPhotos,
-                          newDrafts: controller.photoDrafts,
-                          readOnly: controller.readOnly,
-                          onAddGallery: () => context
-                              .read<LeaveReviewController>()
-                              .addPhotoFromGallery(),
-                          onAddCamera: () => context
-                              .read<LeaveReviewController>()
-                              .addPhotoFromCamera(),
-                          onRemoveExisting: (photo) => context
-                              .read<LeaveReviewController>()
-                              .markExistingPhotoRemoved(photo),
-                          onRemoveDraft: (i) => context
-                              .read<LeaveReviewController>()
-                              .removePhotoDraft(i),
-                        ),
-                      ],
+                      const SizedBox(height: 20),
+                      ReviewPhotoSection(
+                        existingPhotos: controller.existingPhotos,
+                        newDrafts: controller.photoDrafts,
+                        readOnly: controller.readOnly,
+                        onAddGallery: () => context
+                            .read<LeaveReviewController>()
+                            .addPhotoFromGallery(),
+                        onAddCamera: () => context
+                            .read<LeaveReviewController>()
+                            .addPhotoFromCamera(),
+                        onRemoveExisting: (photo) => context
+                            .read<LeaveReviewController>()
+                            .markExistingPhotoRemoved(photo),
+                        onRemoveDraft: (i) => context
+                            .read<LeaveReviewController>()
+                            .removePhotoDraft(i),
+                      ),
                       if (controller.errorMessage != null &&
                           controller.order != null &&
                           !controller.order!.isCompleted) ...[
@@ -333,8 +322,6 @@ class _OrderContextCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final order = controller.order!;
-    final isSeller = controller.isSellerReviewingBuyer;
-
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -396,9 +383,7 @@ class _OrderContextCard extends StatelessWidget {
                 Row(
                   children: [
                     Icon(
-                      isSeller
-                          ? Icons.person_outline_rounded
-                          : Icons.storefront_outlined,
+                      Icons.storefront_outlined,
                       size: 14,
                       color: AppColors.textSecondary,
                     ),

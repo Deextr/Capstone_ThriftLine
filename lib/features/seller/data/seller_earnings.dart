@@ -117,6 +117,7 @@ class SellerPayoutRecord {
     this.rejectionReason,
     this.cancelledAt,
     this.processedAt,
+    this.payoutProofAvailable = false,
   });
 
   final String payoutId;
@@ -131,6 +132,7 @@ class SellerPayoutRecord {
   final String? rejectionReason;
   final DateTime? cancelledAt;
   final DateTime? processedAt;
+  final bool payoutProofAvailable;
 
   bool get canCancel => status == SellerPayoutStatus.requested;
 
@@ -161,6 +163,8 @@ class SellerPayoutRecord {
       rejectionReason: text(map['rejection_reason']),
       cancelledAt: parseTime(map['cancelled_at']),
       processedAt: parseTime(map['processed_at']),
+      payoutProofAvailable:
+          map['has_payout_proof'] == true || map['payout_proof_available'] == true,
     );
   }
 }
