@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/connectivity_timing.dart';
 import '../../../models/enums.dart';
 import '../../../models/product_model.dart';
 import '../../../providers/auth_provider.dart';
@@ -77,14 +78,17 @@ class MyShopController extends ChangeNotifier {
         extraSellerIds: [userId],
         includeApproved: false,
       );
-      final rows = await runProductCatalogSelect((select) async {
-        return await _supabase.client
-            .from('products')
-            .select(select)
-            .eq('seller_id', userId)
-            .inFilter('status', ['active', 'sold'])
-            .order('created_at', ascending: false);
-      });
+      final rows = await ConnectivityTiming.measure(
+        'Seller Dashboard & Inventory Stats',
+        () => runProductCatalogSelect((select) async {
+          return await _supabase.client
+              .from('products')
+              .select(select)
+              .eq('seller_id', userId)
+              .inFilter('status', ['active', 'sold'])
+              .order('created_at', ascending: false);
+        }),
+      );
 
       _products = hydrateCatalogProducts(rows as List<dynamic>, sellerProfiles);
     } catch (e) {

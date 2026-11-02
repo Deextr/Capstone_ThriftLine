@@ -4,6 +4,9 @@ DateTime? chatTimestamptz(Object? value) {
   return DateTime.tryParse(value.toString())?.toUtc();
 }
 
+int aggregateUnreadCount(Iterable<int> unreadCounts) =>
+    unreadCounts.fold(0, (total, count) => total + count);
+
 /// Inbox unread is derived from last_message vs the viewer's last_read column.
 /// The sender's last_read is advanced by the insert trigger, so their own
 /// send does not appear unread.

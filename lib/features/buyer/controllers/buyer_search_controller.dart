@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/services/shared_preferences_service.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/connectivity_timing.dart';
 import '../../../models/product_model.dart';
 import '../data/catalog_product_query.dart';
 import '../data/catalog_search_query.dart';
@@ -180,11 +181,14 @@ class BuyerSearchController extends ChangeNotifier {
     try {
       final sanitized = sanitizeCatalogSearchQuery(trimmed);
       final fetchOffset = reset ? 0 : _offset;
-      final rows = await fetchCatalogSearchRows(
-        _supabase.client,
-        sanitizedQuery: sanitized,
-        filters: _filters,
-        offset: fetchOffset,
+      final rows = await ConnectivityTiming.measure(
+        'Search & Apply Filter (Category/Price/Size)',
+        () => fetchCatalogSearchRows(
+          _supabase.client,
+          sanitizedQuery: sanitized,
+          filters: _filters,
+          offset: fetchOffset,
+        ),
       );
 
       final extraIds = rows

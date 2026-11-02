@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/connectivity_timing.dart';
 import '../../../core/utils/ph_phone.dart';
 import '../../../core/utils/validators.dart';
 import '../../seller/domain/seller_address_draft.dart';
@@ -61,7 +62,10 @@ class ProfileController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final profileData = await _supabaseService.fetchUserProfile(targetId);
+      final profileData = await ConnectivityTiming.measure(
+        'User Profile & Rating Submission',
+        () => _supabaseService.fetchUserProfile(targetId),
+      );
       if (profileData != null) {
         _currentUser = UserModel.fromJson(profileData);
       } else if (_authProvider?.user != null) {

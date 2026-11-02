@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'connectivity_timing.dart';
+
 /// Display labels for the seller trust score stored in Postgres.
 ///
 /// The score itself is not calculated here. [resolveTrustLabel] only maps a
@@ -53,11 +55,15 @@ const double sellerTrustWeightReports = 0.10;
 /// Mirrors PostgreSQL `trust_weighted_sum` for optional transparency UI only.
 /// Criterion inputs must come from [SellerTrustBreakdown] (server-written).
 int mirrorTrustWeightedSum(SellerTrustBreakdown breakdown) {
-  return ((breakdown.identity * SellerTrustWeights.identity) +
-          (breakdown.transactions * SellerTrustWeights.transactions) +
-          (breakdown.ratings * SellerTrustWeights.ratings) +
-          (breakdown.reports * SellerTrustWeights.reports))
-      .round();
+  return ConnectivityTiming.measureSync(
+    'Trust Score Calculation (WSM Evaluation)',
+    () =>
+        ((breakdown.identity * SellerTrustWeights.identity) +
+                (breakdown.transactions * SellerTrustWeights.transactions) +
+                (breakdown.ratings * SellerTrustWeights.ratings) +
+                (breakdown.reports * SellerTrustWeights.reports))
+            .round(),
+  );
 }
 
 /// Criterion scores already computed by `recalculate_seller_trust`.

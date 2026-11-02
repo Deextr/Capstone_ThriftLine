@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/connectivity_timing.dart';
 import '../../../core/utils/stock_limits.dart';
 import '../data/cart_shop_group.dart';
 import '../data/checkout_totals.dart';
@@ -443,7 +444,10 @@ class CheckoutController extends ChangeNotifier {
       final rpcName = (ids.length > 1 || multiShop)
           ? 'checkout_selected_cart'
           : 'checkout_cart';
-      final rpcRes = await _supabase.client.rpc(rpcName, params: params);
+      final rpcRes = await ConnectivityTiming.measure(
+        'Escrow Checkout / Order Placement',
+        () => _supabase.client.rpc(rpcName, params: params),
+      );
       if (!supabaseRpcSuccess(rpcRes)) {
         final map = supabaseRpcMap(rpcRes);
         if (map?['code'] == 'existing_unpaid_checkout') {

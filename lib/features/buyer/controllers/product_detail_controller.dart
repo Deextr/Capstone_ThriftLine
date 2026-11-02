@@ -4,13 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/connectivity_timing.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/enums.dart';
 import '../../../models/product_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../chat/data/conversation_service.dart';
-import '../../seller/data/auction_relist_feedback.dart';
-import '../../seller/data/listing_bucket.dart';
 import '../../seller/data/listing_bucket.dart';
 import '../data/auction_checkout_order.dart';
 import '../data/catalog_product_query.dart';
@@ -406,13 +405,16 @@ class ProductDetailController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await runProductCatalogSelect((select) async {
-        return await _supabase.client
-            .from('products')
-            .select(select)
-            .eq('product_id', _productId)
-            .maybeSingle();
-      });
+      final response = await ConnectivityTiming.measure(
+        'View Item Details & Photo Gallery',
+        () => runProductCatalogSelect((select) async {
+          return await _supabase.client
+              .from('products')
+              .select(select)
+              .eq('product_id', _productId)
+              .maybeSingle();
+        }),
+      );
 
       if (response == null) {
         _errorMessage = 'Product not found';
@@ -688,7 +690,10 @@ class ProductDetailController extends ChangeNotifier {
       if (deviceToken != null) {
         params['p_device_token_hash'] = deviceToken;
       }
-      final rpcRes = await _supabase.client.rpc('place_bid', params: params);
+      final rpcRes = await ConnectivityTiming.measure(
+        'Submit / Place a Bid (Bidding Engine)',
+        () => _supabase.client.rpc('place_bid', params: params),
+      );
 
       if (supabaseRpcSuccess(rpcRes)) {
         await _loadAuctionData();

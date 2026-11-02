@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/connectivity_timing.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/order_model.dart';
 import '../../../models/review_model.dart';
@@ -244,23 +245,26 @@ class LeaveReviewController extends ChangeNotifier {
     final isNew = _existing == null;
     String? reviewId;
     try {
-      final rpcRes = isNew
-          ? await _supabase.client.rpc(
-              'submit_review',
-              params: {
-                'p_order_id': orderId,
-                'p_rating': _rating,
-                'p_review_text': _comment.trim(),
-              },
-            )
-          : await _supabase.client.rpc(
-              'update_review',
-              params: {
-                'p_review_id': _existing!.id,
-                'p_rating': _rating,
-                'p_review_text': _comment.trim(),
-              },
-            );
+      final rpcRes = await ConnectivityTiming.measure(
+        'User Profile & Rating Submission',
+        () => isNew
+            ? _supabase.client.rpc(
+                'submit_review',
+                params: {
+                  'p_order_id': orderId,
+                  'p_rating': _rating,
+                  'p_review_text': _comment.trim(),
+                },
+              )
+            : _supabase.client.rpc(
+                'update_review',
+                params: {
+                  'p_review_id': _existing!.id,
+                  'p_rating': _rating,
+                  'p_review_text': _comment.trim(),
+                },
+              ),
+      );
 
       if (!supabaseRpcSuccess(rpcRes)) {
         return supabaseRpcError(

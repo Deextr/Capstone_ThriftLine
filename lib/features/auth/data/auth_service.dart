@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import '../../../core/services/supabase_edge_function_client.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/connectivity_timing.dart';
 import '../../admin/data/admin_audit_log_models.dart';
 import '../../admin/data/admin_audit_service.dart';
 import '../../../core/utils/validators.dart';
@@ -57,10 +58,13 @@ class AuthService {
     }
 
     try {
-      final response = await _auth.signUp(
-        email: email,
-        password: password,
-        data: {'full_name': sanitizedName, ...consent.toMetadata()},
+      final response = await ConnectivityTiming.measure(
+        'Buyer & Seller Registration',
+        () => _auth.signUp(
+          email: email,
+          password: password,
+          data: {'full_name': sanitizedName, ...consent.toMetadata()},
+        ),
       );
 
       final supabaseUser = response.user;
@@ -147,16 +151,22 @@ class AuthService {
       late final dynamic data;
 
       if (kIsWeb) {
-        final webResponse = await SupabaseEdgeFunctionClient.postJson(
-          'sign-in-with-email',
-          body: body,
+        final webResponse = await ConnectivityTiming.measure(
+          'User Login (Authentication)',
+          () => SupabaseEdgeFunctionClient.postJson(
+            'sign-in-with-email',
+            body: body,
+          ),
         );
         responseStatus = webResponse.status;
         data = webResponse.data;
       } else {
-        final response = await _supabaseService.client.functions.invoke(
-          'sign-in-with-email',
-          body: body,
+        final response = await ConnectivityTiming.measure(
+          'User Login (Authentication)',
+          () => _supabaseService.client.functions.invoke(
+            'sign-in-with-email',
+            body: body,
+          ),
         );
         responseStatus = response.status;
         data = response.data;

@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 import 'package:uuid/uuid.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/connectivity_timing.dart';
 import '../../../models/chat_model.dart';
 import '../../../models/enums.dart';
 import '../../../models/looking_for_model.dart';
@@ -298,11 +299,10 @@ class ConversationService {
       'attachment_path': ?attachmentPath,
     };
     // sender_id is also overwritten by the BEFORE INSERT trigger to auth.uid().
-    final row = await _supabase.client
-        .from('messages')
-        .insert(payload)
-        .select()
-        .single();
+    final row = await ConnectivityTiming.measure(
+      'Real-Time Chat & Inquiry (Buyer-Seller)',
+      () => _supabase.client.from('messages').insert(payload).select().single(),
+    );
     return MessageModel.fromSupabase(row);
   }
 
@@ -382,7 +382,9 @@ class ConversationService {
     return null;
   }
 
-  Future<List<ProductModel>> loadSellerShareableProducts(String sellerId) async {
+  Future<List<ProductModel>> loadSellerShareableProducts(
+    String sellerId,
+  ) async {
     final sellerProfiles = await fetchSellerProfilesMap(
       _supabase.client,
       extraSellerIds: [sellerId],

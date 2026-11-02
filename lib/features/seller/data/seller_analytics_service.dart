@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/connectivity_timing.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import 'seller_analytics.dart';
 import 'seller_analytics_period.dart';
@@ -38,9 +39,9 @@ class SellerAnalyticsService {
         params['p_compare_end'] = window.compareEnd!.toUtc().toIso8601String();
       }
 
-      final rpcRes = await _supabase.client.rpc(
-        'seller_analytics_report',
-        params: params,
+      final rpcRes = await ConnectivityTiming.measure(
+        'Seller Dashboard & Inventory Stats',
+        () => _supabase.client.rpc('seller_analytics_report', params: params),
       );
 
       if (!supabaseRpcSuccess(rpcRes)) {

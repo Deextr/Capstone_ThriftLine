@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/services/shared_preferences_service.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/connectivity_timing.dart';
 import '../../../models/enums.dart';
 import '../../../models/product_model.dart';
 import '../../../models/seller_profile.dart';
@@ -110,7 +111,10 @@ class HomeController extends ChangeNotifier {
 
     Future<void> loadEndingSoon() async {
       try {
-        final ids = await fetchEndingSoonProductIds(client, limit: 16);
+        final ids = await ConnectivityTiming.measure(
+          'Load Marketplace Feed (Home)',
+          () => fetchEndingSoonProductIds(client, limit: 16),
+        );
         if (ids.isEmpty) {
           ending = const [];
           return;
@@ -135,16 +139,22 @@ class HomeController extends ChangeNotifier {
       try {
         List<dynamic> rows;
         try {
-          rows = await fetchCatalogProductRows(
-            client,
-            limit: 16,
-            orderColumn: 'views',
+          rows = await ConnectivityTiming.measure(
+            'Load Marketplace Feed (Home)',
+            () => fetchCatalogProductRows(
+              client,
+              limit: 16,
+              orderColumn: 'views',
+            ),
           );
         } catch (_) {
-          rows = await fetchCatalogProductRows(
-            client,
-            limit: 16,
-            orderColumn: 'created_at',
+          rows = await ConnectivityTiming.measure(
+            'Load Marketplace Feed (Home)',
+            () => fetchCatalogProductRows(
+              client,
+              limit: 16,
+              orderColumn: 'created_at',
+            ),
           );
         }
         suggested = hydrateCatalogProducts(
@@ -160,10 +170,13 @@ class HomeController extends ChangeNotifier {
 
     Future<void> loadBidding() async {
       try {
-        final rows = await fetchCatalogProductRows(
-          client,
-          limit: 30,
-          listingType: 'auction',
+        final rows = await ConnectivityTiming.measure(
+          'Load Marketplace Feed (Home)',
+          () => fetchCatalogProductRows(
+            client,
+            limit: 30,
+            listingType: 'auction',
+          ),
         );
         bidding = hydrateCatalogProducts(
           rows,

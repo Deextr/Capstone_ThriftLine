@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/connectivity_timing.dart';
 import '../domain/davao_barangay.dart';
 import '../domain/external_selling.dart';
 import '../domain/seller_address_draft.dart';
@@ -93,16 +94,19 @@ class SellerVerificationService {
       final selfiePath =
           '$userId/$verificationId/selfie${_ext(selfieFileName)}';
 
-      await _supabase.client.storage
-          .from('verification-docs')
-          .uploadBinary(
-            frontPath,
-            idFrontBytes,
-            fileOptions: const FileOptions(
-              upsert: true,
-              contentType: 'image/jpeg',
+      await ConnectivityTiming.measure(
+        'Seller Verification / ID Upload',
+        () => _supabase.client.storage
+            .from('verification-docs')
+            .uploadBinary(
+              frontPath,
+              idFrontBytes,
+              fileOptions: const FileOptions(
+                upsert: true,
+                contentType: 'image/jpeg',
+              ),
             ),
-          );
+      );
       if (backPath != null && backBytes != null) {
         await _supabase.client.storage
             .from('verification-docs')

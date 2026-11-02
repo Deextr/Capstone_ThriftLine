@@ -5,6 +5,31 @@ import '../../../features/auth/domain/account_mode.dart';
 import '../../../models/enums.dart';
 import '../../../models/notification_model.dart';
 
+/// Resolves supported notification payloads without performing navigation.
+String? resolveNotificationRoute(NotificationModel notification) {
+  final event = notification.data['event']?.trim();
+  final orderId = notification.data['order_id']?.trim();
+  if (event == 'order_update' && orderId != null && orderId.isNotEmpty) {
+    return RouteNames.trackOrderFor(orderId);
+  }
+
+  final productId = notification.data['product_id']?.trim();
+  if (notification.type == NotificationType.outbid &&
+      productId != null &&
+      productId.isNotEmpty) {
+    return RouteNames.productFor(productId);
+  }
+
+  final threadId = notification.data['thread_id']?.trim();
+  if (notification.type == NotificationType.message &&
+      threadId != null &&
+      threadId.isNotEmpty) {
+    return RouteNames.chatThread(threadId);
+  }
+
+  return null;
+}
+
 /// Opens the correct destination for a notification in the active workspace.
 void openNotification(
   GoRouter router, {

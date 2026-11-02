@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/connectivity_timing.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../features/profile/data/followed_shop_item.dart';
 import '../../../providers/auth_provider.dart';
@@ -330,14 +331,17 @@ class ReportUserController extends ChangeNotifier {
     notifyListeners();
     String? reportId;
     try {
-      final rpcRes = await _supabase.client.rpc(
-        'submit_report',
-        params: {
-          'p_reported_user_id': _reportedUserId,
-          'p_category': _selectedCategory,
-          'p_details': _details.trim(),
-          'p_order_id': null,
-        },
+      final rpcRes = await ConnectivityTiming.measure(
+        'Dispute Resolution / Report Submission',
+        () => _supabase.client.rpc(
+          'submit_report',
+          params: {
+            'p_reported_user_id': _reportedUserId,
+            'p_category': _selectedCategory,
+            'p_details': _details.trim(),
+            'p_order_id': null,
+          },
+        ),
       );
       if (!supabaseRpcSuccess(rpcRes)) {
         return supabaseRpcError(

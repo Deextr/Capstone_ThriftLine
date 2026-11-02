@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/routes/route_names.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/connectivity_timing.dart';
 import '../../../core/utils/listing_shipping.dart';
 import '../../../core/utils/supabase_errors.dart';
 import '../../../core/utils/supabase_rpc.dart';
@@ -550,16 +551,8 @@ class AddListingController extends ChangeNotifier {
           ? double.parse(startBidCtrl.text.trim())
           : double.parse(priceCtrl.text.trim());
 
-      // a. Upload images before creating the listing row so a failed upload
-      //    never leaves an active product without photos.
-      uploadedImageUrls = await _uploadImages(sellerId, productId);
-      imagesUploaded = true;
-
-      uploadStatusMessage = 'Saving listing…';
-      _safeNotify();
-
-      // b. Insert into products table
-      await _gateway.insertProduct({
+      // c. Insert into products table
+      await _supabase.client.from('products').insert({
         'product_id': productId,
         'seller_id': sellerId,
         'name': nameCtrl.text.trim(),
@@ -573,9 +566,9 @@ class AddListingController extends ChangeNotifier {
           stockCtrl.text,
         ),
         'category_id': categoryId,
-        if (sizeCtrl.text.trim().isNotEmpty) 'size': sizeCtrl.text.trim(),
-        if (brandCtrl.text.trim().isNotEmpty) 'brand': brandCtrl.text.trim(),
-        if (colorCtrl.text.trim().isNotEmpty) 'color': colorCtrl.text.trim(),
+        if (sizeCtrl.text.isNotEmpty) 'size': sizeCtrl.text,
+        if (brandCtrl.text.isNotEmpty) 'brand': brandCtrl.text,
+        if (colorCtrl.text.isNotEmpty) 'color': colorCtrl.text,
         'show_item_location': showItemLocation,
         'shipping_mode': _resolvedShippingMode().dbValue,
         'shipping_fee': _resolvedShippingFee(),
@@ -585,7 +578,6 @@ class AddListingController extends ChangeNotifier {
           'free_shipping_bid_threshold': _resolvedBidThreshold(),
         'boosted': false,
       });
-      productInserted = true;
 
       // c. Auction row must be created in the same listing flow.
       if (selectedFormat == ListingFormat.auction) {
@@ -602,12 +594,32 @@ class AddListingController extends ChangeNotifier {
         }
       }
 
-      // d. Insert product_images rows (requires product row for RLS).
-      await _gateway.insertProductImages([
-        for (var i = 0; i < uploadedImageUrls.length; i++)
+      // d. Upload images (with cleanup on failure)
+      List<String> imageUrls;
+      try {
+        imageUrls = await _uploadImages(sellerId, productId);
+      } catch (e) {
+        await _cleanupImages(sellerId, productId, images.length);
+        if (context.mounted) {
+          showThriftSnackBar(
+            context,
+            'Image upload failed. Please try again.',
+            isError: true,
+          );
+        }
+        return;
+      }
+
+      // e. Update status message
+      uploadStatusMessage = 'Saving listing…';
+      _safeNotify();
+
+      // f. Insert product_images rows
+      await _supabase.client.from('product_images').insert([
+        for (var i = 0; i < imageUrls.length; i++)
           {
             'product_id': productId,
-            'image_url': uploadedImageUrls[i],
+            'image_url': imageUrls[i],
             'is_primary': i == 0,
             'display_order': i,
           },

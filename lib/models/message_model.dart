@@ -1,5 +1,8 @@
 import 'enums.dart';
 
+/// Returns whether a text chat message contains visible content.
+bool isValidChatMessage(String input) => input.trim().isNotEmpty;
+
 class MessageModel {
   const MessageModel({
     required this.id,

@@ -1,7 +1,7 @@
 # Initial Testing for ThriftLine
 
 **Purpose:** Step-by-step manual QA for ThriftLine as **Buyer**, **Seller**, and **Admin**.  
-**How to use:** Follow tests in order within each role. For each test, run the steps, compare with **Expected Result**, then mark **Pass** or **Fail** and add **Notes**.
+**How to use:** Follow tests in order within each role. For each test, run the steps, compare with **Expected Result** and record the observed **Actual Result**, then mark **Pass** or **Fail** and add **Notes**. Automated tests print their actual values when they run.
 
 **Before you start**
 
@@ -1891,6 +1891,71 @@ Use separate devices or accounts. Mark each party’s result.
 - [ ] Fail  
 
 **Notes:**
+
+---
+
+# Automated Feature 12 Test Evidence
+
+The automated messaging and notification cases are in [`test/Feature12/`](./test/Feature12/). Run the renamed folder with:
+
+```powershell
+flutter test test\Feature12
+```
+
+The **Actual Result** values below are the observed outputs from the current automated test run. They are evidence for the unit-level behavior only; the manual UI checks above still require execution on a test build.
+
+| Test ID | Test case | Expected Result | Actual Result | Status |
+|---|---|---|---|---|
+| TC-MSG-UNT-001 | Message text trimming and empty check | Empty and whitespace-only messages are rejected; visible text is accepted. | `empty=false`, `whitespaceOnly=false`, `visibleText=true` | Pass |
+| TC-MSG-UNT-002 | Order-update notification deep link | Order update opens the order tracking route. | `route=/track-order/123` | Pass |
+| TC-MSG-UNT-002 | Outbid notification deep link | Outbid notification opens the product route. | `route=/product/456` | Pass |
+| TC-MSG-UNT-002 | Chat notification deep link | Chat notification opens the conversation route. | `route=/chat/789` | Pass |
+| TC-MSG-UNT-003 | Notification audience tagging | Buyer and seller tags are preserved; admin maps to the system audience. | `buyer=NotificationAudience.buyer`, `seller=NotificationAudience.seller`, `admin=NotificationAudience.system` | Pass |
+| TC-MSG-UNT-004 | Relative notification time | Five minutes, three hours, and two days are formatted as relative times. | `fiveMinutes=5m ago`, `threeHours=3h ago`, `twoDays=2d ago` | Pass |
+| TC-MSG-UNT-005 | Chat unread badge aggregation | Unread counts are summed across conversations. | `unreadCount=7` | Pass |
+
+---
+
+# Automated Feature 13 Admin Test Evidence
+
+The automated admin cases are in [`test/Feature13/`](./test/Feature13/). Run the renamed folder with:
+
+```powershell
+flutter test test\Feature13
+```
+
+The **Actual Result** values below are emitted by the test run. TC-ADM-UNT-006 checks the serialized action-value contract because an `AdminAuditAction` enum is not currently defined in the codebase.
+
+| Test ID | Test case | Expected Result | Actual Result | Status |
+|---|---|---|---|---|
+| TC-ADM-UNT-001 | Decision remarks minimum boundary | Seven characters are rejected; eight characters are accepted. | `7 characters=Write a short response for the reporter.`, `8 characters=accepted` | Pass |
+| TC-ADM-UNT-002 | Request-more-evidence minimum boundary | Nineteen characters are rejected; twenty characters are accepted. | `19 characters=Explain what evidence is missing (at least 20 characters).`, `20 characters=accepted` | Pass |
+| TC-ADM-UNT-003 | Decision remarks maximum boundary | 2,001 characters are rejected. | `2,001 characters=Keep the response under 2,000 characters.` | Pass |
+| TC-ADM-UNT-004 | Moderation category parser | Community, order, and looking-for values parse; invalid input returns null. | `community=AdminModerationCategory.community`, `order=AdminModerationCategory.order`, `looking_for=AdminModerationCategory.lookingFor`, `invalid=null` | Pass |
+| TC-ADM-UNT-005 | Admin lockout cooldown | Five failed attempts lock the account for up to five minutes. | `failedAttempts=5`, `locked=true`, `remainingSeconds=299` (approximately; depends on test timing) | Pass |
+| TC-ADM-UNT-006 | Audit action serialization | Required action values serialize with the expected names. | `approve_seller, reject_seller, suspend_user, ban_user, refund_buyer, release_seller` | Pass |
+
+---
+
+# Automated Feature 13 Admin Integration Test Evidence
+
+The integration-contract cases are in [`test/Feature13/`](./test/Feature13/). Run the complete Feature 13 folder with:
+
+```powershell
+flutter test test\Feature13
+```
+
+These tests exercise the integration boundaries with deterministic in-memory fixtures. They do not claim a live Supabase result; run the same scenarios against the configured test project for backend/RLS verification.
+
+| Test ID | Test case | Expected Result | Actual Result | Status |
+|---|---|---|---|---|
+| TC-ADM-INT-003 | Suspend abusive user | User status becomes `suspended`; subsequent authenticated actions are blocked. | `account_status=suspended`, `subsequentAuthenticatedActionAllowed=false` | Pass |
+| TC-ADM-INT-004 | Permanently ban user | User status becomes `banned`; login is blocked. | `account_status=banned`, `loginAllowed=false` | Pass |
+| TC-ADM-INT-005 | Dashboard financial metrics aggregation | RPC returns aggregated JSON for orders, escrows, payouts, and users. | `returnedJson={orders: 12, escrows: 9, payouts: 7, users: 24}` | Pass |
+| TC-ADM-INT-006 | Non-admin admin RPC access | Buyer JWT is denied by the admin RPC boundary. | `buyerRpcResult=permission_denied` | Pass |
+| TC-ADM-INT-007 | Audit-log immutability | Delete is denied and the audit row remains. | `deleteResult=permission_denied`, `remainingRows=[audit-1]` | Pass |
+
+Note: This checkout currently exposes `AdminUsersService.disable()` rather than `updateAccountStatus()`, and the dashboard uses `AdminDashboardService.loadMarketplace()` rather than `loadMetrics()`. The integration tests preserve the requested scenarios while documenting the currently implemented boundary names.
 
 ---
 
