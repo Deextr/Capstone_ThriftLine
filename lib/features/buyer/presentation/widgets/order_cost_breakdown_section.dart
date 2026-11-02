@@ -34,13 +34,16 @@ class OrderCostBreakdown extends StatelessWidget {
     final qtySuffix = itemCount != null
         ? ' ($itemCount ${itemCount == 1 ? 'item' : 'items'})'
         : '';
-    final shippingLabel = shippingFee <= 0 ? 'Free' : formatCurrency(shippingFee);
+    final shippingLabel = shippingFee <= 0
+        ? 'Free'
+        : formatCurrency(shippingFee);
 
     return Container(
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: backgroundColor ?? AppColors.surfaceVariant.withValues(alpha: 0.35),
+        color:
+            backgroundColor ?? AppColors.surfaceVariant.withValues(alpha: 0.35),
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
       ),
       child: Column(
@@ -113,8 +116,9 @@ class CombinedPaymentSummaryCard extends StatelessWidget {
         ? 'Shipping fee ($shopCount shops)'
         : 'Shipping fee';
 
-    final shippingValue =
-        shippingFee <= 0 ? 'Free' : formatCurrency(shippingFee);
+    final shippingValue = shippingFee <= 0
+        ? 'Free'
+        : formatCurrency(shippingFee);
 
     return ThriftCard(
       padding: const EdgeInsets.all(16),
@@ -140,7 +144,10 @@ class CombinedPaymentSummaryCard extends StatelessWidget {
               ),
               if (shopCount > 1)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
@@ -157,10 +164,7 @@ class CombinedPaymentSummaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          _BreakdownRow(
-            label: subtotalLabel,
-            value: formatCurrency(subtotal),
-          ),
+          _BreakdownRow(label: subtotalLabel, value: formatCurrency(subtotal)),
           const SizedBox(height: 8),
           _BreakdownRow(
             label: shippingLabel,

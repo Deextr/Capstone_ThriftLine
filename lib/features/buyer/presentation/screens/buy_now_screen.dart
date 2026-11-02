@@ -156,9 +156,7 @@ class _BuyNowScreenState extends State<BuyNowScreen> {
 
     final subtotal = product.price * _quantity;
     final shipping = calculateShopFixedShippingPreview(
-      cartShippingLinesFromProducts([
-        (product: product, quantity: _quantity),
-      ]),
+      cartShippingLinesFromProducts([(product: product, quantity: _quantity)]),
     );
     final platform = checkoutPlatformFee(subtotal);
     final total = checkoutTotal(

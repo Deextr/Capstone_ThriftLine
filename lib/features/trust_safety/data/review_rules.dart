@@ -21,19 +21,15 @@ ReviewActionKind reviewActionKind(ReviewModel? existing, {DateTime? now}) {
   return ReviewActionKind.view;
 }
 
-String reviewActionLabel(ReviewActionKind kind, {required bool ratingBuyer}) {
+String reviewActionLabel(ReviewActionKind kind) {
   return switch (kind) {
-    ReviewActionKind.leave => ratingBuyer ? 'Rate Buyer' : 'Leave a Review',
+    ReviewActionKind.leave => 'Leave a Review',
     ReviewActionKind.edit => 'Edit Review',
     ReviewActionKind.view => 'View Review',
   };
 }
 
-String reviewPrompt({required bool ratingBuyer}) {
-  return ratingBuyer
-      ? 'How was your experience with this buyer?'
-      : 'How was your experience with this seller?';
-}
+String reviewPrompt() => 'How was your experience with this seller?';
 
 String formatRatingAverage({
   double? average,

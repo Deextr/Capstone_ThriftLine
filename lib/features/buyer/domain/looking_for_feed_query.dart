@@ -105,7 +105,8 @@ bool lookingForPostMatchesFilters(
   LookingForFeedFilters filters, {
   required bool applyInactiveStatus,
 }) {
-  if (filters.hasCategoryFilter && !filters.categories.contains(post.category)) {
+  if (filters.hasCategoryFilter &&
+      !filters.categories.contains(post.category)) {
     return false;
   }
   if (filters.hasBudgetFilter &&

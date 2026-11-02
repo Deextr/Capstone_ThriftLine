@@ -118,11 +118,7 @@ List<BuyerTransaction> visibleBuyerTransactions({
   final list = source
       .where((t) => buyerTransactionMatchesFilter(t, filter))
       .where(
-        (t) => buyerTransactionMatchesDateRange(
-          t,
-          from: dateFrom,
-          to: dateTo,
-        ),
+        (t) => buyerTransactionMatchesDateRange(t, from: dateFrom, to: dateTo),
       )
       .toList();
   list.sort((a, b) {
@@ -203,8 +199,7 @@ String buyerRefundExplanation(
                 'The GCash reference will appear here after it is sent.'
           : 'Add the GCash account where we should send your refund. Our team '
                 'sends refunds manually through GCash; this is not automatic.',
-    BuyerRefundState.succeeded =>
-      'Your refund was confirmed.',
+    BuyerRefundState.succeeded => 'Your refund was confirmed.',
     BuyerRefundState.manualCompleted =>
       'Our team sent this refund to your GCash.',
   };
@@ -264,6 +259,7 @@ class BuyerTransaction {
     this.refundClaimLinkExpiresAt,
     this.refundGcashSubmitted = false,
     this.manualRefundReference,
+    this.refundProofAvailable = false,
   });
 
   final String paymentId;
@@ -289,6 +285,7 @@ class BuyerTransaction {
   final DateTime? refundClaimLinkExpiresAt;
   final bool refundGcashSubmitted;
   final String? manualRefundReference;
+  final bool refundProofAvailable;
 
   bool get hasRefund => refundState != null;
 
@@ -355,6 +352,7 @@ class BuyerTransaction {
       manualRefundReference: reference != null && reference.isNotEmpty
           ? reference
           : null,
+      refundProofAvailable: json['refund_proof_available'] == true,
     );
   }
 }

@@ -17,7 +17,11 @@ class AwaitingPaymentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final expired = !order.isPaymentWindowOpen && order.paymentDueAt != null;
+    final isAuction = order.isAuctionObligation;
+    final expired = isAuction
+        ? (!order.isPaymentWindowOpen && order.paymentDueAt != null)
+        : !order.isFixedPriceReservationOpen;
+    final reservationExpires = order.unpaidFixedPriceReservationExpiresAt;
     final extraCount = order.items.length > 1 ? order.items.length - 1 : 0;
 
     return Padding(
@@ -88,8 +92,12 @@ class AwaitingPaymentTile extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         expired
-                            ? 'The payment window for this auction win has ended.'
-                            : 'You won this auction. Complete payment before the deadline.',
+                            ? (isAuction
+                                  ? 'The payment window for this auction win has ended.'
+                                  : 'This checkout reservation has expired.')
+                            : (isAuction
+                                  ? 'You won this auction. Complete payment before the deadline.'
+                                  : 'Complete payment to secure your items before the reservation ends.'),
                         style: AppTypography.caption.copyWith(
                           color: AppColors.textSecondary,
                         ),
@@ -103,6 +111,15 @@ class AwaitingPaymentTile extends StatelessWidget {
                             color: expired
                                 ? AppColors.textHint
                                 : AppColors.primaryDark,
+                          ),
+                        ),
+                      ] else if (reservationExpires != null && !expired) ...[
+                        const SizedBox(height: 6),
+                        PaymentDeadlineText(
+                          due: reservationExpires,
+                          style: AppTypography.caption.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primaryDark,
                           ),
                         ),
                       ],
@@ -128,7 +145,7 @@ class AwaitingPaymentTile extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    'Pay now',
+                    isAuction ? 'Pay now' : 'Continue payment',
                     style: AppTypography.caption.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
@@ -161,10 +178,7 @@ class _ProductThumb extends StatelessWidget {
                   width: 64,
                   height: 64,
                   color: AppColors.surfaceVariant,
-                  child: Icon(
-                    Icons.image_outlined,
-                    color: AppColors.textHint,
-                  ),
+                  child: Icon(Icons.image_outlined, color: AppColors.textHint),
                 )
               : CachedNetworkImage(
                   imageUrl: imageUrl,

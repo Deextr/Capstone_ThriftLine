@@ -69,10 +69,10 @@ class ReturnShipment {
 
 String returnStatusLabel(String status) => switch (status) {
   'not_required' => 'No return needed',
-  'waiting_for_rider' => 'Waiting for rider',
-  'rider_assigned' => 'Rider assigned',
-  'picked_up' => 'Picked up',
-  'returned' => 'Returned',
+  'waiting_for_rider' => 'Return required',
+  'rider_assigned' => 'Pickup arranged',
+  'picked_up' => 'Return in transit',
+  'returned' => 'Return completed',
   'cancelled_by_admin' => 'Return stopped',
   _ => 'Return update',
 };
@@ -80,8 +80,9 @@ String returnStatusLabel(String status) => switch (status) {
 String returnStatusHint(String status) => switch (status) {
   'not_required' => 'You do not need to send the item back.',
   'waiting_for_rider' => 'The seller is responsible for arranging a rider.',
-  'rider_assigned' => 'Hand the item to the rider when they arrive.',
-  'picked_up' => 'The rider has the item.',
+  'rider_assigned' =>
+    'When the rider arrives, enter the six-digit pickup PIN they give you.',
+  'picked_up' => 'The rider has the item. Waiting for the seller to confirm receipt.',
   'returned' => 'The seller confirmed the item was returned.',
   'cancelled_by_admin' =>
     'An admin stopped this return. The refund is unchanged.',
@@ -90,10 +91,10 @@ String returnStatusHint(String status) => switch (status) {
 
 const List<String> kReturnProgressSteps = [
   'Refund approved',
-  'Waiting for rider',
-  'Rider assigned',
-  'Picked up',
-  'Returned',
+  'Return required',
+  'Pickup arranged',
+  'Return in transit',
+  'Return completed',
 ];
 
 int returnProgressIndex(String status) => switch (status) {

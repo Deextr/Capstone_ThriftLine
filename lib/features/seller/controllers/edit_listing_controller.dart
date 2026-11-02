@@ -1,16 +1,18 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/listing_shipping.dart';
+import '../../../core/utils/supabase_errors.dart';
 import '../../../core/utils/supabase_rpc.dart';
 import '../../../models/enums.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../widgets/thrift_widgets.dart';
 import '../domain/product_image_storage.dart';
 import '../domain/product_listing_validation.dart';
+import '../presentation/widgets/listing_publish_error_dialog.dart';
 import 'add_listing_controller.dart'
     show
         CategoryItem,
@@ -21,9 +23,9 @@ import 'add_listing_controller.dart'
         listingQuantityAvailable,
         listingStockIsValid;
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Existing image (already on Supabase Storage)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 /// An image that already exists in `product_images` (has a URL, not bytes).
 class ExistingImage {
@@ -38,9 +40,9 @@ class ExistingImage {
   final int displayOrder;
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// A slot in the image strip â€” either existing or newly picked
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
+// A slot in the image strip — either existing or newly picked
+// ─────────────────────────────────────────────────────────────────────────────
 
 sealed class ImageSlot {}
 
@@ -54,9 +56,9 @@ class NewSlot extends ImageSlot {
   final SelectedImage image;
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Controller
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 class EditListingController extends ChangeNotifier {
   EditListingController({
@@ -75,14 +77,14 @@ class EditListingController extends ChangeNotifier {
   final AuthProvider _auth;
   final ImagePicker _imagePicker;
 
-  // â”€â”€ Loading state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Loading state ──────────────────────────────────────────────────────────
   bool initialLoading = true;
   String? loadError;
 
-  // â”€â”€ Image slots (max 3) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Image slots (max 3) ────────────────────────────────────────────────────
   List<ImageSlot> slots = [];
 
-  // â”€â”€ Text controllers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Text controllers ──────────────────────────────────────────────────────
   final TextEditingController nameCtrl = TextEditingController();
   final TextEditingController descCtrl = TextEditingController();
   final TextEditingController priceCtrl = TextEditingController();
@@ -113,7 +115,7 @@ class EditListingController extends ChangeNotifier {
   double originalStartingPrice = 0;
   DateTime? auctionEndsAt;
 
-  // â”€â”€ Selection state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Selection state ────────────────────────────────────────────────────────
   List<CategoryItem> categories = [];
   bool categoriesLoading = false;
   String? selectedCategoryId;
@@ -123,16 +125,16 @@ class EditListingController extends ChangeNotifier {
   int auctionDurationDays = 3;
   double bidIncrement = 10;
 
-  // â”€â”€ Save state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Save state ─────────────────────────────────────────────────────────────
   bool isSaving = false;
   String saveStatusMessage = '';
   Map<String, String> fieldErrors = {};
 
-  // â”€â”€ IDs to delete from product_images on save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── IDs to delete from product_images on save ──────────────────────────────
   final List<String> _removedImageIds = [];
   final List<String> _removedImageUrls = [];
 
-  // â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Init ──────────────────────────────────────────────────────────────────
 
   Future<void> _init() async {
     await Future.wait([
@@ -312,7 +314,7 @@ class EditListingController extends ChangeNotifier {
         } catch (_) {}
       }
 
-      // Images â€” sort by display_order
+      // Images — sort by display_order
       final imgRows = (row['product_images'] as List? ?? []);
       imgRows.sort(
         (a, b) =>
@@ -341,7 +343,7 @@ class EditListingController extends ChangeNotifier {
     }
   }
 
-  // â”€â”€ Field change handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Field change handlers ──────────────────────────────────────────────────
 
   void onNameChanged(String _) {
     fieldErrors.remove('name');
@@ -447,26 +449,75 @@ class EditListingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // â”€â”€ Image management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Image management ───────────────────────────────────────────────────────
 
-  Future<void> pickImage(int slotIndex) async {
+  Future<void> pickImage(int slotIndex, [BuildContext? context]) async {
     if (slots.length >= 3) return;
     final xfile = await _imagePicker.pickImage(source: ImageSource.gallery);
     if (xfile == null) return;
     final bytes = await xfile.readAsBytes();
+    final pickError = productListingImagePickError(
+      fileName: xfile.name,
+      byteLength: bytes.length,
+      bytes: bytes,
+    );
+    if (pickError != null) {
+      if (slots.isEmpty) {
+        fieldErrors['images'] = pickError;
+        notifyListeners();
+      }
+      if (context != null && context.mounted) {
+        final isTooLarge = pickError == kProductListingImageTooLargeMessage;
+        await showListingPublishErrorDialog(
+          context,
+          title: isTooLarge ? 'Image too large' : 'Unsupported image format',
+          message: pickError,
+          icon: isTooLarge
+              ? Icons.photo_size_select_large_outlined
+              : Icons.broken_image_outlined,
+          canRetry: false,
+          primaryLabel: 'Okay',
+        );
+      }
+      return;
+    }
+
     final newSlot = NewSlot(SelectedImage(bytes: bytes, name: xfile.name));
     if (slotIndex >= slots.length) {
       slots = [...slots, newSlot];
     } else {
       slots = [...slots]..[slotIndex] = newSlot;
     }
+    fieldErrors.remove('images');
     notifyListeners();
   }
 
-  Future<void> replaceImage(int slotIndex) async {
+  Future<void> replaceImage(int slotIndex, [BuildContext? context]) async {
     final xfile = await _imagePicker.pickImage(source: ImageSource.gallery);
     if (xfile == null) return;
     final bytes = await xfile.readAsBytes();
+    final pickError = productListingImagePickError(
+      fileName: xfile.name,
+      byteLength: bytes.length,
+      bytes: bytes,
+    );
+    if (pickError != null) {
+      if (context != null && context.mounted) {
+        final isTooLarge = pickError == kProductListingImageTooLargeMessage;
+        await showListingPublishErrorDialog(
+          context,
+          title: isTooLarge ? 'Image too large' : 'Unsupported image format',
+          message: pickError,
+          icon: isTooLarge
+              ? Icons.photo_size_select_large_outlined
+              : Icons.broken_image_outlined,
+          canRetry: false,
+          primaryLabel: 'Okay',
+        );
+      }
+      return;
+    }
+
     final newSlot = NewSlot(SelectedImage(bytes: bytes, name: xfile.name));
     final old = slotIndex < slots.length ? slots[slotIndex] : null;
     if (old is ExistingSlot) {
@@ -478,6 +529,7 @@ class EditListingController extends ChangeNotifier {
     } else {
       slots = [...slots, newSlot];
     }
+    fieldErrors.remove('images');
     notifyListeners();
   }
 
@@ -489,6 +541,7 @@ class EditListingController extends ChangeNotifier {
       _removedImageUrls.add(slot.image.imageUrl);
     }
     slots = [...slots]..removeAt(slotIndex);
+    fieldErrors.remove('images');
     notifyListeners();
   }
 
@@ -501,7 +554,7 @@ class EditListingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // â”€â”€ Validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Validation ─────────────────────────────────────────────────────────────
 
   bool _validate() {
     fieldErrors = {};
@@ -625,19 +678,34 @@ class EditListingController extends ChangeNotifier {
     return double.tryParse(bidThresholdCtrl.text.trim());
   }
 
-  // â”€â”€ Save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Save ──────────────────────────────────────────────────────────────────
 
   Future<void> saveChanges(BuildContext context) async {
-    if (!_validate()) return;
+    if (isSaving) return;
+
+    if (!_validate()) {
+      if (context.mounted) {
+        showThriftSnackBar(
+          context,
+          kListingMissingDetailsMessage,
+          isError: true,
+        );
+      }
+      return;
+    }
 
     final sellerId = _auth.user?.id;
     if (sellerId == null) {
-      showThriftSnackBar(context, 'Not authenticated.', isError: true);
+      showThriftSnackBar(
+        context,
+        'You must be logged in to update a listing.',
+        isError: true,
+      );
       return;
     }
 
     isSaving = true;
-    saveStatusMessage = 'Savingâ€¦';
+    saveStatusMessage = 'Saving…';
     notifyListeners();
 
     try {
@@ -702,10 +770,7 @@ class EditListingController extends ChangeNotifier {
         );
         if (!supabaseRpcSuccess(rpcRes)) {
           throw Exception(
-            supabaseRpcError(
-              rpcRes,
-              fallback: 'Failed to save the auction record.',
-            ),
+            supabaseRpcError(rpcRes, fallback: 'auction_setup_failed'),
           );
         }
       }
@@ -736,20 +801,31 @@ class EditListingController extends ChangeNotifier {
           .where((e) => e.value is NewSlot)
           .toList();
 
+      final stamp = DateTime.now().millisecondsSinceEpoch;
       for (final entry in newSlots) {
         final idx = entry.key;
         final slot = entry.value as NewSlot;
         saveStatusMessage =
-            'Uploading image ${newSlots.indexOf(entry) + 1}/${newSlots.length}â€¦';
+            'Uploading image ${newSlots.indexOf(entry) + 1}/${newSlots.length}…';
         notifyListeners();
 
-        final path = '$sellerId/$productId/edit_$idx.jpg';
+        final ext = productListingImageStorageExtension(
+          slot.image.name,
+          bytes: slot.image.bytes,
+        );
+        final path = '$sellerId/$productId/edit_${stamp}_$idx$ext';
         await _supabase.client.storage
             .from(productImagesBucket)
             .uploadBinary(
               path,
               slot.image.bytes,
-              fileOptions: FileOptions(contentType: 'image/jpeg'),
+              fileOptions: FileOptions(
+                contentType: productListingImageContentType(
+                  slot.image.name,
+                  bytes: slot.image.bytes,
+                ),
+                upsert: true,
+              ),
             );
         final url = _supabase.client.storage
             .from(productImagesBucket)
@@ -764,7 +840,7 @@ class EditListingController extends ChangeNotifier {
       }
 
       // 4. Re-index display_order for all existing images
-      saveStatusMessage = 'Finishing upâ€¦';
+      saveStatusMessage = 'Finishing up…';
       notifyListeners();
       for (int i = 0; i < slots.length; i++) {
         final slot = slots[i];
@@ -777,6 +853,7 @@ class EditListingController extends ChangeNotifier {
       }
 
       isSaving = false;
+      saveStatusMessage = '';
       notifyListeners();
 
       if (context.mounted) {
@@ -784,15 +861,34 @@ class EditListingController extends ChangeNotifier {
         context.pop();
       }
     } catch (e) {
+      debugPrint('EditListingController.saveChanges error: $e');
       isSaving = false;
+      saveStatusMessage = '';
       notifyListeners();
       if (context.mounted) {
-        showThriftSnackBar(context, 'Failed to save: $e', isError: true);
+        final shouldRetry = await showListingPublishErrorDialog(
+          context,
+          title: isLikelyNetworkError(e)
+              ? 'No internet connection'
+              : 'Couldn\'t save changes',
+          message: userFacingListingPublishError(
+            e,
+            fallback:
+                'We couldn\'t save your listing changes right now. Please try again.',
+          ),
+          icon: isLikelyNetworkError(e)
+              ? Icons.wifi_off_rounded
+              : Icons.error_outline_rounded,
+          canRetry: true,
+        );
+        if (shouldRetry && context.mounted) {
+          await saveChanges(context);
+        }
       }
     }
   }
 
-  // â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void dispose() {
@@ -810,7 +906,7 @@ class EditListingController extends ChangeNotifier {
     super.dispose();
   }
 
-  // â”€â”€ DB helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── DB helpers ─────────────────────────────────────────────────────────────
 
   ProductCondition _conditionFromDb(String s) =>
       ProductCondition.fromDbString(s);

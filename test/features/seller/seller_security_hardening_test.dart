@@ -7,6 +7,11 @@ void main() {
     test('order shipment select omits delivery_pin_hash', () {
       expect(kShipmentSelect, isNot(contains('delivery_pin_hash')));
     });
+
+    test('return shipment select omits return pickup pin secrets', () {
+      expect(kReturnShipmentSelect, isNot(contains('return_pin_hash')));
+      expect(kReturnShipmentSelect, isNot(contains('return_pin_secrets')));
+    });
   });
 
   group('SEL-003 product validation alignment', () {

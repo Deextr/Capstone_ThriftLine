@@ -14,7 +14,6 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../providers/notifications_provider.dart';
 import '../../../../widgets/delivery_timeline.dart';
 import '../../../../widgets/thrift_widgets.dart';
-import '../../../trust_safety/presentation/widgets/order_review_cta.dart';
 import '../../controllers/seller_orders_controller.dart';
 import '../../data/seller_order_buckets.dart';
 import '../../data/seller_order_tab_notifications.dart';
@@ -208,14 +207,6 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
             ),
             if (order.isCompleted) ...[
               const SizedBox(height: 16),
-              OrderReviewCta(
-                order: order,
-                existing: controller.reviewFor(order.id),
-                ratingBuyer: true,
-                onReturned: () => context.read<SellerOrdersController>().load(
-                  showSpinner: false,
-                ),
-              ),
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton(
@@ -236,6 +227,8 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
                   itemReturn: order.itemReturn!,
                   buyerView: false,
                   isBusy: controller.isUpdatingDelivery,
+                  returnPickupPin: controller.returnPickupPin,
+                  returnPinExpiresAt: controller.returnPinExpiresAt,
                   onArrange: () async {
                     await context.push(RouteNames.arrangeReturnFor(order.id));
                     if (!context.mounted) return;

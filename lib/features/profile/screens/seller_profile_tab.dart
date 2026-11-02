@@ -91,6 +91,11 @@ class SellerProfileTab extends StatelessWidget {
                 label: 'Settings',
                 onTap: () => context.push(RouteNames.settings),
               ),
+              _MenuItem(
+                icon: Icons.gavel_outlined,
+                label: 'Confirmed Violations',
+                onTap: () => context.push(RouteNames.confirmedViolations),
+              ),
             ],
           ),
 

@@ -467,14 +467,10 @@ class _BuyerBidsTabState extends State<BuyerBidsTab>
                             : _preparingCheckoutAuctionId == bid.auctionId
                             ? 'Preparing…'
                             : 'Pay now',
-                        onPressed: isExpired ||
-                                _preparingCheckoutAuctionId != null
+                        onPressed:
+                            isExpired || _preparingCheckoutAuctionId != null
                             ? null
-                            : () => _openAuctionPayment(
-                                context,
-                                bidsCtrl,
-                                bid,
-                              ),
+                            : () => _openAuctionPayment(context, bidsCtrl, bid),
                       ),
                   ],
                 ),

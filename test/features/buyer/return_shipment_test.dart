@@ -5,10 +5,10 @@ import 'package:thriftline/models/return_shipment.dart';
 void main() {
   group('return status copy', () {
     test('uses human labels', () {
-      expect(returnStatusLabel('waiting_for_rider'), 'Waiting for rider');
-      expect(returnStatusLabel('rider_assigned'), 'Rider assigned');
-      expect(returnStatusLabel('picked_up'), 'Picked up');
-      expect(returnStatusLabel('returned'), 'Returned');
+      expect(returnStatusLabel('waiting_for_rider'), 'Return required');
+      expect(returnStatusLabel('rider_assigned'), 'Pickup arranged');
+      expect(returnStatusLabel('picked_up'), 'Return in transit');
+      expect(returnStatusLabel('returned'), 'Return completed');
       expect(returnStatusLabel('not_required'), 'No return needed');
       expect(returnStatusLabel('waiting_for_rider'), isNot(contains('_')));
     });
@@ -68,8 +68,19 @@ void main() {
         'total_amount': 1100,
         'created_at': '2026-09-12T02:00:00Z',
       });
-      expect(order.isFailedCheckout, isTrue);
+      expect(order.isAbandonedCheckout, isTrue);
       expect(order.isTrackable, isFalse);
+    });
+
+    test('PIN handoff does not complete the return for the seller', () {
+      final assigned = ReturnShipment.fromSupabase({
+        'return_id': 'r1',
+        'return_required': true,
+        'status': 'rider_assigned',
+      });
+      expect(assigned.canHandOff, isTrue);
+      expect(assigned.canConfirmReceived, isFalse);
+      expect(assigned.status, isNot('returned'));
     });
 
     test('handoff is only allowed after a rider is assigned', () {

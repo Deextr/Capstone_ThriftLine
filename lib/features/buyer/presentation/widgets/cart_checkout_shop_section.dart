@@ -135,7 +135,8 @@ class CartCheckoutShopSection extends StatelessWidget {
                 item: shop.items[i],
                 mode: mode,
                 selected: mode == CartLineInteractionMode.cart
-                    ? (cartProvider?.isSelected(shop.items[i].product.id) ?? false)
+                    ? (cartProvider?.isSelected(shop.items[i].product.id) ??
+                          false)
                     : false,
                 isLast: i == shop.items.length - 1,
               ),

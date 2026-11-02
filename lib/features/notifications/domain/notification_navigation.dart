@@ -51,6 +51,7 @@ void openNotification(
     if (activeAccount == AccountMode.buyer &&
         (event == 'second_chance_offer' ||
             event == 'fallback_offer' ||
+            event == 'payment_due_1h' ||
             notification.type == NotificationType.wonBid)) {
       router.push(RouteNames.paymentForOrder(orderId));
       return;

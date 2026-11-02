@@ -65,6 +65,8 @@ class SellerOrdersController extends ChangeNotifier {
   bool _isLoading = true;
   bool _isUpdatingDelivery = false;
   String? _errorMessage;
+  String? _returnPickupPin;
+  DateTime? _returnPinExpiresAt;
   RealtimeChannel? _channel;
   AppLifecycleListener? _lifecycle;
   int _loadGeneration = 0;
@@ -77,6 +79,8 @@ class SellerOrdersController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isUpdatingDelivery => _isUpdatingDelivery;
   String? get errorMessage => _errorMessage;
+  String? get returnPickupPin => _returnPickupPin;
+  DateTime? get returnPinExpiresAt => _returnPinExpiresAt;
 
   /// Dashboard and nav badge: orders that need the seller to arrange delivery.
   int get pendingCount => countIn(SellerOrderBucket.toShip);
@@ -119,6 +123,7 @@ class SellerOrdersController extends ChangeNotifier {
         if (generation != _loadGeneration) return;
       }
       await _loadMyReviews(myId);
+      await _maybeLoadReturnPickupPin();
     } catch (e) {
       debugPrint('SellerOrdersController.load error: $e');
       if (generation == _loadGeneration) {
@@ -257,6 +262,38 @@ class SellerOrdersController extends ChangeNotifier {
     } finally {
       _isUpdatingDelivery = false;
       _notify();
+    }
+  }
+
+  Future<void> _maybeLoadReturnPickupPin() async {
+    final order = _order;
+    final itemReturn = order?.itemReturn;
+    if (order == null ||
+        itemReturn == null ||
+        itemReturn.status != 'rider_assigned') {
+      _returnPickupPin = null;
+      _returnPinExpiresAt = null;
+      return;
+    }
+    try {
+      final rpcRes = await _supabase.client.rpc(
+        'get_my_return_pin',
+        params: {'p_order_id': order.id},
+      );
+      if (supabaseRpcSuccess(rpcRes)) {
+        final map = supabaseRpcMap(rpcRes);
+        _returnPickupPin = map?['pin']?.toString();
+        _returnPinExpiresAt = DateTime.tryParse(
+          map?['expires_at']?.toString() ?? '',
+        );
+      } else {
+        _returnPickupPin = null;
+        _returnPinExpiresAt = null;
+      }
+    } catch (e) {
+      debugPrint('get_my_return_pin error: $e');
+      _returnPickupPin = null;
+      _returnPinExpiresAt = null;
     }
   }
 

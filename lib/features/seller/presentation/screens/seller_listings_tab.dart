@@ -10,6 +10,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/routes/route_names.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/supabase_errors.dart';
 import '../../../../core/utils/supabase_rpc.dart';
 import '../../../../models/order_model.dart';
 import '../../../../providers/auth_provider.dart';
@@ -331,7 +332,7 @@ class _SellerListingsTabState extends State<SellerListingsTab>
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = 'Failed to load listings: $e';
+          _error = userFacingSellerListingsLoadError(e);
         });
       }
     }

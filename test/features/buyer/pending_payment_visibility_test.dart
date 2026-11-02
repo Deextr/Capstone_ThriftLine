@@ -8,6 +8,7 @@ OrderModel _order({
   List<Map<String, dynamic>>? payments,
   String? auctionId,
   String orderType = 'fixed_price',
+  DateTime? createdAt,
 }) {
   return OrderModel.fromSupabase({
     'order_id': id,
@@ -22,7 +23,10 @@ OrderModel _order({
     'shipping_fee': 80,
     'platform_fee': 20,
     'total_amount': 1100,
-    'created_at': '2026-09-24T02:00:00Z',
+    'created_at':
+        (createdAt ?? DateTime.now().subtract(const Duration(minutes: 10)))
+            .toUtc()
+            .toIso8601String(),
   });
 }
 
@@ -35,14 +39,16 @@ void main() {
       expect(pending.isTrackable, isFalse);
     });
 
-    test('hides unpaid fixed-price checkouts from Awaiting Payment', () {
+    test('lists fixed-price pending checkouts for recovery', () {
       final pendingFixed = _order(id: 'pending', status: 'pending');
       expect(pendingFixed.needsBuyerPayment, isTrue);
-      expect(pendingFixed.showsAsAwaitingPayment, isFalse);
-      expect(buyerAwaitingPayment([pendingFixed]), isEmpty);
+      expect(pendingFixed.showsAsAwaitingPayment, isTrue);
+      expect(buyerPendingPayments([pendingFixed]).map((o) => o.id), [
+        'pending',
+      ]);
     });
 
-    test('lists only live auction wins for Awaiting Payment', () {
+    test('lists only live auction wins and fixed reservations for pending', () {
       final pendingAuction = _order(
         id: 'pending-auction',
         status: 'pending',
@@ -61,16 +67,22 @@ void main() {
           {'payment_status': 'expired'},
         ],
       );
+      final staleFixed = _order(
+        id: 'stale-fixed',
+        status: 'pending',
+        createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+      );
 
       expect(
-        buyerAwaitingPayment([
+        buyerPendingPayments([
           pendingAuction,
           pendingFixed,
           paid,
           voided,
           expired,
-        ]).map((o) => o.id),
-        ['pending-auction'],
+          staleFixed,
+        ]).map((o) => o.id).toSet(),
+        {'pending-auction', 'pending-fixed'},
       );
     });
   });

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/routes/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../widgets/thrift_widgets.dart';
 import '../../controllers/report_appeal_controller.dart';
@@ -15,6 +16,7 @@ class ReportAppealScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<ReportAppealController>();
+    final reportId = controller.reportId;
     final appeal = controller.appeal;
 
     return GestureDetector(
@@ -63,7 +65,20 @@ class ReportAppealScreen extends StatelessWidget {
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: () => context.push(
+                          RouteNames.confirmedViolationDetailFor(
+                            'community_report',
+                            reportId,
+                          ),
+                        ),
+                        child: const Text('View confirmed violation details'),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     if (appeal.underReview)
                       Text(
                         'This report is still under review.',

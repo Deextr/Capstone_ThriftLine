@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/data/financial_evidence_access.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/formatters.dart';
@@ -96,8 +98,7 @@ class _BuyerTransactionHistoryScreenState
                   hasScrollBody: false,
                   child: TransactionHistoryEmptyState(
                     title: 'No transactions yet',
-                    message:
-                        'Completed payments and refunds will appear here.',
+                    message: 'Completed payments and refunds will appear here.',
                   ),
                 )
               else ...[
@@ -210,8 +211,7 @@ String _emptyFilterMessage(BuyerTransactionHistoryController controller) {
     return 'No transactions for ${controller.dateFilterSummary}.';
   }
   return switch (controller.filter) {
-    BuyerTransactionFilter.successful =>
-      'No paid orders match this filter.',
+    BuyerTransactionFilter.successful => 'No paid orders match this filter.',
     BuyerTransactionFilter.refunded => 'No refunds yet.',
     BuyerTransactionFilter.all => 'No transactions to show.',
   };
@@ -335,6 +335,23 @@ class _TransactionDetailsSheet extends StatelessWidget {
               const SizedBox(height: 14),
               BuyerRefundStatusSection(transaction: transaction),
             ],
+            if (transaction.hasRefund) ...[
+              const SizedBox(height: 20),
+              TransactionFinancialProofSection(
+                title: 'REFUND PROOF',
+                emptyMessage: 'No refund proof available.',
+                loadSignedUrl: () {
+                  final escrowId = transaction.escrowId;
+                  if (escrowId == null || escrowId.isEmpty) {
+                    return Future.value(null);
+                  }
+                  return loadRefundProofSignedUrl(
+                    context.read<SupabaseService>(),
+                    escrowId,
+                  );
+                },
+              ),
+            ],
             const SizedBox(height: 20),
             const TransactionHistorySectionTitle(title: 'AMOUNT'),
             TransactionHistoryDetailRow(
@@ -356,9 +373,7 @@ class _TransactionDetailsSheet extends StatelessWidget {
             if (transaction.orderNumber.isNotEmpty)
               TransactionHistoryDetailRow(
                 label: 'Order ID',
-                value: formatTransactionOrderReference(
-                  transaction.orderNumber,
-                ),
+                value: formatTransactionOrderReference(transaction.orderNumber),
               ),
             if (transaction.paidAt != null)
               TransactionHistoryDetailRow(

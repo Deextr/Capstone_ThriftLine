@@ -23,6 +23,7 @@ class AccountPhoneVerificationSection extends StatefulWidget {
     this.sectionTitle = 'Phone number',
     this.intro,
     this.sendOtpButtonLabel = 'Verify',
+    this.lockVerifiedPhone = false,
   });
 
   final TextEditingController phoneController;
@@ -30,6 +31,10 @@ class AccountPhoneVerificationSection extends StatefulWidget {
   final String sectionTitle;
   final String? intro;
   final String sendOtpButtonLabel;
+
+  /// When true (Become a Seller), a verified number is read-only until re-verified
+  /// via OTP. Edit Profile leaves this false so users can tap Change.
+  final bool lockVerifiedPhone;
 
   @override
   State<AccountPhoneVerificationSection> createState() =>
@@ -185,7 +190,16 @@ class _AccountPhoneVerificationSectionState
                   ),
               ],
             ),
-            if (verified) ...[
+            if (verified && widget.lockVerifiedPhone) ...[
+              const SizedBox(height: 4),
+              Text(
+                'This number is verified and locked for seller registration.',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textHint,
+                  height: 1.35,
+                ),
+              ),
+            ] else if (verified) ...[
               const SizedBox(height: 4),
               Text(
                 'Tap Change to replace your verified number, or edit the field '
@@ -215,6 +229,10 @@ class _AccountPhoneVerificationSectionState
                     child: TextFormField(
                       focusNode: _phoneFocus,
                       controller: widget.phoneController,
+                      readOnly:
+                          widget.lockVerifiedPhone &&
+                          verified &&
+                          !changingVerified,
                       keyboardType: const TextInputType.numberWithOptions(
                         signed: false,
                         decimal: false,
@@ -262,6 +280,7 @@ class _AccountPhoneVerificationSectionState
                   const SizedBox(width: 10),
                   _PhoneVerifyTrailing(
                     verified: verified,
+                    allowChangeWhenVerified: !widget.lockVerifiedPhone,
                     isBusy: _otp.isBusy,
                     isSending: _otp.isSending,
                     onVerify: _startVerify,
@@ -351,6 +370,7 @@ class _AccountPhoneVerificationSectionState
 class _PhoneVerifyTrailing extends StatelessWidget {
   const _PhoneVerifyTrailing({
     required this.verified,
+    required this.allowChangeWhenVerified,
     required this.isBusy,
     required this.isSending,
     required this.onVerify,
@@ -359,6 +379,7 @@ class _PhoneVerifyTrailing extends StatelessWidget {
   });
 
   final bool verified;
+  final bool allowChangeWhenVerified;
   final bool isBusy;
   final bool isSending;
   final VoidCallback onVerify;
@@ -369,7 +390,7 @@ class _PhoneVerifyTrailing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (verified) {
+    if (verified && allowChangeWhenVerified) {
       return TextButton(
         onPressed: isBusy ? null : onChangeNumber,
         style: TextButton.styleFrom(
@@ -390,6 +411,10 @@ class _PhoneVerifyTrailing extends StatelessWidget {
           ),
         ),
       );
+    }
+
+    if (verified) {
+      return const SizedBox.shrink();
     }
 
     return TextButton(

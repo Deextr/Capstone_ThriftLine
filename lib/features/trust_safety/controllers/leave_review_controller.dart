@@ -63,14 +63,16 @@ class LeaveReviewController extends ChangeNotifier {
       _order != null && myId.isNotEmpty && _order!.sellerId == myId;
 
   bool get canSubmit {
-    if (_isSaving || _readOnly || _order == null) return false;
+    if (_isSaving || _readOnly || _order == null || isSellerReviewingBuyer) {
+      return false;
+    }
     return reviewRatingError(_rating) == null &&
         reviewCommentError(_comment) == null;
   }
 
   String get counterpartName {
     if (_order == null) return 'this member';
-    return isSellerReviewingBuyer ? _order!.buyerName : _order!.sellerName;
+    return _order!.sellerName;
   }
 
   Future<void> load() async {
@@ -94,6 +96,20 @@ class LeaveReviewController extends ChangeNotifier {
       if (!found.isCompleted) {
         _errorMessage = 'You can review only after this order is completed.';
         _order = found;
+        return;
+      }
+
+      if (uid == found.sellerId) {
+        _errorMessage = 'Only buyers can review sellers on ThriftLine.';
+        _order = found;
+        _readOnly = true;
+        return;
+      }
+
+      if (uid != found.buyerId) {
+        _errorMessage = 'You can only review sellers for orders you purchased.';
+        _order = found;
+        _readOnly = true;
         return;
       }
 
@@ -139,7 +155,7 @@ class LeaveReviewController extends ChangeNotifier {
   }
 
   Future<String?> addPhotoFromGallery() async {
-    if (_readOnly || isSellerReviewingBuyer) return null;
+    if (_readOnly) return null;
     try {
       final files = await _picker.pickMultiImage(imageQuality: 80);
       if (files.isEmpty) return null;
@@ -162,7 +178,7 @@ class LeaveReviewController extends ChangeNotifier {
   Future<String?> addPhotoFromCamera() => _addSinglePhoto(ImageSource.camera);
 
   Future<String?> _addSinglePhoto(ImageSource source) async {
-    if (_readOnly || isSellerReviewingBuyer) return null;
+    if (_readOnly) return null;
     if (existingPhotos.length + _photoDrafts.length >= kReviewPhotoMaxCount) {
       return 'You can attach up to $kReviewPhotoMaxCount photos.';
     }
@@ -213,6 +229,9 @@ class LeaveReviewController extends ChangeNotifier {
 
   Future<String?> submit() async {
     if (_order == null) return 'Order not found.';
+    if (isSellerReviewingBuyer) {
+      return 'Only buyers can review sellers on ThriftLine.';
+    }
     final ratingError = reviewRatingError(_rating);
     if (ratingError != null) return ratingError;
     final commentError = reviewCommentError(_comment);
@@ -268,7 +287,7 @@ class LeaveReviewController extends ChangeNotifier {
         }
       }
 
-      if (_photoDrafts.isNotEmpty && !isSellerReviewingBuyer) {
+      if (_photoDrafts.isNotEmpty) {
         final uploadError = await uploadReviewPhotos(
           supabase: _supabase,
           uid: uid,

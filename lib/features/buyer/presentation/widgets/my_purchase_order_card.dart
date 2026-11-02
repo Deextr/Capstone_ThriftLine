@@ -275,7 +275,7 @@ class MyPurchaseOrderCard extends StatelessWidget {
         ? buyerPurchaseCategory(order)
         : category;
     if (bucket == BuyerPurchaseCategory.completed && reviewActionKind != null) {
-      return reviewActionLabel(reviewActionKind!, ratingBuyer: false);
+      return reviewActionLabel(reviewActionKind!);
     }
     if (bucket == BuyerPurchaseCategory.toReceive) return 'Track delivery';
     if (category == BuyerPurchaseCategory.toPay) return 'Pay now';

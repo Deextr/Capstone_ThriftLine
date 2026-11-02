@@ -1,6 +1,7 @@
 import '../../../core/utils/fulfillment_sla.dart';
 import '../../../models/enums.dart';
 import '../../../models/order_model.dart';
+import '../../../models/return_shipment.dart';
 import '../../../widgets/thrift_widgets.dart';
 
 /// Seller workspace categories. These are display/filter buckets over the
@@ -70,12 +71,12 @@ SellerOrderBucket? sellerOrderBucketFor(OrderModel order) {
     if (!order.isAuctionObligation) return null;
     return SellerOrderBucket.pendingPayment;
   }
+  if (order.status == OrderStatus.cancelled || order.isRefundedSale) {
+    return SellerOrderBucket.cancelled;
+  }
   if (order.isToShip) return SellerOrderBucket.toShip;
   if (order.isShippedTab) return SellerOrderBucket.shipped;
   if (order.isCompleted) return SellerOrderBucket.completed;
-  if (order.status == OrderStatus.cancelled) {
-    return SellerOrderBucket.cancelled;
-  }
   return null;
 }
 
@@ -127,6 +128,16 @@ SellerOrderChipView sellerOrderChip(OrderModel order) {
     return const SellerOrderChipView('Completed', BadgeVariant.success);
   }
   if (bucket == SellerOrderBucket.cancelled) {
+    final itemReturn = order.itemReturn;
+    if (itemReturn != null && itemReturn.isOpen) {
+      return SellerOrderChipView(
+        returnStatusLabel(itemReturn.status),
+        BadgeVariant.warning,
+      );
+    }
+    if (order.isRefundedSale) {
+      return const SellerOrderChipView('Refunded', BadgeVariant.neutral);
+    }
     return const SellerOrderChipView('Cancelled', BadgeVariant.neutral);
   }
   if (order.isDisputed) {

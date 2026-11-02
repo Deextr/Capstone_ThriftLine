@@ -70,12 +70,7 @@ class _LookingForFilterSheetState extends State<LookingForFilterSheet> {
       min: 1500,
       max: 5000,
     ),
-    (
-      id: '5000_plus',
-      label: '${formatCurrency(5000)}+',
-      min: 5000,
-      max: null,
-    ),
+    (id: '5000_plus', label: '${formatCurrency(5000)}+', min: 5000, max: null),
   ];
 
   @override
@@ -217,8 +212,7 @@ class _LookingForFilterSheetState extends State<LookingForFilterSheet> {
                     _sectionTitle('More options'),
                     SwitchListTile(
                       value: _referenceImageOnly,
-                      onChanged: (v) =>
-                          setState(() => _referenceImageOnly = v),
+                      onChanged: (v) => setState(() => _referenceImageOnly = v),
                       title: const Text('Has reference photo'),
                       subtitle: const Text(
                         'Only requests that include an image',

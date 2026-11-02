@@ -86,11 +86,17 @@ import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/seller/presentation/screens/my_shop_screen.dart';
 import '../../features/trust_safety/controllers/buyer_to_rate_controller.dart';
 import '../../features/trust_safety/controllers/leave_review_controller.dart';
+import '../../features/trust_safety/controllers/my_looking_for_report_controller.dart';
+import '../../features/trust_safety/controllers/my_confirmed_violations_controller.dart';
 import '../../features/trust_safety/controllers/my_reports_controller.dart';
 import '../../features/trust_safety/controllers/report_appeal_controller.dart';
+import '../../features/trust_safety/data/confirmed_violations_service.dart';
 import '../../features/trust_safety/controllers/report_user_controller.dart';
 import '../../features/trust_safety/presentation/screens/buyer_to_rate_screen.dart';
 import '../../features/trust_safety/presentation/screens/leave_review_screen.dart';
+import '../../features/trust_safety/presentation/screens/my_looking_for_report_detail_screen.dart';
+import '../../features/trust_safety/presentation/screens/confirmed_violation_detail_screen.dart';
+import '../../features/trust_safety/presentation/screens/my_confirmed_violations_screen.dart';
 import '../../features/trust_safety/presentation/screens/my_reports_screen.dart';
 import '../../features/trust_safety/presentation/screens/report_appeal_screen.dart';
 import '../../features/trust_safety/presentation/screens/report_detail_screen.dart';
@@ -202,6 +208,12 @@ GoRouter createMobileAppRouter({
             isForgotPassword ||
             isResetPassword) {
           if (authProvider.isAdmin) return RouteNames.adminPortalRequired;
+          final resumeOrderId = paymongoReturn?.checkoutOrderId?.trim();
+          if (resumeOrderId != null &&
+              resumeOrderId.isNotEmpty &&
+              paymongoReturn?.peekLocation() == null) {
+            return RouteNames.paymentForOrder(resumeOrderId);
+          }
           return authProvider.homeRoute;
         }
         return authenticatedWorkspaceRedirect(
@@ -619,6 +631,17 @@ GoRouter createMobileAppRouter({
         ),
       ),
       GoRoute(
+        path: RouteNames.myLookingForReportDetail,
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => MyLookingForReportController(
+            supabase: context.read<SupabaseService>(),
+            auth: context.read<AuthProvider>(),
+            reportId: state.pathParameters['id']!,
+          ),
+          child: const MyLookingForReportDetailScreen(),
+        ),
+      ),
+      GoRoute(
         path: RouteNames.reportDetail,
         builder: (context, state) => ChangeNotifierProvider(
           create: (context) => MyReportsController(
@@ -637,6 +660,30 @@ GoRouter createMobileAppRouter({
             supabase: context.read<SupabaseService>(),
           ),
           child: const ReportAppealScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.confirmedViolations,
+        builder: (context, _) => ChangeNotifierProvider(
+          create: (context) => MyConfirmedViolationsController(
+            service: ConfirmedViolationsService(
+              context.read<SupabaseService>(),
+            ),
+          ),
+          child: const MyConfirmedViolationsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.confirmedViolationDetail,
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (context) => ConfirmedViolationDetailController(
+            service: ConfirmedViolationsService(
+              context.read<SupabaseService>(),
+            ),
+            source: state.pathParameters['source']!,
+            recordId: state.pathParameters['recordId']!,
+          ),
+          child: const ConfirmedViolationDetailScreen(),
         ),
       ),
       GoRoute(

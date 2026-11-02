@@ -282,7 +282,7 @@ class _PhotosSection extends StatelessWidget {
                   child: GestureDetector(
                     onTap: () => isFilled
                         ? _showOptions(context, index)
-                        : c.pickImage(index),
+                        : c.pickImage(index, context),
                     child: _SlotWidget(
                       index: index,
                       slot: isFilled ? c.slots[index] : null,
@@ -316,7 +316,7 @@ class _PhotosSection extends StatelessWidget {
             title: const Text('Replace'),
             onTap: () {
               Navigator.pop(context);
-              c.replaceImage(index);
+              c.replaceImage(index, context);
             },
           ),
           ListTile(

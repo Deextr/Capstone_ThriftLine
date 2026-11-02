@@ -170,7 +170,8 @@ class BuyerOrdersController extends ChangeNotifier {
     try {
       unawaited(_completeExpiredInspections());
       if (orderId == null) {
-        await restoreAbandonedFixedPriceCheckouts(_supabase);
+        // Do not restore/void abandoned checkouts here — that can cancel an
+        // open PayMongo session the buyer is still paying (see order_query.dart).
         await syncMyUnpaidCheckouts(_supabase);
       }
       if (generation != _loadGeneration) return;
@@ -827,7 +828,7 @@ class BuyerOrdersController extends ChangeNotifier {
     }
   }
 
-  Future<String?> confirmReturnHandedOff() async {
+  Future<String?> verifyReturnPickupPin(String pin) async {
     final id = orderId ?? _order?.id;
     if (id == null) return 'Order not found.';
     if (_isUpdatingDelivery) return null;
@@ -835,20 +836,20 @@ class BuyerOrdersController extends ChangeNotifier {
     _notify();
     try {
       final rpcRes = await _supabase.client.rpc(
-        'confirm_return_handed_off',
-        params: {'p_order_id': id},
+        'verify_return_pickup_pin',
+        params: {'p_order_id': id, 'p_pickup_pin': pin.trim()},
       );
       if (!supabaseRpcSuccess(rpcRes)) {
         return supabaseRpcError(
           rpcRes,
-          fallback: 'Could not record the handoff.',
+          fallback: 'Could not verify the pickup PIN.',
         );
       }
       await load(showSpinner: false);
       return null;
     } catch (e) {
-      debugPrint('confirm_return_handed_off error: $e');
-      return 'Could not record the handoff.';
+      debugPrint('verify_return_pickup_pin error: $e');
+      return 'Could not verify the pickup PIN.';
     } finally {
       _isUpdatingDelivery = false;
       _notify();

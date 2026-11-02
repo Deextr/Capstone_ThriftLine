@@ -48,10 +48,7 @@ class CheckoutScreen extends StatelessWidget {
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: Icon(
-              Icons.arrow_back_rounded,
-              color: AppColors.textPrimary,
-            ),
+            icon: Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
             onPressed: () => _handleBack(context),
           ),
           title: Column(
@@ -553,51 +550,50 @@ class _CheckoutBottomBar extends StatelessWidget {
               ElevatedButton(
                 onPressed:
                     blocked ||
-                            checkout.isLoading ||
-                            checkout.isSubmitting ||
-                            checkout.isContinuingToPayment
-                        ? null
-                        : () async {
-                            final leftoverCount = context
-                                .read<CheckoutController>()
-                                .remainingOtherSellerCount;
-                            final result = await context
-                                .read<CheckoutController>()
-                                .continueToPayment();
-                            if (!context.mounted) return;
-                            if (result.error != null) {
-                              showThriftSnackBar(
-                                context,
-                                result.error!,
-                                isError: true,
-                              );
-                              return;
-                            }
-                            if (leftoverCount > 0) {
-                              showThriftSnackBar(
-                                context,
-                                'Other cart items are still in your cart.',
-                              );
-                            }
-                            final checkoutCtrl =
-                                context.read<CheckoutController>();
-                            final buyNow = checkoutCtrl.isBuyNowCheckout;
-                            final paymongoReturn =
-                                context.read<PaymongoReturnCoordinator>();
-                            paymongoReturn.clear();
-                            paymongoReturn.clearCheckoutOpened();
-                            context.go(
-                              RouteNames.paymentForOrder(
-                                result.orderId!,
-                                checkoutSource: buyNow
-                                    ? CheckoutOrigin.buyNow.routeValue
-                                    : CheckoutOrigin.cart.routeValue,
-                                productId: buyNow
-                                    ? checkoutCtrl.scopedProductId
-                                    : null,
-                              ),
-                            );
-                          },
+                        checkout.isLoading ||
+                        checkout.isSubmitting ||
+                        checkout.isContinuingToPayment
+                    ? null
+                    : () async {
+                        final leftoverCount = context
+                            .read<CheckoutController>()
+                            .remainingOtherSellerCount;
+                        final result = await context
+                            .read<CheckoutController>()
+                            .continueToPayment();
+                        if (!context.mounted) return;
+                        if (result.error != null) {
+                          showThriftSnackBar(
+                            context,
+                            result.error!,
+                            isError: true,
+                          );
+                          return;
+                        }
+                        if (leftoverCount > 0) {
+                          showThriftSnackBar(
+                            context,
+                            'Other cart items are still in your cart.',
+                          );
+                        }
+                        final checkoutCtrl = context.read<CheckoutController>();
+                        final buyNow = checkoutCtrl.isBuyNowCheckout;
+                        final paymongoReturn = context
+                            .read<PaymongoReturnCoordinator>();
+                        paymongoReturn.clear();
+                        paymongoReturn.clearCheckoutOpened();
+                        context.go(
+                          RouteNames.paymentForOrder(
+                            result.orderId!,
+                            checkoutSource: buyNow
+                                ? CheckoutOrigin.buyNow.routeValue
+                                : CheckoutOrigin.cart.routeValue,
+                            productId: buyNow
+                                ? checkoutCtrl.scopedProductId
+                                : null,
+                          ),
+                        );
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,

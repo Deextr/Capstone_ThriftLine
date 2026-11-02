@@ -751,6 +751,9 @@ class SelfieCaptureGuide {
   static const Duration liveAnalyzeInterval = Duration(milliseconds: 160);
   static const Duration autoCaptureHold = Duration(milliseconds: 900);
 
+  /// Short frame glow after [autoCaptureHold] before `takePicture()`.
+  static const Duration preCaptureGlowDuration = Duration(milliseconds: 520);
+
   /// Face must stay uncovered and front-facing this long before Face completes.
   static const Duration challengeFaceHold = Duration(milliseconds: 800);
 
